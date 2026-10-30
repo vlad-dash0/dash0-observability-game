@@ -298,3 +298,45 @@ test('checkConfig: empty attribute values are set but empty, reported as -wrong'
   assert.deepEqual(codes(env), ['environment-wrong']);
   assert.match(env.issues[0].message, /empty/);
 });
+
+// Review round 2 (#14)
+
+test('checkConfig: OTEL_SERVICE_NAME shadowing a different RA service.name is service-name-conflict', () => {
+  const both = (ra) =>
+    checkConfig(
+      `OTEL_SERVICE_NAME=checkout\nOTEL_RESOURCE_ATTRIBUTES=service.name=${ra},service.version=1,deployment.environment.name=production`,
+      WANT,
+    );
+  const r = both('cart');
+  assert.deepEqual(codes(r), ['service-name-conflict']);
+  assert.match(r.issues[0].message, /service\.name=cart in OTEL_RESOURCE_ATTRIBUTES is ignored because OTEL_SERVICE_NAME is set/);
+  assert.deepEqual(both('checkout'), { ok: true, issues: [] }, 'the same name in both is fine');
+  const empty = checkConfig(
+    'OTEL_SERVICE_NAME=\nOTEL_RESOURCE_ATTRIBUTES=service.name=cart,service.version=1,deployment.environment.name=production',
+    WANT,
+  );
+  assert.deepEqual(codes(empty), ['service-name-wrong'], 'an empty OTEL_SERVICE_NAME shadows nothing');
+});
+
+test('checkConfig: OTEL_SDK_DISABLED=true (any case, trimmed) is sdk-disabled', () => {
+  for (const v of ['true', 'TRUE', '" True "']) {
+    const r = checkConfig(`${GOOD}\nOTEL_SDK_DISABLED=${v}`, WANT);
+    assert.deepEqual(codes(r), ['sdk-disabled'], v);
+    assert.equal(r.issues[0].message, 'OTEL_SDK_DISABLED=true turns the SDK off: nothing is reported.');
+  }
+  for (const v of ['false', '', 'yes']) {
+    assert.deepEqual(checkConfig(`${GOOD}\nOTEL_SDK_DISABLED=${v}`, WANT), { ok: true, issues: [] }, v);
+  }
+});
+
+test('a resource attribute key or value over 255 characters discards the whole variable', () => {
+  const ok = effectiveResource({ OTEL_RESOURCE_ATTRIBUTES: `service.name=cart,a=${'v'.repeat(255)}` }, NODE);
+  assert.equal(ok.attributes['service.name'], 'cart');
+  assert.deepEqual(ok.errors, []);
+  for (const bad of [`service.name=cart,a=${'v'.repeat(256)}`, `service.name=cart,${'k'.repeat(256)}=v`]) {
+    const r = effectiveResource({ OTEL_RESOURCE_ATTRIBUTES: bad }, NODE);
+    assert.equal(r.attributes['service.name'], 'unknown_service:node');
+    assert.equal(r.errors.length, 1);
+    assert.match(r.errors[0].message, /255/);
+  }
+});

@@ -23,13 +23,13 @@ const SHOWS_UP_AS = [
   {
     key: 'name',
     label: '<code>checkout</code>',
-    why: 'Nothing in this config says checkout. The SDK does not guess a name from the repository, the image or the host.',
+    why: 'Nothing in this config says checkout, and nothing here lets the SDK work it out: it does not read the repository, the image or the host name. (A few cloud detectors, such as Azure App Service\'s, do fill in <code>service.name</code>.)',
   },
   {
     key: 'fallback',
     label: '<code>unknown_service:node</code>',
     right: true,
-    why: 'With no <code>OTEL_SERVICE_NAME</code> and no <code>service.name</code> in <code>OTEL_RESOURCE_ATTRIBUTES</code>, the SDK falls back to <code>unknown_service:&lt;executable&gt;</code>. For Node that is <code>unknown_service:node</code>, the same name every other unnamed Node service gets.',
+    why: 'With no <code>OTEL_SERVICE_NAME</code> and no <code>service.name</code> in <code>OTEL_RESOURCE_ATTRIBUTES</code>, the SDK falls back to <code>unknown_service:&lt;executable&gt;</code>. For a process started as <code>node</code>, that is <code>unknown_service:node</code>, the same name every other unnamed service started that way gets.',
   },
   {
     key: 'bare',
@@ -89,38 +89,45 @@ export default {
       fb().innerHTML = html;
     };
 
-    // Wire a multiple-choice question: a wrong pick is a mistake and stays marked;
-    // the right pick locks the question and calls onRight.
+    // Wire a multiple-choice question: a wrong pick is a mistake, stays marked and
+    // passes focus to the next enabled choice (wrapping), else to the feedback; the
+    // right pick locks the question and focuses what onRight returns (Next or Finish).
     const ask = (choices, onRight) => {
-      for (const b of body.querySelectorAll('[data-pick]')) {
+      const buttons = [...body.querySelectorAll('[data-pick]')];
+      buttons.forEach((b, i) => {
         const c = choices.find((x) => x.key === b.dataset.pick);
         b.onclick = () => {
           if (c.right) {
             b.classList.add('correct');
-            for (const x of body.querySelectorAll('[data-pick]')) x.disabled = true;
+            for (const x of buttons) x.disabled = true;
             say('good', `Right. ${c.why}`);
-            onRight();
+            onRight().focus();
           } else {
             ctx.mistake();
             b.classList.add('wrong');
             b.disabled = true;
             say('info', `Not quite. ${c.why}`);
+            const rest = [...buttons.slice(i + 1), ...buttons.slice(0, i)];
+            (rest.find((x) => !x.disabled) ?? fb()).focus();
           }
         };
-      }
+      });
+      buttons[0].focus();
     };
     const choiceButtons = (choices) =>
       ctx
         .shuffle(choices)
         .map((c) => `<button class="choice" data-pick="${c.key}">${c.label}</button>`)
         .join('');
-    const feedbackBox = '<div class="feedback" id="nys-feedback" role="status" aria-live="polite"></div>';
+    const feedbackBox =
+      '<div class="feedback" id="nys-feedback" role="status" aria-live="polite" tabindex="-1"></div>';
 
     const stepShowsUpAs = () => {
       ctx.renderStep(
         `<div class="lesson-intro">${ctx.speech(
           'Your first ticket: checkout went live last week and nobody can find its traces. ' +
-            'Here is the whole environment its Node process starts with.',
+            'Its code sets no service name and it runs on a plain Linux VM, so this environment ' +
+            'is all its SDK has to go on. The process is started as <code>node</code>.',
         )}</div>
         <div class="lesson-stage">
           <pre id="nys-config"><code>${GIVEN_ENV}</code></pre>
@@ -133,6 +140,7 @@ export default {
       const next = actions.querySelector('#nys-next');
       ask(SHOWS_UP_AS, () => {
         next.disabled = false;
+        return next;
       });
       next.onclick = stepFix;
     };
@@ -164,9 +172,12 @@ export default {
       const check = body.querySelector('#nys-check');
       const hint = body.querySelector('#nys-hint');
       const next = actions.querySelector('#nys-next');
+      let lastFailed = null;
+      input.focus();
       hint.onclick = () => {
         ctx.hint();
         hint.disabled = true;
+        input.focus();
         const box = body.querySelector('#nys-hint-text');
         box.classList.add('show');
         box.innerHTML =
@@ -178,9 +189,13 @@ export default {
         const text = input.value;
         const result = checkConfig(text, TARGET, PROCESS);
         if (!result.ok) {
-          ctx.mistake();
-          const n = result.issues.length;
-          say('info', `Not yet: ${plural(n, 'problem', 'problems')}.${renderIssues(result.issues, ctx.escapeHtml)}`);
+          // Only a new failing config costs a mistake; re-checking the same text does not.
+          const same = text === lastFailed;
+          if (!same) ctx.mistake();
+          lastFailed = text;
+          const n = plural(result.issues.length, 'problem', 'problems');
+          const lead = same ? `Same config as last time: ${n}.` : `Not yet: ${n}.`;
+          say('info', `${lead}${renderIssues(result.issues, ctx.escapeHtml)}`);
           return;
         }
         const attrs = effectiveResource(parseEnv(text).vars, PROCESS).attributes;
@@ -191,10 +206,11 @@ export default {
             `<code>service.version</code> ${e(attrs['service.version'])} and ` +
             `<code>deployment.environment.name</code> ${e(attrs['deployment.environment.name'])}.`,
         );
-        input.disabled = true;
+        input.readOnly = true;
         check.disabled = true;
         hint.disabled = true;
         next.disabled = false;
+        next.focus();
       };
       next.onclick = stepWhoWins;
     };
@@ -216,6 +232,7 @@ export default {
       const finish = actions.querySelector('#nys-finish');
       ask(WHO_WINS, () => {
         finish.disabled = false;
+        return finish;
       });
       finish.onclick = () =>
         ctx.finish({
