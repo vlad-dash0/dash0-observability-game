@@ -158,28 +158,57 @@ test('index.html links the SVG favicon, so browsers do not probe /favicon.ico', 
   assert.equal(icons[0].getAttribute('type'), 'image/svg+xml');
 });
 
+/**
+ * Why `svg` is unsafe as a favicon under the CSP, as messages ([] when it is fine).
+ * Animation (SMIL) and xml-stylesheet are out because they can rewrite attributes or
+ * pull in a sheet after the static checks have passed.
+ */
+function faviconProblems(svg) {
+  const out = [];
+  const { document: icon } = parseHTML(`<!DOCTYPE html><html><body>${svg}</body></html>`);
+  const root = icon.body.firstElementChild;
+  if (root?.localName !== 'svg') return ['favicon.svg must have an <svg> root'];
+  if (root.getAttribute('xmlns') !== 'http://www.w3.org/2000/svg') out.push('<svg> needs the SVG xmlns');
+  if (!root.hasAttribute('viewBox')) out.push('favicon.svg needs a viewBox to scale');
+  if (/<\s*(style|script|foreignObject)\b/i.test(svg)) out.push('no <style>, <script> or <foreignObject>');
+  if (/<\s*(set|animate\w*)\b/i.test(svg)) out.push('no SMIL <set> or <animate*>');
+  if (/<\?\s*xml-stylesheet\b/i.test(svg)) out.push('no <?xml-stylesheet?>');
+  for (const el of [root, ...root.querySelectorAll('*')]) {
+    for (const name of el.getAttributeNames()) {
+      const n = name.toLowerCase();
+      if (n === 'style') out.push(`<${el.localName} style> is blocked by style-src 'self'`);
+      if (n.startsWith('on')) out.push(`<${el.localName} ${name}> is an inline handler`);
+      if ((n === 'href' || n === 'xlink:href') && !el.getAttribute(name).startsWith('#')) {
+        out.push(`<${el.localName} ${name}> must be a #fragment`);
+      }
+    }
+  }
+  if (/@import|url\(\s*['"]?(?!#)/i.test(svg)) out.push('no external url() or @import');
+  return out;
+}
+
+test('the favicon checker flags each unsafe construct', () => {
+  const svg = (inner, pre = '') => `${pre}<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1">${inner}</svg>`;
+  assert.deepEqual(faviconProblems(svg('<rect fill="#000"/><use href="#a"/>')), []);
+  assert.deepEqual(faviconProblems(svg('<rect style="fill:red"/>')), ["<rect style> is blocked by style-src 'self'"]);
+  assert.deepEqual(faviconProblems(svg('<style>rect{}</style>')), ['no <style>, <script> or <foreignObject>']);
+  assert.deepEqual(faviconProblems(svg('<image href="data:image/png;base64,AA"/>')), ['<image href> must be a #fragment']);
+  assert.deepEqual(faviconProblems(svg('<a><set attributeName="href" to="https://x.test/"/></a>')),
+    ['no SMIL <set> or <animate*>']);
+  for (const tag of ['animate', 'animateTransform', 'animateMotion']) {
+    assert.deepEqual(faviconProblems(svg(`<rect><${tag} attributeName="x" to="1"/></rect>`)),
+      ['no SMIL <set> or <animate*>'], tag);
+  }
+  assert.deepEqual(faviconProblems(svg('<rect/>', '<?xml-stylesheet href="https://x.test/a.css"?>\n')),
+    ['no <?xml-stylesheet?>']);
+});
+
 test('favicon.svg is a small, deployed, CSP-safe SVG', () => {
   assert.ok(isFile(join(ROOT, 'favicon.svg')), 'favicon.svg does not exist');
   assert.equal(ignoreMatcher(read('.vercelignore'))('favicon.svg'), false, 'favicon.svg is not deployed');
   const svg = read('favicon.svg');
   assert.ok(svg.length < 1024, `favicon.svg is ${svg.length} bytes; keep it under 1 KB`);
-  const { document: icon } = parseHTML(`<!DOCTYPE html><html><body>${svg}</body></html>`);
-  const root = icon.body.firstElementChild;
-  assert.equal(root?.localName, 'svg', 'favicon.svg must have an <svg> root');
-  assert.equal(root.getAttribute('xmlns'), 'http://www.w3.org/2000/svg');
-  assert.ok(root.hasAttribute('viewBox'), 'favicon.svg needs a viewBox to scale');
-  assert.ok(!/<\s*(style|script|foreignObject)\b/i.test(svg), 'no <style>, <script> or <foreignObject>');
-  for (const el of [root, ...root.querySelectorAll('*')]) {
-    for (const name of el.getAttributeNames()) {
-      const n = name.toLowerCase();
-      assert.notEqual(n, 'style', `<${el.localName} style> is blocked by style-src 'self'`);
-      assert.ok(!n.startsWith('on'), `<${el.localName} ${name}> is an inline handler`);
-      if (n === 'href' || n === 'xlink:href') {
-        assert.ok(el.getAttribute(name).startsWith('#'), `<${el.localName} ${name}> must not reference a file`);
-      }
-    }
-  }
-  assert.ok(!/@import|url\(\s*['"]?(?!#)/i.test(svg), 'no external url() or @import');
+  assert.deepEqual(faviconProblems(svg), []);
 });
 
 // ---- local references in CSS and JS -----------------------------------------------
