@@ -51,3 +51,4 @@ package files out (keep its lines to the forms `tools/serve.mjs` parses).
 ## Git
 - One branch per issue, PR to `main`, conventional-commit titles (`feat: ... (#N)`).
 - No AI-attribution trailers (`Co-Authored-By`, "Generated with") in commits or PRs.
+- Merge gate: `All checks` green and `node tools/pr-findings.mjs <PR>` exits 0 (review comment formats: `.github/pull_request_template.md`).
