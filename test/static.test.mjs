@@ -102,24 +102,42 @@ test('vercel.json keeps the hardening headers and the vendor cache rule', () => 
   assert.equal(h['X-Frame-Options'], 'DENY');
   assert.equal(h['X-Content-Type-Options'], 'nosniff');
   assert.equal(h['Referrer-Policy'], 'no-referrer');
-  assert.equal(h['Permissions-Policy'], 'camera=(), microphone=(), geolocation=()');
+  assert.equal(
+    h['Permissions-Policy'],
+    'camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()',
+  );
   assert.equal(headerRule('/vendor/(.*)')['Cache-Control'], 'public, max-age=31536000, immutable');
   assert.equal(headerRule('/fonts/(.*)')['Cache-Control'], 'public, max-age=31536000, immutable');
   assert.equal(vercel.functions, undefined, 'no serverless functions yet');
 });
 
-// Features every target browser recognises; anything else (a retired name such as
-// browsing-topics, or a typo) makes Chrome log an "Unrecognized feature" error (#37).
-const PERMISSIONS_POLICY_FEATURES = ['camera', 'microphone', 'geolocation'];
+// The reviewed set: a feature joins only after a check that Chrome does not flag it as
+// unrecognised (#37: the retired browsing-topics did). This test pins the header to that
+// set, so a new name or a typo needs a deliberate edit here; it does not itself verify
+// what any browser recognises.
+const PERMISSIONS_POLICY_FEATURES = ['camera', 'microphone', 'geolocation', 'payment', 'usb', 'display-capture'];
 
-test('Permissions-Policy names only known features, each denied', () => {
-  const entries = headerRule('/(.*)')['Permissions-Policy'].split(',').map((e) => e.trim());
-  for (const entry of entries) {
-    const m = /^([a-z-]+)=\(\)$/.exec(entry);
+// Feature names of a Permissions-Policy value, each of which must deny all origins:
+// `feature=()`, optionally with whitespace inside the empty list (RFC 8941).
+function deniedFeatures(value) {
+  return value.split(',').map((e) => e.trim()).map((entry) => {
+    const m = /^([a-z-]+)=\(\s*\)$/.exec(entry);
     assert.ok(m, `Permissions-Policy entry "${entry}" is not of the form feature=()`);
-    assert.ok(PERMISSIONS_POLICY_FEATURES.includes(m[1]), `unknown Permissions-Policy feature "${m[1]}"`);
+    return m[1];
+  });
+}
+
+test('Permissions-Policy names only reviewed features, each denied', () => {
+  const names = deniedFeatures(headerRule('/(.*)')['Permissions-Policy']);
+  for (const name of names) {
+    assert.ok(PERMISSIONS_POLICY_FEATURES.includes(name), `unreviewed Permissions-Policy feature "${name}"`);
   }
-  assert.deepEqual(entries.map((e) => e.split('=')[0]).sort(), [...PERMISSIONS_POLICY_FEATURES].sort());
+  assert.deepEqual([...names].sort(), [...PERMISSIONS_POLICY_FEATURES].sort());
+});
+
+test('a denied feature may have whitespace inside its empty list, but nothing else', () => {
+  assert.deepEqual(deniedFeatures('camera=( ), usb=()'), ['camera', 'usb']);
+  assert.throws(() => deniedFeatures('camera=(self)'), /not of the form feature=\(\)/);
 });
 
 test('the dev server sends the vercel.json headers', () => {
