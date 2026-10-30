@@ -430,7 +430,7 @@ test('unquotable values (BigInt, circular, Symbol) are reported, not thrown', ()
     [(a) => (a[0].levels[0].lights = [circ]), 'level "x": unknown node [object Object]'],
     [(a) => (a[0].levels[0].no = circ), 'level "x": no [object Object]'],
     [(a) => (a[0].id = Symbol('a0')), 'invalid act id [object Symbol]'],
-    [(a) => (a[0].no = Symbol('n')), 'act "a0": no must be an integer >= 0'],
+    [(a) => (a[0].no = Symbol('n')), 'act "a0": no must be an integer from 0 to'],
     [(a) => (a[0].levels[0].id = 7n), 'act "a0": invalid level id [object BigInt]'],
   ];
   for (const [edit, fragment] of cases) rejects(withEdit(edit), fragment);
@@ -454,6 +454,59 @@ test('bad options are reported, not thrown', () => {
   });
   assert.throws(() => buildRegistry([], null), RegistryError);
   assert.throws(() => buildRegistry([], { deck: [], nodeIds: 5 }), RegistryError);
+});
+
+test('cardIds and nodeIds entries must be ids; a caller object is never frozen', () => {
+  const node = { id: 'n2' };
+  assert.deepEqual(validateRegistry([], { nodeIds: ['n1', node], cardIds: ['c1', 7] }).errors, [
+    'cardIds: invalid id 7',
+    'nodeIds: invalid id {"id":"n2"}',
+  ]);
+  const acts = withEdit((a) => (a[0].levels[0].lights = [node]));
+  assert.throws(() => buildRegistry(acts, { deck: DECK, nodeIds: ['n1', node] }), RegistryError);
+  assert.equal(Object.isFrozen(node), false);
+});
+
+test('act numbers must be safe integers; no strings are compared as numbers', () => {
+  rejects(
+    withEdit((a) => {
+      a[1].no = 1e21;
+      a[1].levels[0].no = '1eee21.1';
+    }),
+    'act "a1": no must be an integer from 0 to 9007199254740991',
+  );
+  rejects(
+    withEdit((a) => (a[1].levels[0].no = '1.1.1')),
+    'level "z": no "1.1.1" must be "1.<n>"',
+  );
+});
+
+test('a throwing getter is reported as unreadable, never thrown', () => {
+  const trap = (obj, key) =>
+    Object.defineProperty(obj, key, {
+      enumerable: true,
+      get() {
+        throw new Error('trap');
+      },
+    });
+  rejects(
+    withEdit((a) => trap(a[0].levels[1], 'name')),
+    'act "a0": level 1 could not be read',
+  );
+  rejects(
+    withEdit((a) => trap(a[1], 'levels')),
+    'act 1 could not be read',
+  );
+  const deck = [card('c1')];
+  trap(deck[0], 'back');
+  assert.deepEqual(validateDeck(deck).errors, ['deck card 0 could not be read']);
+});
+
+test('short unknown keys get no hint', () => {
+  for (const key of ['', 'x', 'ui']) {
+    const { errors } = validateRegistry(withEdit((a) => (a[0].levels[0][key] = 1)), REFS);
+    assert.deepEqual(errors, [`unknown key "${key}" on level "x"`]);
+  }
 });
 
 test('validateRegistry never throws, even on garbage', () => {

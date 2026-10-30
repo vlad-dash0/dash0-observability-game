@@ -40,7 +40,7 @@ default with an explicit light toggle; star rule as §2.6; Martian Mono self-hos
 | field | type | default | rule |
 |---|---|---|---|
 | id | string | required | `^[a-z0-9]+(-[a-z0-9]+)*$`, ≤64 chars, unique, never renamed |
-| no | string \| null | required | non-boss `^<act.no>\.\d+$`, increasing within the act; boss `null` |
+| no | string \| null | required | non-boss `^<act.no>\.[1-9]\d*$` (levels number from 1, no leading zeros), increasing within the act; boss `null` |
 | name | string | required | non-empty |
 | sub | string | `''` | |
 | icon | string | required | non-empty |
