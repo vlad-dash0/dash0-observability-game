@@ -3,6 +3,7 @@
 // level 1.2 checker (lib/widgets/env-config.mjs), then answers which name wins when
 // OTEL_SERVICE_NAME and service.name in OTEL_RESOURCE_ATTRIBUTES disagree.
 // Spec: docs/FOUNDATION.md §5 and §6 F6. Player text reaches HTML only via escapeHtml.
+import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { checkConfig, effectiveResource, parseEnv, renderIssues } from '../lib/widgets/env-config.mjs';
 
 const TARGET = { serviceName: 'checkout', environment: 'production' };
@@ -89,36 +90,7 @@ export default {
       fb().innerHTML = html;
     };
 
-    // Wire a multiple-choice question: a wrong pick is a mistake, stays marked and
-    // passes focus to the next enabled choice (wrapping), else to the feedback; the
-    // right pick locks the question and focuses what onRight returns (Next or Finish).
-    const ask = (choices, onRight) => {
-      const buttons = [...body.querySelectorAll('[data-pick]')];
-      buttons.forEach((b, i) => {
-        const c = choices.find((x) => x.key === b.dataset.pick);
-        b.onclick = () => {
-          if (c.right) {
-            b.classList.add('correct');
-            for (const x of buttons) x.disabled = true;
-            say('good', `Right. ${c.why}`);
-            onRight().focus();
-          } else {
-            ctx.mistake();
-            b.classList.add('wrong');
-            b.disabled = true;
-            say('info', `Not quite. ${c.why}`);
-            const rest = [...buttons.slice(i + 1), ...buttons.slice(0, i)];
-            (rest.find((x) => !x.disabled) ?? fb()).focus();
-          }
-        };
-      });
-      buttons[0].focus();
-    };
-    const choiceButtons = (choices) =>
-      ctx
-        .shuffle(choices)
-        .map((c) => `<button class="choice" data-pick="${c.key}">${c.label}</button>`)
-        .join('');
+    // Step 2's check feedback; the choice steps get theirs from choiceHtml (same id).
     const feedbackBox =
       '<div class="feedback" id="nys-feedback" role="status" aria-live="polite" tabindex="-1"></div>';
 
@@ -131,16 +103,18 @@ export default {
         )}</div>
         <div class="lesson-stage">
           <pre id="nys-config"><code>${GIVEN_ENV}</code></pre>
-          <h3 class="q">What service name does its telemetry show up under?</h3>
-          <div class="choices">${choiceButtons(SHOWS_UP_AS)}</div>
-          ${feedbackBox}
+          <h3 class="q" id="nys-q-name">What service name does its telemetry show up under?</h3>
+          ${choiceHtml(ctx, SHOWS_UP_AS, { id: 'nys', labelledBy: 'nys-q-name' })}
         </div>`,
         '<button class="btn" id="nys-next" disabled>Next</button>',
       );
       const next = actions.querySelector('#nys-next');
-      ask(SHOWS_UP_AS, () => {
-        next.disabled = false;
-        return next;
+      mountChoice(ctx, SHOWS_UP_AS, {
+        id: 'nys',
+        onRight: () => {
+          next.disabled = false;
+          return next;
+        },
       });
       next.onclick = stepFix;
     };
@@ -223,16 +197,18 @@ export default {
         )}</div>
         <div class="lesson-stage">
           <pre><code>${CLASH_ENV}</code></pre>
-          <h3 class="q">Which service name does the SDK report?</h3>
-          <div class="choices">${choiceButtons(WHO_WINS)}</div>
-          ${feedbackBox}
+          <h3 class="q" id="nys-q-wins">Which service name does the SDK report?</h3>
+          ${choiceHtml(ctx, WHO_WINS, { id: 'nys', labelledBy: 'nys-q-wins' })}
         </div>`,
         '<button class="btn" id="nys-finish" data-finish disabled>Finish</button>',
       );
       const finish = actions.querySelector('#nys-finish');
-      ask(WHO_WINS, () => {
-        finish.disabled = false;
-        return finish;
+      mountChoice(ctx, WHO_WINS, {
+        id: 'nys',
+        onRight: () => {
+          finish.disabled = false;
+          return finish;
+        },
       });
       finish.onclick = () =>
         ctx.finish({
