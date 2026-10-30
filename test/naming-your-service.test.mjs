@@ -68,7 +68,7 @@ test('player config is echoed only escaped', () => {
   toEditor();
   q('#nys-env').value = GOOD.replace('=checkout', '=<img src=x onerror=alert(1)>');
   click('#nys-check');
-  assert.equal(q('#nys-feedback img'), null, 'player markup became an element');
+  assert.equal(q('#nys-feedback img') === null, true, 'player markup became an element');
   assert.match(feedback(), /<img src=x onerror=alert\(1\)>/);
 });
 

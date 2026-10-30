@@ -3,7 +3,7 @@
 export const DECK = [
   {
     id: 'unknown-service',
-    front: 'Without service.name, your telemetry arrives as unknown_service:<process>.',
+    front: 'Without service.name, your telemetry arrives as unknown_service:<executable>.',
     back:
       'With neither OTEL_SERVICE_NAME nor service.name in OTEL_RESOURCE_ATTRIBUTES set, the ' +
       'SDK reports service.name as unknown_service:<executable> (unknown_service:node for ' +
