@@ -60,7 +60,7 @@ plays levels synchronously, as R does).
 
 `export const ACTS = [{ id, no, name, sub, levels: Level[], boss: Level | null }]`.
 `id` kebab, unique; `no` integer ≥0, strictly increasing (gaps allowed); `levels.length ≥ 1`.
-Acts unlock by array position. Empty `ACTS` is valid.
+Acts unlock by array position, unless already entered (§3). Empty `ACTS` is valid.
 
 ### 2.3 Nuance card (`cards/deck.mjs`)
 
@@ -368,6 +368,7 @@ Registry: a0 `['l0a','l0b']` boss `b0`; a1 `['l1a','l1b']` no boss; a2 `['l2a']`
 - a0, a1 complete → l2a open, b2 locked.
 - `{l1a:3, l1b:3}` with a0 incomplete → l2a locked; l1a `'done'`. Mutation: check only the previous act.
 - Unknown id → `'locked'`, no throw. `lockReason` returns the act / boss-remaining forms.
+- Entered acts (M1-DESIGN §3, `test/unlock.test.mjs`): one completed level or a completed boss alone opens its act; an entered act stays open after an earlier act gains a level, an un-entered one re-locks; un-entered later acts wait for the chain; migration `{naming-your-service:3}` on an M1-shaped registry; `lockReason` null exactly when `levelState` is open. Mutations: drop the entered clause; boss-only act not entered; `levelState` disagrees with `lockReason`.
 
 ### F4 `test/progress.test.mjs`
 Fixture: `levelIds ['a','b','u']`, `cardIds ['c1','c2']`; `a.cards ['c1','c2']`; `u.scored false`.
