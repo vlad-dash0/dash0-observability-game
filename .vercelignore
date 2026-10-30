@@ -1,0 +1,23 @@
+# Deploy only the web app (index.html, main.mjs, styles/, vendor/, vercel.json and,
+# later, api/, lib/, levels/ ...). Tests, tooling and docs stay out of the deployment.
+# tools/serve.mjs reads this file and 404s the same paths locally; it supports only
+# `dir/`, `name` and `*.ext` (any depth) and `/dir/`, `/name`, `a/b` (anchored to the
+# root). Top-level tooling dirs are anchored so a future lib/test/ or api/tools/ deploys.
+/.github/
+/docs/
+/test/
+/tools/
+CLAUDE.md
+README.md
+.nvmrc
+.gitignore
+.vercelignore
+package.json
+package-lock.json
+node_modules/
+vendor/README.md
+vendor/SHA256SUMS
+.env
+.env.*
+.vercel
+*.log

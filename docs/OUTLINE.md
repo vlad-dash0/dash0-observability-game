@@ -27,7 +27,7 @@ PromQL, real semantic-convention names.
 | webo-money-world | This game |
 | --- | --- |
 | Town hub; a prop pops in when a lesson completes | **System map**: services start grey and "light up" as you instrument them; edges appear as traces connect them; a red pulse marks the current incident |
-| One ES module per lesson + ordered registry (`lessons/index.mjs`) | Same. Each level is one file that exports `{id, act, name, concept, run(ctx)}`; the hub, progress and rewards derive from the registry |
+| One ES module per lesson + ordered registry (`lessons/index.mjs`) | Same. Each level is one file that exports `{id, no, name, …, run(ctx)}` (its act comes from its registry position; FOUNDATION.md §2.1); the hub, progress and rewards derive from the registry |
 | `lesson-kit` primitives (`renderStep`, `speech`, `finish`) | Same kit plus engineer-grade widgets: YAML editor with validation, PromQL box run against a fake TSDB, trace waterfall, log stream, drag-to-classify |
 | Stars per lesson | Stars (0 to 3) for accuracy and speed, plus collectible **Nuance cards** (section 5) |
 | Lessons unlock in order | Acts unlock in order; levels inside an act can be played in any order; a "boss" incident ends each act |
@@ -35,8 +35,8 @@ PromQL, real semantic-convention names.
 | "Ask Webo" Claude proxy with moderation | **Ask the guide**: a Claude-backed helper that knows the glossary and the current level, gives hints rather than answers, and keeps the key server-side |
 | Play-through tests for every lesson (linkedom) | Same, plus tests that every YAML/PromQL puzzle's reference answer passes its own checker |
 
-The license point from the README applies: re-implement the pattern; ask wealthbot-io
-before copying files.
+webo-money-world was built by the same author, so its code is reused directly; see
+[FOUNDATION.md](FOUNDATION.md) §5 for what is copied, adapted or left behind.
 
 **Dogfooding:** the game itself is instrumented with OpenTelemetry (browser SDK +
 the serverless functions) and sends to a Dash0 org. The final act's boss is a real
@@ -220,8 +220,8 @@ pricing wording.
 3. **Gating**: fully free/anonymous, or email gate for leaderboards and a certificate?
 4. **Length**: is ~40 levels too many for v1? A cut-down v1 could be Acts 0, 1, 2 and
    the Act 2 boss.
-5. **Base code**: ask wealthbot-io for permission to reuse code, or rebuild the
-   pattern from scratch (small effort either way).
+5. ~~**Base code**: ask wealthbot-io for permission to reuse code, or rebuild the
+   pattern from scratch.~~ **Resolved**: reuse directly; the game's author owns it.
 6. **Tone and setting**: is "Kettle & Co" the right fictional company? Mascot or none?
 
 ## 8. Proposed milestones

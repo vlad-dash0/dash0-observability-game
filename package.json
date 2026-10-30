@@ -1,0 +1,17 @@
+{
+  "name": "dash0-observability-game",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A browser game that teaches observability, OpenTelemetry and Dash0 (static + Vercel functions)",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node tools/serve.mjs",
+    "test": "node --test \"test/**/*.test.mjs\""
+  },
+  "devDependencies": {
+    "linkedom": "0.18.14"
+  }
+}

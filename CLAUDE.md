@@ -1,0 +1,49 @@
+# Dash0 Observability Game
+
+A browser game that teaches observability to working engineers: signals, OpenTelemetry
+and its nuances, and Dash0. You are the new on-call engineer at a small company; levels
+light up a system map as you instrument, query and debug it. Static front end (Alpine.js
+ES modules, no build step), local-first progress, serverless `api/` later.
+
+## Run and test
+- Node: `.nvmrc` (Active LTS); `package.json` `engines` allows >=22. `npm ci` once.
+- `npm run dev` serves the repo at http://localhost:3000/ with the vercel.json headers
+  (CSP included) and 404s what `.vercelignore` excludes, plus every dotfile (stricter
+  than Vercel); `PORT=8080 npm run dev` to move it.
+- `npm test` runs `node --test` over `test/**/*.test.mjs`; CI runs the same on Node 22
+  and `.nvmrc`, for pushes to `main` and for pull requests.
+
+## Layout
+- `index.html`, `main.mjs` (the only file that touches Alpine), `styles/`.
+- `lib/` pure modules, `levels/` one file per level + `levels/index.mjs` registry,
+  `cards/deck.mjs`, `hub/` map data (arriving in F2-F6).
+- `vendor/` self-hosted Alpine 3.14.1, pinned by `vendor/SHA256SUMS`.
+- `test/` (`*.test.mjs`; `test/helpers/dom.mjs` is the linkedom DOM + click helpers).
+- `tools/serve.mjs` dev server; `.github/workflows/ci.yml`.
+
+## Design
+- `docs/FOUNDATION.md`: authoritative for M0 (data contracts, invariants, files per
+  phase, the RED test spec, CSP). Read it before changing any foundation file.
+- `docs/OUTLINE.md` (game and curriculum), `docs/GLOSSARY.md`, `README.md`.
+
+## Conventions
+- `.mjs` everywhere, `"type": "module"`, relative imports, no new runtime dependencies.
+- No top-level `window` / `document` / `localStorage` access; inject them, so modules
+  import cleanly under `node --test`.
+- CSP has no `'unsafe-inline'`: no inline `<script>` or `style=`, no `on*=` attributes,
+  no `:style` / `x-bind:style`. Wire level buttons with `el.onclick = ...` after
+  `renderStep`. `test/static.test.mjs` enforces the markup rules.
+- Every level needs a driver in `test/levels-play.test.mjs` (happy and sloppy runs).
+- Tests assert behaviour and are mutation-checked: after green, change one line of the
+  implementation, watch the test go red, change it back.
+- Alpine gotcha: `:class` with a mixed array (`['a', {b: on}]`) renders
+  `"[object Object]"`. Use a method that returns a class string.
+
+## Hosting
+Company Vercel account: static files plus serverless `api/` later. No Docker, no build
+step. `vercel.json` holds the headers; `.vercelignore` keeps tests, tools, docs and
+package files out (keep its lines to the forms `tools/serve.mjs` parses).
+
+## Git
+- One branch per issue, PR to `main`, conventional-commit titles (`feat: ... (#N)`).
+- No AI-attribution trailers (`Co-Authored-By`, "Generated with") in commits or PRs.
