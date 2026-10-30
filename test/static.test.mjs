@@ -148,6 +148,40 @@ test('every local src and href in index.html exists on disk', () => {
   }
 });
 
+// ---- the favicon (#39) --------------------------------------------------------------
+
+test('index.html links the SVG favicon, so browsers do not probe /favicon.ico', () => {
+  const icons = [...document.head.querySelectorAll('link')]
+    .filter((l) => (l.getAttribute('rel') ?? '').toLowerCase().split(/\s+/).includes('icon'));
+  assert.equal(icons.length, 1, 'expected exactly one <link rel="icon">');
+  assert.equal(icons[0].getAttribute('href'), '/favicon.svg');
+  assert.equal(icons[0].getAttribute('type'), 'image/svg+xml');
+});
+
+test('favicon.svg is a small, deployed, CSP-safe SVG', () => {
+  assert.ok(isFile(join(ROOT, 'favicon.svg')), 'favicon.svg does not exist');
+  assert.equal(ignoreMatcher(read('.vercelignore'))('favicon.svg'), false, 'favicon.svg is not deployed');
+  const svg = read('favicon.svg');
+  assert.ok(svg.length < 1024, `favicon.svg is ${svg.length} bytes; keep it under 1 KB`);
+  const { document: icon } = parseHTML(`<!DOCTYPE html><html><body>${svg}</body></html>`);
+  const root = icon.body.firstElementChild;
+  assert.equal(root?.localName, 'svg', 'favicon.svg must have an <svg> root');
+  assert.equal(root.getAttribute('xmlns'), 'http://www.w3.org/2000/svg');
+  assert.ok(root.hasAttribute('viewBox'), 'favicon.svg needs a viewBox to scale');
+  assert.ok(!/<\s*(style|script|foreignObject)\b/i.test(svg), 'no <style>, <script> or <foreignObject>');
+  for (const el of [root, ...root.querySelectorAll('*')]) {
+    for (const name of el.getAttributeNames()) {
+      const n = name.toLowerCase();
+      assert.notEqual(n, 'style', `<${el.localName} style> is blocked by style-src 'self'`);
+      assert.ok(!n.startsWith('on'), `<${el.localName} ${name}> is an inline handler`);
+      if (n === 'href' || n === 'xlink:href') {
+        assert.ok(el.getAttribute(name).startsWith('#'), `<${el.localName} ${name}> must not reference a file`);
+      }
+    }
+  }
+  assert.ok(!/@import|url\(\s*['"]?(?!#)/i.test(svg), 'no external url() or @import');
+});
+
 // ---- local references in CSS and JS -----------------------------------------------
 
 const isExternal = (ref) => /^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(ref);
