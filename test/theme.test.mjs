@@ -99,6 +99,7 @@ function resolveColor(value, theme, seen = new Set()) {
     };
     const [ca, pa] = part(a);
     const [cb, pb] = part(b);
+    assert.ok(pa === null || pb === null, `give one percentage only (no normalising): ${v}`);
     const wa = pa ?? (pb === null ? 0.5 : 1 - pb);
     const A = resolveColor(ca, theme, seen);
     const B = resolveColor(cb, theme, seen);
@@ -158,9 +159,12 @@ test('every --color-* is light-dark(); dark by default, light by data-theme only
 
 test('primary is red on both sides, success mint, error purple (not red, not primary)', () => {
   assert.equal(VARS['--color-primary'], 'light-dark(var(--d0-red), var(--d0-red))');
+  // Success is mint on dark; on light it is mint darkened for contrast, still from mint.
+  const [lightSuccess] = splitTop(call('light-dark', VARS['--color-success']));
+  assert.match(lightSuccess, /var\(--d0-mint\)/);
+  assert.equal(resolveColor('var(--color-success)', 'dark').join(), resolveColor('var(--d0-mint)', 'dark').join());
   for (const theme of ['light', 'dark']) {
     const at = (name) => resolveColor(`var(${name})`, theme).join();
-    assert.equal(at('--color-success'), resolveColor('var(--d0-mint)', theme).join(), theme);
     assert.equal(at('--color-error'), resolveColor('var(--d0-purple)', theme).join(), theme);
     assert.notEqual(at('--color-error'), at('--color-primary'), theme);
     assert.notEqual(at('--color-error'), resolveColor('var(--d0-red)', theme).join(), theme);
@@ -179,6 +183,55 @@ test('WCAG AA: text and muted text on bg and surfaces, button text on primary, f
     assert.ok(btn >= 4.5, `${theme}: primary-contrast on primary is ${btn.toFixed(2)}`);
     const ring = contrast('--color-focus', '--color-bg', theme);
     assert.ok(ring >= 3, `${theme}: focus on bg is ${ring.toFixed(2)}, needs 3 (non-text)`);
+  }
+});
+
+test('WCAG 1.4.11: success and error borders reach 3:1 on bg and surface, both themes', () => {
+  for (const theme of ['light', 'dark']) {
+    for (const fg of ['--color-success', '--color-error']) {
+      for (const bg of ['--color-bg', '--color-surface']) {
+        const r = contrast(fg, bg, theme);
+        assert.ok(r >= 3, `${theme}: ${fg} on ${bg} is ${r.toFixed(2)}, needs 3`);
+      }
+    }
+  }
+});
+
+test('correct and wrong choices carry a non-colour cue: a marker and a thicker border', () => {
+  const base = rules(read('styles/base.css'));
+  const declsOf = (sel) => Object.fromEntries(base
+    .filter((r) => r.selector.split(',').map((s) => s.trim()).includes(sel))
+    .flatMap((r) => decls(r.body)));
+  const px = (v) => Number(/([\d.]+)px/.exec(v ?? '')?.[1] ?? NaN);
+  const plain = px(declsOf('.choice').border);
+  assert.ok(plain > 0, '.choice has a px border');
+  const markers = ['.choice.correct', '.choice.wrong'].map((sel) => {
+    assert.ok(px(declsOf(sel)['border-width']) > plain, `${sel} border is thicker than .choice`);
+    const content = declsOf(`${sel}::after`).content ?? '';
+    assert.match(content, /^"[^"]+"$/, `${sel}::after has a marker`);
+    return content;
+  });
+  assert.notEqual(markers[0], markers[1], 'correct and wrong markers differ');
+  // The 3:1 success token only helps if the border uses it unmixed.
+  assert.match(declsOf('.feedback.good').border ?? '', /^\d+px solid var\(--color-success\)$/);
+});
+
+test('tokens live only in tokens.css: one :root rule plus the light rule', () => {
+  const selectors = tokenRules.map((r) => r.selector).filter((s) => s !== '@font-face');
+  assert.deepEqual(selectors, [':root', ':root[data-theme="light"]']);
+  for (const f of readdirSync(join(ROOT, 'styles')).filter((n) => n.endsWith('.css'))) {
+    if (f === 'tokens.css') continue;
+    const hits = stripComments(read(`styles/${f}`)).match(/--(color|d0)-[\w-]+\s*:/g) ?? [];
+    assert.deepEqual(hits, [], `styles/${f} declares tokens`);
+  }
+});
+
+test('every color-mix() in tokens.css gives at most one percentage', () => {
+  const mixes = stripComments(tokensCss).match(/color-mix\((?:[^()]|\([^()]*\))*\)/g) ?? [];
+  assert.ok(mixes.length > 0);
+  for (const m of mixes) {
+    const pcts = splitTop(call('color-mix', m)).filter((p) => /\s[\d.]+%$/.test(p));
+    assert.ok(pcts.length <= 1, `two percentages need normalising, give one: ${m}`);
   }
 });
 
@@ -201,18 +254,22 @@ test('code, pre, kbd use Martian Mono, served from local /fonts/ files', () => {
   const family = Object.fromEntries(decls(mono.body))['font-family'] ?? '';
   assert.match(resolveText(family), /^"Martian Mono"/);
 
-  const faces = rules(tokensCss + read('styles/base.css')).filter((r) =>
-    /font-family:\s*"Martian Mono"/.test(r.body) && /\bsrc:/.test(r.body));
-  assert.ok(faces.length >= 2, 'regular and bold @font-face');
-  for (const face of faces) {
-    const urls = [...face.body.matchAll(/url\(["']?([^"')]+)["']?\)/g)].map((m) => m[1]);
-    assert.ok(urls.length > 0);
-    for (const url of urls) {
-      assert.match(url, /^\/fonts\/MartianMono-[\w-]+\.woff2$/);
-      assert.ok(existsSync(join(ROOT, url)), `${url} exists`);
-    }
+  const faces = rules(tokensCss + read('styles/base.css'))
+    .filter((r) => r.selector === '@font-face')
+    .map((r) => Object.fromEntries(decls(r.body)));
+  assert.equal(faces.length, 2, 'exactly the regular and bold faces');
+  const byWeight = Object.fromEntries(faces.map((f) => {
+    assert.equal(f['font-family'], '"Martian Mono"');
+    assert.equal(f['font-style'], 'normal');
+    return [f['font-weight'], f.src];
+  }));
+  assert.deepEqual(byWeight, {
+    400: 'url("/fonts/MartianMono-Regular.woff2") format("woff2")',
+    700: 'url("/fonts/MartianMono-Bold.woff2") format("woff2")',
+  });
+  for (const file of ['MartianMono-Regular.woff2', 'MartianMono-Bold.woff2', 'OFL.txt']) {
+    assert.ok(existsSync(join(ROOT, 'fonts', file)), `fonts/${file} exists`);
   }
-  assert.ok(existsSync(join(ROOT, 'fonts/OFL.txt')), 'OFL licence ships with the fonts');
 });
 
 test('resolveTheme: only "light" is light; anything else is dark', () => {
