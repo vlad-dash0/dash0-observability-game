@@ -13,15 +13,24 @@ export function focusName(el) {
   return el.localName;
 }
 
+const NATIVE = new Set(['button', 'input', 'select', 'textarea']);
+
+/** Whether a browser would focus `el`: connected, enabled, and natively focusable or tabindexed. */
+function canFocus(el) {
+  const native = NATIVE.has(el.localName) || (el.localName === 'a' && el.hasAttribute('href'));
+  return !el.disabled && el.isConnected && (native || el.hasAttribute('tabindex'));
+}
+
 /**
  * Patch `window.HTMLElement.prototype.focus` (from makeDom()) to record calls.
  * Returns `{ names(), last(), unfocusable() }`, all strings: `last()` is 'body' before
- * any focus call; `unfocusable()` lists targets that were disabled or detached.
+ * any focus call; `unfocusable()` lists targets that were disabled, detached, or
+ * neither natively focusable (button, input, select, textarea, a[href]) nor tabindexed.
  */
 export function recordFocus(window) {
   const log = [];
   window.HTMLElement.prototype.focus = function focus() {
-    log.push({ name: focusName(this), focusable: !this.disabled && this.isConnected });
+    log.push({ name: focusName(this), focusable: canFocus(this) });
   };
   return {
     names: () => log.map((f) => f.name),

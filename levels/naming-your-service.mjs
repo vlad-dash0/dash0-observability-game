@@ -103,8 +103,8 @@ export default {
         )}</div>
         <div class="lesson-stage">
           <pre id="nys-config"><code>${GIVEN_ENV}</code></pre>
-          <h3 class="q">What service name does its telemetry show up under?</h3>
-          ${choiceHtml(ctx, SHOWS_UP_AS, { id: 'nys' })}
+          <h3 class="q" id="nys-q-name">What service name does its telemetry show up under?</h3>
+          ${choiceHtml(ctx, SHOWS_UP_AS, { id: 'nys', labelledBy: 'nys-q-name' })}
         </div>`,
         '<button class="btn" id="nys-next" disabled>Next</button>',
       );
@@ -197,8 +197,8 @@ export default {
         )}</div>
         <div class="lesson-stage">
           <pre><code>${CLASH_ENV}</code></pre>
-          <h3 class="q">Which service name does the SDK report?</h3>
-          ${choiceHtml(ctx, WHO_WINS, { id: 'nys' })}
+          <h3 class="q" id="nys-q-wins">Which service name does the SDK report?</h3>
+          ${choiceHtml(ctx, WHO_WINS, { id: 'nys', labelledBy: 'nys-q-wins' })}
         </div>`,
         '<button class="btn" id="nys-finish" data-finish disabled>Finish</button>',
       );
