@@ -67,24 +67,27 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 
 /* ---------- Choices ---------- */
 .choices { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 8px; }
+/* The right padding reserves room for the marker, so marking never rewraps the text. */
 .choice {
   border: 1.5px solid var(--color-border); background: var(--color-surface); color: var(--color-text);
-  border-radius: var(--radius); padding: 15px; font-family: inherit; font-size: 15px;
+  border-radius: var(--radius); padding: 15px 41.5px 15px 15px; font-family: inherit; font-size: 15px;
   font-weight: 600; cursor: pointer; text-align: left; transition: all .15s;
 }
 .choice:hover { border-color: var(--color-accent); }
 .choice.correct { border-color: var(--color-success); background: color-mix(in srgb, var(--color-success) 12%, transparent); }
 .choice.wrong { border-color: var(--color-error); background: color-mix(in srgb, var(--color-error) 12%, transparent); }
 /* Non-colour cue (WCAG 1.4.1): a thicker border plus a check or cross marker. The
-   marker is a visual aid only; levels must also state the result in text or an
-   aria-label, so screen readers never depend on the pseudo-element. */
+   marker is announced as "correct" / "wrong" unless the level sets an aria-label,
+   which replaces it; levels should still state the result in text. The thicker
+   border comes out of the padding (1.5px per side) so the content does not move. */
 .choice.correct, .choice.wrong { position: relative; border-width: 3px; padding: 13.5px 40px 13.5px 13.5px; }
 .choice.correct::after, .choice.wrong::after {
   position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
   font-weight: 700; font-size: 17px; line-height: 1;
 }
-.choice.correct::after { content: "\2713"; color: var(--color-success); }
-.choice.wrong::after { content: "\2717"; color: var(--color-error); }
+/* Plain content first: browsers without alt-text support drop the second line. */
+.choice.correct::after { content: "\2713"; content: "\2713" / "correct"; color: var(--color-success); }
+.choice.wrong::after { content: "\2717"; content: "\2717" / "wrong"; color: var(--color-error); }
 
 /* ---------- Feedback ---------- */
 .feedback {

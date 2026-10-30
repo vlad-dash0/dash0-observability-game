@@ -197,23 +197,78 @@ test('WCAG 1.4.11: success and error borders reach 3:1 on bg and surface, both t
   }
 });
 
+const baseRules = rules(read('styles/base.css'));
+/** Declarations, in cascade order, of every base.css rule whose selector list has `sel`. */
+const declsFor = (...sels) => sels.flatMap((sel) => baseRules
+  .filter((r) => r.selector.split(',').map((s) => s.trim()).includes(sel))
+  .flatMap((r) => decls(r.body)));
+const last = (list, prop) => list.filter(([k]) => k === prop).at(-1)?.[1];
+const px = (v) => Number(/([\d.]+)px/.exec(v ?? '')?.[1] ?? NaN);
+const SIDES = ['top', 'right', 'bottom', 'left'];
+
+/** Padding and border width per side ({top, right, bottom, left}) after the cascade. */
+function box(list) {
+  const pad = {};
+  const border = {};
+  const four = (v) => {
+    const [t, r = t, b = t, l = r] = v.split(/\s+/).map(px);
+    return { top: t, right: r, bottom: b, left: l };
+  };
+  for (const [k, v] of list) {
+    if (k === 'padding') Object.assign(pad, four(v));
+    else if (k.startsWith('padding-')) pad[k.slice(8)] = px(v);
+    else if (k === 'border') for (const s of SIDES) border[s] = px(v);
+    else if (k === 'border-width') Object.assign(border, four(v));
+    else if (/^border-\w+-width$/.test(k)) border[k.split('-')[1]] = px(v);
+  }
+  return Object.fromEntries(SIDES.map((s) => [s, pad[s] + border[s]]));
+}
+
+test('marking a choice does not move its content: padding + border is the same per side', () => {
+  const plain = box(declsFor('.choice'));
+  for (const s of SIDES) assert.ok(plain[s] > 0, `.choice ${s} has padding and border`);
+  for (const sel of ['.choice.correct', '.choice.wrong']) {
+    assert.deepEqual(box(declsFor('.choice', sel)), plain, `${sel} keeps the .choice box`);
+  }
+});
+
 test('correct and wrong choices carry a non-colour cue: a marker and a thicker border', () => {
-  const base = rules(read('styles/base.css'));
-  const declsOf = (sel) => Object.fromEntries(base
-    .filter((r) => r.selector.split(',').map((s) => s.trim()).includes(sel))
-    .flatMap((r) => decls(r.body)));
-  const px = (v) => Number(/([\d.]+)px/.exec(v ?? '')?.[1] ?? NaN);
-  const plain = px(declsOf('.choice').border);
+  const plain = px(last(declsFor('.choice'), 'border'));
   assert.ok(plain > 0, '.choice has a px border');
-  const markers = ['.choice.correct', '.choice.wrong'].map((sel) => {
-    assert.ok(px(declsOf(sel)['border-width']) > plain, `${sel} border is thicker than .choice`);
-    const content = declsOf(`${sel}::after`).content ?? '';
-    assert.match(content, /^"[^"]+"$/, `${sel}::after has a marker`);
-    return content;
-  });
-  assert.notEqual(markers[0], markers[1], 'correct and wrong markers differ');
+  const decode = (s) => s.replace(/\\([0-9a-f]{1,6})\s?/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)));
+  for (const [sel, glyph, alt] of [['.choice.correct', '✓', 'correct'], ['.choice.wrong', '✗', 'wrong']]) {
+    assert.ok(px(last(declsFor(sel), 'border-width')) > plain, `${sel} border is thicker than .choice`);
+    const content = declsFor(`${sel}::after`).filter(([k]) => k === 'content').map(([, v]) => decode(v));
+    // Fallback first (browsers without alt text drop the second), then glyph / alt text.
+    assert.deepEqual(content, [`"${glyph}"`, `"${glyph}" / "${alt}"`], `${sel}::after marker`);
+  }
   // The 3:1 success token only helps if the border uses it unmixed.
-  assert.match(declsOf('.feedback.good').border ?? '', /^\d+px solid var\(--color-success\)$/);
+  assert.match(last(declsFor('.feedback.good'), 'border') ?? '', /^\d+px solid var\(--color-success\)$/);
+});
+
+test('the markers are visible and reach 3:1 over the tinted choice fill, both themes', () => {
+  for (const sel of ['.choice.correct', '.choice.wrong']) {
+    const marker = declsFor(`${sel}::after`);
+    assert.notEqual(last(marker, 'display'), 'none', `${sel}::after is displayed`);
+    for (const prop of ['visibility', 'opacity']) {
+      assert.equal(last(marker, prop), undefined, `${sel}::after does not set ${prop}`);
+    }
+    const color = last(marker, 'color') ?? '';
+    assert.match(color, /^var\(--color-[\w-]+\)$/, `${sel}::after colour is a token, not transparent`);
+    const fill = /^color-mix\(in srgb, (var\(--color-[\w-]+\)) ([\d.]+)%, transparent\)$/
+      .exec(last(declsFor('.choice', sel), 'background') ?? '');
+    assert.ok(fill, `${sel} background is a token tint over transparent`);
+    for (const theme of ['light', 'dark']) {
+      for (const under of ['--color-bg', '--color-surface']) {
+        const u = resolveColor(`var(${under})`, theme);
+        const tint = resolveColor(fill[1], theme).map((c, i) => c * fill[2] / 100 + u[i] * (1 - fill[2] / 100));
+        const a = luminance(resolveColor(color, theme));
+        const b = luminance(tint);
+        const r = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+        assert.ok(r >= 3, `${theme}: ${sel} marker over its fill on ${under} is ${r.toFixed(2)}, needs 3`);
+      }
+    }
+  }
 });
 
 test('tokens live only in tokens.css: one :root rule plus the light rule', () => {
@@ -227,7 +282,16 @@ test('tokens live only in tokens.css: one :root rule plus the light rule', () =>
 });
 
 test('every color-mix() in tokens.css gives at most one percentage', () => {
-  const mixes = stripComments(tokensCss).match(/color-mix\((?:[^()]|\([^()]*\))*\)/g) ?? [];
+  // Every color-mix( occurrence, nested ones included, cut at its balanced paren.
+  const css = stripComments(tokensCss);
+  const mixes = [...css.matchAll(/color-mix\(/g)].map(({ index }) => {
+    let depth = 0;
+    for (let i = index + 'color-mix'.length; i < css.length; i++) {
+      if (css[i] === '(') depth++;
+      else if (css[i] === ')' && --depth === 0) return css.slice(index, i + 1);
+    }
+    assert.fail(`unbalanced color-mix at ${index}`);
+  });
   assert.ok(mixes.length > 0);
   for (const m of mixes) {
     const pcts = splitTop(call('color-mix', m)).filter((p) => /\s[\d.]+%$/.test(p));
