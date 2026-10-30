@@ -102,10 +102,42 @@ test('vercel.json keeps the hardening headers and the vendor cache rule', () => 
   assert.equal(h['X-Frame-Options'], 'DENY');
   assert.equal(h['X-Content-Type-Options'], 'nosniff');
   assert.equal(h['Referrer-Policy'], 'no-referrer');
-  assert.equal(h['Permissions-Policy'], 'camera=(), microphone=(), geolocation=(), browsing-topics=()');
+  assert.equal(
+    h['Permissions-Policy'],
+    'camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()',
+  );
   assert.equal(headerRule('/vendor/(.*)')['Cache-Control'], 'public, max-age=31536000, immutable');
   assert.equal(headerRule('/fonts/(.*)')['Cache-Control'], 'public, max-age=31536000, immutable');
   assert.equal(vercel.functions, undefined, 'no serverless functions yet');
+});
+
+// The reviewed set: a feature joins only after a check that Chrome does not flag it as
+// unrecognised (#37: browsing-topics, unrecognised where Chrome's Topics feature is
+// disabled, did). This test pins the header to that set, so a new name or a typo needs a
+// deliberate edit here; it does not itself verify what any browser recognises.
+const PERMISSIONS_POLICY_FEATURES = ['camera', 'microphone', 'geolocation', 'payment', 'usb', 'display-capture'];
+
+// Feature names of a Permissions-Policy value, each of which must deny all origins:
+// `feature=()`, optionally with whitespace inside the empty list (RFC 8941).
+function deniedFeatures(value) {
+  return value.split(',').map((e) => e.trim()).map((entry) => {
+    const m = /^([a-z-]+)=\(\s*\)$/.exec(entry);
+    assert.ok(m, `Permissions-Policy entry "${entry}" is not of the form feature=()`);
+    return m[1];
+  });
+}
+
+test('Permissions-Policy names only reviewed features, each denied', () => {
+  const names = deniedFeatures(headerRule('/(.*)')['Permissions-Policy']);
+  for (const name of names) {
+    assert.ok(PERMISSIONS_POLICY_FEATURES.includes(name), `unreviewed Permissions-Policy feature "${name}"`);
+  }
+  assert.deepEqual([...names].sort(), [...PERMISSIONS_POLICY_FEATURES].sort());
+});
+
+test('a denied feature may have whitespace inside its empty list, but nothing else', () => {
+  assert.deepEqual(deniedFeatures('camera=( ), usb=()'), ['camera', 'usb']);
+  assert.throws(() => deniedFeatures('camera=(self)'), /not of the form feature=\(\)/);
 });
 
 test('the dev server sends the vercel.json headers', () => {
