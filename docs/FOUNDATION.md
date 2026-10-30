@@ -92,16 +92,17 @@ never throws. F4 codes against this shape with hand-written fixtures and does no
 Completed = has an own entry, whatever its stars (`stars: 0` is real and distinct from no
 entry). `CURRENT_VERSION = 1`; `MIGRATIONS = {}` where `MIGRATIONS[n]` maps v n → n+1.
 
-`sanitizeProgress(raw, {levelIds?, cardIds?})`: never throws, never mutates, never awards.
+`sanitizeProgress(raw, {levelIds?, cardIds?, keep?})`: never throws, never mutates, never awards.
 - Not a plain object, or `levels` not a plain object → `emptyProgress()`; missing `cards` → `[]`.
 - Own keys only; ignore `__proto__`, `constructor`, `prototype`; outputs null-prototype.
 - Id must match `^[a-z0-9-]{1,64}$`, else the entry is DROPPED (never cleaned).
 - `stars` must be a finite number, else drop; clamp `Math.min(3, Math.max(0, Math.floor(s)))`.
 - `at`: an ISO-8601 date-time with `Z` or `±HH:MM` that exists on the calendar as written
-  (no Feb 30, no `T24:00`) → `toISOString()`, else `null`.
+  (no Feb 30, no `T24:00`) → `toISOString()` if that stays in years 0000–9999, else `null`.
 - Cards: strings only, valid ids, dedupe, sort. Caps (one rule, applied by sanitize and
-  merge): 500 level entries and 500 cards; ids in `keep` (the registry's, passed by storage
-  and `recordCompletion`) are never evicted, unknown ids fill the rest by sorted id.
+  merge): level entries and cards each at most max(500, registered ids present); the cap
+  bounds unknown data only. Ids in `keep` (the registry's, passed by storage and
+  `recordCompletion`) are never evicted, unknown ids fill the rest by sorted id.
 - With `levelIds`/`cardIds`: drop ids not in the set (the in-memory view). Without: keep
   every well-formed id (what gets persisted).
 
@@ -150,7 +151,7 @@ declared; valid mechanics; `run` is a function; reward titles unique.
 
 Progress: never downgrades (best stars, earliest non-null `at`, card union); stars
 integers 0–3; corrupt input → empty, no throw; `recordCompletion` idempotent;
-`mergeProgress` commutative, associative, idempotent.
+`mergeProgress` commutative, associative, idempotent for a fixed `keep`.
 
 Unlock (`lib/unlock.mjs`, pure):
 - `isCompleted(progress, id)`: has an own entry.
@@ -164,7 +165,8 @@ Unlock (`lib/unlock.mjs`, pure):
 Concurrency: `saveProgress` reads storage, merges, writes in one sync task; the `storage`
 event merges other tabs' writes into memory; progress only goes up, so last-writer-wins
 cannot lose a completion. `finished` flag stops double finish; AbortSignal + captured id
-stop stale finish; `openLevel` re-checks `levelState`. No reset UI in M0.
+stop stale finish; `openLevel` re-checks `levelState`. No reset UI in M0. When two different
+builds run side by side, only the current build's registry is protected at the cap (accepted for M0).
 
 ## 4. Pure functions
 
@@ -174,9 +176,9 @@ stop stale finish; `openLevel` re-checks `levelState`. No reset UI in M0.
 | `validateDeck`, `validateRegistry`, `buildRegistry`, `nodeLitBy` | `lib/registry.mjs` |
 | `scoreStars` | `lib/scoring.mjs` |
 | `createLevelContext` | `lib/level-context.mjs` |
-| `emptyProgress`, `sanitizeProgress`, `migrate(raw, {current, migrations})` → migrated record, `raw` if at/past `current`, or `null` (corrupt), `mergeProgress(a, b, {keep}?)`, `recordCompletion(progress, levelId, {stars, cards, at}, registry)` → `{progress, firstCompletion, newBest, newCards}`, `starTotals` → `{earned, max}`, `cardTotals` → `{earned, max}` | `lib/progress.mjs` |
+| `emptyProgress`, `sanitizeProgress`, `registryIds(registry)` → `{levelIds, cardIds}` (the `keep` ids), `migrate(raw, {current, migrations})` → migrated record, `raw` if at/past `current`, or `null` (corrupt), `mergeProgress(a, b, {keep}?)`, `recordCompletion(progress, levelId, {stars, cards, at}, registry)` → `{progress, firstCompletion, newBest, newCards}`, `starTotals` → `{earned, max}`, `cardTotals` → `{earned, max}` | `lib/progress.mjs` |
 | `isCompleted`, `isActComplete`, `isActUnlocked`, `levelState`, `lockReason` | `lib/unlock.mjs` |
-| `loadProgress(storageGetter, registry)` → `{status, progress}`, `saveProgress(storageGetter, progress, registry)` → `{saved, reason?, progress}` (`progress` is always the registry view; `TypeError` before any storage access without a registry) | `lib/storage.mjs` |
+| `loadProgress(storageGetter, registry)` → `{status, progress}` (`TypeError` before any read without a registry), `saveProgress(storageGetter, progress, registry)` → `{saved, reason?, progress}` (`progress` is always the registry view; `TypeError` before any storage access without a registry) | `lib/storage.mjs` |
 | `resolveTheme`, `readTheme(getter)`, `writeTheme(getter, t)` | `lib/theme.mjs` |
 | `nodeStates(registry, progress, NODES, EDGES)` | `lib/map.mjs` |
 | `parseEnv`, `effectiveResource`, `checkConfig` | `lib/widgets/env-config.mjs` |
