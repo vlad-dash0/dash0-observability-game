@@ -40,15 +40,20 @@ function driverGaps(order, drivers) {
   };
 }
 
-// The last element clicked during a play-through, so a finish can be traced to the
-// click that caused it. Drivers use these wrappers, not ./helpers/dom.mjs directly.
-let lastClick = null;
+// The click in progress, set only while its handler runs, so a finish can be traced
+// to the click that caused it; a finish outside a wrapper click sees null. Drivers
+// use these wrappers, not ./helpers/dom.mjs directly.
+let current = null;
 
-/** dom.mjs click, recording whether the clicked element was the Finish button. */
+/** dom.mjs click, recording for its duration whether it hit the Finish button. */
 function click(elOrSel) {
   const el = typeof elOrSel === 'string' ? q(elOrSel) : elOrSel;
-  lastClick = { sel: String(elOrSel), finish: !!el?.matches?.('[data-finish]') };
-  domClick(elOrSel);
+  current = { sel: String(elOrSel), finish: !!el?.matches?.('[data-finish]') };
+  try {
+    domClick(elOrSel);
+  } finally {
+    current = null;
+  }
 }
 
 /** Click `sel` then `next` each round until `until` exists (at most `max` rounds). */
@@ -65,7 +70,7 @@ function playLevel(level, play) {
   const dom = makeDom();
   const calls = [];
   const steps = [];
-  lastClick = null;
+  current = null;
   const ctx = createLevelContext({
     level,
     ovBody: dom.body,
@@ -73,7 +78,7 @@ function playLevel(level, play) {
     now: () => NOW,
     shuffle: (a) => a,
     reduceMotion: true,
-    onFinish: (id, result) => calls.push({ id, result, via: lastClick }),
+    onFinish: (id, result) => calls.push({ id, result, via: current }),
     signal: new AbortController().signal,
     reportError: (e) => {
       throw e;
@@ -170,6 +175,7 @@ const FIXTURES = buildRegistry(
         V.FINISH_IN_RUN,
         V.CARD_OUTSIDE,
         V.FINISH_OUTSIDE_RENDER,
+        V.STALE_FINISH_CLICK,
       ],
       boss: null,
     },
@@ -280,6 +286,21 @@ test('harness: a Finish named only in text, never rendered as an element, fails'
       checkRun(lvl, { play: () => (click('#go'), click('#fin')), expect: { stars: 3, cards: [] } }),
     /some step shows a Finish button/,
   );
+});
+
+test('harness: an earlier Finish click does not cover a finish from outside a click', () => {
+  const lvl = FIXTURES['fx-stale-click'];
+  const expect = { stars: 3, cards: [] };
+  const bypasses = [
+    () => domClick('#real'), // the F1 helper, which does not record
+    () => q('#real').onclick(), // calling the handler directly
+  ];
+  for (const bypass of bypasses) {
+    assert.throws(
+      () => checkRun(lvl, { play: () => (click('#go'), click('#fin'), bypass()), expect }),
+      /finished from a \[data-finish\] click, not from no click/,
+    );
+  }
 });
 
 test('harness: a wrong expectation, a missing sloppy run or an equal sloppy run fails', () => {
