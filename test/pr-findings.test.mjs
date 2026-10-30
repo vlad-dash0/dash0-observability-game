@@ -194,17 +194,24 @@ test('a finding hidden in an unterminated comment or fence is inconclusive', () 
   }
 });
 
-test('a review edited after its dispositions is inconclusive until they are re-posted', () => {
-  const edited = (when) => [{ at: at(0), edited: when, url: 'rev', body: REV }, { at: at(1), url: 'disp', body: DISP() }];
-  const after = evaluate({ comments: edited(at(2)), threads: [] });
-  assert.match(after.errors.join('\n'), /rev.*2222222.*edited/);
-  assert.equal(after.exit, 2);
-  const before = evaluate({ comments: edited(at(1)), threads: [] });
-  assert.deepEqual(before.errors, []);
-  assert.equal(before.exit, 0);
-  const reposted = evaluate({ comments: [...edited(at(2)), { at: at(3), url: 'again', body: DISP('Still fixed') }], threads: [] });
-  assert.deepEqual(reposted.errors, []);
-  assert.equal(reposted.exit, 0);
+// R3: dispositions answer the review as it read when they were posted; after an edit,
+// each finding needs a fresh one (a partial repost leaves the rest open).
+test('dispositions posted before the review\'s last edit do not count', () => {
+  const REV2 = `## Review of 2222222: NOT CLEAN\n\n${T}| 2 | low | thing 2 |\n`;
+  const DISP2 = (rows) => `## Dispositions for the review of 2222222\n\n| # | Disposition |\n|---|---|\n${rows.map((r) => `| ${r} | Fixed |`).join('\n')}\n`;
+  const run = (edited, ...later) => evaluate({ comments: [
+    { at: at(0), edited, url: 'rev', body: REV2 }, { at: at(1), url: 'disp', body: DISP2(['1', '2']) },
+    ...later.map((body, i) => ({ at: at(3 + i), url: `later${i}`, body }))], threads: [] });
+  const stale = run(at(2));
+  assert.deepEqual(stale.errors, []);
+  assert.deepEqual(ids(stale.open), ['1', '2']);
+  assert.ok(stale.open.every((f) => f.stale === at(2)), 'open findings say why');
+  assert.equal(stale.exit, 1);
+  const partial = run(at(2), DISP2(['2']));
+  assert.deepEqual(ids(partial.open), ['1']);
+  assert.equal(partial.exit, 1);
+  assert.equal(run(at(2), DISP2(['1', '2'])).exit, 0);
+  assert.equal(run(at(1)).exit, 0, 'an edit before the dispositions is fine');
 });
 
 test('placeholder dispositions leave the finding open', () => {
@@ -234,10 +241,122 @@ test('an unminimized old-style review heading is an error', () => {
 });
 
 test('a minimized (hidden) comment is skipped: the override for a bad heading', () => {
-  const comments = [...bodies(CLEAN), { at: at(1), url: 'hidden', minimized: true, body: `## Re-review round 2\n\n${T}` }];
+  const comments = [...bodies(CLEAN), { at: at(1), url: 'hidden', author: 'bot', minimized: true, body: `## Re-review round 2\n\n${T}` }];
   const r = evaluate({ comments, threads: [] });
   assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.skipped, [{ url: 'hidden', author: 'bot' }]);
   assert.equal(r.exit, 0);
+});
+
+// --- re-review of 456142a (R1-R10): read exactly what GitHub renders --------------------
+
+const S = '2222222';
+const ROW = (id, sev = 'low') => `| ${id} | ${sev} | thing ${id} |`;
+const DISPS = (cell, ...rows) => `## Dispositions for the review of ${S}\n\n| # | Disposition |\n|---|---|\n${rows.map((r) => `| ${r} | ${cell} |`).join('\n')}\n`;
+const exitOf = (...bs) => judge(...bs).exit;
+
+test('R1: GFM tables without outer pipes are read, in and out of a review', () => {
+  const noLead = judge(`${REV}2 | high | thing 2\n`, DISPS('Fixed', '1'));
+  assert.deepEqual(ids(noLead.open), ['2']);
+  assert.equal(noLead.exit, 1);
+  const leadless = judge(`${REV}\nSeverity | # | Finding\n--- | --- | ---\nhigh | 3 | thing 3\n`, DISPS('Fixed', '1'));
+  assert.deepEqual(ids(leadless.open), ['3']);
+  assert.equal(leadless.exit, 1);
+  const outside = judge(REV, DISPS('Fixed', '1'), '## Notes\n\nSeverity | # | Finding\n--- | --- | ---\nhigh | 2 | b\n');
+  assert.match(outside.errors.join('\n'), /outside a review/);
+  assert.equal(outside.exit, 2);
+  const headless = judge(`${REV}\n${ROW('2')}\n`, DISPS('Fixed', '1'));
+  assert.match(headless.errors.join('\n'), /row outside a table/);
+  assert.equal(headless.exit, 2);
+});
+
+test('R1: a second header glued to a table (no blank line) is ambiguous', () => {
+  const r = judge(`${REV}${T}`, DISPS('Fixed', '1'));
+  assert.match(r.errors.join('\n'), /delimiter/);
+  assert.equal(r.exit, 2);
+});
+
+test('R2: formatted placeholders leave the finding open', () => {
+  for (const cell of ['**TODO**', '`open`', 'TBD.', 'N/A', 'n/a', '?', '&nbsp;', '_tbd_', 'Open — later', 'TODO: after merge']) {
+    const r = judge(REV, DISP(cell));
+    assert.deepEqual(ids(r.open), ['1'], cell);
+    assert.equal(r.exit, 1, cell);
+  }
+  assert.equal(exitOf(REV, DISP('**Fixed** in abc1234.')), 0, 'formatting around a real disposition is fine');
+});
+
+test('R4: blockquoted reviews and tables are read', () => {
+  const quoted = judge(CLEAN, `> ## Review of ${S}: NOT CLEAN\n>\n> | # | Severity | Finding |\n> |---|---|---|\n> ${ROW('1')}\n`);
+  assert.deepEqual(ids(quoted.open), ['1']);
+  assert.equal(quoted.exit, 1);
+  const nested = judge(`${REV}\n> > | # | Severity | Finding |\n> > |---|---|---|\n> > ${ROW('2')}\n`, DISPS('Fixed', '1'));
+  assert.deepEqual(ids(nested.open), ['2']);
+  assert.equal(nested.exit, 1);
+  assert.equal(exitOf(CLEAN, '> [!IMPORTANT]\n> ## Review skipped\n>\n> Auto reviews are disabled'), 0);
+});
+
+test('R5: an indented code block hides what it holds; list continuations do not', () => {
+  const code = judge(REV, `## Dispositions for the review of ${S}\n\nText:\n\n    | # | Disposition |\n    |---|---|\n    | 1 | Fixed |\n`);
+  assert.match(code.errors.join('\n'), /no dispositions table/);
+  assert.equal(code.exit, 2);
+  const tab = judge(REV, `${DISP('-')}\n\t| # | Disposition |\n\t|---|---|\n\t| 1 | Fixed |\n`);
+  assert.deepEqual(ids(tab.open), ['1']);
+  assert.equal(tab.exit, 1);
+  const inList = judge(REV, `${DISP('-')}\n- later:\n\n    | # | Disposition |\n    |---|---|\n    | 1 | Fixed |\n`);
+  assert.deepEqual(inList.open, [], 'a table indented under a list item renders as a table');
+  assert.equal(inList.exit, 0);
+});
+
+test('R6: a #-and-finding/findings/issue table outside a review section is an error', () => {
+  for (const col of ['Finding', 'Findings', 'Issue', 'issues']) {
+    const r = judge(CLEAN, `## Audit at ${S}\n\n| # | Severity | ${col} |\n|---|---|---|\n| 1 | high | x |`);
+    assert.match(r.errors.join('\n'), /outside a review/, col);
+    assert.equal(r.exit, 2, col);
+  }
+});
+
+test('R9: "No findings." must stand alone in a review that is not NOT CLEAN; no list items', () => {
+  for (const body of [
+    `## Review of ${S}: NOT CLEAN\n\nNo findings.\n`,
+    `## Review of ${S}: CLEAN\n\nNo findings.\n\n1. high: real one\n`,
+    `## Review of ${S}: CLEAN\n\nNo findings.\n\n${T}`,
+    `${REV}\n- 2. high: also this\n`,
+    `## Review of ${S}: CLEAN\n\n* one more thing\n`,
+  ]) {
+    const r = judge(body, DISPS('Fixed', '1'));
+    assert.equal(r.exit, 2, body);
+  }
+  assert.equal(exitOf(`## Review of ${S}: CLEAN\n\nNo findings.\n`), 0);
+});
+
+test('R10: honest review layouts are not blocked', () => {
+  const ok = {
+    '### Findings in a review': [`## Review of ${S}\n\n### Findings\n\n${T}`, DISPS('Fixed', '1')],
+    'bold subheading in a review': [`## Review of ${S}\n\n**Findings**\n\n${T}`, DISPS('Fixed', '1')],
+    'reserved-looking subheading in a review': [`## Review of ${S}\n\n### Re-review notes\n\n${T}`, DISPS('Fixed', '1')],
+    'summary table in a review': [`## Review of ${S}\n\n| File | Notes |\n|---|---|\n| a.js | ok |\n\n${T}`, DISPS('Fixed', '1')],
+    'sha in backticks': [`## Review of \`${S}\`: CLEAN\n\nNo findings.`],
+    'dispositions sha in backticks': [REV, `## Dispositions for the review of \`${S}\`\n\n| # | Disposition |\n|---|---|\n| 1 | Fixed |`],
+    'human "## Findings from QA"': [CLEAN, '## Findings from QA\n\nAll good on staging.'],
+    'human "## Review notes"': [CLEAN, '## Review notes\n\nlooks fine'],
+    'setext "Re-review requested"': [CLEAN, 'Re-review requested\n---\n'],
+    '<!-- inside inline code': [CLEAN, 'The template has a `<!-- -->` block and `<!--` opener.'],
+  };
+  for (const [name, bs] of Object.entries(ok)) {
+    const r = judge(...bs);
+    assert.deepEqual(r.errors, [], name);
+    assert.equal(r.exit, 0, name);
+  }
+});
+
+test('R10: the strict counterparts still block', () => {
+  const bad = {
+    'Issue column in a review': `## Review of ${S}\n\n| # | Severity | Issue |\n|---|---|---|\n| 1 | high | x |`,
+    '### Review of <sha> inside a review': `${REV}\n### Review of 3333333\n`,
+    'setext review form': `Review of ${S}\n---\n\n${T}`,
+    'findings named with a sha': `## Findings on ${S}\n\n1. low: thing\n`,
+  };
+  for (const [name, body] of Object.entries(bad)) assert.equal(judge(CLEAN, body).exit, 2, name);
 });
 
 test('a comment with no usable timestamp is inconclusive', () => {
@@ -278,15 +397,15 @@ const sink = () => { const lines = []; return { lines, log: (s) => lines.push(s)
 
 test('fetchPr reads every page of comments, reviews and threads, with edit and hidden flags', async () => {
   const { gh } = fakeGh({
-    comments: [[issueComment(0, 'review', { lastEditedAt: at(9) })], [issueComment(2, 'dispositions-partial', { isMinimized: true })]],
+    comments: [[issueComment(0, 'review', { lastEditedAt: at(9), author: { login: 'ann' } })], [issueComment(2, 'dispositions-partial', { isMinimized: true })]],
     reviews: [[{ submittedAt: at(1), createdAt: at(1), lastEditedAt: null, isMinimized: false, url: 'r1', body: '' }],
       [{ submittedAt: null, createdAt: at(3), lastEditedAt: at(4), isMinimized: false, url: 'r2', body: fx('combined') }]],
     threads: [[{ isResolved: true, path: 'a', line: 1, comments: { nodes: [{ body: 'x', url: 't0' }] } }],
       [{ isResolved: false, path: 'b', line: 2, comments: { nodes: [{ body: 'y', url: 't1' }] } }]],
   });
   const pr = await fetchPr({ repo: 'acme/game', pr: 7, gh });
-  assert.deepEqual(pr.comments.map((c) => [c.url, c.at, c.edited, c.minimized]), [
-    ['c0', at(0), at(9), false], ['c2', at(2), null, true], ['r2', at(3), at(4), false], // empty review body dropped
+  assert.deepEqual(pr.comments.map((c) => [c.url, c.at, c.edited, c.minimized, c.author]), [
+    ['c0', at(0), at(9), false, 'ann'], ['c2', at(2), null, true, '(unknown)'], ['r2', at(3), at(4), false, '(unknown)'], // empty review body dropped
   ]);
   assert.deepEqual(pr.threads.map((t) => [t.where, t.isResolved]), [['a:1', true], ['b:2', false]]);
 });
@@ -336,9 +455,24 @@ test('run exits 2 for a PR with no review comment', async () => {
   assert.match(out.lines.join('\n'), /no review/i);
 });
 
-test('run skips a minimized comment fetched from GitHub', async () => {
-  const { gh } = fakeGh({ comments: [[issueComment(0, 'clean'), issueComment(1, 'malformed-row', { isMinimized: true })]] });
-  assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: () => {} }), 0);
+test('R7: run skips a minimized comment but logs who posted it and where', async () => {
+  const hidden = issueComment(1, 'malformed-row', { isMinimized: true, author: { login: 'some-bot' } });
+  const { gh } = fakeGh({ comments: [[issueComment(0, 'clean'), hidden]] });
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 0);
+  assert.match(out.lines.join('\n'), /SKIPPED minimized comment by some-bot: c1/);
+});
+
+test('R8: a page carrying errors is inconclusive even when it also has data', async () => {
+  const { gh: base } = fakeGh({ comments: [[issueComment(0, 'clean')]] });
+  const gh = async (args) => {
+    const out = await base(args);
+    if (!args.join(' ').includes('reviews(first: 100')) return out;
+    return JSON.stringify(JSON.parse(out).map((p) => ({ ...p, errors: [{ message: 'partial: rate limited' }] })));
+  };
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 2);
+  assert.match(out.lines.join('\n'), /INCONCLUSIVE: .*rate limited/);
 });
 
 test('run resolves the repo through gh when none is given, and passes it on', async () => {
