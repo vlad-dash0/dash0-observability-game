@@ -231,3 +231,30 @@ test('everything main.mjs imports, transitively, is deployed (not in .verceligno
   visit('main.mjs');
   assert.ok(seen.has('app.mjs') && seen.has('hub/map-data.mjs'), `walked ${[...seen].join(', ')}`);
 });
+
+// A failing assert.equal / deepEqual on a linkedom node (or a ctx holding one) makes node's
+// assertion message inspect linkedom's huge circular graph: it runs synchronously for
+// minutes and took tens of GB once, and --test-timeout cannot interrupt it. Compare
+// booleans or strings instead, e.g. `assert.equal(el === null, true)`.
+const DOM_OPERAND = new RegExp(
+  String.raw`assert\.(?:equal|notEqual|strictEqual|notStrictEqual|deepEqual|deepStrictEqual|notDeepEqual|notDeepStrictEqual)\(\s*` +
+    String.raw`(?:(?:[\w.]+\.)?(?:getElementById|querySelector|closest)\([^()]*\)|ctxs\.\w+|ctx)\s*,`,
+);
+
+test('the DOM-operand guard spots node and ctx operands, not their string properties', () => {
+  assert.ok(DOM_OPERAND.test("assert.equal(document.getElementById('a'), null)"));
+  assert.ok(DOM_OPERAND.test("assert.equal(el.closest('.x'), null, 'm')"));
+  assert.ok(DOM_OPERAND.test('assert.deepEqual(ctxs.y, undefined)'));
+  assert.ok(!DOM_OPERAND.test("assert.equal(document.getElementById('a') === null, true)"));
+  assert.ok(!DOM_OPERAND.test("assert.equal(q('#a').getAttribute('cx'), '5')"));
+  assert.ok(!DOM_OPERAND.test("assert.equal(dom.document.getElementById('ov-body').innerHTML, '')"));
+});
+
+test('no test passes a DOM node or a level ctx to an equality assertion', () => {
+  const files = walk('test', ['.mjs']).filter((rel) => rel !== 'test/static.test.mjs');
+  for (const rel of files) {
+    read(rel).split('\n').forEach((line, i) => {
+      assert.ok(!DOM_OPERAND.test(line), `${rel}:${i + 1} compares a DOM node; compare a boolean: ${line.trim()}`);
+    });
+  }
+});

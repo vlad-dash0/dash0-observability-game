@@ -80,3 +80,38 @@ test('renderMap positions with attributes only, escapes labels and marks state i
   assert.equal(lines.length, EDGES.length);
   assert.equal(lines.filter((l) => /\blit\b/.test(l.getAttribute('class'))).length, 1);
 });
+
+test('renderMap escapes labels, ids and kinds, and coerces positions to numbers', () => {
+  const nodes = [{
+    id: '"><g id="pwn-id"></g>',
+    label: '</text><g id="pwn"></g>',
+    kind: '"><g id="pwn-kind"></g>',
+    x: '5" onload="alert(1)',
+    y: 7,
+  }];
+  const state = { nodes: { [nodes[0].id]: { lit: true, pulse: false } }, edges: [] };
+  const markup = renderMap(state, nodes, []);
+  const { document } = parseHTML(`<svg xmlns="http://www.w3.org/2000/svg">${markup}</svg>`);
+  for (const id of ['pwn', 'pwn-id', 'pwn-kind']) {
+    // A boolean, so a failure never prints a linkedom node (huge and slow to inspect).
+    assert.equal(document.getElementById(id) === null, true, `#${id} was injected`);
+  }
+  assert.ok(markup.includes('&lt;/text&gt;'), 'label is escaped');
+  assert.ok(markup.includes('data-node="&quot;&gt;&lt;g'), 'data-node is escaped');
+  assert.ok(markup.includes('kind-&quot;&gt;&lt;g'), 'kind is escaped');
+  assert.ok(!markup.includes('onload'), 'a position cannot carry markup');
+  assert.equal(document.querySelector('circle').getAttribute('cy'), '7');
+  assert.equal(document.querySelector('circle').getAttribute('cx'), '0', 'non-numeric x is clamped to 0');
+});
+
+test('renderMap clamps non-finite coordinates to 0 instead of emitting NaN or Infinity', () => {
+  const nodes = [
+    { id: 'a', label: 'A', kind: 'service', x: Infinity, y: NaN },
+    { id: 'b', label: 'B', kind: 'service', x: -Infinity, y: 1e400 },
+  ];
+  const state = { nodes: { a: { lit: false }, b: { lit: false } }, edges: [{ lit: false }] };
+  const markup = renderMap(state, nodes, [{ from: 'a', to: 'b' }]);
+  assert.doesNotMatch(markup, /NaN|Infinity/);
+  assert.match(markup, /<line class="edge" x1="0" y1="0" x2="0" y2="0">/);
+  assert.match(markup, /<circle cx="0" cy="0" /);
+});

@@ -17,8 +17,7 @@ import assert from 'node:assert/strict';
 import { makeDom, q, qa, click as domClick } from './helpers/dom.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
-import { ACTS } from '../levels/index.mjs';
-import { DECK } from '../cards/deck.mjs';
+import { liveRegistry } from '../app.mjs';
 import fixtureLevel, { FIXTURE_CARD } from './fixtures/fixture-level.mjs';
 import * as V from './fixtures/variant-levels.mjs';
 
@@ -27,8 +26,9 @@ const NOW = 1767225600000;
 /** One driver per registered level id. */
 const DRIVERS = {};
 
-// nodeIds is empty until F5 adds hub/map-data.mjs; then pass the real node ids here.
-const LIVE = buildRegistry(ACTS, { deck: DECK, nodeIds: [] });
+// The same registry the app boots with (levels/index.mjs, the deck and the map's node ids),
+// so a level the app accepts is a level this file plays, and vice versa.
+const LIVE = liveRegistry();
 
 /** Ids registered without a driver, and drivers for ids that are not registered. */
 function driverGaps(order, drivers) {
@@ -106,6 +106,18 @@ function hasFinish(html) {
   return box.querySelector('[data-finish]') !== null;
 }
 
+/**
+ * Alpine attribute names (x-*, @*, :*) in `html`. Level HTML must have none: Alpine's
+ * mutation observer initialises nodes added under x-ignore too (it never checks
+ * ancestors), so such an attribute would run as an Alpine expression.
+ */
+function alpineAttrs(html) {
+  const box = globalThis.document.createElement('div');
+  box.innerHTML = html;
+  return [...box.querySelectorAll('*')].flatMap((el) =>
+    el.getAttributeNames().filter((n) => /^(x-|@|:)/.test(n)).map((n) => `<${el.localName} ${n}>`));
+}
+
 /** Every check a play-through must pass; returns the stars earned. */
 function checkRun(level, run) {
   const { calls, steps, first } = playLevel(level, run.play);
@@ -126,6 +138,7 @@ function checkRun(level, run) {
   for (const s of steps) {
     assert.ok(/<button|<input/.test(s), `step has nothing to click: ${s.slice(0, 80)}`);
     assert.ok(!s.includes('\u2014'), `step copy has an em dash: ${s.slice(0, 80)}`);
+    assert.deepEqual(alpineAttrs(s), [], `step uses an Alpine attribute: ${s.slice(0, 80)}`);
   }
   return result.stars;
 }
@@ -312,4 +325,33 @@ test('harness: a wrong expectation, a missing sloppy run or an equal sloppy run 
     () => checkLevel(FIXTURE, { ...FIXTURE_DRIVER, sloppy: FIXTURE_DRIVER }),
     /fewer stars/,
   );
+});
+
+test('harness: a step with an Alpine attribute (x-, @ or :) fails', () => {
+  const tags = ['x-on:click="go()"', '@click="go()"', ':disabled="false"'];
+  for (const attr of tags) {
+    const [lvl] = Object.values(
+      buildRegistry(
+        [{ id: 'fx-act', no: 0, levels: [{ ...fixtureLevel, id: 'fx-alpine', run(ctx) {
+          ctx.renderStep('<p>Go on.</p>', `<button id="fin" data-finish ${attr}>Finish</button>`);
+          ctx.ovActions.querySelector('#fin').disabled = true;
+          ctx.ovActions.querySelector('#fin').onclick = () => ctx.finish({ text: 'A long enough reward text.' });
+        } }], boss: null }],
+        { deck: [FIXTURE_CARD], nodeIds: [] },
+      ).levels,
+    );
+    const play = () => {
+      q('#fin').disabled = false;
+      click('#fin');
+    };
+    assert.throws(() => checkRun(lvl, { play, expect: { stars: 3, cards: [] } }), /Alpine attribute/, attr);
+  }
+  assert.deepEqual(alpineAttrs('<p data-x="1" class="x-y" aria-label=":)">ok</p>'), []);
+});
+
+test('the live registry checks levels against the real map nodes', () => {
+  const act = (lights) => [{ id: 'fx-act', no: 0, levels: [{ ...fixtureLevel, lights }], boss: null }];
+  const reg = liveRegistry(act(['checkout', 'payments']), [FIXTURE_CARD]);
+  assert.deepEqual(reg.levels['fixture-level'].lights, ['checkout', 'payments']);
+  assert.throws(() => liveRegistry(act(['nowhere']), [FIXTURE_CARD]), /unknown node "nowhere"/);
 });

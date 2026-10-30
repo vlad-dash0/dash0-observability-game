@@ -115,7 +115,7 @@ test('openLevel on a locked level is refused and nudges with the lock reason', (
   assert.equal(game.levelState('z'), 'locked');
   assert.equal(game.openLevel('z'), false);
   assert.equal(game.overlayOpen, false);
-  assert.equal(ctxs.z, undefined, 'the level never ran');
+  assert.equal(ctxs.z === undefined, true, 'the level never ran');
   assert.equal(game.nudgeId, 'z');
   assert.match(game.levelSub('z'), /First act/);
   assert.equal(timers.length, 1, 'the nudge clears itself');
@@ -181,12 +181,65 @@ test('closeOverlay aborts the level signal and clears the level DOM', () => {
   assert.equal(dom.document.getElementById('ov-actions').innerHTML, '');
 });
 
-test('opening another level aborts the one still open', () => {
+test('a stray openLevel while a level is open is refused and the run keeps going', () => {
   const { game } = setup();
   game.openLevel('x');
+  assert.equal(game.openLevel('y'), false);
+  assert.equal(game.openLevel('x'), false, 'not even the same level restarts');
+  assert.equal(ctxs.x.signal.aborted, false);
+  assert.equal(ctxs.y === undefined, true);
+  assert.equal(game.currentLevelId, 'x');
+  game.closeOverlay();
+  assert.equal(game.openLevel('y'), true, 'once closed, another level opens');
+});
+
+test('openLevel while the reward card is open is refused', () => {
+  const { game } = setup();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  assert.equal(game.rewardOpen, true);
+  assert.equal(game.openLevel('y'), false);
+  assert.equal(ctxs.y === undefined, true);
+  game.closeReward();
+  assert.equal(game.openLevel('y'), true);
+});
+
+test('Escape closes the reward, or the level unless the player is typing', () => {
+  const { game, dom } = setup();
+  game.openLevel('x');
+  const body = dom.document.getElementById('ov-body');
+  body.innerHTML = '<input id="in"><textarea id="ta"></textarea><p id="ce" contenteditable="true"></p>';
+  for (const id of ['in', 'ta', 'ce']) {
+    game.onEscape({ target: dom.document.getElementById(id) });
+    assert.equal(game.overlayOpen, true, `Escape in #${id} keeps the level open`);
+  }
+  assert.equal(ctxs.x.signal.aborted, false);
+  game.onEscape({ target: dom.document.body });
+  assert.equal(game.overlayOpen, false);
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  game.onEscape({ target: dom.document.body });
+  assert.equal(game.rewardOpen, false);
+  game.onEscape({ target: null }); // nothing open: a no-op
+});
+
+test('focus returns to the level card after closing the level and after the reward', () => {
+  const { game, dom } = setup();
+  const focused = [];
+  for (const id of ['x', 'y']) {
+    const card = dom.document.createElement('div');
+    card.setAttribute('data-level-id', id);
+    card.focus = () => focused.push(id);
+    dom.document.body.appendChild(card);
+  }
+  game.openLevel('x');
+  game.closeOverlay();
+  assert.equal(focused.at(-1), 'x');
   game.openLevel('y');
-  assert.equal(ctxs.x.signal.aborted, true);
-  assert.equal(ctxs.y.signal.aborted, false);
+  ctxs.y.finish({ text: 'y is finished now' });
+  focused.length = 0;
+  game.closeReward();
+  assert.deepEqual(focused, ['y']);
 });
 
 test('completion: stored with its stars, done, its nodes lit, totals and reward updated', () => {
@@ -262,6 +315,38 @@ test('a storage event merges another tab\'s progress into memory', () => {
   assert.equal(game.progress.levels.y.stars, 3, 'never downgrades');
 });
 
+test('a storage event carrying a newer version sets the future notice', () => {
+  const { game, store } = setup();
+  assert.equal(game.notice, null);
+  store.data.set(STORAGE_KEY, JSON.stringify({ v: 99, levels: { y: { stars: 3, at: AT } }, cards: [] }));
+  game.onStorage({ key: STORAGE_KEY });
+  assert.equal(game.notice, 'future');
+});
+
+test('a successful save clears the corrupt and unavailable notices', () => {
+  const corrupt = setup({ initial: { [STORAGE_KEY]: '{bad' } });
+  assert.equal(corrupt.game.notice, 'corrupt');
+  corrupt.game.openLevel('x');
+  ctxs.x.finish({ text: 'saved over the corrupt value' });
+  assert.equal(corrupt.store.data.get('oncall.progress.corrupt'), '{bad', 'backup exists');
+  assert.equal(corrupt.game.notice, null);
+
+  const store = fakeStorage();
+  let blocked = true;
+  const flaky = setup({
+    storage: () => {
+      if (blocked) throw new Error('blocked');
+      return store;
+    },
+  });
+  assert.equal(flaky.game.notice, 'unavailable');
+  blocked = false;
+  flaky.game.openLevel('x');
+  ctxs.x.finish({ text: 'storage came back' });
+  assert.equal(flaky.game.notice, null);
+  assert.equal(stored(store).levels.x.stars, 3);
+});
+
 test('storage events for other keys are ignored; a corrupt write changes nothing', () => {
   const { game, store } = setup();
   store.data.set(STORAGE_KEY, v1({ y: { stars: 3, at: AT } }));
@@ -313,6 +398,14 @@ test('level labels and classes cover every state', () => {
   game.openLevel('z');
   assert.equal(game.levelClasses('z'), 'locked nudge');
   assert.equal(game.starText('y'), '★★☆');
+});
+
+test('the map text alternative names the lit components', () => {
+  const { game } = setup();
+  assert.equal(game.mapLabel(), 'System map: 0 of 15 components lit.');
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  assert.equal(game.mapLabel(), 'System map: 2 of 15 components lit: Checkout, Payments.');
 });
 
 test('the theme toggle flips, applies and stores the theme', () => {
@@ -385,6 +478,34 @@ test('index.html: level cards keep the keyboard and screen-reader wiring', () =>
     assert.equal(d.getAttribute('aria-modal'), 'true', sel);
   }
   assert.ok(shell.querySelector('[x-show="!hasLevels"]'), 'empty state is wired');
+});
+
+test('index.html: the hub goes inert while a dialog is open; dialogs stay outside it', () => {
+  const hub = shell.querySelector('.hub');
+  assert.ok(hub, '.hub wrapper exists');
+  assert.equal(hub.getAttribute(':inert'), 'overlayOpen || rewardOpen');
+  for (const sel of ['.hub-header', '.system-map', '.levels']) {
+    assert.ok(hub.querySelector(sel), `${sel} is inside .hub`);
+  }
+  for (const sel of ['.overlay', '.reward']) {
+    assert.equal(shell.querySelector(sel).closest('.hub') === null, true, `${sel} is outside .hub`);
+  }
+  assert.equal(shell.querySelector('.app').getAttribute('@keydown.escape.window'), 'onEscape($event)');
+});
+
+test('index.html: the notice and star live regions stay rendered and carry text', () => {
+  const notice = shell.querySelector('.notice');
+  assert.equal(notice.getAttribute('role'), 'status');
+  assert.equal(notice.hasAttribute('x-show'), false, 'x-show would hide the live region');
+  assert.equal(notice.getAttribute(':class'), "notice ? 'show' : ''");
+  assert.equal(notice.getAttribute('x-text'), 'noticeText()');
+  const stars = shell.querySelector('.star-count');
+  assert.equal(stars.getAttribute('role'), 'status');
+  const spoken = stars.querySelector('.visually-hidden');
+  assert.ok(spoken, 'the star status holds visually hidden text');
+  assert.equal(spoken.getAttribute('x-text'), 'starSummary()');
+  assert.match(read('styles/hub.css'), /\.visually-hidden\s*\{[^}]*clip-path/);
+  assert.match(read('styles/hub.css'), /\.notice:not\(\.show\)/);
 });
 
 test('main.mjs applies the stored theme before anything else runs', () => {

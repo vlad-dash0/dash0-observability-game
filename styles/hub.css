@@ -46,6 +46,14 @@
   background: color-mix(in srgb, var(--color-error) 10%, transparent);
   font-size: 14px;
 }
+/* Stays in the accessibility tree (a live region) but takes no space when empty. */
+.notice:not(.show) { margin: 0; padding: 0; border: 0; background: none; }
+
+/* Read by screen readers, not shown. */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
 
 .section-label {
   font-weight: 700; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase;
