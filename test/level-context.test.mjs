@@ -13,6 +13,7 @@ function setup({
   now = () => NOW,
   controller = new AbortController(),
   onFinish,
+  reportError,
 } = {}) {
   const dom = makeDom();
   const calls = [];
@@ -26,7 +27,7 @@ function setup({
     reduceMotion: true,
     onFinish: onFinish ?? ((...args) => calls.push(args)),
     signal: controller.signal,
-    reportError: (e) => reported.push(e),
+    reportError: reportError ?? ((e) => reported.push(e)),
   });
   return { dom, ctx, calls, controller, reported };
 }
@@ -124,6 +125,60 @@ test('an onFinish that throws is reported; the player still gets the result once
   assert.deepEqual(ctx.finish({ text: 'done' }), { stars: 3, cards: [], text: 'done' });
   assert.deepEqual(reported, [boom]);
   assert.equal(ctx.finish({ text: 'again' }), null);
+});
+
+test('a throwing clock at finish: elapsed 0, no date, reported, one onFinish', () => {
+  let n = 0;
+  const now = () => {
+    if (n++ > 0) throw new Error('clock gone');
+    return NOW;
+  };
+  const { ctx, calls, reported } = setup({ level: PAR_60S, now });
+  assert.equal(ctx.finish({ text: 'done' }).stars, 3);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][1].at, null);
+  assert.equal(reported.length, 1);
+});
+
+test('a text whose toString throws becomes empty text, reported, one onFinish', () => {
+  const { ctx, calls, reported } = setup();
+  const text = {
+    toString() {
+      throw new Error('no string');
+    },
+  };
+  assert.equal(ctx.finish({ text }).text, '');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][1].text, '');
+  assert.equal(reported.length, 1);
+});
+
+test('a reportError that throws is swallowed; onFinish still fires once', () => {
+  const reportError = () => {
+    throw new Error('logger down');
+  };
+  const { ctx, calls } = setup({ level: PAR_60S, now: () => NaN, reportError });
+  assert.deepEqual(ctx.finish({ text: 'x' }), { stars: 3, cards: [], text: 'x' });
+  assert.equal(calls.length, 1);
+  const thrower = setup({
+    reportError,
+    onFinish: () => {
+      throw new Error('store down');
+    },
+  });
+  assert.deepEqual(thrower.ctx.finish(), { stars: 3, cards: [], text: '' });
+});
+
+test('if building the result throws, nothing is latched and finish can be retried', () => {
+  const { ctx, calls } = setup();
+  const cards = ['c1'];
+  cards[Symbol.iterator] = () => {
+    throw new Error('bad cards');
+  };
+  assert.throws(() => ctx.finish({ cards }), /bad cards/);
+  assert.equal(calls.length, 0);
+  assert.ok(ctx.finish({ text: 'retry' }));
+  assert.equal(calls.length, 1);
 });
 
 test('reportError defaults to console.error', (t) => {

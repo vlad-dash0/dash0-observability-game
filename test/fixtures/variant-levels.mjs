@@ -1,5 +1,5 @@
 // Fixture variants for the harness-teeth tests in test/levels-play.test.mjs: one valid
-// unscored level and five levels the harness must reject. Not registered anywhere.
+// unscored level and six levels the harness must reject. Not registered anywhere.
 import fixtureLevel from './fixture-level.mjs';
 
 const base = (id, no, extra) => ({
@@ -63,6 +63,20 @@ export const FINISH_OUTSIDE_RENDER = base('fx-outside-render', '0.7', {
     ctx.ovActions.querySelector('#go').onclick = () => {
       ctx.ovActions.innerHTML = '<button id="fin" data-finish>Finish</button>';
       ctx.ovActions.querySelector('#fin').onclick = () => ctx.finish({ text: REWARD });
+    };
+  },
+});
+
+/** Broken: a [data-finish] button only advances; a later plain button finishes. */
+export const STALE_FINISH_CLICK = base('fx-stale-click', '0.8', {
+  run(ctx) {
+    ctx.renderStep('<p>Start.</p>', '<button id="go">Go</button>');
+    ctx.ovActions.querySelector('#go').onclick = () => {
+      ctx.renderStep('<p>Almost.</p>', '<button id="fin" data-finish>Continue</button>');
+      ctx.ovActions.querySelector('#fin').onclick = () => {
+        ctx.renderStep('<p>Now.</p>', '<button id="real">Done</button>');
+        ctx.ovActions.querySelector('#real').onclick = () => ctx.finish({ text: REWARD });
+      };
     };
   },
 });
