@@ -128,6 +128,7 @@ test('checkConfig: no service name anywhere is service-name-missing', () => {
   );
   assert.equal(r.ok, false);
   assert.deepEqual(codes(r), ['service-name-missing']);
+  assert.match(r.issues[0].message, /unknown_service:node/);
 });
 
 test('checkConfig: a different service name is service-name-wrong', () => {
@@ -204,4 +205,75 @@ test('renderIssues escapes player input', () => {
 
 test('renderIssues renders nothing for no issues', () => {
   assert.equal(renderIssues([], escapeHtml), '');
+});
+
+test('renderIssues escapes the issue code too', () => {
+  const html = renderIssues([{ code: '"><x>', message: 'm' }], escapeHtml);
+  assert.doesNotMatch(html, /"><x>/);
+  assert.match(html, /&quot;&gt;&lt;x&gt;/);
+});
+
+// Review follow-ups (#14)
+
+test('parseEnv: a lone double quote is a value, not an empty quoted string', () => {
+  assert.equal(parseEnv('A="').vars.A, '"');
+});
+
+test('parseEnv: an inline comment after an unquoted value is cut', () => {
+  assert.equal(parseEnv('OTEL_SERVICE_NAME=checkout # prod').vars.OTEL_SERVICE_NAME, 'checkout');
+  assert.equal(parseEnv('A=a#b').vars.A, 'a#b');
+});
+
+test('parseEnv: an inline comment after a quoted value is cut; other trailing text is an error', () => {
+  assert.equal(parseEnv('OTEL_SERVICE_NAME="checkout" # prod').vars.OTEL_SERVICE_NAME, 'checkout');
+  assert.equal(parseEnv('A="x # y"').vars.A, 'x # y');
+  const r = parseEnv('A="checkout" prod');
+  assert.deepEqual(r.vars, {});
+  assert.equal(r.errors[0].line, 1);
+});
+
+test('parseEnv: single quotes are stripped, with no escape processing', () => {
+  assert.equal(parseEnv("OTEL_SERVICE_NAME='checkout'").vars.OTEL_SERVICE_NAME, 'checkout');
+  assert.equal(parseEnv("A='a\\nb'").vars.A, 'a\\nb');
+});
+
+test('parseEnv: export followed by a tab is still stripped', () => {
+  assert.deepEqual(parseEnv('export\tA=1').vars, { A: '1' });
+});
+
+test('an unencoded = inside a resource attribute value discards the whole variable', () => {
+  const r = effectiveResource({ OTEL_RESOURCE_ATTRIBUTES: 'service.name=cart,service.version=1=2' }, NODE);
+  assert.equal(r.attributes['service.name'], 'unknown_service:node');
+  assert.equal(r.errors.length, 1);
+});
+
+test('a whitespace-only OTEL_SERVICE_NAME counts as unset', () => {
+  const ra = effectiveResource(
+    { OTEL_SERVICE_NAME: '  ', OTEL_RESOURCE_ATTRIBUTES: 'service.name=cart' },
+    NODE,
+  );
+  assert.equal(ra.attributes['service.name'], 'cart');
+  const none = parseEnv('OTEL_SERVICE_NAME="  "').vars;
+  assert.equal(effectiveResource(none, NODE).attributes['service.name'], 'unknown_service:node');
+});
+
+test('checkConfig: parse errors are capped at 20, then one parse-error-more with the count', () => {
+  const r = checkConfig(`${GOOD}\n${'NOPE\n'.repeat(100)}`, WANT);
+  assert.equal(codes(r).filter((c) => c === 'parse-error').length, 20);
+  const more = r.issues.filter((i) => i.code === 'parse-error-more');
+  assert.equal(more.length, 1);
+  assert.match(more[0].message, /and 80 more/);
+});
+
+test('checkConfig: empty attribute values are set but empty, reported as -wrong', () => {
+  const ra = (s) => `OTEL_RESOURCE_ATTRIBUTES=${s}`;
+  const name = checkConfig(ra('service.name=,service.version=1,deployment.environment.name=production'), WANT);
+  assert.deepEqual(codes(name), ['service-name-wrong']);
+  assert.match(name.issues[0].message, /empty/);
+  const version = checkConfig(GOOD.replace('service.version=1.4.2', 'service.version='), WANT);
+  assert.deepEqual(codes(version), ['version-wrong']);
+  assert.match(version.issues[0].message, /empty/);
+  const env = checkConfig(GOOD.replace('name=production', 'name='), WANT);
+  assert.deepEqual(codes(env), ['environment-wrong']);
+  assert.match(env.issues[0].message, /empty/);
 });
