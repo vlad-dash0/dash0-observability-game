@@ -144,20 +144,63 @@ test('save: future data is never overwritten (zero setItem calls)', () => {
   assert.equal(s.data.get(STORAGE_KEY), raw);
 });
 
-test('save: every corrupt value is copied before the progress write; the first copy is kept', () => {
+test('save: every corrupt value is copied once before the progress write; the first copy is kept', () => {
   const s = fakeStorage({ initial: { [STORAGE_KEY]: '{bad' } });
   const r = saveProgress(getter(s), P({ a: lv(2) }), REG);
   assert.equal(r.saved, true);
-  assert.deepEqual(s.sets.map(([k]) => k), [CORRUPT_KEY, CORRUPT_LATEST_KEY, STORAGE_KEY]);
+  assert.deepEqual(s.sets.map(([k]) => k), [CORRUPT_KEY, STORAGE_KEY], 'first corrupt value: one copy');
   assert.equal(s.data.get(CORRUPT_KEY), '{bad');
-  assert.equal(s.data.get(CORRUPT_LATEST_KEY), '{bad');
+  assert.equal(s.data.has(CORRUPT_LATEST_KEY), false);
   assert.deepEqual(stored(s).levels, { a: { stars: 2, at: null } });
 
   s.data.set(STORAGE_KEY, '[]');
   saveProgress(getter(s), P({ b: lv(1) }), REG);
   assert.equal(s.data.get(CORRUPT_KEY), '{bad', 'the first corrupt value is kept');
-  assert.equal(s.data.get(CORRUPT_LATEST_KEY), '[]', 'the second corrupt value is copied too');
-  assert.deepEqual(s.sets.map(([k]) => k).slice(3), [CORRUPT_LATEST_KEY, STORAGE_KEY]);
+  assert.equal(s.data.get(CORRUPT_LATEST_KEY), '[]', 'a different corrupt value is copied to latest');
+  assert.deepEqual(s.sets.map(([k]) => k).slice(2), [CORRUPT_LATEST_KEY, STORAGE_KEY]);
+
+  s.data.set(STORAGE_KEY, '{bad');
+  saveProgress(getter(s), P({ b: lv(1) }), REG);
+  assert.deepEqual(s.sets.map(([k]) => k).slice(4), [STORAGE_KEY], 'a value already in CORRUPT_KEY is not copied again');
+  assert.equal(s.data.get(CORRUPT_LATEST_KEY), '[]');
+});
+
+test('save: a registered completion is never evicted by the cap (levels and cards)', () => {
+  const reg = Object.freeze({
+    ...REG,
+    levels: Object.freeze(Object.assign(Object.create(null), {
+      ...REG.levels,
+      'zzz-final': Object.freeze({ id: 'zzz-final', actId: 'a0', kind: 'level', scored: true, cards: Object.freeze(['zzz-card']) }),
+    })),
+    order: Object.freeze([...REG.order, 'zzz-final']),
+    cardIds: Object.freeze([...REG.cardIds, 'zzz-card']),
+  });
+  const levels = {};
+  const cards = [];
+  for (let i = 0; i < 500; i++) {
+    levels[`a${String(i).padStart(4, '0')}`] = lv(1);
+    cards.push(`ac${String(i).padStart(4, '0')}`);
+  }
+  const s = fakeStorage({ initial: { [STORAGE_KEY]: json(levels, cards) } });
+  const r = saveProgress(getter(s), P({ 'zzz-final': lv(3) }, ['zzz-card']), reg);
+  assert.equal(r.saved, true);
+  assert.deepEqual(stored(s).levels['zzz-final'], { stars: 3, at: null });
+  assert.equal(Object.keys(stored(s).levels).length, 500);
+  assert.equal(stored(s).levels.a0499, undefined, 'the last unknown id by sort makes room');
+  assert.ok(stored(s).cards.includes('zzz-card'));
+  assert.equal(stored(s).cards.length, 500);
+  assert.deepEqual(plain(r.progress), { v: 1, levels: { 'zzz-final': { stars: 3, at: null } }, cards: ['zzz-card'] });
+});
+
+test('save: a missing or invalid registry throws TypeError before any read or write', () => {
+  for (const bad of [undefined, null, {}, { order: ['a'] }]) {
+    const s = fakeStorage({ initial: { [STORAGE_KEY]: json({ a: lv(1) }) } });
+    let reads = 0;
+    const g = () => { reads += 1; return s; };
+    assert.throws(() => saveProgress(g, P({ a: lv(2) }), bad), TypeError);
+    assert.equal(reads, 0, 'storage never touched');
+    assert.deepEqual(s.sets, []);
+  }
 });
 
 test('save: a failed latest-backup write aborts before the progress write', () => {

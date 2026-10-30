@@ -96,9 +96,11 @@ entry). `CURRENT_VERSION = 1`; `MIGRATIONS = {}` where `MIGRATIONS[n]` maps v n 
 - Own keys only; ignore `__proto__`, `constructor`, `prototype`; outputs null-prototype.
 - Id must match `^[a-z0-9-]{1,64}$`, else the entry is DROPPED (never cleaned).
 - `stars` must be a finite number, else drop; clamp `Math.min(3, Math.max(0, Math.floor(s)))`.
-- `at`: a parseable date string → `toISOString()`, else `null`.
-- Cards: strings only, valid ids, dedupe, sort. Caps: 500 level entries and 500 cards,
-  keeping the first by sorted id.
+- `at`: an ISO-8601 date-time with `Z` or `±HH:MM` that exists on the calendar as written
+  (no Feb 30, no `T24:00`) → `toISOString()`, else `null`.
+- Cards: strings only, valid ids, dedupe, sort. Caps (one rule, applied by sanitize and
+  merge): 500 level entries and 500 cards; ids in `keep` (the registry's, passed by storage
+  and `recordCompletion`) are never evicted, unknown ids fill the rest by sorted id.
 - With `levelIds`/`cardIds`: drop ids not in the set (the in-memory view). Without: keep
   every well-formed id (what gets persisted).
 
@@ -151,12 +153,12 @@ integers 0–3; corrupt input → empty, no throw; `recordCompletion` idempotent
 
 Unlock (`lib/unlock.mjs`, pure):
 - `isCompleted(progress, id)`: has an own entry.
-- `isActComplete(act)`: all `levelIds` and the `bossId` (if any) completed.
-- `isActUnlocked(i)`: EVERY earlier act complete (whole chain).
+- `isActComplete(act, progress)`: all `levelIds` and the `bossId` (if any) completed.
+- `isActUnlocked(i, progress, registry)`: EVERY earlier act complete (whole chain).
 - `levelState(id, progress, registry)` → `'locked'|'open'|'done'`: unknown → locked;
   completed → done (even in a locked act; imported progress is never hidden); act locked →
   locked; boss with an unfinished level in its act → locked; else open.
-- `lockReason(id, progress, registry)` → `{kind:'act', actId} | {kind:'boss', remaining:[ids]} | null`.
+- `lockReason(id, progress, registry)` → `{kind:'act', actId}` (first incomplete earlier act) `| {kind:'boss', remaining:[ids]} | {kind:'unknown'}` (id or its act not in the registry) `| null` (playable).
 
 Concurrency: `saveProgress` reads storage, merges, writes in one sync task; the `storage`
 event merges other tabs' writes into memory; progress only goes up, so last-writer-wins
@@ -171,9 +173,9 @@ stop stale finish; `openLevel` re-checks `levelState`. No reset UI in M0.
 | `validateDeck`, `validateRegistry`, `buildRegistry`, `nodeLitBy` | `lib/registry.mjs` |
 | `scoreStars` | `lib/scoring.mjs` |
 | `createLevelContext` | `lib/level-context.mjs` |
-| `emptyProgress`, `sanitizeProgress`, `migrate(raw, {current, migrations})`, `mergeProgress(a,b)`, `recordCompletion(progress, levelId, {stars, cards, at}, registry)` → `{progress, firstCompletion, newBest, newCards}`, `starTotals` → `{earned, max}`, `cardTotals` → `{earned, max}` | `lib/progress.mjs` |
+| `emptyProgress`, `sanitizeProgress`, `migrate(raw, {current, migrations})` → migrated record, `raw` if at/past `current`, or `null` (corrupt), `mergeProgress(a, b, {keep}?)`, `recordCompletion(progress, levelId, {stars, cards, at}, registry)` → `{progress, firstCompletion, newBest, newCards}`, `starTotals` → `{earned, max}`, `cardTotals` → `{earned, max}` | `lib/progress.mjs` |
 | `isCompleted`, `isActComplete`, `isActUnlocked`, `levelState`, `lockReason` | `lib/unlock.mjs` |
-| `loadProgress(storageGetter, registry)` → `{status, progress}`, `saveProgress(storageGetter, progress)` → `{saved, reason?, progress}` | `lib/storage.mjs` |
+| `loadProgress(storageGetter, registry)` → `{status, progress}`, `saveProgress(storageGetter, progress, registry)` → `{saved, reason?, progress}` (`progress` is always the registry view; `TypeError` before any storage access without a registry) | `lib/storage.mjs` |
 | `resolveTheme`, `readTheme(getter)`, `writeTheme(getter, t)` | `lib/theme.mjs` |
 | `nodeStates(registry, progress, NODES, EDGES)` | `lib/map.mjs` |
 | `parseEnv`, `effectiveResource`, `checkConfig` | `lib/widgets/env-config.mjs` |
@@ -189,12 +191,13 @@ Absence (`storageGetter = () => window.localStorage`, called inside try/catch):
 |---|---|---|---|
 | `fresh` | `getItem` → null | empty | normal |
 | `ok` | parses, `v === 1` after migration | sanitized view | read, merge, write |
-| `corrupt` | bad JSON, not an object, `v` missing / not an integer, migration gap | empty | first save copies the raw string to `oncall.progress.corrupt` (only if absent), then writes |
+| `corrupt` | bad JSON, not an object, `v` missing / not an integer, migration gap, `levels` not an object | empty | each save first copies the raw string to `oncall.progress.corrupt` if absent, else to `oncall.progress.corrupt.latest` if it differs; a failed copy aborts with `unavailable`; then writes |
 | `future` | `v > CURRENT_VERSION` | sanitized best effort | refused `{saved:false, reason:'future'}` |
 | `unavailable` | getter / `getItem` / `setItem` throws | memory only | `{saved:false, reason:'unavailable'}` |
 
 `game.notice` is set for corrupt, future and unavailable; null for fresh and ok. On save,
-stored data is sanitized without id filtering, so unknown levels survive.
+stored data is sanitized without id filtering, so unknown levels survive in storage; the
+returned `progress` is the registry view, so they never reach memory.
 
 ## 5. Files per phase (copy / adapt / new from R)
 
@@ -385,10 +388,11 @@ Fixture: `levelIds ['a','b','u']`, `cardIds ['c1','c2']`; `a.cards ['c1','c2']`;
 ### F4 `test/storage.test.mjs` (`fakeStorage({initial, throwOn})` records every `setItem`)
 fresh; ok; corrupt for `'{bad'`, `'[]'`, `'{"levels":{}}'`; future for `v:99`; unavailable
 for a throwing getter or `getItem`. Save merges with stored (stored `{a:2}`, memory
-`{a:1, b:3}` → `{a:2, b:3}`, returned equals stored; mutation: write memory directly).
+`{a:1, b:3}` → `{a:2, b:3}`, returns the registry view; mutation: write memory directly).
 Save keeps unknown ids. Throwing `setItem` → `{saved:false, reason:'unavailable'}`. Future
 → zero `setItem` calls (mutation: drop the check). Corrupt → backup written before the
-progress write, and a second corrupt value doesn't overwrite the backup.
+progress write, and a second corrupt value doesn't overwrite the backup (it goes to
+`.latest`). A registered completion is never evicted by the cap.
 
 ### F5 `test/map.test.mjs`
 A lights `['checkout','payments']`, B `['checkout']`, progress `{B:1}`: checkout lit,

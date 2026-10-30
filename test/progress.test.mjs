@@ -125,6 +125,15 @@ test('sanitize: at must be an ISO-8601 date-time with Z or an offset', () => {
   }
 });
 
+test('sanitize: at must be a real calendar date-time (no rollover)', () => {
+  const at = (v) => P({ a: { stars: 1, at: v } }).levels.a.at;
+  for (const bad of ['2026-02-30T00:00:00Z', '2026-04-31T00:00:00Z', '2025-02-29T00:00:00Z', '2026-10-30T24:00:00Z', '2026-10-30T23:60:00Z', '2026-10-30T10:00:00+24:00']) {
+    assert.equal(at(bad), null, bad);
+  }
+  assert.equal(at('2024-02-29T00:00:00Z'), '2024-02-29T00:00:00.000Z', 'leap day');
+  assert.equal(at('2026-10-31T23:30:00-02:00'), '2026-11-01T01:30:00.000Z', 'offset crossing midnight');
+});
+
 test('sanitize: a malformed id is dropped, never cleaned into a real one', () => {
   const r = raw({ 'naming-your-service<x>': { stars: 3, at: null } });
   const p = sanitizeProgress(r, { levelIds: ['naming-your-service'], cardIds: [] });
@@ -315,6 +324,64 @@ test('merge: the result keeps at most 500 entries and cards, the first by sorted
   assert.equal(m.cards.length, 500);
   assert.equal(m.cards[499], 'ac499');
   assert.deepEqual(plain(mergeProgress(side('a'), side('z'))), plain(m), 'same set either way');
+});
+
+// Over-cap fixtures: `n` unknown ids from `from` with prefix, plus the given registered ones.
+function over(prefix, from, n, known = [], knownCards = []) {
+  const levels = {};
+  const cards = [...knownCards];
+  for (let i = from; i < from + n; i++) {
+    levels[`${prefix}${String(i).padStart(3, '0')}`] = { stars: i % 4, at: null };
+    cards.push(`${prefix}c${String(i).padStart(3, '0')}`);
+  }
+  for (const id of known) levels[id] = { stars: 2, at: T2 };
+  return P(levels, cards);
+}
+const KEEP = { levelIds: ['zzz-final', 'zzz-boss'], cardIds: ['zzz-card'] };
+
+test('merge with keep: registered ids are never evicted; unknown ids fill the rest by sorted id', () => {
+  const m = mergeProgress(over('a', 0, 500), over('b', 0, 0, ['zzz-final'], ['zzz-card']), { keep: KEEP });
+  const keys = Object.keys(m.levels);
+  assert.equal(keys.length, 500);
+  assert.ok(keys.includes('zzz-final'));
+  assert.equal(keys.filter((k) => k.startsWith('a')).at(-1), 'a498');
+  assert.ok(m.cards.includes('zzz-card'));
+  assert.equal(m.cards.length, 500);
+  const plainCap = mergeProgress(over('a', 0, 500), over('b', 0, 0, ['zzz-final'], ['zzz-card']));
+  assert.ok(!Object.keys(plainCap.levels).includes('zzz-final'), 'without keep the cap is by sorted id only');
+});
+
+test('merge with keep: commutative, idempotent, associative over the cap', () => {
+  const X = over('u', 0, 300, ['zzz-final'], ['zzz-card']);
+  const Y = over('u', 150, 300, ['zzz-boss']);
+  const Z = over('v', 0, 300, ['zzz-final']);
+  const mk = (p, q) => mergeProgress(p, q, { keep: KEEP });
+  const eq = (x, y, msg) => assert.deepEqual(plain(x), plain(y), msg);
+  eq(mk(X, Y), mk(Y, X), 'X∪Y');
+  eq(mk(Y, Z), mk(Z, Y), 'Y∪Z');
+  for (const W of [X, Y, Z]) eq(mk(W, W), W, 'idempotent');
+  eq(mk(mk(X, Y), Z), mk(X, mk(Y, Z)), 'associative');
+  eq(mk(mk(Z, X), Y), mk(Z, mk(X, Y)), 'associative');
+  const all = mk(mk(X, Y), Z);
+  assert.ok(Object.hasOwn(all.levels, 'zzz-final') && Object.hasOwn(all.levels, 'zzz-boss'));
+});
+
+test('sanitize with keep: registered ids survive a full record', () => {
+  const r = raw({ ...Object.fromEntries(Array.from({ length: 500 }, (_, i) => [`a${String(i).padStart(3, '0')}`, { stars: 1, at: null }])), 'zzz-final': { stars: 3, at: null } });
+  assert.ok(Object.hasOwn(sanitizeProgress(r, { keep: KEEP }).levels, 'zzz-final'));
+  assert.ok(!Object.hasOwn(sanitizeProgress(r).levels, 'zzz-final'));
+});
+
+test('recordCompletion never evicts the level just finished, even over the cap', () => {
+  const reg = Object.freeze({
+    ...REG,
+    levels: Object.freeze(Object.assign(Object.create(null), { ...REG.levels, 'zzz-final': level('zzz-final', { cards: Object.freeze(['zzz-card']) }) })),
+    order: Object.freeze([...REG.order, 'zzz-final']),
+    cardIds: Object.freeze([...REG.cardIds, 'zzz-card']),
+  });
+  const r = recordCompletion(over('a', 0, 500), 'zzz-final', { stars: 3, cards: ['zzz-card'], at: T1 }, reg);
+  assert.deepEqual(plain(r.progress.levels['zzz-final']), { stars: 3, at: T1 });
+  assert.ok(r.progress.cards.includes('zzz-card'));
 });
 
 test('merge: never mutates either side', () => {
