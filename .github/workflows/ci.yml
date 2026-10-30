@@ -9,14 +9,22 @@ permissions:
 
 jobs:
   test:
+    name: test (node ${{ matrix.node || '.nvmrc' }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - node: '22' # engines.node floor
+          - node-file: .nvmrc # Active LTS, single source
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: .nvmrc
+          node-version: ${{ matrix.node }}
+          node-version-file: ${{ matrix.node-file }}
           cache: npm
       - run: npm ci
       - run: npm test

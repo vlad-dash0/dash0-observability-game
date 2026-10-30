@@ -15,7 +15,7 @@ platform and first level are being built (design: [docs/FOUNDATION.md](docs/FOUN
 
 ## Run and test
 
-Needs Node 22 or later (`.nvmrc` pins the Active LTS CI uses). No build step.
+Needs Node 22 or later (`.nvmrc` pins the Active LTS; CI tests both 22 and that). No build step.
 
 ```sh
 npm ci          # installs linkedom, the only (dev) dependency

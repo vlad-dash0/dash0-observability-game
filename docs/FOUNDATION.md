@@ -18,7 +18,8 @@ makes them pass, then proves each test by a one-line mutation of the implementat
    a renamed level must not erase progress).
 6. Standard Alpine 3.14.1 build + `'unsafe-eval'` in the CSP (as R does). No string
    `:style`, no `style=` attributes, so `style-src 'self'`.
-7. `test/` (singular), plain `node --test`, `"type": "module"`, `.mjs` everywhere,
+7. `test/` (singular), plain `node --test "test/**/*.test.mjs"` (the bare default also
+   runs `test/helpers/` and `test/fixtures/` as test files), `"type": "module"`, `.mjs` everywhere,
    relative imports, no top-level `window`/`document` access; Alpine referenced only in
    `main.mjs`.
 8. One ctx implementation (`lib/level-context.mjs`) used by both app and test harness
@@ -205,7 +206,8 @@ for those. After F1, only the named phase edits each file.
 
 **F1 scaffold, CI, CLAUDE.md (#9)**
 - Copy: `vendor/alpine-3.14.1.min.js`.
-- Adapt: `package.json` (name, description, `"type":"module"`, `scripts.test = "node --test"`,
+- Adapt: `package.json` (name, description, `"type":"module"`, `scripts.test = "node --test \"test/**/*.test.mjs\""`,
+  so helpers and fixtures are not run as tests;
   `linkedom` pinned exactly, `engines.node >=22`); `vercel.json` (no `functions`; CSP §7;
   keep X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, the
   `/vendor/(.*)` immutable cache header); `.gitignore`/`.vercelignore`; `index.html` stub
@@ -439,5 +441,6 @@ default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self'; img-src '
 ```
 Tests import modules directly; `window`, `localStorage`, `matchMedia` are injected as
 dependencies. CI: on push + pull_request, `permissions: contents: read`, ubuntu-latest,
-`actions/checkout` and `actions/setup-node` pinned to SHAs, `node-version-file: .nvmrc`,
+`actions/checkout` and `actions/setup-node` pinned to SHAs, a matrix of Node 22 (the
+`engines` floor) and `node-version-file: .nvmrc`,
 `cache: npm`, `npm ci`, `npm test`. `.nvmrc` = current Active LTS major.
