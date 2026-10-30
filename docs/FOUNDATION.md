@@ -60,7 +60,7 @@ plays levels synchronously, as R does).
 
 `export const ACTS = [{ id, no, name, sub, levels: Level[], boss: Level | null }]`.
 `id` kebab, unique; `no` integer ≥0, strictly increasing (gaps allowed); `levels.length ≥ 1`.
-Acts unlock by array position. Empty `ACTS` is valid.
+Acts unlock by array position, unless already entered (§3). Empty `ACTS` is valid.
 
 ### 2.3 Nuance card (`cards/deck.mjs`)
 
@@ -153,14 +153,16 @@ Progress: never downgrades (best stars, earliest non-null `at`, card union); sta
 integers 0–3; corrupt input → empty, no throw; `recordCompletion` idempotent;
 `mergeProgress` commutative, associative, idempotent for a fixed `keep`.
 
-Unlock (`lib/unlock.mjs`, pure):
+Unlock (`lib/unlock.mjs`, pure; entered rule decided 2026-10-30, see [M1-DESIGN](M1-DESIGN.md) §3):
 - `isCompleted(progress, id)`: has an own entry.
 - `isActComplete(act, progress)`: all `levelIds` and the `bossId` (if any) completed.
-- `isActUnlocked(i, progress, registry)`: EVERY earlier act complete (whole chain).
+- `isActUnlocked(i, progress, registry)`: EVERY earlier act complete (whole chain), OR act
+  `i` entered (any of its levels or its boss completed; opening a level is not recorded and
+  does not count). An entered act never re-locks when an earlier act gains a level.
 - `levelState(id, progress, registry)` → `'locked'|'open'|'done'`: unknown → locked;
   completed → done (even in a locked act; imported progress is never hidden); act locked →
   locked; boss with an unfinished level in its act → locked; else open.
-- `lockReason(id, progress, registry)` → `{kind:'act', actId}` (first incomplete earlier act) `| {kind:'boss', remaining:[ids]} | {kind:'unknown'}` (id or its act not in the registry) `| null` (playable).
+- `lockReason(id, progress, registry)` → `{kind:'act', actId}` (act not entered: first incomplete earlier act) `| {kind:'boss', remaining:[ids]} | {kind:'unknown'}` (id or its act not in the registry) `| null` (playable); `levelState` is `'open'` exactly when it is null.
 
 Concurrency: `saveProgress` reads storage, merges, writes in one sync task; the `storage`
 event merges other tabs' writes into memory; progress only goes up, so last-writer-wins
@@ -366,6 +368,7 @@ Registry: a0 `['l0a','l0b']` boss `b0`; a1 `['l1a','l1b']` no boss; a2 `['l2a']`
 - a0, a1 complete → l2a open, b2 locked.
 - `{l1a:3, l1b:3}` with a0 incomplete → l2a locked; l1a `'done'`. Mutation: check only the previous act.
 - Unknown id → `'locked'`, no throw. `lockReason` returns the act / boss-remaining forms.
+- Entered acts (M1-DESIGN §3, `test/unlock.test.mjs`): one completed level or a completed boss alone opens its act; an entered act stays open after an earlier act gains a level, an un-entered one re-locks; un-entered later acts wait for the chain; migration `{naming-your-service:3}` on an M1-shaped registry; `lockReason` null exactly when `levelState` is open. Mutations: drop the entered clause; boss-only act not entered; `levelState` disagrees with `lockReason`.
 
 ### F4 `test/progress.test.mjs`
 Fixture: `levelIds ['a','b','u']`, `cardIds ['c1','c2']`; `a.cards ['c1','c2']`; `u.scored false`.
