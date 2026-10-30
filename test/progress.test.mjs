@@ -134,6 +134,17 @@ test('sanitize: at must be a real calendar date-time (no rollover)', () => {
   assert.equal(at('2026-10-31T23:30:00-02:00'), '2026-11-01T01:30:00.000Z', 'offset crossing midnight');
 });
 
+test('sanitize: an offset that leaves years 0000..9999 gives null, and sanitizing twice keeps at', () => {
+  const at = (v) => P({ a: { stars: 1, at: v } }).levels.a.at;
+  assert.equal(at('0000-01-01T00:30:00+01:00'), null, 'would be year -1');
+  assert.equal(at('9999-12-31T23:30:00-01:00'), null, 'would be year 10000');
+  assert.equal(at('0000-01-01T00:30:00Z'), '0000-01-01T00:30:00.000Z');
+  for (const v of ['0000-01-01T00:30:00+01:00', '9999-12-31T23:30:00-01:00', '0000-01-01T01:30:00+01:00', '2026-10-31T23:30:00-02:00']) {
+    const once = P({ a: { stars: 1, at: v } });
+    assert.equal(sanitizeProgress(once).levels.a.at, once.levels.a.at, v);
+  }
+});
+
 test('sanitize: a malformed id is dropped, never cleaned into a real one', () => {
   const r = raw({ 'naming-your-service<x>': { stars: 3, at: null } });
   const p = sanitizeProgress(r, { levelIds: ['naming-your-service'], cardIds: [] });

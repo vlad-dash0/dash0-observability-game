@@ -165,22 +165,31 @@ test('save: every corrupt value is copied once before the progress write; the fi
   assert.equal(s.data.get(CORRUPT_LATEST_KEY), '[]');
 });
 
-test('save: a registered completion is never evicted by the cap (levels and cards)', () => {
-  const reg = Object.freeze({
-    ...REG,
-    levels: Object.freeze(Object.assign(Object.create(null), {
-      ...REG.levels,
-      'zzz-final': Object.freeze({ id: 'zzz-final', actId: 'a0', kind: 'level', scored: true, cards: Object.freeze(['zzz-card']) }),
-    })),
-    order: Object.freeze([...REG.order, 'zzz-final']),
-    cardIds: Object.freeze([...REG.cardIds, 'zzz-card']),
-  });
+// REG plus a level `zzz-final` (card `zzz-card`) that sorts after every unknown id.
+const REG_Z = Object.freeze({
+  ...REG,
+  levels: Object.freeze(Object.assign(Object.create(null), {
+    ...REG.levels,
+    'zzz-final': Object.freeze({ id: 'zzz-final', actId: 'a0', kind: 'level', scored: true, cards: Object.freeze(['zzz-card']) }),
+  })),
+  order: Object.freeze([...REG.order, 'zzz-final']),
+  cardIds: Object.freeze([...REG.cardIds, 'zzz-card']),
+});
+
+// 500 unknown levels `a0000..a0499` and 500 unknown cards `ac0000..ac0499`: a full record.
+function fullUnknown() {
   const levels = {};
   const cards = [];
   for (let i = 0; i < 500; i++) {
     levels[`a${String(i).padStart(4, '0')}`] = lv(1);
     cards.push(`ac${String(i).padStart(4, '0')}`);
   }
+  return { levels, cards };
+}
+
+test('save: a registered completion is never evicted by the cap (levels and cards)', () => {
+  const reg = REG_Z;
+  const { levels, cards } = fullUnknown();
   const s = fakeStorage({ initial: { [STORAGE_KEY]: json(levels, cards) } });
   const r = saveProgress(getter(s), P({ 'zzz-final': lv(3) }, ['zzz-card']), reg);
   assert.equal(r.saved, true);
@@ -190,6 +199,25 @@ test('save: a registered completion is never evicted by the cap (levels and card
   assert.ok(stored(s).cards.includes('zzz-card'));
   assert.equal(stored(s).cards.length, 500);
   assert.deepEqual(plain(r.progress), { v: 1, levels: { 'zzz-final': { stars: 3, at: null } }, cards: ['zzz-card'] });
+});
+
+test('save: a registered completion already stored over the cap survives a save', () => {
+  const { levels, cards } = fullUnknown();
+  const s = fakeStorage({ initial: { [STORAGE_KEY]: json({ ...levels, 'zzz-final': lv(2) }, [...cards, 'zzz-card']) } });
+  const r = saveProgress(getter(s), P({}), REG_Z);
+  assert.equal(r.saved, true);
+  assert.deepEqual(stored(s).levels['zzz-final'], { stars: 2, at: null });
+  assert.ok(stored(s).cards.includes('zzz-card'));
+  assert.deepEqual(plain(r.progress), { v: 1, levels: { 'zzz-final': { stars: 2, at: null } }, cards: ['zzz-card'] });
+});
+
+test('load: a missing or invalid registry throws TypeError before any read', () => {
+  for (const bad of [undefined, null, {}, { order: ['a'] }]) {
+    let reads = 0;
+    const g = () => { reads += 1; return fakeStorage(); };
+    assert.throws(() => loadProgress(g, bad), TypeError);
+    assert.equal(reads, 0, 'storage never touched');
+  }
 });
 
 test('save: a missing or invalid registry throws TypeError before any read or write', () => {
