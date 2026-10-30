@@ -217,6 +217,20 @@ test('renderIssues escapes the issue code too', () => {
 
 test('parseEnv: a lone double quote is a value, not an empty quoted string', () => {
   assert.equal(parseEnv('A="').vars.A, '"');
+  assert.equal(parseEnv("A='").vars.A, "'");
+});
+
+test('parseEnv: a quoted value with no closing quote is an unclosed-quote error', () => {
+  for (const line of ['A="checkout', "A='checkout", 'A="checkout # prod', "A='x\""]) {
+    const r = parseEnv(line);
+    assert.deepEqual(r.vars, {}, line);
+    assert.equal(r.errors.length, 1, line);
+    assert.equal(r.errors[0].line, 1, line);
+    assert.match(r.errors[0].message, /unclosed quote/, line);
+  }
+  const c = checkConfig(`${GOOD}\nOTEL_SERVICE_NAME="checkout`, WANT);
+  assert.deepEqual(codes(c), ['parse-error']);
+  assert.match(c.issues[0].message, /^Line 3: unclosed quote\.$/);
 });
 
 test('parseEnv: an inline comment after an unquoted value is cut', () => {
@@ -262,7 +276,14 @@ test('checkConfig: parse errors are capped at 20, then one parse-error-more with
   assert.equal(codes(r).filter((c) => c === 'parse-error').length, 20);
   const more = r.issues.filter((i) => i.code === 'parse-error-more');
   assert.equal(more.length, 1);
-  assert.match(more[0].message, /and 80 more/);
+  assert.match(more[0].message, /and 80 more bad lines\.$/);
+});
+
+test('checkConfig: parse-error-more says "line" for exactly one more', () => {
+  const r = checkConfig(`${GOOD}\n${'NOPE\n'.repeat(21)}`, WANT);
+  const more = r.issues.filter((i) => i.code === 'parse-error-more');
+  assert.equal(more.length, 1);
+  assert.match(more[0].message, /and 1 more bad line\.$/);
 });
 
 test('checkConfig: empty attribute values are set but empty, reported as -wrong', () => {

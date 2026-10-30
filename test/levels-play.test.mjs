@@ -24,8 +24,49 @@ import * as V from './fixtures/variant-levels.mjs';
 
 const NOW = 1767225600000;
 
+/** Type `text` into the textarea `sel` (what the player sees is its value). */
+function type(sel, text) {
+  const el = q(sel);
+  assert.ok(el, `expected an element for ${sel}`);
+  assert.ok(!el.disabled, `${sel} is disabled`);
+  el.value = text;
+}
+
+const FIXED_ENV = [
+  'OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318',
+  'OTEL_SERVICE_NAME=checkout',
+  'OTEL_RESOURCE_ATTRIBUTES=service.version=1.4.2,deployment.environment.name=production',
+].join('\n');
+
 /** One driver per registered level id. */
-const DRIVERS = {};
+const DRIVERS = {
+  'naming-your-service': {
+    play() {
+      click('[data-pick="fallback"]');
+      click('#nys-next');
+      type('#nys-env', FIXED_ENV);
+      click('#nys-check');
+      click('#nys-next');
+      click('[data-pick="env-var"]');
+      click('#nys-finish');
+    },
+    expect: { stars: 3, cards: ['unknown-service'] },
+    sloppy: {
+      play() {
+        click('[data-pick="name"]');
+        click('[data-pick="fallback"]');
+        click('#nys-next');
+        click('#nys-check'); // the given config, unfixed: one failed check
+        type('#nys-env', FIXED_ENV);
+        click('#nys-check');
+        click('#nys-next');
+        click('[data-pick="env-var"]');
+        click('#nys-finish');
+      },
+      expect: { stars: 2, cards: ['unknown-service'] },
+    },
+  },
+};
 
 // nodeIds is empty until F5 adds hub/map-data.mjs; then pass the real node ids here.
 const LIVE = buildRegistry(ACTS, { deck: DECK, nodeIds: [] });
