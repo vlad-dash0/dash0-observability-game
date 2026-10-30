@@ -264,10 +264,10 @@ test('code, pre, kbd use Martian Mono, served from local /fonts/ files', () => {
     return [f['font-weight'], f.src];
   }));
   assert.deepEqual(byWeight, {
-    400: 'url("/fonts/MartianMono-Regular.woff2") format("woff2")',
-    700: 'url("/fonts/MartianMono-Bold.woff2") format("woff2")',
+    400: 'url("/fonts/MartianMono-1.1.0-Regular.woff2") format("woff2")',
+    700: 'url("/fonts/MartianMono-1.1.0-Bold.woff2") format("woff2")',
   });
-  for (const file of ['MartianMono-Regular.woff2', 'MartianMono-Bold.woff2', 'OFL.txt']) {
+  for (const file of ['MartianMono-1.1.0-Regular.woff2', 'MartianMono-1.1.0-Bold.woff2', 'OFL.txt']) {
     assert.ok(existsSync(join(ROOT, 'fonts', file)), `fonts/${file} exists`);
   }
 });

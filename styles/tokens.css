@@ -6,12 +6,13 @@
    Fonts: system sans for text; Martian Mono for code, self-hosted under the OFL
    (fonts/OFL.txt). Source: github.com/evilmartians/mono release v1.1.0,
    martian-mono-1.1.0-woff2.zip; MartianMono-StdRg.woff2 and -StdBd.woff2, renamed to
-   MartianMono-Regular.woff2 and -Bold.woff2, otherwise unmodified. Roobert is
+   MartianMono-1.1.0-Regular.woff2 and -1.1.0-Bold.woff2, otherwise unmodified. Roobert is
    licensed and is not shipped. */
 
+/* /fonts/ is served immutable for a year: bump the version in the filename whenever the font changes. */
 @font-face {
   font-family: "Martian Mono";
-  src: url("/fonts/MartianMono-Regular.woff2") format("woff2");
+  src: url("/fonts/MartianMono-1.1.0-Regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -19,7 +20,7 @@
 
 @font-face {
   font-family: "Martian Mono";
-  src: url("/fonts/MartianMono-Bold.woff2") format("woff2");
+  src: url("/fonts/MartianMono-1.1.0-Bold.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
