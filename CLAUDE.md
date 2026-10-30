@@ -33,6 +33,8 @@ ES modules, no build step), local-first progress, serverless `api/` later.
 - CSP has no `'unsafe-inline'`: no inline `<script>` or `style=`, no `on*=` attributes,
   no `:style` / `x-bind:style`. Wire level buttons with `el.onclick = ...` after
   `renderStep`. `test/static.test.mjs` enforces the markup rules.
+- A level's Finish button carries `data-finish`, is never enabled on the first screen,
+  and is the only thing that calls `ctx.finish` (`test/levels-play.test.mjs` checks all three).
 - Every level needs a driver in `test/levels-play.test.mjs` (happy and sloppy runs).
 - Tests assert behaviour and are mutation-checked: after green, change one line of the
   implementation, watch the test go red, change it back.

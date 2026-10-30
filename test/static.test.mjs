@@ -3,11 +3,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseHTML } from 'linkedom';
-import { headersFor } from '../tools/serve.mjs';
+import { headersFor, ignoreMatcher } from '../tools/serve.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const VENDOR = join(ROOT, 'vendor');
@@ -22,7 +22,13 @@ const CSP =
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 const html = read('index.html');
 const { document } = parseHTML(html);
-const all = [...document.querySelectorAll('*')];
+// Every element, including those inside <template> content (Alpine x-for / x-if bodies),
+// which querySelectorAll does not enter.
+function deepAll(root) {
+  return [...root.querySelectorAll('*')].flatMap((el) =>
+    el.localName === 'template' && el.content ? [el, ...deepAll(el.content)] : [el]);
+}
+const all = deepAll(document);
 const vercel = JSON.parse(read('vercel.json'));
 
 function headerRule(source) {
@@ -109,7 +115,7 @@ test('the dev server sends the vercel.json headers', () => {
   const vendored = headersFor(vercel, `/vendor/${ALPINE}`);
   assert.equal(vendored['Content-Security-Policy'], CSP);
   assert.equal(vendored['Cache-Control'], 'public, max-age=31536000, immutable');
-  const font = headersFor(vercel, '/fonts/MartianMono-Regular.woff2');
+  const font = headersFor(vercel, '/fonts/MartianMono-1.1.0-Regular.woff2');
   assert.equal(font['Content-Security-Policy'], CSP);
   assert.equal(font['Cache-Control'], 'public, max-age=31536000, immutable');
 });
@@ -128,6 +134,10 @@ test('vendored files match vendor/SHA256SUMS', () => {
   }
 });
 
+test('the markup walk enters <template> content', () => {
+  assert.ok(all.some((el) => el.classList?.contains('level-card')), 'level cards live in an x-for template');
+});
+
 test('every local src and href in index.html exists on disk', () => {
   const refs = all.flatMap((el) => ['src', 'href'].map((a) => el.getAttribute(a)).filter(Boolean));
   assert.ok(refs.length > 0, 'expected local references');
@@ -136,4 +146,88 @@ test('every local src and href in index.html exists on disk', () => {
     const path = join(ROOT, ref.split(/[?#]/)[0]);
     assert.ok(existsSync(path) && statSync(path).isFile(), `${ref} does not exist`);
   }
+});
+
+// ---- local references in CSS and JS -----------------------------------------------
+
+const isExternal = (ref) => /^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(ref);
+const isFile = (path) => existsSync(path) && statSync(path).isFile();
+// A local ref: '/x' from the site root, anything else from the referring file's dir.
+const resolveRef = (ref, fromFile) =>
+  ref.startsWith('/') ? join(ROOT, ref.split(/[?#]/)[0]) : resolve(dirname(fromFile), ref.split(/[?#]/)[0]);
+
+/** Every file under `dir` (repo-relative) with one of `exts`, skipping node_modules and dotdirs. */
+function walk(dir, exts) {
+  const out = [];
+  for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+    if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+    const rel = dir ? `${dir}/${e.name}` : e.name;
+    if (e.isDirectory()) out.push(...walk(rel, exts));
+    else if (exts.some((x) => e.name.endsWith(x))) out.push(rel);
+  }
+  return out;
+}
+
+/** url(...) targets in a stylesheet, comments stripped. */
+function cssUrls(css) {
+  const text = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  return [...text.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g)].map((m) => m[2].trim());
+}
+
+/** Static and dynamic import / export-from specifiers in a module, comments stripped. */
+function importSpecifiers(js) {
+  const text = js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const re = /(?:\bimport\s*\(\s*|\bimport\s+|\bfrom\s+)(['"])([^'"\n]+)\1/g;
+  return [...text.matchAll(re)].map((m) => m[2]);
+}
+const isLocalSpecifier = (s) => s.startsWith('./') || s.startsWith('../') || s.startsWith('/');
+
+test('the ref scanners find url() and import specifiers', () => {
+  assert.deepEqual(cssUrls('a{src:url("/f.woff2") format("woff2")} /* url(/no.png) */ b{background:url(x.png)}'),
+    ['/f.woff2', 'x.png']);
+  assert.deepEqual(
+    importSpecifiers("import a from './a.mjs';\nimport './b.mjs';\nexport { c } from \"../c.mjs\";\n" +
+      "const d = await import('./d.mjs');\n// import x from './comment.mjs';\nimport { e } from 'linkedom';"),
+    ['./a.mjs', './b.mjs', '../c.mjs', './d.mjs', 'linkedom'],
+  );
+});
+
+test('every local url() in styles/*.css exists on disk', () => {
+  const sheets = walk('styles', ['.css']);
+  assert.ok(sheets.length > 0);
+  let count = 0;
+  for (const rel of sheets) {
+    for (const ref of cssUrls(read(rel))) {
+      if (isExternal(ref)) continue;
+      count++;
+      assert.ok(isFile(resolveRef(ref, join(ROOT, rel))), `${rel}: url(${ref}) does not exist`);
+    }
+  }
+  assert.ok(count > 0, 'expected local url() references (the fonts)');
+});
+
+test('every local import specifier in a .mjs file exists on disk', () => {
+  // This file is skipped: its scanner self-test holds sample specifiers in strings.
+  const modules = walk('', ['.mjs']).filter((rel) => rel !== 'test/static.test.mjs');
+  assert.ok(modules.includes('main.mjs') && modules.includes('test/game.test.mjs'));
+  for (const rel of modules) {
+    for (const spec of importSpecifiers(read(rel)).filter(isLocalSpecifier)) {
+      assert.ok(isFile(resolveRef(spec, join(ROOT, rel))), `${rel}: import '${spec}' does not exist`);
+    }
+  }
+});
+
+test('everything main.mjs imports, transitively, is deployed (not in .vercelignore)', () => {
+  const ignored = ignoreMatcher(read('.vercelignore'));
+  const seen = new Set();
+  const visit = (rel) => {
+    if (seen.has(rel)) return;
+    seen.add(rel);
+    assert.ok(!ignored(rel), `${rel} is imported by the app but excluded from the deployment`);
+    for (const spec of importSpecifiers(read(rel)).filter(isLocalSpecifier)) {
+      visit(relative(ROOT, resolveRef(spec, join(ROOT, rel))).split('\\').join('/'));
+    }
+  };
+  visit('main.mjs');
+  assert.ok(seen.has('app.mjs') && seen.has('hub/map-data.mjs'), `walked ${[...seen].join(', ')}`);
 });

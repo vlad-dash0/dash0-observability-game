@@ -1,0 +1,51 @@
+// The shipped registry and map data are valid together. Spec: docs/FOUNDATION.md §2.7
+// and §6 F5 live-registry.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { buildRegistry } from '../lib/registry.mjs';
+import { ACTS } from '../levels/index.mjs';
+import { DECK } from '../cards/deck.mjs';
+import { EDGES, NODES } from '../hub/map-data.mjs';
+import { liveRegistry } from '../app.mjs';
+
+const nodeIds = NODES.map((n) => n.id);
+
+// F6 sets this to ['naming-your-service'].
+const EXPECTED_ORDER = [];
+
+test('the live registry builds against the real deck and map nodes', () => {
+  const reg = buildRegistry(ACTS, { deck: DECK, nodeIds });
+  assert.deepEqual(reg.order, EXPECTED_ORDER);
+  assert.deepEqual(liveRegistry().order, EXPECTED_ORDER, 'app.mjs builds the same registry');
+});
+
+test('map nodes: the §2.7 ids, unique, valid kinds and positions in the viewBox', () => {
+  assert.deepEqual([...nodeIds].sort(), [
+    'api-gateway', 'cart', 'catalog', 'checkout', 'inventory', 'kafka', 'notifications', 'orders',
+    'payment-provider', 'payments', 'postgres', 'recommendations', 'redis', 'shipping', 'storefront',
+  ]);
+  assert.equal(new Set(nodeIds).size, nodeIds.length, 'node ids are unique');
+  for (const n of NODES) {
+    assert.ok(['service', 'datastore', 'queue', 'external'].includes(n.kind), `${n.id} kind ${n.kind}`);
+    assert.ok(typeof n.label === 'string' && n.label.length > 0, `${n.id} label`);
+    assert.ok(Number.isFinite(n.x) && n.x >= 0 && n.x <= 100, `${n.id} x ${n.x}`);
+    assert.ok(Number.isFinite(n.y) && n.y >= 0 && n.y <= 60, `${n.id} y ${n.y}`);
+  }
+  assert.equal(NODES.find((n) => n.id === 'payment-provider').kind, 'external');
+});
+
+test('map edges reference real nodes, never loop and never repeat', () => {
+  const ids = new Set(nodeIds);
+  const seen = new Set();
+  assert.ok(EDGES.length > 0);
+  for (const e of EDGES) {
+    assert.ok(ids.has(e.from), `edge from unknown node ${e.from}`);
+    assert.ok(ids.has(e.to), `edge to unknown node ${e.to}`);
+    assert.notEqual(e.from, e.to, `self-edge on ${e.from}`);
+    const key = [e.from, e.to].sort().join('|');
+    assert.ok(!seen.has(key), `duplicate edge ${key}`);
+    seen.add(key);
+  }
+  const linked = new Set(EDGES.flatMap((e) => [e.from, e.to]));
+  assert.deepEqual(nodeIds.filter((id) => !linked.has(id)), [], 'every node has an edge');
+});
