@@ -102,10 +102,24 @@ test('vercel.json keeps the hardening headers and the vendor cache rule', () => 
   assert.equal(h['X-Frame-Options'], 'DENY');
   assert.equal(h['X-Content-Type-Options'], 'nosniff');
   assert.equal(h['Referrer-Policy'], 'no-referrer');
-  assert.equal(h['Permissions-Policy'], 'camera=(), microphone=(), geolocation=(), browsing-topics=()');
+  assert.equal(h['Permissions-Policy'], 'camera=(), microphone=(), geolocation=()');
   assert.equal(headerRule('/vendor/(.*)')['Cache-Control'], 'public, max-age=31536000, immutable');
   assert.equal(headerRule('/fonts/(.*)')['Cache-Control'], 'public, max-age=31536000, immutable');
   assert.equal(vercel.functions, undefined, 'no serverless functions yet');
+});
+
+// Features every target browser recognises; anything else (a retired name such as
+// browsing-topics, or a typo) makes Chrome log an "Unrecognized feature" error (#37).
+const PERMISSIONS_POLICY_FEATURES = ['camera', 'microphone', 'geolocation'];
+
+test('Permissions-Policy names only known features, each denied', () => {
+  const entries = headerRule('/(.*)')['Permissions-Policy'].split(',').map((e) => e.trim());
+  for (const entry of entries) {
+    const m = /^([a-z-]+)=\(\)$/.exec(entry);
+    assert.ok(m, `Permissions-Policy entry "${entry}" is not of the form feature=()`);
+    assert.ok(PERMISSIONS_POLICY_FEATURES.includes(m[1]), `unknown Permissions-Policy feature "${m[1]}"`);
+  }
+  assert.deepEqual(entries.map((e) => e.split('=')[0]).sort(), [...PERMISSIONS_POLICY_FEATURES].sort());
 });
 
 test('the dev server sends the vercel.json headers', () => {
