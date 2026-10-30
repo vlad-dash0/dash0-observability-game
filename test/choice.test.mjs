@@ -248,3 +248,46 @@ test('level 1.2 labels both of its choice groups with their question', () => {
   click('#nys-next');
   assert.equal(question(), 'Which service name does the SDK report?');
 });
+
+test('mountChoice refuses a key that is not a non-empty string', () => {
+  for (const [name, bad] of [['number', 1], ['empty', '']]) {
+    const choices = CHOICES.map((c) => (c.key === 'c' ? { ...c, key: bad } : c));
+    const { ctx, onRight } = setup(choices);
+    assert.throws(() => mountChoice(ctx, choices, { id: 'q1', onRight }), { name: 'TypeError', message: /non-empty string/ }, name);
+  }
+});
+
+test('the rendered keys are compared one by one, so a key holding a newline cannot pose as two', () => {
+  const two = [
+    { key: 'a', label: 'A', why: 'a.' },
+    { key: 'b', label: 'B', right: true, why: 'b.' },
+  ];
+  const { ctx, onRight } = setup(two);
+  const one = [{ key: 'a\nb', label: 'AB', right: true, why: 'ab.' }];
+  assert.throws(() => mountChoice(ctx, one, { id: 'q1', onRight }), { name: 'TypeError', message: /rendered/ });
+});
+
+test('choiceHtml refuses a labelledBy that is not a plain token', () => {
+  const { ctx } = setup();
+  for (const bad of ['', 'a"b', 'two words']) {
+    assert.throws(() => choiceHtml(ctx, CHOICES, { id: 'q1', labelledBy: bad }), { name: 'TypeError', message: /labelledBy/ }, JSON.stringify(bad));
+  }
+});
+
+test('focus goes to the feedback when onRight returns an element that cannot take focus', () => {
+  const { ctx, dom, focus } = setup();
+  dom.actions.innerHTML += '<div id="plain">not focusable</div>';
+  mountChoice(ctx, CHOICES, { id: 'q1', onRight: () => dom.actions.querySelector('#plain') });
+  click('[data-pick="b"]');
+  assert.equal(focus.last(), '#q1-feedback');
+});
+
+test('mountChoice refuses choices that are not an array, naming the question', () => {
+  const { ctx, onRight } = setup();
+  assert.throws(() => mountChoice(ctx, { a: CHOICES[0] }, { id: 'q1', onRight }), { name: 'TypeError', message: /^choice "q1": choices must be an array/ });
+});
+
+test('mountChoice refuses a null choice, naming the question', () => {
+  const { ctx, onRight } = setup();
+  assert.throws(() => mountChoice(ctx, [...CHOICES, null], { id: 'q1', onRight }), { name: 'TypeError', message: /^choice "q1": choice 4 is not an object/ });
+});

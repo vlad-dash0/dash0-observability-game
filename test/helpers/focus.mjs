@@ -1,6 +1,8 @@
 // linkedom has no focus model: record each focus() call as a string plus whether the
 // element could take focus, never the node itself (comparing nodes in an assertion
-// makes node inspect linkedom's whole graph; see test/static.test.mjs).
+// makes node inspect linkedom's whole graph; see test/static.test.mjs). Whether an element
+// could take focus is lib/widgets/focus.mjs's canFocus, the rule the widgets use.
+import { canFocus } from '../../lib/widgets/focus.mjs';
 
 /**
  * The name a focus target is recorded under: `#id`, else `<data-key>:<value>` for its
@@ -13,19 +15,10 @@ export function focusName(el) {
   return el.localName;
 }
 
-const NATIVE = new Set(['button', 'input', 'select', 'textarea']);
-
-/** Whether a browser would focus `el`: connected, enabled, and natively focusable or tabindexed. */
-function canFocus(el) {
-  const native = NATIVE.has(el.localName) || (el.localName === 'a' && el.hasAttribute('href'));
-  return !el.disabled && el.isConnected && (native || el.hasAttribute('tabindex'));
-}
-
 /**
  * Patch `window.HTMLElement.prototype.focus` (from makeDom()) to record calls.
  * Returns `{ names(), last(), unfocusable() }`, all strings: `last()` is 'body' before
- * any focus call; `unfocusable()` lists targets that were disabled, detached, or
- * neither natively focusable (button, input, select, textarea, a[href]) nor tabindexed.
+ * any focus call; `unfocusable()` lists targets that fail canFocus.
  */
 export function recordFocus(window) {
   const log = [];
