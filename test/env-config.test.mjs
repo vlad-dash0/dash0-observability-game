@@ -340,3 +340,32 @@ test('a resource attribute key or value over 255 characters discards the whole v
     assert.match(r.errors[0].message, /255/);
   }
 });
+
+// Review round 3 (#14)
+
+test('the 255-character limit applies after percent-decoding', () => {
+  const long = effectiveResource({ OTEL_RESOURCE_ATTRIBUTES: `service.name=cart,a=${'%41'.repeat(100)}` }, NODE);
+  assert.equal(long.attributes.a, 'A'.repeat(100), '300 raw characters, 100 decoded: kept');
+  assert.deepEqual(long.errors, []);
+  const over = effectiveResource({ OTEL_RESOURCE_ATTRIBUTES: `service.name=cart,a=${'%41'.repeat(256)}` }, NODE);
+  assert.equal(over.attributes['service.name'], 'unknown_service:node', '256 decoded characters: discarded');
+  assert.equal(over.errors.length, 1);
+});
+
+test('checkConfig: an empty RA service.name shadowed by OTEL_SERVICE_NAME reads "(empty)"', () => {
+  const r = checkConfig(
+    'OTEL_SERVICE_NAME=checkout\nOTEL_RESOURCE_ATTRIBUTES=service.name=,service.version=1,deployment.environment.name=production',
+    WANT,
+  );
+  assert.deepEqual(codes(r), ['service-name-conflict']);
+  assert.match(r.issues[0].message, /^service\.name \(empty\) in OTEL_RESOURCE_ATTRIBUTES is ignored/);
+});
+
+test('checkConfig: with the SDK disabled, a missing name does not claim what it shows up as', () => {
+  const r = checkConfig(
+    'OTEL_SDK_DISABLED=true\nOTEL_RESOURCE_ATTRIBUTES=service.version=1,deployment.environment.name=production',
+    WANT,
+  );
+  assert.deepEqual(codes(r), ['sdk-disabled', 'service-name-missing']);
+  assert.equal(r.issues[1].message, 'No service name set.');
+});
