@@ -120,3 +120,18 @@ test('lockReason names the blocking act, the remaining boss levels, or nothing',
 test('lockReason for an unknown id is a distinct reason, not null (null means unlocked)', () => {
   assert.deepEqual(lockReason('nope', P(), REG), { kind: 'unknown' });
 });
+
+test('a level whose actId names no act is locked with an unknown reason', () => {
+  const reg = Object.freeze({
+    ...REG,
+    levels: Object.freeze(Object.assign(Object.create(null), { ...REG.levels, ghost: level('ghost', 'a9', 'level') })),
+  });
+  assert.equal(levelState('ghost', P(), reg), 'locked');
+  assert.deepEqual(lockReason('ghost', P(), reg), { kind: 'unknown' });
+});
+
+test('an act whose bossId is undefined counts as having no boss', () => {
+  const act = Object.freeze({ id: 'a1', no: 1, name: 'A1', sub: '', levelIds: Object.freeze(['l1a', 'l1b']), bossId: undefined });
+  assert.equal(isActComplete(act, P({ l1a: 1, l1b: 1 })), true);
+  assert.equal(isActComplete(act, P({ l1a: 1 })), false);
+});

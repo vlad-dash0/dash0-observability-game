@@ -3,7 +3,7 @@
 // Spec: docs/FOUNDATION.md §3 Concurrency, §4 Absence table and §6 F4.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CORRUPT_KEY, STORAGE_KEY, loadProgress, saveProgress } from '../lib/storage.mjs';
+import { CORRUPT_KEY, CORRUPT_LATEST_KEY, STORAGE_KEY, loadProgress, saveProgress } from '../lib/storage.mjs';
 import { emptyProgress, sanitizeProgress } from '../lib/progress.mjs';
 import { fakeStorage } from './helpers/fake-storage.mjs';
 
@@ -30,6 +30,7 @@ const stored = (s) => JSON.parse(s.data.get(STORAGE_KEY));
 test('storage keys', () => {
   assert.equal(STORAGE_KEY, 'oncall.progress');
   assert.equal(CORRUPT_KEY, 'oncall.progress.corrupt');
+  assert.equal(CORRUPT_LATEST_KEY, 'oncall.progress.corrupt.latest');
 });
 
 // ---- loadProgress ----
@@ -82,7 +83,7 @@ test('load: a throwing getter, a missing storage or a throwing getItem is unavai
 
 test('save: merges with what is stored (read, merge, write) and returns what it wrote', () => {
   const s = fakeStorage({ initial: { [STORAGE_KEY]: json({ a: lv(2) }) } });
-  const r = saveProgress(getter(s), P({ a: lv(1), b: lv(3) }));
+  const r = saveProgress(getter(s), P({ a: lv(1), b: lv(3) }), REG);
   assert.equal(r.saved, true);
   assert.equal(r.reason, undefined);
   assert.deepEqual(stored(s).levels, { a: { stars: 2, at: null }, b: { stars: 3, at: null } });
@@ -92,59 +93,87 @@ test('save: merges with what is stored (read, merge, write) and returns what it 
 
 test('save: fresh storage gets the memory record', () => {
   const s = fakeStorage();
-  const r = saveProgress(getter(s), P({ b: lv(0) }, ['c1']));
+  const r = saveProgress(getter(s), P({ b: lv(0) }, ['c1']), REG);
   assert.equal(r.saved, true);
   assert.deepEqual(stored(s), { v: 1, levels: { b: { stars: 0, at: null } }, cards: ['c1'] });
 });
 
-test('save: ids this build does not know survive in storage', () => {
+test('save: ids this build does not know survive in storage but never reach memory', () => {
   const s = fakeStorage({ initial: { [STORAGE_KEY]: json({ zz: lv(3), 'old-level': lv(1) }, ['c9']) } });
-  saveProgress(getter(s), P({ a: lv(1) }, ['c1']));
-  assert.deepEqual(Object.keys(stored(s).levels).sort(), ['a', 'old-level', 'zz']);
-  assert.deepEqual(stored(s).cards, ['c1', 'c9']);
+  const r = saveProgress(getter(s), P({ a: lv(1), yy: lv(2) }, ['c1', 'c8']), REG);
+  assert.equal(r.saved, true);
+  assert.deepEqual(Object.keys(stored(s).levels).sort(), ['a', 'old-level', 'yy', 'zz']);
+  assert.deepEqual(stored(s).cards, ['c1', 'c8', 'c9']);
+  assert.deepEqual(plain(r.progress), { v: 1, levels: { a: { stars: 1, at: null } }, cards: ['c1'] });
+});
+
+test('save: the written record keeps at most 500 entries, the first by sorted id', () => {
+  const side = (prefix) => {
+    const levels = {};
+    for (let i = 0; i < 500; i++) levels[`${prefix}${String(i).padStart(3, '0')}`] = lv(1);
+    return levels;
+  };
+  const s = fakeStorage({ initial: { [STORAGE_KEY]: json(side('a')) } });
+  saveProgress(getter(s), P(side('z')), REG);
+  const keys = Object.keys(stored(s).levels).sort();
+  assert.equal(keys.length, 500);
+  assert.deepEqual(keys, Object.keys(side('a')).sort());
 });
 
 test('save: a throwing setItem, getItem or getter is unavailable', () => {
-  const memory = P({ a: lv(1) });
+  const memory = P({ a: lv(1), zz: lv(2) });
   for (const g of [
     getter(fakeStorage({ throwOn: ['setItem'] })),
     getter(fakeStorage({ throwOn: ['getItem'] })),
     () => { throw new Error('SecurityError'); },
   ]) {
-    const r = saveProgress(g, memory);
+    const r = saveProgress(g, memory, REG);
     assert.deepEqual({ saved: r.saved, reason: r.reason }, { saved: false, reason: 'unavailable' });
-    assert.equal(r.progress, memory, 'memory is returned untouched');
+    assert.deepEqual(plain(r.progress), { v: 1, levels: { a: { stars: 1, at: null } }, cards: [] }, 'memory, filtered');
   }
 });
 
 test('save: future data is never overwritten (zero setItem calls)', () => {
   const raw = json({ a: lv(1) }, [], 99);
   const s = fakeStorage({ initial: { [STORAGE_KEY]: raw } });
-  const memory = P({ a: lv(3) });
-  const r = saveProgress(getter(s), memory);
+  const memory = P({ a: lv(3), zz: lv(1) });
+  const r = saveProgress(getter(s), memory, REG);
   assert.deepEqual({ saved: r.saved, reason: r.reason }, { saved: false, reason: 'future' });
-  assert.equal(r.progress, memory);
+  assert.deepEqual(plain(r.progress), { v: 1, levels: { a: { stars: 3, at: null } }, cards: [] }, 'memory, filtered');
   assert.equal(s.sets.length, 0);
   assert.equal(s.data.get(STORAGE_KEY), raw);
 });
 
-test('save: corrupt data is backed up before the progress write, and the first backup is kept', () => {
+test('save: every corrupt value is copied before the progress write; the first copy is kept', () => {
   const s = fakeStorage({ initial: { [STORAGE_KEY]: '{bad' } });
-  const r = saveProgress(getter(s), P({ a: lv(2) }));
+  const r = saveProgress(getter(s), P({ a: lv(2) }), REG);
   assert.equal(r.saved, true);
-  assert.deepEqual(s.sets.map(([k]) => k), [CORRUPT_KEY, STORAGE_KEY]);
+  assert.deepEqual(s.sets.map(([k]) => k), [CORRUPT_KEY, CORRUPT_LATEST_KEY, STORAGE_KEY]);
   assert.equal(s.data.get(CORRUPT_KEY), '{bad');
+  assert.equal(s.data.get(CORRUPT_LATEST_KEY), '{bad');
   assert.deepEqual(stored(s).levels, { a: { stars: 2, at: null } });
 
   s.data.set(STORAGE_KEY, '[]');
-  saveProgress(getter(s), P({ b: lv(1) }));
-  assert.equal(s.data.get(CORRUPT_KEY), '{bad', 'second corrupt value does not overwrite the backup');
-  assert.deepEqual(s.sets.map(([k]) => k), [CORRUPT_KEY, STORAGE_KEY, STORAGE_KEY]);
+  saveProgress(getter(s), P({ b: lv(1) }), REG);
+  assert.equal(s.data.get(CORRUPT_KEY), '{bad', 'the first corrupt value is kept');
+  assert.equal(s.data.get(CORRUPT_LATEST_KEY), '[]', 'the second corrupt value is copied too');
+  assert.deepEqual(s.sets.map(([k]) => k).slice(3), [CORRUPT_LATEST_KEY, STORAGE_KEY]);
+});
+
+test('save: a failed latest-backup write aborts before the progress write', () => {
+  const s = fakeStorage({
+    initial: { [STORAGE_KEY]: '[]', [CORRUPT_KEY]: '{bad' },
+    throwOn: [`setItem:${CORRUPT_LATEST_KEY}`],
+  });
+  const r = saveProgress(getter(s), P({ a: lv(2) }), REG);
+  assert.deepEqual({ saved: r.saved, reason: r.reason }, { saved: false, reason: 'unavailable' });
+  assert.deepEqual(s.sets.map(([k]) => k), [CORRUPT_LATEST_KEY]);
+  assert.equal(s.data.get(STORAGE_KEY), '[]');
 });
 
 test('save: a failed backup write does not overwrite the corrupt data', () => {
   const s = fakeStorage({ initial: { [STORAGE_KEY]: '{bad' }, throwOn: ['setItem'] });
-  const r = saveProgress(getter(s), P({ a: lv(2) }));
+  const r = saveProgress(getter(s), P({ a: lv(2) }), REG);
   assert.deepEqual({ saved: r.saved, reason: r.reason }, { saved: false, reason: 'unavailable' });
   assert.deepEqual(s.sets.map(([k]) => k), [CORRUPT_KEY]);
   assert.equal(s.data.get(STORAGE_KEY), '{bad');

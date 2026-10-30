@@ -115,6 +115,16 @@ test('sanitize: at is normalized to ISO UTC or null', () => {
   assert.equal(P({ a: { stars: 1 } }).levels.a.at, null, 'missing at');
 });
 
+test('sanitize: at must be an ISO-8601 date-time with Z or an offset', () => {
+  const at = (v) => P({ a: { stars: 1, at: v } }).levels.a.at;
+  assert.equal(at('2026-10-30T12:00:00+02:00'), '2026-10-30T10:00:00.000Z');
+  assert.equal(at('2026-10-30T10:00:00.123Z'), '2026-10-30T10:00:00.123Z');
+  assert.equal(at('2026-10-30T10:00Z'), '2026-10-30T10:00:00.000Z');
+  for (const loose of ['1', '2026', '2026-10-30', '2026-10-30T10:00:00', 'Oct 30 2026 10:00 GMT', '2026-13-01T00:00:00Z', ' 2026-10-30T10:00:00Z']) {
+    assert.equal(at(loose), null, loose);
+  }
+});
+
 test('sanitize: a malformed id is dropped, never cleaned into a real one', () => {
   const r = raw({ 'naming-your-service<x>': { stars: 3, at: null } });
   const p = sanitizeProgress(r, { levelIds: ['naming-your-service'], cardIds: [] });
@@ -140,6 +150,19 @@ test('sanitize: ids over 64 chars are dropped; caps keep the first 500 by sorted
   assert.equal(keys[499], 'l499');
   assert.equal(p.cards.length, 500);
   assert.equal(p.cards[499], 'c499');
+});
+
+test('sanitize: the cap counts valid entries only (500 invalid ids sorting first do not crowd out a valid one)', () => {
+  const levels = {};
+  for (let i = 0; i < 600; i++) levels[`a${String(i).padStart(3, '0')}`] = { stars: 'x', at: null };
+  levels.zz = { stars: 2, at: null };
+  assert.deepEqual(Object.keys(P(levels).levels), ['zz']);
+});
+
+test('sanitize: null opts behaves like no opts', () => {
+  const r = raw({ a: { stars: 1, at: null }, zz: { stars: 2, at: null } }, ['c1', 'zz']);
+  assert.deepEqual(plain(sanitizeProgress(r, null)), plain(sanitizeProgress(r)));
+  assert.deepEqual(Object.keys(sanitizeProgress(r, null).levels), ['a', 'zz']);
 });
 
 test('sanitize: never mutates (frozen input) and never throws', () => {
@@ -272,6 +295,26 @@ test('merge: commutative, idempotent, associative', () => {
   for (const X of [A, B, C]) eq(mergeProgress(X, X), X, 'idempotent');
   eq(mergeProgress(mergeProgress(A, B), C), mergeProgress(A, mergeProgress(B, C)), 'associative');
   eq(mergeProgress(mergeProgress(C, A), B), mergeProgress(C, mergeProgress(A, B)), 'associative');
+});
+
+test('merge: the result keeps at most 500 entries and cards, the first by sorted id', () => {
+  const side = (prefix) => {
+    const levels = {};
+    const cards = [];
+    for (let i = 0; i < 500; i++) {
+      levels[`${prefix}${String(i).padStart(3, '0')}`] = { stars: 1, at: null };
+      cards.push(`${prefix}c${String(i).padStart(3, '0')}`);
+    }
+    return P(levels, cards);
+  };
+  const m = mergeProgress(side('z'), side('a'));
+  const keys = Object.keys(m.levels);
+  assert.equal(keys.length, 500);
+  assert.equal(keys[0], 'a000');
+  assert.equal(keys[499], 'a499');
+  assert.equal(m.cards.length, 500);
+  assert.equal(m.cards[499], 'ac499');
+  assert.deepEqual(plain(mergeProgress(side('a'), side('z'))), plain(m), 'same set either way');
 });
 
 test('merge: never mutates either side', () => {
