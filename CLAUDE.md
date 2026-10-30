@@ -8,7 +8,8 @@ ES modules, no build step), local-first progress, serverless `api/` later.
 ## Run and test
 - Node: `.nvmrc` (Active LTS); `package.json` `engines` allows >=22. `npm ci` once.
 - `npm run dev` serves the repo at http://localhost:3000/ with the vercel.json headers
-  (CSP included) and 404s what `.vercelignore` excludes; `PORT=8080 npm run dev` to move it.
+  (CSP included) and 404s what `.vercelignore` excludes, plus every dotfile (stricter
+  than Vercel); `PORT=8080 npm run dev` to move it.
 - `npm test` runs `node --test` over `test/**/*.test.mjs`; CI runs the same on Node 22
   and `.nvmrc`, for pushes to `main` and for pull requests.
 

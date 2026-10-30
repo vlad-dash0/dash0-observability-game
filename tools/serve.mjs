@@ -57,8 +57,8 @@ export function headersFor(config, pathname) {
 
 /**
  * Predicate over repo-relative paths for the .vercelignore forms we use: `dir/`,
- * `name` and `*.ext` (any depth when there is no inner `/`), `a/b` (anchored). `*`
- * stays within one segment. Negation, `**`, `?` and `[...]` throw rather than being misread.
+ * `name` and `*.ext` match at any depth; a leading `/` or an inner `/` (`/dir/`,
+ * `a/b`) anchors the line to the root. `*` stays within one segment. Negation, `**`, `?` and `[...]` throw rather than being misread.
  */
 export function ignoreMatcher(text) {
   const rules = text.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((line) => {
@@ -67,7 +67,7 @@ export function ignoreMatcher(text) {
     return {
       re: new RegExp(`^${pat.split('*').map(escapeRe).join('[^/]*')}$`),
       dirOnly: line.endsWith('/'),
-      anchored: pat.includes('/'),
+      anchored: line.startsWith('/') || pat.includes('/'),
       depth: pat.split('/').length,
     };
   });
@@ -92,6 +92,7 @@ async function resolveFile(root, ignored, decoded) {
   let file = resolve(root, `.${decoded}`);
   try {
     if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
+    else if (decoded.endsWith('/')) return null; // `/index.html/`: a file is not a directory
     file = await realpath(file); // follow symlinks so the checks below see the target
     if (!(await stat(file)).isFile()) return null;
   } catch {
@@ -122,11 +123,13 @@ export function startServer({ root = REPO, port = 3000, host = '127.0.0.1', log 
       res.writeHead(status, { ...headers, 'Content-Type': type });
       res.end(req.method === 'HEAD' ? undefined : body);
     };
+    let pathname = req.url;
     let decoded;
     try {
-      decoded = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+      pathname = new URL(req.url, 'http://localhost').pathname;
+      decoded = decodeURIComponent(pathname);
     } catch {
-      return send(400, 'Bad Request\n', {});
+      return send(400, 'Bad Request\n', headersFor(config, pathname));
     }
     const headers = headersFor(config, decoded);
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(405, 'Method Not Allowed\n', headers);

@@ -45,7 +45,7 @@ function assertHeaders(res, expected) {
 // ---- against the real repo ------------------------------------------------------
 let repo;
 before(async () => { repo = await listen({}); });
-after(() => repo.server.close());
+after(() => repo?.server.close());
 
 test('the running server sends the vercel.json headers', async () => {
   const page = await get(repo.port, '/');
@@ -96,7 +96,7 @@ before(async () => {
   site = await listen({ root });
 });
 after(() => {
-  site.server.close();
+  site?.server.close();
   rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -106,6 +106,18 @@ test('a path cannot climb out of the root', async () => {
     const res = await get(site.port, path);
     assert.equal(res.status, 404, path);
     assert.ok(!res.body.includes('outside'), path);
+  }
+});
+
+test('a trailing slash on a file is 404', async () => {
+  assert.equal((await get(site.port, '/index.html/')).status, 404);
+});
+
+test('a malformed path is a 400 that still carries the vercel.json headers', async () => {
+  for (const path of ['/%zz', '/%E0%A4%A']) {
+    const res = await get(repo.port, path);
+    assert.equal(res.status, 400, path);
+    assertHeaders(res, rule('/(.*)'));
   }
 });
 
@@ -119,7 +131,8 @@ test('dot segments are refused even when not ignored', async () => {
   assert.equal((await get(site.port, '/.git/config')).status, 404);
 });
 
-test('an unreadable file is a 500 and the server stays up', async () => {
+const isRoot = process.getuid?.() === 0;
+test('an unreadable file is a 500 and the server stays up', { skip: isRoot && 'root ignores file modes' }, async () => {
   assert.equal((await get(site.port, '/locked.txt')).status, 500);
   assert.equal((await get(site.port, '/index.html')).status, 200);
 });
@@ -141,6 +154,24 @@ test('ignoreMatcher follows the .vercelignore forms we use', () => {
     assert.ok(!ignored(p), p);
   }
   assert.throws(() => ignoreMatcher('!keep.md'), /unsupported/);
+});
+
+test('a leading / anchors an ignore line to the root', () => {
+  const ignored = ignoreMatcher('/foo\n/bar/\n');
+  assert.ok(ignored('foo'));
+  assert.ok(!ignored('a/foo'), '/foo must not match a/foo');
+  assert.ok(ignored('bar/x.js'));
+  assert.ok(!ignored('a/bar/x.js'), '/bar/ must not match a/bar/');
+});
+
+test('the real .vercelignore excludes top-level tooling dirs only', () => {
+  const ignored = ignoreMatcher(readFileSync(join(ROOT, '.vercelignore'), 'utf8'));
+  for (const p of ['test/x.js', 'tools/serve.mjs', 'docs/a.md', '.github/workflows/ci.yml']) {
+    assert.ok(ignored(p), p);
+  }
+  for (const p of ['lib/test/x.js', 'api/tools/x.js', 'lib/docs/x.js', 'index.html']) {
+    assert.ok(!ignored(p), `${p} must still deploy`);
+  }
 });
 
 test('header sources outside (...) groups are literal', () => {

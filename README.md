@@ -23,7 +23,8 @@ npm run dev     # http://localhost:3000/, production headers (CSP) and .vercelig
 npm test        # node --test over test/**/*.test.mjs
 ```
 
-It deploys to Vercel as static files (serverless `api/` functions come later).
+The dev server 404s what `.vercelignore` excludes and, stricter than Vercel, every
+dotfile. It deploys to Vercel as static files (serverless `api/` functions come later).
 
 ## Lineage
 
