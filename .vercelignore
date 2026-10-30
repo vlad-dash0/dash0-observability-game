@@ -1,0 +1,15 @@
+# Deploy only the web app (index.html, main.mjs, styles/, vendor/ and, later, api/,
+# lib/, levels/ ...). Tests, tooling and docs stay out of the deployment.
+.github/
+docs/
+test/
+tools/
+CLAUDE.md
+README.md
+.nvmrc
+vendor/README.md
+vendor/SHA256SUMS
+.env
+.env.*
+.vercel
+*.log
