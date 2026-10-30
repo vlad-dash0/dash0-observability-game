@@ -557,6 +557,18 @@ test('validateDeck rejects each bad card field', () => {
   bad('nope', 'deck must be an array');
 });
 
+test('an id whose only fault is an uppercase letter is rejected', () => {
+  // Lowercase twins pass, so the uppercase letter is the only reason for each rejection.
+  assert.equal(validateRegistry(withEdit((a) => (a[0].levels[0].id = 'abc')), REFS).ok, true);
+  assert.equal(validateRegistry(withEdit((a) => (a[0].id = 'a9')), REFS).ok, true);
+  assert.equal(validateDeck([card('cx')]).ok, true);
+  rejects(withEdit((a) => (a[0].levels[0].id = 'Abc')), 'invalid level id "Abc"');
+  rejects(withEdit((a) => (a[0].id = 'A9')), 'invalid act id "A9"');
+  const deck = validateDeck([card('Cx')]);
+  assert.equal(deck.ok, false);
+  assert.equal(deck.errors.some((e) => e.includes('invalid card id "Cx"')), true);
+});
+
 test('nodeLitBy lists the levels that light a node, in play order', () => {
   const acts = withEdit((a) => {
     a[0].levels[0].lights = ['n1'];
