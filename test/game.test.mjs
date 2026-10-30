@@ -208,14 +208,28 @@ test('Escape closes the reward, or the level unless the player is typing', () =>
   const { game, dom } = setup();
   game.openLevel('x');
   const body = dom.document.getElementById('ov-body');
-  body.innerHTML = '<input id="in"><textarea id="ta"></textarea><p id="ce" contenteditable="true"></p>';
-  for (const id of ['in', 'ta', 'ce']) {
+  body.innerHTML =
+    '<input id="in"><input id="em" type="Email"><textarea id="ta"></textarea><select id="se"></select>' +
+    '<p id="ce" contenteditable="true"><b id="ceb">x</b></p>' +
+    '<input id="ra" type="radio"><input id="cb" type="CHECKBOX"><input id="bt" type="button">' +
+    '<p id="nce" contenteditable="false"></p>';
+  for (const id of ['in', 'em', 'ta', 'se', 'ce', 'ceb']) {
     game.onEscape({ target: dom.document.getElementById(id) });
     assert.equal(game.overlayOpen, true, `Escape in #${id} keeps the level open`);
   }
   assert.equal(ctxs.x.signal.aborted, false);
   game.onEscape({ target: dom.document.body });
   assert.equal(game.overlayOpen, false);
+  // Focus on a control that takes no text: Escape still closes the level.
+  for (const id of ['ra', 'cb', 'bt', 'nce']) {
+    game.openLevel('x');
+    ctxs.x.renderStep(
+      '<input id="ra" type="radio"><input id="cb" type="CHECKBOX"><input id="bt" type="button">' +
+        '<p id="nce" contenteditable="false"></p>',
+    );
+    game.onEscape({ target: dom.document.getElementById(id) });
+    assert.equal(game.overlayOpen, false, `Escape on #${id} closes the level`);
+  }
   game.openLevel('x');
   ctxs.x.finish({ text: 'x is finished now' });
   game.onEscape({ target: dom.document.body });

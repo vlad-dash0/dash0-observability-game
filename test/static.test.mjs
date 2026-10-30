@@ -232,19 +232,28 @@ test('everything main.mjs imports, transitively, is deployed (not in .verceligno
   assert.ok(seen.has('app.mjs') && seen.has('hub/map-data.mjs'), `walked ${[...seen].join(', ')}`);
 });
 
-// A failing assert.equal / deepEqual on a linkedom node (or a ctx holding one) makes node's
-// assertion message inspect linkedom's huge circular graph: it runs synchronously for
-// minutes and took tens of GB once, and --test-timeout cannot interrupt it. Compare
-// booleans or strings instead, e.g. `assert.equal(el === null, true)`.
+// Tripwire, not proof. A failing assert.equal / deepEqual on a linkedom node (or a ctx
+// holding one) makes node's assertion message inspect linkedom's huge circular graph: it
+// runs synchronously for minutes, once took tens of GB, and --test-timeout cannot stop
+// it. This line-based check catches the common forms only: an equality assertion whose
+// first argument is a getElementById / querySelector(All) / closest call, a q( / qa(
+// helper call, or ctxs.<id> / ctx. A node held in a variable, a second argument, or a
+// call split over lines gets through. Compare booleans or strings instead, e.g.
+// `assert.equal(el === null, true)`.
 const DOM_OPERAND = new RegExp(
   String.raw`assert\.(?:equal|notEqual|strictEqual|notStrictEqual|deepEqual|deepStrictEqual|notDeepEqual|notDeepStrictEqual)\(\s*` +
-    String.raw`(?:(?:[\w.]+\.)?(?:getElementById|querySelector|closest)\([^()]*\)|ctxs\.\w+|ctx)\s*,`,
+    String.raw`(?:(?:[\w.]+\.)?(?:getElementById|querySelectorAll|querySelector|closest)\([^()]*\)|qa?\([^()]*\)|ctxs\.\w+|ctx)\s*,`,
 );
 
 test('the DOM-operand guard spots node and ctx operands, not their string properties', () => {
   assert.ok(DOM_OPERAND.test("assert.equal(document.getElementById('a'), null)"));
   assert.ok(DOM_OPERAND.test("assert.equal(el.closest('.x'), null, 'm')"));
   assert.ok(DOM_OPERAND.test('assert.deepEqual(ctxs.y, undefined)'));
+  assert.ok(DOM_OPERAND.test("assert.equal(q('#fin'), null)"));
+  assert.ok(DOM_OPERAND.test("assert.deepEqual(qa('.choice'), [])"));
+  assert.ok(DOM_OPERAND.test("assert.deepEqual(body.querySelectorAll('p'), [])"));
+  assert.ok(!DOM_OPERAND.test("assert.equal(qa('.choice').length, 2)"));
+  assert.ok(!DOM_OPERAND.test("assert.equal(seq('#a'), 1)"), 'the operand must open the call');
   assert.ok(!DOM_OPERAND.test("assert.equal(document.getElementById('a') === null, true)"));
   assert.ok(!DOM_OPERAND.test("assert.equal(q('#a').getAttribute('cx'), '5')"));
   assert.ok(!DOM_OPERAND.test("assert.equal(dom.document.getElementById('ov-body').innerHTML, '')"));

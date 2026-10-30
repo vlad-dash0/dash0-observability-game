@@ -95,8 +95,18 @@ function playLevel(level, play) {
     finishEnabled: qa('[data-finish]').some((b) => !b.disabled),
     finishedEarly: calls.length,
   };
+  // The live overlay, not just renderStep's strings: setAttribute, innerHTML and
+  // insertAdjacentHTML can add Alpine attributes too.
+  const injected = [...liveAlpineAttrs(dom.body, dom.actions)];
   play();
-  return { calls, steps, first };
+  injected.push(...liveAlpineAttrs(dom.body, dom.actions));
+  return { calls, steps, first, injected };
+}
+
+/** Alpine attribute names (see alpineAttrs) on `roots` and everything under them. */
+function liveAlpineAttrs(...roots) {
+  return roots.flatMap((root) => [root, ...root.querySelectorAll('*')]).flatMap((el) =>
+    el.getAttributeNames().filter((n) => ALPINE_ATTR.test(n)).map((n) => `<${el.localName} ${n}>`));
 }
 
 /** True when `html` holds a [data-finish] element (a real query, not a substring). */
@@ -105,6 +115,8 @@ function hasFinish(html) {
   box.innerHTML = html;
   return box.querySelector('[data-finish]') !== null;
 }
+
+const ALPINE_ATTR = /^(x-|@|:)/;
 
 /**
  * Alpine attribute names (x-*, @*, :*) in `html`. Level HTML must have none: Alpine's
@@ -115,12 +127,13 @@ function alpineAttrs(html) {
   const box = globalThis.document.createElement('div');
   box.innerHTML = html;
   return [...box.querySelectorAll('*')].flatMap((el) =>
-    el.getAttributeNames().filter((n) => /^(x-|@|:)/.test(n)).map((n) => `<${el.localName} ${n}>`));
+    el.getAttributeNames().filter((n) => ALPINE_ATTR.test(n)).map((n) => `<${el.localName} ${n}>`));
 }
 
 /** Every check a play-through must pass; returns the stars earned. */
 function checkRun(level, run) {
-  const { calls, steps, first } = playLevel(level, run.play);
+  const { calls, steps, first, injected } = playLevel(level, run.play);
+  assert.deepEqual(injected, [], 'the overlay holds an Alpine attribute (set outside renderStep)');
   assert.ok(first.rendered >= 1, 'run() renders a first step');
   assert.equal(first.finishEnabled, false, 'the first screen has no enabled Finish');
   assert.equal(first.finishedEarly, 0, 'run() alone does not finish');
@@ -354,4 +367,46 @@ test('the live registry checks levels against the real map nodes', () => {
   const reg = liveRegistry(act(['checkout', 'payments']), [FIXTURE_CARD]);
   assert.deepEqual(reg.levels['fixture-level'].lights, ['checkout', 'payments']);
   assert.throws(() => liveRegistry(act(['nowhere']), [FIXTURE_CARD]), /unknown node "nowhere"/);
+});
+
+test('harness: an Alpine attribute added outside renderStep, after run() or during play, fails', () => {
+  const REWARD = 'A long enough reward text.';
+  const level = (id, inject) => ({
+    ...fixtureLevel,
+    id,
+    run(ctx) {
+      ctx.renderStep('<p id="msg">Go on.</p>', '<button id="go">Go</button>');
+      inject.atRun?.(ctx);
+      ctx.ovActions.querySelector('#go').onclick = () => {
+        inject.atPlay?.(ctx);
+        ctx.renderStep('<p>Done.</p>', '<button id="fin" data-finish>Finish</button>');
+        inject.afterFinishRender?.(ctx);
+        ctx.ovActions.querySelector('#fin').onclick = () => ctx.finish({ text: REWARD });
+      };
+    },
+  });
+  const cases = {
+    'fx-set-attr': { atRun: (ctx) => ctx.ovBody.querySelector('#msg').setAttribute('@click', 'go()') },
+    'fx-set-attr-late': {
+      afterFinishRender: (ctx) => ctx.ovActions.querySelector('#fin').setAttribute('x-on:click', 'go()'),
+    },
+    'fx-adjacent': {
+      afterFinishRender: (ctx) => ctx.ovBody.insertAdjacentHTML('beforeend', '<span :class="c">!</span>'),
+    },
+    'fx-root-attr': { atRun: (ctx) => ctx.ovBody.setAttribute('x-data', '{}') },
+  };
+  for (const [id, inject] of Object.entries(cases)) {
+    const lvl = buildRegistry(
+      [{ id: 'fx-act', no: 0, levels: [level(id, inject)], boss: null }],
+      { deck: [FIXTURE_CARD], nodeIds: [] },
+    ).levels[id];
+    const play = () => (click('#go'), click('#fin'));
+    assert.throws(() => checkRun(lvl, { play, expect: { stars: 3, cards: [] } }), /Alpine attribute \(set outside/, id);
+  }
+  // The same flow with nothing injected passes, so the cases above fail only on the attribute.
+  const clean = buildRegistry(
+    [{ id: 'fx-act', no: 0, levels: [level('fx-clean', {})], boss: null }],
+    { deck: [FIXTURE_CARD], nodeIds: [] },
+  ).levels['fx-clean'];
+  checkRun(clean, { play: () => (click('#go'), click('#fin')), expect: { stars: 3, cards: [] } });
 });

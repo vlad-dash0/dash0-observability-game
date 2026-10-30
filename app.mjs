@@ -44,6 +44,20 @@ const STATE_LABELS = Object.freeze({
   done: 'done, play again',
 });
 
+// <input> types that take no text: Escape on them still closes the level.
+const NON_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file']);
+
+/** True when `el` is (inside) a text-entry control: textarea, select, contenteditable or a text-like input. */
+function isTyping(el) {
+  if (!el || typeof el.closest !== 'function') return false;
+  const field = el.closest('input, textarea, select, [contenteditable]');
+  if (field === null) return false;
+  const tag = field.localName;
+  if (tag === 'input') return !NON_TEXT_INPUTS.has((field.getAttribute('type') || 'text').toLowerCase());
+  if (tag === 'textarea' || tag === 'select') return true;
+  return field.getAttribute('contenteditable').toLowerCase() !== 'false';
+}
+
 const NUDGE_MS = 2600;
 const CONFETTI = 40;
 
@@ -292,10 +306,7 @@ export function createGame(deps) {
         return;
       }
       if (!this.overlayOpen) return;
-      const t = e?.target;
-      const typing =
-        !!t && (t.isContentEditable || (typeof t.closest === 'function' && t.closest('input, textarea, select') !== null));
-      if (!typing) this.closeOverlay();
+      if (!isTyping(e?.target)) this.closeOverlay();
     },
 
     // ---------- focus ----------
