@@ -3,7 +3,7 @@
 // status is what a merge waits on; a job left out of its `needs` would never gate a merge.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -107,4 +107,13 @@ test('all-checks runs always and fails unless every needed job succeeded', () =>
   assert.match(gate, /^ {4}if: always\(\)\s*$/m);
   assert.match(gate, /needs\.\*\.result/);
   assert.match(gate, /"\$r" = success/, 'each result must equal success (not merely "not failure")');
+});
+
+// Only ci.yml's jobs are gated. A new workflow file would add a check `All checks` does not
+// wait on, so adding one means extending this list and gating its jobs deliberately.
+const WORKFLOWS = ['ci.yml'];
+
+test('every workflow file is on the allow-list', () => {
+  const files = readdirSync(join(ROOT, '.github/workflows')).sort();
+  assert.deepEqual(files, WORKFLOWS);
 });

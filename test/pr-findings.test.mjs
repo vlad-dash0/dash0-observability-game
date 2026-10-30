@@ -134,27 +134,138 @@ test('inconclusive wins over open: an unparseable comment means the list may be 
   assert.equal(r.exit, 2);
 });
 
+
+// --- review round on f24711a: headings, hidden text, edits, placeholders, escape hatch ---
+
+const T = '| # | Severity | Finding |\n|---|---|---|\n| 1 | low | thing 1 |\n';
+const CLEAN = '## Review of 1111111: CLEAN\n\nNo findings.\n';
+const REV = `## Review of 2222222: NOT CLEAN\n\n${T}`;
+const DISP = (cell = 'Fixed') => `## Dispositions for the review of 2222222\n\n| # | Disposition |\n|---|---|\n| 1 | ${cell} |\n`;
+const bodies = (...bs) => bs.map((b, i) => ({ at: at(i), url: `c${i}`, body: b }));
+const judge = (...bs) => evaluate({ comments: bodies(...bs), threads: [] });
+
+test('a review heading at a level other than ## is an error, not skipped', () => {
+  for (const body of [`# Review of 2222222\n\n${T}`, `### Review of 2222222\n\n${T}`,
+    `###### Dispositions for the review of 1111111\n`, `Review of 2222222\n---\n\n${T}`,
+    `Review of 2222222\n===\n\n${T}`, `**Review of 2222222**\n\n${T}`, `__Review of 2222222:__\n\n${T}`]) {
+    const r = judge(CLEAN, body);
+    assert.equal(r.exit, 2, body);
+    assert.match(r.errors.join('\n'), /2222222|1111111/, body);
+  }
+});
+
+test('a level-2 heading that names findings but no recognised form is an error', () => {
+  const r = judge(CLEAN, '## Findings on 2222222\n\n1. low: thing\n');
+  assert.match(r.errors.join('\n'), /Findings on 2222222.*unrecognised/);
+  assert.equal(r.exit, 2);
+});
+
+test('a findings table outside a review section is an error', () => {
+  for (const body of [`${CLEAN}\n## Extra\n\n${T}`, `Before any heading:\n\n${T}`]) {
+    const r = judge(body);
+    assert.match(r.errors.join('\n'), /outside a review/, body);
+    assert.equal(r.exit, 2, body);
+  }
+});
+
+// Every table in a review section must still be a findings table (a renamed column must
+// not hide a finding); ordinary subheadings and text are fine.
+test('ordinary subheadings inside a review are fine', () => {
+  const r = judge(`## Review of 2222222: NOT CLEAN\n\n### Notes\n\n**Verdict:** see the table.\n\n${T}`, DISP());
+  assert.deepEqual(r.errors, []);
+  assert.equal(r.exit, 0);
+});
+
+test('a disposition hidden in an HTML comment or a code fence does not count', () => {
+  for (const hidden of [`<!--\n${DISP()}-->\n`, `\`\`\`\n${DISP()}\`\`\`\n`, `~~~md\n${DISP()}~~~\n`,
+    DISP('<!-- Fixed -->')]) {
+    const r = judge(REV, hidden);
+    assert.deepEqual(r.errors, [], hidden);
+    assert.deepEqual(ids(r.open), ['1'], hidden);
+    assert.equal(r.exit, 1, hidden);
+  }
+});
+
+test('a finding hidden in an unterminated comment or fence is inconclusive', () => {
+  for (const tail of ['<!-- note\n', '```\n']) {
+    const r = judge(`${tail}${REV}`);
+    assert.match(r.errors.join('\n'), /unterminated/, tail);
+    assert.equal(r.exit, 2, tail);
+  }
+});
+
+test('a review edited after its dispositions is inconclusive until they are re-posted', () => {
+  const edited = (when) => [{ at: at(0), edited: when, url: 'rev', body: REV }, { at: at(1), url: 'disp', body: DISP() }];
+  const after = evaluate({ comments: edited(at(2)), threads: [] });
+  assert.match(after.errors.join('\n'), /rev.*2222222.*edited/);
+  assert.equal(after.exit, 2);
+  const before = evaluate({ comments: edited(at(1)), threads: [] });
+  assert.deepEqual(before.errors, []);
+  assert.equal(before.exit, 0);
+  const reposted = evaluate({ comments: [...edited(at(2)), { at: at(3), url: 'again', body: DISP('Still fixed') }], threads: [] });
+  assert.deepEqual(reposted.errors, []);
+  assert.equal(reposted.exit, 0);
+});
+
+test('placeholder dispositions leave the finding open', () => {
+  for (const cell of ['-', '—', 'TBD', ' todo ', 'Open']) {
+    const sep = judge(REV, DISP(cell));
+    assert.deepEqual(ids(sep.open), ['1'], `dispositions table: ${cell}`);
+    assert.equal(sep.exit, 1);
+    const combined = judge(`## Review of 2222222: NOT CLEAN\n\n| # | Finding | Disposition |\n|---|---|---|\n| 1 | x | ${cell} |\n`);
+    assert.deepEqual(ids(combined.open), ['1'], `combined table: ${cell}`);
+    assert.equal(combined.exit, 1);
+  }
+  assert.equal(judge(REV, DISP('Open question answered in #12')).exit, 0, 'only the bare word is a placeholder');
+});
+
+test('third-party headings that merely mention review are ignored', () => {
+  for (const h of ["## Reviewer's Guide", '## Preview deployment', '## Reviewed-by bots', '### Summary']) {
+    const r = judge(CLEAN, `${h}\n\nbot text\n`);
+    assert.deepEqual(r.errors, [], h);
+    assert.equal(r.exit, 0, h);
+  }
+});
+
+test('an unminimized old-style review heading is an error', () => {
+  const r = judge(CLEAN, '## Re-review round 2\n\nAll fixed.\n');
+  assert.match(r.errors.join('\n'), /Re-review round 2.*unrecognised/);
+  assert.equal(r.exit, 2);
+});
+
+test('a minimized (hidden) comment is skipped: the override for a bad heading', () => {
+  const comments = [...bodies(CLEAN), { at: at(1), url: 'hidden', minimized: true, body: `## Re-review round 2\n\n${T}` }];
+  const r = evaluate({ comments, threads: [] });
+  assert.deepEqual(r.errors, []);
+  assert.equal(r.exit, 0);
+});
+
+test('a comment with no usable timestamp is inconclusive', () => {
+  const r = evaluate({ comments: [{ at: null, url: 'r', body: REV }, { at: at(1), url: 'd', body: DISP() }], threads: [] });
+  assert.match(r.errors.join('\n'), /timestamp/);
+  assert.equal(r.exit, 2);
+});
+
 // --- the gh layer -----------------------------------------------------------------
 
 // A fake `gh`: pages are returned whole only under --paginate --slurp, as gh does;
 // without --slurp gh concatenates pages (not valid JSON); without --paginate, page one.
+// Comments, reviews and threads are three GraphQL connections, told apart by the query.
 function fakeGh({ comments: c = [[]], reviews = [[]], threads = [[]], fail } = {}) {
   const calls = [];
   const gh = async (args) => {
     calls.push(args);
-    if (fail && args.some((a) => fail.test(a))) throw new Error('gh: HTTP 502');
     const joined = args.join(' ');
-    let pages;
+    if (fail && fail.test(joined)) throw new Error('gh: HTTP 502');
     if (/repo view/.test(joined)) return 'acme/game\n';
-    if (args.includes('graphql')) {
-      pages = threads.map((nodes, i) => ({
-        data: { repository: { pullRequest: { reviewThreads: {
-          pageInfo: { hasNextPage: i < threads.length - 1, endCursor: `cur${i}` }, nodes,
-        } } } },
-      }));
-    } else if (/issues\/\d+\/comments/.test(joined)) pages = c;
-    else if (/pulls\/\d+\/reviews/.test(joined)) pages = reviews;
-    else throw new Error(`unexpected gh call: ${joined}`);
+    if (!args.includes('graphql')) throw new Error(`unexpected gh call: ${joined}`);
+    const key = /reviewThreads\(/.test(joined) ? 'reviewThreads' : /reviews\(/.test(joined) ? 'reviews' : 'comments';
+    const src = { reviewThreads: threads, reviews, comments: c }[key];
+    const pages = src.map((nodes, i) => ({
+      data: { repository: { pullRequest: { [key]: {
+        pageInfo: { hasNextPage: i < src.length - 1, endCursor: `cur${i}` }, nodes,
+      } } } },
+    }));
     if (!args.includes('--paginate')) return JSON.stringify(pages[0]);
     if (!args.includes('--slurp')) return pages.map((p) => JSON.stringify(p)).join('');
     return JSON.stringify(pages);
@@ -162,18 +273,21 @@ function fakeGh({ comments: c = [[]], reviews = [[]], threads = [[]], fail } = {
   return { gh, calls };
 }
 
-const issueComment = (i, name) => ({ created_at: at(i), html_url: `c${i}`, body: fx(name) });
+const issueComment = (i, name, extra = {}) => ({ createdAt: at(i), lastEditedAt: null, isMinimized: false, url: `c${i}`, body: fx(name), ...extra });
 const sink = () => { const lines = []; return { lines, log: (s) => lines.push(s) }; };
 
-test('fetchPr reads every page of comments, reviews and threads', async () => {
+test('fetchPr reads every page of comments, reviews and threads, with edit and hidden flags', async () => {
   const { gh } = fakeGh({
-    comments: [[issueComment(0, 'review')], [issueComment(2, 'dispositions-partial')]],
-    reviews: [[{ submitted_at: at(1), html_url: 'r1', body: '' }], [{ submitted_at: at(3), html_url: 'r2', body: fx('combined') }]],
+    comments: [[issueComment(0, 'review', { lastEditedAt: at(9) })], [issueComment(2, 'dispositions-partial', { isMinimized: true })]],
+    reviews: [[{ submittedAt: at(1), createdAt: at(1), lastEditedAt: null, isMinimized: false, url: 'r1', body: '' }],
+      [{ submittedAt: null, createdAt: at(3), lastEditedAt: at(4), isMinimized: false, url: 'r2', body: fx('combined') }]],
     threads: [[{ isResolved: true, path: 'a', line: 1, comments: { nodes: [{ body: 'x', url: 't0' }] } }],
       [{ isResolved: false, path: 'b', line: 2, comments: { nodes: [{ body: 'y', url: 't1' }] } }]],
   });
   const pr = await fetchPr({ repo: 'acme/game', pr: 7, gh });
-  assert.deepEqual(pr.comments.map((c) => c.url), ['c0', 'c2', 'r2']); // empty review body dropped
+  assert.deepEqual(pr.comments.map((c) => [c.url, c.at, c.edited, c.minimized]), [
+    ['c0', at(0), at(9), false], ['c2', at(2), null, true], ['r2', at(3), at(4), false], // empty review body dropped
+  ]);
   assert.deepEqual(pr.threads.map((t) => [t.where, t.isResolved]), [['a:1', true], ['b:2', false]]);
 });
 
@@ -194,7 +308,7 @@ test('run exits 1 and prints each open finding', async () => {
 });
 
 test('run exits 2 on an API error, whichever call fails', async () => {
-  for (const fail of [/issues\/\d+\/comments/, /pulls\/\d+\/reviews/, /^graphql$/]) {
+  for (const fail of [/ comments\(first: 100/, / reviews\(first: 100/, /reviewThreads\(first: 100/]) {
     const { gh } = fakeGh({ comments: [[issueComment(0, 'clean')]], fail });
     const out = sink();
     assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 2, String(fail));
@@ -202,9 +316,17 @@ test('run exits 2 on an API error, whichever call fails', async () => {
   }
 });
 
-test('run exits 2 when gh returns a non-page shape (e.g. a GraphQL error body)', async () => {
-  const gh = async (args) => (args.includes('graphql') ? JSON.stringify([{ errors: [{ message: 'nope' }] }]) : '[[]]');
-  assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: () => {} }), 2);
+test('run exits 2 when gh returns a GraphQL error body instead of a connection', async () => {
+  const gh = async () => JSON.stringify([{ errors: [{ message: 'nope' }] }]);
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 2);
+  assert.match(out.lines.join('\n'), /INCONCLUSIVE: .*nope/);
+});
+
+test('run names the bad response when gh does not return a list of pages', async () => {
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh: async () => '{"message":"Not Found"}', log: out.log }), 2);
+  assert.match(out.lines.join('\n'), /INCONCLUSIVE: .*expected an array of pages/);
 });
 
 test('run exits 2 for a PR with no review comment', async () => {
@@ -214,14 +336,14 @@ test('run exits 2 for a PR with no review comment', async () => {
   assert.match(out.lines.join('\n'), /no review/i);
 });
 
+test('run skips a minimized comment fetched from GitHub', async () => {
+  const { gh } = fakeGh({ comments: [[issueComment(0, 'clean'), issueComment(1, 'malformed-row', { isMinimized: true })]] });
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: () => {} }), 0);
+});
+
 test('run resolves the repo through gh when none is given, and passes it on', async () => {
   const { gh, calls } = fakeGh({ comments: [[issueComment(0, 'clean')]] });
   assert.equal(await run({ pr: 7, gh, log: () => {} }), 0);
-  assert.ok(calls.some((a) => a.includes('repos/acme/game/issues/7/comments?per_page=100')));
-});
-
-test('run names the bad response when gh does not return a list of pages', async () => {
-  const out = sink();
-  assert.equal(await run({ repo: 'acme/game', pr: 7, gh: async () => '{"message":"Not Found"}', log: out.log }), 2);
-  assert.match(out.lines.join('\n'), /INCONCLUSIVE: .*expected an array of pages/);
+  const q = calls.find((a) => a.includes('graphql'));
+  assert.ok(q.includes('owner=acme') && q.includes('name=game') && q.includes('number=7'), q.join(' '));
 });

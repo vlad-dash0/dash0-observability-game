@@ -32,6 +32,7 @@ findings, 2 inconclusive. Merge needs `All checks` green and the detector at 0.
 2. Dispositions, posted after the review they answer:
 
    ## Dispositions for the review of <sha>
+   (or "## Dispositions for the re-review of <sha>")
 
    | # | Disposition |
    |---|---|
@@ -39,7 +40,9 @@ findings, 2 inconclusive. Merge needs `All checks` green and the detector at 0.
    | N1 | Won't fix: ... |
 
    Every `#` must exist in the latest earlier review of that sha. An empty Disposition
-   cell leaves the finding open. Other columns (Severity) are allowed.
+   cell, or one holding only `-`, `—`, `TBD`, `TODO` or `open` (any case), leaves the
+   finding open. Other columns (Severity) are allowed. If the review is edited after
+   its dispositions, post the dispositions again.
 
 3. Combined, when the fixes land before the comment is posted:
 
@@ -50,6 +53,14 @@ findings, 2 inconclusive. Merge needs `All checks` green and the detector at 0.
    | 1 | nit | ... | Reworded |
 
 Inline review threads count as findings; resolve a thread when it is addressed.
-Any other level-2 heading containing "review" or "disposition" makes the detector
-inconclusive, so other summary comments use different words (e.g. "## Pre-merge audit").
+
+What the detector reads: only what GitHub renders, so text in an HTML comment or a code fence
+does not count (an unterminated one is inconclusive). Review and dispositions headings
+must be level 2 ("## "). Any heading (#..######, setext, or a bold-only line) that starts
+with "Review", "Re-review", "Reviews" or "Disposition(s)", or contains "finding(s)", and
+is not one of the forms above at level 2 makes it inconclusive; so does a `#` + Finding
+table outside a review section. Other summary comments use other words ("## Pre-merge
+audit"); "## Reviewer's Guide" or "## Preview" are fine.
+Override: hide (minimize) a comment the detector must not read, e.g. a bot's or an
+old-format review; minimized comments are skipped.
 -->

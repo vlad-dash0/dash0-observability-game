@@ -454,4 +454,6 @@ Tests import modules directly; `window`, `localStorage`, `matchMedia` are inject
 dependencies. CI: on push + pull_request, `permissions: contents: read`, ubuntu-latest,
 `actions/checkout` and `actions/setup-node` pinned to SHAs, a matrix of Node 22 (the
 `engines` floor) and `node-version-file: .nvmrc`,
-`cache: npm`, `npm ci`, `npm test`. `.nvmrc` = current Active LTS major.
+`cache: npm`, `npm ci`, `npm test`. `.nvmrc` = current Active LTS major. An `All checks`
+job (`if: always()`, `needs:` every other job, fails unless each succeeded) is the merge
+gate, with `node tools/pr-findings.mjs <PR>` exiting 0 (#35).
