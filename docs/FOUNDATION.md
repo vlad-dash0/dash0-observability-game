@@ -153,14 +153,16 @@ Progress: never downgrades (best stars, earliest non-null `at`, card union); sta
 integers 0–3; corrupt input → empty, no throw; `recordCompletion` idempotent;
 `mergeProgress` commutative, associative, idempotent for a fixed `keep`.
 
-Unlock (`lib/unlock.mjs`, pure):
+Unlock (`lib/unlock.mjs`, pure; entered rule decided 2026-10-30, see [M1-DESIGN](M1-DESIGN.md) §3):
 - `isCompleted(progress, id)`: has an own entry.
 - `isActComplete(act, progress)`: all `levelIds` and the `bossId` (if any) completed.
-- `isActUnlocked(i, progress, registry)`: EVERY earlier act complete (whole chain).
+- `isActUnlocked(i, progress, registry)`: EVERY earlier act complete (whole chain), OR act
+  `i` entered (any of its levels or its boss completed; opening a level is not recorded and
+  does not count). An entered act never re-locks when an earlier act gains a level.
 - `levelState(id, progress, registry)` → `'locked'|'open'|'done'`: unknown → locked;
   completed → done (even in a locked act; imported progress is never hidden); act locked →
   locked; boss with an unfinished level in its act → locked; else open.
-- `lockReason(id, progress, registry)` → `{kind:'act', actId}` (first incomplete earlier act) `| {kind:'boss', remaining:[ids]} | {kind:'unknown'}` (id or its act not in the registry) `| null` (playable).
+- `lockReason(id, progress, registry)` → `{kind:'act', actId}` (act not entered: first incomplete earlier act) `| {kind:'boss', remaining:[ids]} | {kind:'unknown'}` (id or its act not in the registry) `| null` (playable); `levelState` is `'open'` exactly when it is null.
 
 Concurrency: `saveProgress` reads storage, merges, writes in one sync task; the `storage`
 event merges other tabs' writes into memory; progress only goes up, so last-writer-wins
