@@ -12,4 +12,15 @@
 //   3. Add DRIVERS['<id>'] (happy and sloppy runs) in test/levels-play.test.mjs.
 //
 // Act: { id, no, name, sub, levels: [level, ...], boss: level | null }.
-export const ACTS = [];
+import namingYourService from './naming-your-service.mjs';
+
+export const ACTS = [
+  {
+    id: 'act-1',
+    no: 1,
+    name: 'Resources and identity',
+    sub: 'Who is talking?',
+    levels: [namingYourService],
+    boss: null,
+  },
+];

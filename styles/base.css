@@ -104,6 +104,18 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
   border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
 
+/* ---------- Config editor (level 1.2) ---------- */
+.env-label { display: block; font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+.env-editor {
+  display: block; width: 100%; min-height: 9em; resize: vertical;
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.6; color: var(--color-text);
+  background: var(--color-code-bg); border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); padding: 12px 14px;
+}
+.env-editor[readonly] { opacity: .7; }
+.env-note { font-size: 13px; color: var(--color-text-muted); margin: 8px 0 4px; }
+.env-issues { margin: 8px 0 0 18px; }
+
 @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 @media (prefers-reduced-motion: reduce) {

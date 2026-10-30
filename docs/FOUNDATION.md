@@ -435,11 +435,14 @@ neither recorded, storage unchanged (mutation: R's `complete(this.currentLevel)`
 
 ### F6 driver (`naming-your-service`)
 Steps: (1) given config, "what does it show up as?" (4 choices, `unknown_service:node`
-correct; wrong → `mistake()`); (2) fix the config and `check` (each failure → `mistake()`);
+correct; wrong → `mistake()`); (2) fix the config and `check` (each new failing config → `mistake()`);
 (3) precedence question (`checkout` correct). Happy → `{stars:3, cards:['unknown-service']}`;
-sloppy (one wrong choice, one failed check) → `{stars:2, …}`. Mutation: skip `mistake()`
-on a failed check. DECK adds `unknown-service` (front: "Without service.name, your
-telemetry arrives as unknown_service:<process>.").
+sloppy (one wrong choice, one failed check) → `{stars:2, …}`. A single dropped `mistake()`
+cannot flip the sloppy run (1 and 2 penalties both score 2★), so
+`test/naming-your-service.test.mjs` plays one-penalty runs (each must score 2★). Mutation:
+skip `mistake()` on a failed check, or on a wrong pick; that test goes red. DECK adds
+`unknown-service` (front: "Without service.name, your telemetry arrives as
+unknown_service:<executable>.").
 
 ## 7. CSP, imports, CI
 

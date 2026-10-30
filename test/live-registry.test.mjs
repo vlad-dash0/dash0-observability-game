@@ -10,8 +10,7 @@ import { liveRegistry } from '../app.mjs';
 
 const nodeIds = NODES.map((n) => n.id);
 
-// F6 sets this to ['naming-your-service'].
-const EXPECTED_ORDER = [];
+const EXPECTED_ORDER = ['naming-your-service'];
 
 test('the live registry builds against the real deck and map nodes', () => {
   const reg = buildRegistry(ACTS, { deck: DECK, nodeIds });
