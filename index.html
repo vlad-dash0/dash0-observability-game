@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- Stub from F1 (#9); F5 (#13) owns this file. -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dash0 Observability Game</title>
+<title>On Call: a Dash0 observability game</title>
 <!-- App logic is an ES module (main.mjs), never an inline <script>, so the CSP keeps
      'unsafe-inline' out of script-src. main.mjs registers the Alpine component on
      `alpine:init`, so it must load before Alpine starts: both scripts are deferred and
@@ -17,6 +16,115 @@
 <link rel="stylesheet" href="/styles/hub.css">
 </head>
 <body>
-<div class="app" x-data="game"></div>
+<div class="app" x-data="game" @keydown.escape.window="onEscape($event)">
+
+  <!-- The hub: inert while the level or reward dialog is open, so Tab and Enter cannot
+       reach the cards behind it. Alpine removes the attribute when the value is false. -->
+  <div class="hub" :inert="overlayOpen || rewardOpen">
+    <header class="hub-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">0</span>
+        <span class="brand-name">On Call <span>by Dash0</span></span>
+      </div>
+      <div class="head-right">
+        <!-- A live region announces its text, not aria-label changes: the spoken summary
+             is visually hidden text inside it. -->
+        <div class="star-count" role="status">
+          <span aria-hidden="true">&#9733;</span>
+          <span aria-hidden="true" x-text="stars.earned + ' / ' + stars.max">0 / 0</span>
+          <span class="visually-hidden" x-text="starSummary()"></span>
+        </div>
+        <button class="theme-btn" type="button" @click="toggleTheme()" :aria-label="themeLabel()"
+                :title="themeLabel()">
+          <span aria-hidden="true" x-text="theme === 'light' ? '☾' : '☀'">&#9728;</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Always rendered (a hidden live region would not announce); .show draws the box. -->
+    <p class="notice" role="status" :class="notice ? 'show' : ''" x-text="noticeText()"></p>
+
+    <!-- SYSTEM MAP. Markup comes from mapSvg() (lib/map.mjs): Alpine's x-for cannot run
+         inside an svg (an SVG template element has no .content), so the whole map is one
+         x-html. Positions are SVG attributes only, never style (CSP style-src 'self'). -->
+    <section class="map-panel" aria-labelledby="map-title">
+      <h2 id="map-title" class="section-label">System map</h2>
+      <svg class="system-map" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60"
+           role="img" :aria-label="mapLabel()" x-html="mapSvg()"></svg>
+    </section>
+
+    <section class="levels" aria-labelledby="levels-title">
+      <h2 id="levels-title" class="section-label">Levels</h2>
+      <p class="empty-state" x-show="!hasLevels" x-cloak>
+        Levels coming soon. Each one you finish lights up part of the map.
+      </p>
+      <template x-for="act in acts" :key="act.id">
+        <div class="act">
+          <h3 class="act-title"><span x-text="'Act ' + act.no"></span>: <span x-text="act.name"></span></h3>
+          <p class="act-sub" x-show="act.sub" x-text="act.sub"></p>
+          <div class="level-list">
+            <template x-for="id in act.ids" :key="id">
+              <div class="level-card"
+                   role="button" tabindex="0"
+                   :data-level-id="id"
+                   :aria-disabled="levelState(id) === 'locked' ? 'true' : 'false'"
+                   :aria-label="levelLabel(id)"
+                   :class="levelClasses(id)"
+                   @click="openLevel(id)"
+                   @keydown.enter.prevent="openLevel(id)"
+                   @keydown.space.prevent="openLevel(id)">
+                <div class="level-ico" aria-hidden="true" x-text="level(id).icon"></div>
+                <div class="level-body">
+                  <div class="level-no" x-text="level(id).kind === 'boss' ? 'Incident' : level(id).no"></div>
+                  <div class="level-name" x-text="level(id).name"></div>
+                  <div class="level-sub" aria-live="polite" x-text="levelSub(id)"></div>
+                </div>
+                <div class="level-status" aria-hidden="true">
+                  <span class="level-stars" x-show="levelState(id) === 'done' &amp;&amp; level(id).scored" x-text="starText(id)"></span>
+                  <span x-text="levelState(id) === 'done' ? 'Play again' : levelState(id) === 'open' ? 'Start' : 'Locked'"></span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </section>
+  </div>
+
+  <!-- LEVEL OVERLAY. Levels render into ov-body / ov-actions (found by id) with
+       ctx.renderStep and wire buttons with el.onclick. x-ignore only keeps Alpine off
+       the initial markup: Alpine still initialises nodes added later, so level markup
+       must not use Alpine attributes (x-, @, :). -->
+  <div class="overlay" :class="overlayOpen ? 'show' : ''" x-cloak
+       role="dialog" aria-modal="true" :aria-label="overlayTitle">
+    <div class="lesson-top">
+      <button class="back-btn" type="button" @click="closeOverlay()" aria-label="Back to the map">&larr;</button>
+      <h2 x-text="overlayTitle"></h2>
+    </div>
+    <div class="level-host" x-ignore>
+      <div class="lesson-scroll" id="ov-body"></div>
+      <div class="lesson-actions" id="ov-actions"></div>
+    </div>
+  </div>
+
+  <!-- REWARD -->
+  <div class="reward" :class="rewardOpen ? 'show' : ''" x-cloak
+       role="dialog" aria-modal="true" aria-labelledby="reward-title">
+    <div class="reward-card">
+      <h2 id="reward-title" x-text="rewardTitle"></h2>
+      <p class="reward-stars" role="img" :aria-label="rewardStarsLabel()" x-show="rewardStars !== null"
+         x-text="rewardStarsText()"></p>
+      <p x-text="rewardText"></p>
+      <div class="reward-cards" x-show="rewardCards.length > 0">
+        <p class="reward-cards-title">New nuance card</p>
+        <template x-for="front in rewardCards" :key="front">
+          <p class="nuance-card" x-text="front"></p>
+        </template>
+      </div>
+      <button class="btn" type="button" @click="closeReward()">Back to the map</button>
+    </div>
+  </div>
+
+</div>
 </body>
 </html>

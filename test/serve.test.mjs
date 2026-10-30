@@ -55,8 +55,8 @@ test('the running server sends the vercel.json headers', async () => {
   const vendored = await get(repo.port, '/vendor/alpine-3.14.1.min.js');
   assert.equal(vendored.status, 200);
   assertHeaders(vendored, [...rule('/(.*)'), ...rule('/vendor/(.*)')]);
-  // Status depends on whether F2's fonts exist yet; the headers must not.
-  const font = await get(repo.port, '/fonts/MartianMono-Regular.woff2');
+  const font = await get(repo.port, '/fonts/MartianMono-1.1.0-Regular.woff2');
+  assert.equal(font.status, 200);
   assertHeaders(font, [...rule('/(.*)'), ...rule('/fonts/(.*)')]);
 });
 
