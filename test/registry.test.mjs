@@ -104,12 +104,61 @@ test('the built registry is deep-frozen with a null-prototype level map', () => 
 });
 
 test('building copies: the source level modules are neither frozen nor annotated', () => {
-  const acts = baseline();
-  buildRegistry(acts, { deck: DECK, nodeIds: ['n1'] });
+  const acts = withEdit((a) => {
+    Object.assign(a[0].levels[0], { cards: ['c1'], scoring: { parMs: 5000 } });
+  });
+  const reg = buildRegistry(acts, { deck: DECK, nodeIds: ['n1'] });
   const x = acts[0].levels[0];
   assert.equal(Object.isFrozen(x), false);
+  assert.equal(Object.isFrozen(x.scoring), false, 'nested source object stays unfrozen');
+  assert.equal(Object.isFrozen(x.cards), false);
+  assert.equal(Object.isFrozen(x.mechanics), false);
+  assert.equal(Object.isFrozen(acts[0]), false);
+  assert.equal(Object.isFrozen(acts[0].levels), false);
+  assert.ok(Object.isFrozen(reg.levels.x.scoring));
+  assert.notEqual(reg.levels.x.scoring, x.scoring);
   assert.equal('actId' in x, false);
   assert.equal('kind' in x, false);
+});
+
+test('the built level holds exactly the §2.1 fields plus actId and kind', () => {
+  const reg = buildRegistry(baseline(), { deck: DECK, nodeIds: ['n1'] });
+  assert.deepEqual(Object.keys(reg.levels.x).sort(), [
+    'actId', 'cards', 'icon', 'id', 'kind', 'lights', 'mechanics', 'name', 'no',
+    'rewardTitle', 'run', 'scored', 'scoring', 'sub',
+  ]);
+});
+
+test('unknown keys on levels, acts and cards are rejected, with a hint when close', () => {
+  rejects(
+    withEdit((a) => (a[0].levels[0].light = ['n1'])),
+    'unknown key "light" on level "x" (did you mean "lights"?)',
+  );
+  rejects(
+    withEdit((a) => (a[0].boss.concept = 'x')),
+    'unknown key "concept" on level "bx"',
+  );
+  const far = validateRegistry(withEdit((a) => (a[0].levels[0].zzzzzz = 1)), REFS).errors;
+  assert.deepEqual(far, ['unknown key "zzzzzz" on level "x"']);
+  rejects(
+    withEdit((a) => (a[1].bos = null)),
+    'unknown key "bos" on act "a1" (did you mean "boss"?)',
+  );
+  const { errors } = validateDeck([card('c1', { fronts: 'x' })]);
+  assert.deepEqual(errors, ['unknown key "fronts" on card "c1" (did you mean "front"?)']);
+});
+
+test('a declared act or kind gets its own message, not an unknown-key one', () => {
+  const { errors } = validateRegistry(withEdit((a) => (a[0].levels[0].kind = 'boss')), REFS);
+  assert.deepEqual(errors, ['level "x": must not declare "kind"']);
+});
+
+test('an id of exactly 64 characters and a 140-character front are accepted', () => {
+  const long = 'a'.repeat(64);
+  const acts = withEdit((a) => (a[0].levels[0].id = long));
+  assert.deepEqual(validateRegistry(acts, REFS), { ok: true, errors: [] });
+  const deck = [card(long, { front: 'x'.repeat(140) })];
+  assert.deepEqual(validateDeck(deck), { ok: true, errors: [] });
 });
 
 test('declared cards, lights, scored and scoring survive the build', () => {
@@ -196,7 +245,7 @@ test('no must match the act, increase within it, and be null for a boss', () => 
   );
   rejects(
     withEdit((a) => (a[0].levels[1].no = '0.1')),
-    'level "y": no "0.1"',
+    'level "y": no "0.1" must come after "0.1" (level "x")',
   );
   rejects(
     withEdit((a) => (a[0].boss.no = '0.3')),
@@ -205,6 +254,21 @@ test('no must match the act, increase within it, and be null for a boss', () => 
   rejects(
     withEdit((a) => (a[0].levels[0].no = null)),
     'level "x": no',
+  );
+});
+
+test('no is "<act>.<n>" with n >= 1 and no leading zeros', () => {
+  rejects(
+    withEdit((a) => (a[0].levels[0].no = '0.0')),
+    'level "x": no "0.0" must be "0.<n>" with n >= 1 and no leading zeros',
+  );
+  rejects(
+    withEdit((a) => (a[0].levels[1].no = '0.02')),
+    'level "y": no "0.02" must be "0.<n>"',
+  );
+  rejects(
+    withEdit((a) => (a[1].levels[0].no = '01.1')),
+    'level "z": no "01.1" must be "1.<n>"',
   );
 });
 
@@ -343,6 +407,53 @@ test('buildRegistry also reports deck problems', () => {
       }),
     (err) => err instanceof RegistryError && err.message.includes('card "c1": specUrl'),
   );
+});
+
+test('holes in ACTS, in levels or in the deck are reported, never skipped', () => {
+  const holeyLevels = withEdit((a) => (a[0].levels = [a[0].levels[0], , a[0].levels[1]]));
+  rejects(holeyLevels, 'act "a0": level 1 is not an object');
+  const [a0, a1] = baseline();
+  rejects([a0, , a1], 'act 1 is not an object');
+  const deck = [card('c1')];
+  deck.length = 2;
+  const res = validateDeck(deck);
+  assert.equal(res.ok, false);
+  assert.ok(res.errors.includes('deck card 1 is not an object'), JSON.stringify(res.errors));
+});
+
+test('unquotable values (BigInt, circular, Symbol) are reported, not thrown', () => {
+  const circ = {};
+  circ.self = circ;
+  const cases = [
+    [(a) => (a[0].levels[0].no = 1n), 'level "x": no [object BigInt]'],
+    [(a) => (a[0].levels[0].cards = [10n]), 'level "x": unknown card [object BigInt]'],
+    [(a) => (a[0].levels[0].lights = [circ]), 'level "x": unknown node [object Object]'],
+    [(a) => (a[0].levels[0].no = circ), 'level "x": no [object Object]'],
+    [(a) => (a[0].id = Symbol('a0')), 'invalid act id [object Symbol]'],
+    [(a) => (a[0].no = Symbol('n')), 'act "a0": no must be an integer >= 0'],
+    [(a) => (a[0].levels[0].id = 7n), 'act "a0": invalid level id [object BigInt]'],
+  ];
+  for (const [edit, fragment] of cases) rejects(withEdit(edit), fragment);
+  assert.deepEqual(validateDeck([card('c1', { id: Symbol('c') })]).errors, [
+    'invalid card id [object Symbol]',
+  ]);
+});
+
+test('bad options are reported, not thrown', () => {
+  assert.deepEqual(validateRegistry([], null), {
+    ok: false,
+    errors: ['options must be an object'],
+  });
+  assert.deepEqual(validateRegistry([], { nodeIds: 5 }), {
+    ok: false,
+    errors: ['nodeIds must be an array'],
+  });
+  assert.deepEqual(validateRegistry([], { cardIds: 'c1' }), {
+    ok: false,
+    errors: ['cardIds must be an array'],
+  });
+  assert.throws(() => buildRegistry([], null), RegistryError);
+  assert.throws(() => buildRegistry([], { deck: [], nodeIds: 5 }), RegistryError);
 });
 
 test('validateRegistry never throws, even on garbage', () => {

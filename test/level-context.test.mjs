@@ -8,9 +8,15 @@ import { createLevelContext } from '../lib/level-context.mjs';
 const NOW = 1767225600000; // 2026-01-01T00:00:00.000Z
 const LEVEL_A = { id: 'lvl-a', scored: true, scoring: { parMs: null } };
 
-function setup({ level = LEVEL_A, now = () => NOW, controller = new AbortController() } = {}) {
+function setup({
+  level = LEVEL_A,
+  now = () => NOW,
+  controller = new AbortController(),
+  onFinish,
+} = {}) {
   const dom = makeDom();
   const calls = [];
+  const reported = [];
   const ctx = createLevelContext({
     level,
     ovBody: dom.body,
@@ -18,10 +24,11 @@ function setup({ level = LEVEL_A, now = () => NOW, controller = new AbortControl
     now,
     shuffle: (a) => a,
     reduceMotion: true,
-    onFinish: (...args) => calls.push(args),
+    onFinish: onFinish ?? ((...args) => calls.push(args)),
     signal: controller.signal,
+    reportError: (e) => reported.push(e),
   });
-  return { dom, ctx, calls, controller };
+  return { dom, ctx, calls, controller, reported };
 }
 
 test('renderStep fills body and actions and scrolls the body to the top', () => {
@@ -82,14 +89,74 @@ test('finish with no argument is a clean 3-star run with empty text and cards', 
   assert.deepEqual(ctx.finish(), { stars: 3, cards: [], text: '' });
 });
 
+const PAR_60S = { id: 'lvl-a', scored: true, scoring: { parMs: 60000 } };
+
 test('elapsed time is measured from creation: 61 s over a 60 s par costs a star', () => {
-  const times = [0, 61000];
-  const { ctx, calls } = setup({
-    level: { id: 'lvl-a', scored: true, scoring: { parMs: 60000 } },
-    now: () => times.shift(),
-  });
+  const times = [NOW, NOW + 61000];
+  const { ctx, calls } = setup({ level: PAR_60S, now: () => times.shift() });
   assert.equal(ctx.finish({ text: 'slow' }).stars, 2);
-  assert.equal(calls[0][1].at, '1970-01-01T00:01:01.000Z');
+  assert.equal(calls[0][1].at, '2026-01-01T00:01:01.000Z');
+});
+
+test('59 s under a 60 s par keeps 3 stars', () => {
+  const times = [NOW, NOW + 59000];
+  const { ctx } = setup({ level: PAR_60S, now: () => times.shift() });
+  assert.equal(ctx.finish({ text: 'quick' }).stars, 3);
+});
+
+test('a non-finite or out-of-range clock counts as no elapsed time and no date', () => {
+  for (const bad of [NaN, 1e20]) {
+    const times = [NOW, bad];
+    const { ctx, calls, reported } = setup({ level: PAR_60S, now: () => times.shift() });
+    assert.equal(ctx.finish({ text: 'clock' }).stars, 3);
+    assert.equal(calls[0][1].at, null);
+    assert.equal(reported.length, 1, 'a broken clock is reported');
+  }
+});
+
+test('an onFinish that throws is reported; the player still gets the result once', () => {
+  const boom = new Error('storage exploded');
+  const { ctx, reported } = setup({
+    onFinish: () => {
+      throw boom;
+    },
+  });
+  assert.deepEqual(ctx.finish({ text: 'done' }), { stars: 3, cards: [], text: 'done' });
+  assert.deepEqual(reported, [boom]);
+  assert.equal(ctx.finish({ text: 'again' }), null);
+});
+
+test('reportError defaults to console.error', (t) => {
+  const seen = t.mock.method(console, 'error', () => {});
+  const dom = makeDom();
+  const ctx = createLevelContext({
+    level: LEVEL_A,
+    ovBody: dom.body,
+    ovActions: dom.actions,
+    onFinish: () => {
+      throw new Error('x');
+    },
+    signal: new AbortController().signal,
+  });
+  ctx.finish();
+  assert.equal(seen.mock.callCount(), 1);
+});
+
+test('finish(null) is a clean finish; non-string text is stringified', () => {
+  assert.deepEqual(setup().ctx.finish(null), { stars: 3, cards: [], text: '' });
+  assert.equal(setup().ctx.finish({ text: 42 }).text, '42');
+  assert.equal(setup().ctx.finish({ text: null }).text, '');
+});
+
+test('the caller and onFinish get separate copies of cards', () => {
+  const { ctx, calls } = setup();
+  const cards = ['c1'];
+  const result = ctx.finish({ cards });
+  assert.notEqual(result.cards, cards);
+  assert.notEqual(result.cards, calls[0][1].cards);
+  result.cards.push('c2');
+  assert.deepEqual(calls[0][1].cards, ['c1']);
+  assert.deepEqual(cards, ['c1']);
 });
 
 test('a second finish returns null and does not call onFinish again', () => {
@@ -134,7 +201,7 @@ test('finish credits the level the ctx was created for, not whichever opened las
   assert.equal(calls[0][0], 'lvl-a');
 });
 
-test('createLevelContext refuses a missing onFinish or level id', () => {
+test('createLevelContext refuses missing deps', () => {
   const dom = makeDom();
   const base = {
     level: LEVEL_A,
@@ -146,4 +213,7 @@ test('createLevelContext refuses a missing onFinish or level id', () => {
   assert.throws(() => createLevelContext({ ...base, onFinish: undefined }), TypeError);
   assert.throws(() => createLevelContext({ ...base, level: {} }), TypeError);
   assert.throws(() => createLevelContext({ ...base, signal: undefined }), TypeError);
+  assert.throws(() => createLevelContext({ ...base, ovBody: undefined }), TypeError);
+  assert.throws(() => createLevelContext({ ...base, ovActions: null }), TypeError);
+  assert.throws(() => createLevelContext({ ...base, reportError: 'log' }), TypeError);
 });
