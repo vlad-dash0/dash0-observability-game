@@ -89,14 +89,16 @@ remaining(spec, state) → itemIds not yet right, spec order
 untried(spec, state, itemId) → bucketIds not yet tried, spec order
 isComplete(spec, state) → boolean
 ```
-View `lib/widgets/sort-it-view.mjs`: `renderSort(spec, state, {selected, escapeHtml})` (item
-buttons `data-item` + `aria-pressed`; bucket buttons `data-bucket`, disabled when tried for the
-selected item or nothing selected; `[data-bucket-list]` of placed items; `#ID-feedback`).
+View `lib/widgets/sort-it-view.mjs`: `renderSort(spec, state, {selected, escapeHtml,
+labelledBy?})` (item buttons `data-item` + `aria-pressed`; bucket buttons `data-bucket`,
+disabled when tried for the selected item or nothing selected; `[data-bucket-list]` of placed
+items; `#ID-feedback`; `labelledBy`, a plain-token heading id, makes the widget a labelled group).
 `mountSort(ctx, spec, {onComplete})`: tap-to-place (item then bucket; keyboard-native); drag is
 an enhancement calling the same path. Only `'wrong'` costs a mistake. Feedback: `Right. <label>
 goes in <bucket>. <why>` / `Not quite. <label> is not <bucket>. <whyNot?>` (doesn't reveal the
-answer) / `Pick an item first.` Focus: first remaining item → its first untried bucket → after
-wrong, next untried bucket → after right, next remaining item → `onComplete()`'s return.
+answer) / `You already tried <bucket> for <label>.` (a repeat; free) / `Pick an item first.`
+Focus: first remaining item → its first untried bucket → after wrong, next untried bucket →
+after right, next remaining item → `onComplete()`'s return.
 
 ### 4.2 Build it, trace waterfall (P5)
 Core `lib/widgets/trace.mjs`:

@@ -108,6 +108,37 @@ test('validateSortSpec: whyNot keys must be known buckets', () => {
   assert.equal(has(validateSortSpec(spec), 'item "i2": whyNot has unknown bucket "span"'), true);
 });
 
+test('validateSortSpec: every bucket and item needs a non-empty string label', () => {
+  const spec = fixture();
+  spec.buckets[0].label = '  ';
+  delete spec.buckets[1].label;
+  spec.items[0].label = 7;
+  spec.items[1].label = '';
+  const problems = validateSortSpec(spec);
+  assert.equal(has(problems, 'bucket "metric": empty label'), true);
+  assert.equal(has(problems, 'bucket "log": empty label'), true);
+  assert.equal(has(problems, 'item "i1": empty label'), true);
+  assert.equal(has(problems, 'item "i2": empty label'), true);
+  assert.equal(problems.length, 4);
+});
+
+test('validateSortSpec: every whyNot value must be a non-empty string', () => {
+  const spec = fixture();
+  spec.items[1].whyNot = { metric: '', trace: 3 };
+  const problems = validateSortSpec(spec);
+  assert.equal(has(problems, 'item "i2": whyNot "metric" is empty'), true);
+  assert.equal(has(problems, 'item "i2": whyNot "trace" is empty'), true);
+  assert.equal(problems.length, 2);
+});
+
+test('validateSortSpec: a whyNot for the item\'s own bucket is dead content', () => {
+  const spec = fixture();
+  spec.items[1].whyNot = { metric: 'Not a number.', log: 'Never shown.' };
+  const problems = validateSortSpec(spec);
+  assert.equal(has(problems, 'item "i2": whyNot "log" is its own bucket'), true);
+  assert.equal(problems.length, 1);
+});
+
 test('validateSortSpec never throws on junk', () => {
   for (const junk of [undefined, null, 7, 'x', [], {}, { buckets: 'x', items: {} }, { buckets: [null], items: [7] }]) {
     const problems = validateSortSpec(junk);

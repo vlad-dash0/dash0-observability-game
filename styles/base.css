@@ -105,13 +105,14 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 }
 
 /* ---------- Sort it (lib/widgets/sort-it-view.mjs) ---------- */
-/* Only existing text/background pairs (text on surface and surface-2, muted text on
+/* Labels may hold long <code> names: items, bucket buttons and placed items wrap anywhere
+   so nothing overflows at 320px. Only existing text/background pairs (text on surface and surface-2, muted text on
    surface), so test/theme.test.mjs's contrast checks cover them in both themes. */
 .sort-pool { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; min-height: 8px; }
 .sort-item {
   border: 1.5px solid var(--color-border); background: var(--color-surface); color: var(--color-text);
   border-radius: var(--radius-sm); padding: 10px 13.5px; font-family: inherit; font-size: 14.5px;
-  font-weight: 600; cursor: grab; transition: all .15s;
+  font-weight: 600; cursor: grab; transition: all .15s; max-width: 100%; overflow-wrap: anywhere;
 }
 .sort-item:hover { border-color: var(--color-accent); }
 /* Selected: a thicker text-coloured border (not colour alone) on the raised surface;
@@ -127,12 +128,15 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .sort-bucket-btn {
   width: 100%; border: 1.5px solid var(--color-border); background: var(--color-surface-2); color: var(--color-text);
   border-radius: var(--radius-sm); padding: 10px; font-family: inherit; font-size: 15px; font-weight: 700;
-  cursor: pointer; transition: all .15s;
+  cursor: pointer; transition: all .15s; max-width: 100%; overflow-wrap: anywhere;
 }
 .sort-bucket-btn:hover:not(:disabled) { border-color: var(--color-accent); }
 .sort-bucket-btn:disabled { opacity: .4; cursor: not-allowed; }
 .sort-placed { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-.sort-placed li { color: var(--color-text-muted); font-size: 13.5px; font-weight: 600; padding: 0 4px; }
+.sort-placed li {
+  color: var(--color-text-muted); font-size: 13.5px; font-weight: 600; padding: 0 4px;
+  max-width: 100%; overflow-wrap: anywhere;
+}
 .sort-placed li::before { content: "\2713 "; content: "\2713 " / ""; color: var(--color-success); }
 
 /* ---------- Config editor (level 1.2) ---------- */

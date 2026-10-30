@@ -42,7 +42,7 @@ function setup(spec = fixture(), opts = {}) {
       counts.mistakes += 1;
     },
   };
-  const fresh = fixture();
+  const fresh = spec ?? fixture();
   dom.body.innerHTML = renderSort(fresh, newSortState(fresh), { selected: null, escapeHtml, ...opts });
   dom.actions.innerHTML = '<button id="finish" disabled>Finish</button>';
   const onComplete = () => {
@@ -329,6 +329,33 @@ test('mountSort refuses a spec that is not rendered, or a missing onComplete', (
   assert.throws(() => mount(), { name: 'TypeError', message: /^sort "signals": not rendered/ });
   const { mount: again } = setup();
   assert.throws(() => again({ onComplete: undefined }), { name: 'TypeError', message: /onComplete/ });
+});
+
+test('whyNot is read for its own keys only: a "constructor" bucket never shows Object\'s function', () => {
+  const spec = fixture();
+  spec.buckets[2] = { id: 'constructor', label: 'Constructor' };
+  spec.items[2].bucket = 'constructor';
+  const { counts, mount } = setup(spec);
+  mount();
+  sortTo('i2', 'constructor'); // i2 has a partial whyNot ({metric}); none for constructor
+  assert.equal(counts.mistakes, 1);
+  assert.equal(feedback(), 'Not quite. Stack trace text is not Constructor.');
+  assert.equal(feedback().includes('function'), false);
+  assert.equal(feedback().includes('native code'), false);
+});
+
+test('long labels wrap: .sort-item, the bucket button and placed items cap their width and break anywhere', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const css = readFileSync(join(root, 'styles', 'base.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, sel, body]) => ({
+    sels: sel.split(',').map((s) => s.trim()),
+    body: body.replace(/\s+/g, ' '),
+  }));
+  for (const sel of ['.sort-item', '.sort-bucket-btn', '.sort-placed li']) {
+    const body = rules.filter((r) => r.sels.includes(sel)).map((r) => r.body).join(';');
+    assert.equal(/max-width:\s*100%/.test(body), true, `${sel} max-width: 100%`);
+    assert.equal(/overflow-wrap:\s*anywhere/.test(body), true, `${sel} overflow-wrap: anywhere`);
+  }
 });
 
 test('lib/widgets uses no timers (I2)', () => {
