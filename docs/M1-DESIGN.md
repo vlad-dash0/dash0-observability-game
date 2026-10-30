@@ -59,6 +59,8 @@ complete). FOUNDATION §3 is updated in P0.
 
 **Merge order still matters:** the pager (P4) merges before any Act 2 level (P6) so Act 2's
 unlock condition doesn't change under players; the Act 2 boss (P11) merges after 2.1–2.7.
+Between P3 and P4 a new player who finished 0.1–0.3 but not 1.2 sees Act 1 lock again when the
+pager lands; accepted, since the game is not yet deployed.
 
 ## 4. Widget contracts
 
@@ -230,24 +232,24 @@ INTERNAL loses the checkout→payments edge. Card: "Span kind is not cosmetic: s
 edges from CLIENT to SERVER and PRODUCER to CONSUMER pairs." Copy says "backends derive", not
 "the spec says". Spec: https://opentelemetry.io/docs/specs/otel/trace/api/#spankind
 
-**2.3 `status-and-errors`**: Sort into `ok` / `wrong`: a storefront CLIENT `GET
-/products/999` 404 ERROR → ok; b catalog SERVER 404 ERROR → wrong (SERVER 4xx stays Unset); c
+**2.3 `status-and-errors`**: cards `['span-status']`. Sort into `ok` / `wrong`: a
+storefront CLIENT `GET /products/999` 404 ERROR → ok; b catalog SERVER 404 ERROR → wrong (SERVER 4xx stays Unset); c
 checkout SERVER 500 UNSET → wrong; d inventory SERVER 200 UNSET → ok. Step 2 choice: Ok then
 setStatus(Error) → stays Ok (Ok is final). Card: "Status starts Unset. A 4xx is Error on the
 CLIENT span but stays Unset on the SERVER span. Ok is a final override." Spec:
 https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status ,
 https://opentelemetry.io/docs/specs/otel/trace/api/#set-status
 
-**2.4 `context-propagation`**: Step 1 choice: hop headers show nginx proxy dropping
-`traceparent`; waterfall shows two roots → the proxy. Step 2 choice: valid traceparent →
+**2.4 `context-propagation`**: cards `['broken-propagation']`. Step 1 choice: hop headers
+show nginx proxy dropping `traceparent`; waterfall shows two roots → the proxy. Step 2 choice: valid traceparent →
 `00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01` (decoys: all-zero trace-id,
 uppercase hex, 15-hex parent-id). Step 3 Build `edit:['parent']`: checkout's SERVER span's
 parent is `00f067aa0ba902b7`. Card: "When a hop drops the traceparent header, one request
 becomes two traces: look for unexpected root spans." Spec:
 https://www.w3.org/TR/trace-context/#traceparent-header
 
-**2.5 `baggage`**: Sort `ok` / `never`: `experiment.variant=B` ok; `tenant.tier=gold` ok;
-`user.email` never; `session.token` never; `card.last4` never. Step 2 choice: do
+**2.5 `baggage`**: cards `['baggage-leaks']`. Sort `ok` / `never`: `experiment.variant=B` ok;
+`tenant.tier=gold` ok; `user.email` never; `session.token` never; `card.last4` never. Step 2 choice: do
 recommendations' spans carry `tenant.tier` from baggage? → no, only if copied (e.g. a baggage
 span processor). Card: "Baggage is not copied onto spans for you, and it travels in plain
 headers to every downstream, third parties too." Spec:
@@ -290,7 +292,8 @@ herring). Hypotheses: n-plus-one (right), provider, redis, replicas.
 - P0: new rule cases: entered act stays open after an earlier act gains a level; un-entered act
   still waits; completed always `'done'`; boss rule unchanged; existing-player migration
   (`{naming-your-service:3}` → 1.2 done, act-1 open, act-0 open). Mutations: drop the "entered"
-  clause; count opened-not-completed as entered.
+  clause; a boss-only completion doesn't enter; `levelState` disagrees with `lockReason`; the
+  boss gate is skipped in an entered-only act.
 - P1: `test/choice.test.mjs` (wrong/right/focus-wrap/TypeError); 1.2's tests and driver
   byte-identical (`git diff --stat` empty for them).
 - P2: `test/sort-it.test.mjs` (validate, place outcomes incl. repeat/placed/unknown, frozen

@@ -165,12 +165,19 @@ test('a completed boss alone enters its act; the boss rule still holds for the r
   assert.equal(levelState('l1a', p, REG), 'locked');
 });
 
-test('an entered act whose boss is not done keeps the boss locked behind its levels', () => {
-  const p = P({ l2a: 3 });
-  assert.equal(levelState('b2', p, REG), 'open');
-  const q = P({ l1a: 3 });
-  assert.equal(isActUnlocked(1, q, REG), true);
-  assert.equal(levelState('l1b', q, REG), 'open');
+test('the boss gate still holds in an act open only by entry (earlier act incomplete)', () => {
+  const r = reg([
+    { id: 'a0', levelIds: ['l0'], bossId: null },
+    { id: 'a1', levelIds: ['l1a', 'l1b'], bossId: 'b1' },
+  ]);
+  const one = P({ l1a: 3 });
+  assert.equal(isActUnlocked(1, one, r), true);
+  assert.equal(isActComplete(r.acts[0], one), false);
+  assert.equal(levelState('b1', one, r), 'locked');
+  assert.deepEqual(lockReason('b1', one, r), { kind: 'boss', remaining: ['l1b'] });
+  const both = P({ l1a: 3, l1b: 3 });
+  assert.equal(levelState('b1', both, r), 'open');
+  assert.equal(lockReason('b1', both, r), null);
 });
 
 // Before/after inserting a level into act 0: the shipped registry, then the same with one more
