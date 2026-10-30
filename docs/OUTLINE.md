@@ -78,7 +78,7 @@ Each level lists **concept** / **OTel nuance** / **Dash0 tie-in** / **mechanic**
 | Level | Concept | Nuance | Dash0 tie-in | Mechanic |
 | --- | --- | --- | --- | --- |
 | 1.1 Resources | Telemetry is about *something*: service, pod, host, cloud region | Resource attributes vs signal attributes; putting `k8s.pod.name` on every span is wrong | Dash0 builds its resource / infrastructure views from resource attributes | Sort it |
-| 1.2 Naming your service | `service.name`, `service.version`, `deployment.environment.name` | Missing `service.name` gives `unknown_service:<process>`; `OTEL_SERVICE_NAME` wins over `OTEL_RESOURCE_ATTRIBUTES` | Services group and filter by these in Dash0 | Configure it |
+| 1.2 Naming your service | `service.name`, `service.version`, `deployment.environment.name` | Missing `service.name` gives `unknown_service:<executable>`; `OTEL_SERVICE_NAME` wins over `OTEL_RESOURCE_ATTRIBUTES` | Services group and filter by these in Dash0 | Configure it |
 | 1.3 Detectors and Kubernetes | Resource detectors; the `k8sattributes` processor | Detectors run at SDK start; pod metadata is better added in the Collector | Dash0 Kubernetes operator auto-instruments workloads and adds resource attributes | Configure it |
 
 ### Act 2: Traces ("Follow the request")

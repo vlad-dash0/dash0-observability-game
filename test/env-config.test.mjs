@@ -52,7 +52,7 @@ test('parseEnv: __proto__ is stored as data, not as the prototype', () => {
 
 // effectiveResource
 
-test('no service name anywhere falls back to unknown_service:<process>', () => {
+test('no service name anywhere falls back to unknown_service:<executable>', () => {
   const r = effectiveResource({}, NODE);
   assert.equal(r.attributes['service.name'], 'unknown_service:node');
   assert.equal(r.source, 'default');
