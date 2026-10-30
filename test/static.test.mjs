@@ -78,6 +78,9 @@ test('main.mjs loads as a module before Alpine, and Alpine is deferred', () => {
   const scripts = document.querySelectorAll('script');
   assert.equal(scripts[main].getAttribute('type'), 'module');
   assert.ok(scripts[alpine].hasAttribute('defer'), 'Alpine must be deferred');
+  for (const el of scripts) {
+    assert.ok(!el.hasAttribute('async'), `${el.getAttribute('src')} must not be async (breaks the order)`);
+  }
 });
 
 test('vercel.json CSP equals the design, with no unsafe-inline and no framing', () => {
@@ -93,8 +96,9 @@ test('vercel.json keeps the hardening headers and the vendor cache rule', () => 
   assert.equal(h['X-Frame-Options'], 'DENY');
   assert.equal(h['X-Content-Type-Options'], 'nosniff');
   assert.equal(h['Referrer-Policy'], 'no-referrer');
-  assert.ok(h['Permissions-Policy'], 'Permissions-Policy missing');
+  assert.equal(h['Permissions-Policy'], 'camera=(), microphone=(), geolocation=(), browsing-topics=()');
   assert.equal(headerRule('/vendor/(.*)')['Cache-Control'], 'public, max-age=31536000, immutable');
+  assert.equal(headerRule('/fonts/(.*)')['Cache-Control'], 'public, max-age=31536000, immutable');
   assert.equal(vercel.functions, undefined, 'no serverless functions yet');
 });
 
@@ -105,6 +109,9 @@ test('the dev server sends the vercel.json headers', () => {
   const vendored = headersFor(vercel, `/vendor/${ALPINE}`);
   assert.equal(vendored['Content-Security-Policy'], CSP);
   assert.equal(vendored['Cache-Control'], 'public, max-age=31536000, immutable');
+  const font = headersFor(vercel, '/fonts/MartianMono-Regular.woff2');
+  assert.equal(font['Content-Security-Policy'], CSP);
+  assert.equal(font['Cache-Control'], 'public, max-age=31536000, immutable');
 });
 
 test('vendored files match vendor/SHA256SUMS', () => {

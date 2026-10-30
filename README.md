@@ -19,7 +19,7 @@ Needs Node 22 or later (`.nvmrc` pins the Active LTS; CI tests both 22 and that)
 
 ```sh
 npm ci          # installs linkedom, the only (dev) dependency
-npm run dev     # http://localhost:3000/ with the production headers (CSP); PORT=8080 to change
+npm run dev     # http://localhost:3000/, production headers (CSP) and .vercelignore; PORT=8080 to change
 npm test        # node --test over test/**/*.test.mjs
 ```
 

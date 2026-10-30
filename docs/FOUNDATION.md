@@ -199,7 +199,8 @@ stored data is sanitized without id filtering, so unknown levels survive.
 
 ## 5. Files per phase (copy / adapt / new from R)
 
-R = `/private/tmp/claude-501/-Users-vjk-migration-tool/6cf66d3f-ddc1-4ba3-b1c9-5f297e7580c0/scratchpad/webo`.
+R = <https://github.com/wealthbot-io/webo-money-world> at commit
+`f80763e825ae301ffb347f9e8a0f6e3356582419` (clone anywhere; R below means that checkout).
 Not brought over: `api/`, `lib/kv.js`, `lib/util.js`, `grownups.*`, `prototype/`,
 `scripts/`, `assets/`, `HANDOFF.md`, `run.sh`, `.env.example`, all lessons, and the tests
 for those. After F1, only the named phase edits each file.
@@ -210,12 +211,13 @@ for those. After F1, only the named phase edits each file.
   so helpers and fixtures are not run as tests;
   `linkedom` pinned exactly, `engines.node >=22`); `vercel.json` (no `functions`; CSP §7;
   keep X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, the
-  `/vendor/(.*)` immutable cache header); `.gitignore`/`.vercelignore`; `index.html` stub
+  `/vendor/(.*)` immutable cache header, and the same for `/fonts/(.*)`); `.gitignore`/`.vercelignore`; `index.html` stub
   (R's head order and CSP comment; no Google Fonts; links `styles/tokens.css`,
   `styles/base.css`, `styles/hub.css`; `<script type="module" src="/main.mjs">` then
   `<script defer src="/vendor/alpine-3.14.1.min.js">`; body `<div class="app" x-data="game">`).
 - New: `.github/workflows/ci.yml`, `CLAUDE.md`, `.nvmrc`, `vendor/SHA256SUMS`,
-  `vendor/README.md`, `tools/serve.mjs` (dev server sending the vercel.json headers),
+  `vendor/README.md`, `tools/serve.mjs` (dev server sending the vercel.json headers and
+  refusing what `.vercelignore` lists), `test/serve.test.mjs`,
   `test/helpers/dom.mjs` (R's `makeDom` via linkedom `parseHTML`, sets globals, stubs
   `Element.prototype.animate`; exports `q`, `qa`, `click`, `clickUntil`),
   `test/static.test.mjs`, `docs/FOUNDATION.md` (this file).

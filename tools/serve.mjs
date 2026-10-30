@@ -1,13 +1,14 @@
-// Zero-dependency dev server: serves the repo root as static files and sends the
-// same headers vercel.json declares, so the CSP bites locally as it does in production.
+// Zero-dependency dev server that behaves like the Vercel deployment: it sends the
+// headers vercel.json declares (so the CSP bites locally) and refuses whatever
+// .vercelignore keeps out of the deployment (node_modules/ included), plus dotfiles.
 // Usage: npm run dev   (PORT=8080 npm run dev to change the port)
 import { createServer } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
-import { extname, join, normalize, resolve, sep } from 'node:path';
+import { readFile, realpath, stat } from 'node:fs/promises';
+import { readFileSync, realpathSync } from 'node:fs';
+import { extname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
+const REPO = resolve(fileURLToPath(new URL('..', import.meta.url)));
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -22,13 +23,26 @@ const TYPES = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-// vercel.json `source` uses path-to-regexp; we support only the regex-group form
-// (`/(.*)`, `/vendor/(.*)`). Anything else is refused rather than silently unmatched.
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+
+// vercel.json `source` uses path-to-regexp. We support literal paths plus `(...)` regex
+// groups (`/(.*)`, `/vendor/(.*)`); params and modifiers are refused, not guessed at.
 function sourceRegExp(source) {
-  if (/:[A-Za-z_]/.test(source)) {
-    throw new Error(`tools/serve.mjs: unsupported vercel.json source "${source}"`);
+  let out = '';
+  for (let i = 0; i < source.length; i++) {
+    const c = source[i];
+    if (c === '(') {
+      const end = source.indexOf(')', i);
+      if (end < 0) throw new Error(`tools/serve.mjs: unclosed group in source "${source}"`);
+      out += source.slice(i, end + 1);
+      i = end;
+    } else if (/[:*+?{}]/.test(c)) {
+      throw new Error(`tools/serve.mjs: unsupported vercel.json source "${source}"`);
+    } else {
+      out += escapeRe(c);
+    }
   }
-  return new RegExp(`^${source}$`);
+  return new RegExp(`^${out}$`);
 }
 
 /** Headers vercel.json applies to `pathname`: every matching rule, later keys win. */
@@ -41,41 +55,94 @@ export function headersFor(config, pathname) {
   return out;
 }
 
-async function resolveFile(pathname) {
-  const rel = normalize(decodeURIComponent(pathname)).replace(/^[/\\]+/, '');
-  if (rel.split(/[/\\]/).some((part) => part.startsWith('.'))) return null; // .env, .git
-  let file = join(ROOT, rel);
-  if (file !== ROOT && !file.startsWith(ROOT + sep)) return null;
+/**
+ * Predicate over repo-relative paths for the .vercelignore forms we use: `dir/`,
+ * `name` and `*.ext` (any depth when there is no inner `/`), `a/b` (anchored). `*`
+ * stays within one segment. Negation, `**`, `?` and `[...]` throw rather than being misread.
+ */
+export function ignoreMatcher(text) {
+  const rules = text.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((line) => {
+    if (/^!|\*\*|[?[\]]/.test(line)) throw new Error(`tools/serve.mjs: unsupported .vercelignore line "${line}"`);
+    const pat = line.replace(/^\/+|\/+$/g, '');
+    return {
+      re: new RegExp(`^${pat.split('*').map(escapeRe).join('[^/]*')}$`),
+      dirOnly: line.endsWith('/'),
+      anchored: pat.includes('/'),
+      depth: pat.split('/').length,
+    };
+  });
+  return (relPath) => {
+    const parts = relPath.split('/');
+    return rules.some(({ re, dirOnly, anchored, depth }) => {
+      const starts = anchored ? [0] : parts.map((_, i) => i);
+      return starts.some((i) => {
+        const end = i + depth;
+        // A dir-only rule needs at least one segment (the file) after the match.
+        if (end > parts.length || (dirOnly && end === parts.length)) return false;
+        return re.test(parts.slice(i, end).join('/'));
+      });
+    });
+  };
+}
+
+const inside = (root, p) => p === root || p.startsWith(root + sep);
+
+// The real path of the file to serve for the decoded request path, or null (404).
+async function resolveFile(root, ignored, decoded) {
+  let file = resolve(root, `.${decoded}`);
   try {
     if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
-    return (await stat(file)).isFile() ? file : null;
+    file = await realpath(file); // follow symlinks so the checks below see the target
+    if (!(await stat(file)).isFile()) return null;
   } catch {
     return null;
   }
+  if (!inside(root, file)) return null; // `..` or a symlink out of the root
+  const rel = relative(root, file).split(sep).join('/');
+  // Dotfiles (.git, .env); `..` means outside the root, which the guard above owns.
+  if (rel.split('/').some((part) => part.startsWith('.') && part !== '..')) return null;
+  if (ignored(rel)) return null; // not deployed, so not served
+  return file;
 }
 
-export function startServer({ port = 3000, host = '127.0.0.1' } = {}) {
-  const config = JSON.parse(readFileSync(join(ROOT, 'vercel.json'), 'utf8'));
+export function startServer({ root = REPO, port = 3000, host = '127.0.0.1', log = console.log } = {}) {
+  const realRoot = realpathSync(root);
+  const config = JSON.parse(readFileSync(join(realRoot, 'vercel.json'), 'utf8'));
   config.headers?.forEach((rule) => sourceRegExp(rule.source)); // fail at startup
+  let ignoreText;
+  try {
+    ignoreText = readFileSync(join(realRoot, '.vercelignore'), 'utf8');
+  } catch (err) {
+    throw new Error(`tools/serve.mjs: cannot read ${join(realRoot, '.vercelignore')}: ${err.code}`);
+  }
+  const ignored = ignoreMatcher(ignoreText);
+
   const server = createServer(async (req, res) => {
-    const { pathname } = new URL(req.url, 'http://localhost');
-    const headers = headersFor(config, pathname);
-    const send = (status, body, type = 'text/plain; charset=utf-8') => {
+    const send = (status, body, headers, type = 'text/plain; charset=utf-8') => {
       res.writeHead(status, { ...headers, 'Content-Type': type });
       res.end(req.method === 'HEAD' ? undefined : body);
     };
-    if (req.method !== 'GET' && req.method !== 'HEAD') return send(405, 'Method Not Allowed\n');
-    let file;
+    let decoded;
     try {
-      file = await resolveFile(pathname);
+      decoded = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     } catch {
-      return send(400, 'Bad Request\n');
+      return send(400, 'Bad Request\n', {});
     }
-    if (!file) return send(404, 'Not Found\n');
-    const body = await readFile(file);
-    send(200, body, TYPES[extname(file)] ?? 'application/octet-stream');
+    const headers = headersFor(config, decoded);
+    if (req.method !== 'GET' && req.method !== 'HEAD') return send(405, 'Method Not Allowed\n', headers);
+    const file = await resolveFile(realRoot, ignored, decoded);
+    if (!file) return send(404, 'Not Found\n', headers);
+    let body;
+    try {
+      body = await readFile(file);
+    } catch (err) {
+      if (err.code === 'ENOENT') return send(404, 'Not Found\n', headers);
+      log(`tools/serve.mjs: ${decoded}: ${err.code ?? err.message}`);
+      return send(500, 'Internal Server Error\n', headers);
+    }
+    send(200, body, headers, TYPES[extname(file)] ?? 'application/octet-stream');
   });
-  server.listen(port, host, () => console.log(`serving ${ROOT} at http://localhost:${port}/`));
+  server.listen(port, host, () => log(`serving ${realRoot} at http://localhost:${server.address().port}/`));
   return server;
 }
 
