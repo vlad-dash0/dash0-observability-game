@@ -3,8 +3,10 @@
 // import: main.mjs registers it as Alpine.data('game') and tests call it directly.
 // Everything from the browser (storage, document, window, clock, timers) comes in `deps`.
 //
-// Level HTML is rendered into #ov-body / #ov-actions, which index.html keeps inside an
-// x-ignore wrapper so Alpine never walks or re-renders a level's markup.
+// Level HTML is rendered into #ov-body / #ov-actions inside an x-ignore wrapper. x-ignore
+// only stops Alpine walking the initial markup: Alpine 3.14.1's mutation observer still
+// initialises nodes a level adds later (it never checks ancestors for x-ignore), so level
+// markup must not use Alpine attributes (x-*, @*, :*). test/levels-play.test.mjs checks.
 import { DECK } from './cards/deck.mjs';
 import { EDGES, NODES } from './hub/map-data.mjs';
 import { ACTS } from './levels/index.mjs';
@@ -17,9 +19,12 @@ import { loadProgress, saveProgress, STORAGE_KEY } from './lib/storage.mjs';
 import { readTheme, writeTheme } from './lib/theme.mjs';
 import { levelState, lockReason } from './lib/unlock.mjs';
 
-/** The shipped registry: levels/index.mjs checked against the deck and the map's node ids. */
-export function liveRegistry() {
-  return buildRegistry(ACTS, { deck: DECK, nodeIds: NODES.map((n) => n.id) });
+/**
+ * The shipped registry: levels/index.mjs checked against the deck and the map's node ids.
+ * `acts` / `deck` default to the real ones; tests pass fixtures through the same checks.
+ */
+export function liveRegistry(acts = ACTS, deck = DECK) {
+  return buildRegistry(acts, { deck, nodeIds: NODES.map((n) => n.id) });
 }
 
 // Player-facing text for every non-null game.notice (§4 Absence).
@@ -38,6 +43,20 @@ const STATE_LABELS = Object.freeze({
   open: 'ready to play',
   done: 'done, play again',
 });
+
+// <input> types that take no text: Escape on them still closes the level.
+const NON_TEXT_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color', 'file']);
+
+/** True when `el` is (inside) a text-entry control: textarea, select, contenteditable or a text-like input. */
+function isTyping(el) {
+  if (!el || typeof el.closest !== 'function') return false;
+  const field = el.closest('input, textarea, select, [contenteditable]');
+  if (field === null) return false;
+  const tag = field.localName;
+  if (tag === 'input') return !NON_TEXT_INPUTS.has((field.getAttribute('type') || 'text').toLowerCase());
+  if (tag === 'textarea' || tag === 'select') return true;
+  return field.getAttribute('contenteditable').toLowerCase() !== 'false';
+}
 
 const NUDGE_MS = 2600;
 const CONFETTI = 40;
@@ -161,9 +180,12 @@ export function createGame(deps) {
     mapSvg() {
       return renderMap(this.mapState(), nodes, edges);
     },
+    // The map's text alternative: how many components are lit, and which.
     mapLabel() {
-      const lit = Object.values(this.mapState().nodes).filter((n) => n.lit).length;
-      return `System map: ${lit} of ${nodes.length} components lit.`;
+      const state = this.mapState().nodes;
+      const lit = nodes.filter((n) => state[n.id]?.lit).map((n) => n.label);
+      const names = lit.length ? `: ${lit.join(', ')}` : '';
+      return `System map: ${lit.length} of ${nodes.length} components lit${names}.`;
     },
 
     // ---------- theme ----------
@@ -178,7 +200,10 @@ export function createGame(deps) {
 
     // ---------- levels ----------
     // A locked card wiggles and names what unlocks it (R's nudge) instead of doing nothing.
+    // Refused while a level or the reward is open: the hub is inert then, and a stray
+    // Enter must never abort a run. Close the level first (closeOverlay).
     openLevel(id) {
+      if (this.overlayOpen || this.rewardOpen) return false;
       if (this.levelState(id) === 'locked') {
         if (Object.hasOwn(registry.levels, id)) this.nudge(id);
         return false;
@@ -241,7 +266,8 @@ export function createGame(deps) {
       const rec = recordCompletion(this.progress, levelId, result, registry);
       const saved = saveProgress(storage, rec.progress, registry);
       this.progress = saved.progress;
-      if (!saved.saved) this.notice = saved.reason;
+      // A save that went through clears corrupt (the backup now exists) and unavailable.
+      this.notice = saved.saved ? null : saved.reason;
       this.endSession();
       this.overlayOpen = false;
       this.fireConfetti();
@@ -267,8 +293,20 @@ export function createGame(deps) {
     // Another tab saved: merge its progress in (progress only goes up, never replaced).
     onStorage(e) {
       if (e && e.key !== STORAGE_KEY && e.key !== null) return;
-      const other = loadProgress(storage, registry).progress;
+      const { status, progress: other } = loadProgress(storage, registry);
+      if (status === 'future') this.notice = 'future';
       this.progress = mergeProgress(this.progress, other, { keep: registryIds(registry) });
+    },
+
+    // One window-level Escape handler: closes the reward, else the level, but never the
+    // level while the player is typing in it.
+    onEscape(e) {
+      if (this.rewardOpen) {
+        this.closeReward();
+        return;
+      }
+      if (!this.overlayOpen) return;
+      if (!isTyping(e?.target)) this.closeOverlay();
     },
 
     // ---------- focus ----------
