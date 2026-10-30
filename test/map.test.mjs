@@ -115,3 +115,17 @@ test('renderMap clamps non-finite coordinates to 0 instead of emitting NaN or In
   assert.match(markup, /<line class="edge" x1="0" y1="0" x2="0" y2="0">/);
   assert.match(markup, /<circle cx="0" cy="0" /);
 });
+
+test('two bosses open at once (one act open only by entry) both pulse', () => {
+  const reg = buildRegistry(
+    [
+      { id: 'a0', no: 0, levels: [L('l0', '0.1')], boss: L('boss0', null, { lights: ['cart'] }) },
+      { id: 'a1', no: 1, levels: [L('l1a', '1.1'), L('l1b', '1.2')], boss: L('boss1', null, { lights: ['payments'] }) },
+    ],
+    { deck: [], nodeIds: NODES.map((n) => n.id) },
+  );
+  const s = nodeStates(reg, progress({ l0: 3, l1a: 3, l1b: 3 }), NODES, EDGES);
+  assert.equal(s.nodes.cart.pulse, true);
+  assert.equal(s.nodes.payments.pulse, true);
+  assert.equal(s.nodes.checkout.pulse, false);
+});
