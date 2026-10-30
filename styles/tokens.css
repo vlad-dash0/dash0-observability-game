@@ -1,1 +1,76 @@
-/* Stub from F1 (#9); F2 (#10) owns this file: Dash0 theme tokens. */
+/* Dash0 theme tokens (F2, #10). The only file with hex colours: brand primitives
+   (--d0-*) come from dash0.com production CSS; everything else refers to them.
+   Semantic colours (--color-*) are light-dark(<light>, <dark>): dark by default,
+   light when <html data-theme="light"> (lib/theme.mjs stores the choice).
+   Provisional (#16): success = mint, error = purple (brand deck: purple = error).
+   Fonts: system sans for text; Martian Mono for code, self-hosted under the OFL
+   (fonts/OFL.txt). Source: github.com/evilmartians/mono release v1.1.0,
+   martian-mono-1.1.0-woff2.zip; MartianMono-StdRg.woff2 and -StdBd.woff2, renamed to
+   MartianMono-Regular.woff2 and -Bold.woff2, otherwise unmodified. Roobert is
+   licensed and is not shipped. */
+
+@font-face {
+  font-family: "Martian Mono";
+  src: url("/fonts/MartianMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Martian Mono";
+  src: url("/fonts/MartianMono-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Brand primitives (dash0.com). */
+  --d0-red: #f8494d;
+  --d0-orange: #fd6f40;
+  --d0-orange-soft: #fd8c66;
+  --d0-grey-900: #101010;
+  --d0-grey-800: #212121;
+  --d0-grey-700: #2c2c2c;
+  --d0-grey-600: #424242;
+  --d0-grey-400: #9e9e9e;
+  --d0-white: #ffffff;
+  --d0-mint: #a8fbbe;
+  --d0-purple: #ad46ff;
+
+  /* Semantic colours: light-dark(<light>, <dark>). */
+  --color-bg: light-dark(var(--d0-white), var(--d0-grey-900));
+  --color-surface: light-dark(color-mix(in srgb, var(--d0-grey-400) 10%, var(--d0-white)), var(--d0-grey-800));
+  --color-surface-2: light-dark(color-mix(in srgb, var(--d0-grey-400) 20%, var(--d0-white)), var(--d0-grey-700));
+  --color-border: light-dark(var(--d0-grey-400), var(--d0-grey-600));
+  --color-text: light-dark(var(--d0-grey-900), var(--d0-white));
+  --color-text-muted: light-dark(var(--d0-grey-600), var(--d0-grey-400));
+  --color-primary: light-dark(var(--d0-red), var(--d0-red));
+  /* White on red is 3.5:1 (fails AA for normal text); near-black is 5.5:1. */
+  --color-primary-contrast: light-dark(var(--d0-grey-900), var(--d0-grey-900));
+  --color-accent: light-dark(var(--d0-orange), var(--d0-orange));
+  --color-success: light-dark(var(--d0-mint), var(--d0-mint));
+  --color-error: light-dark(var(--d0-purple), var(--d0-purple));
+  /* Orange on white is under 3:1, so the light-theme ring is near-black. */
+  --color-focus: light-dark(var(--d0-grey-900), var(--d0-orange));
+  --color-code-bg: light-dark(var(--color-surface-2), var(--d0-grey-900));
+  --color-map-node-dark: light-dark(var(--color-surface-2), var(--d0-grey-700));
+  --color-map-node-lit: light-dark(var(--d0-orange), var(--d0-orange));
+  --color-map-edge: light-dark(var(--d0-grey-400), var(--d0-grey-600));
+  --color-pulse: light-dark(var(--d0-red), var(--d0-red)); /* OUTLINE: a red pulse marks the incident */
+  --color-shadow: light-dark(color-mix(in srgb, var(--d0-grey-900) 15%, transparent), color-mix(in srgb, var(--d0-grey-900) 60%, transparent));
+
+  /* Type and shape. */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Martian Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 18px;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
