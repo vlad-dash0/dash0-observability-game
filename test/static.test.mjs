@@ -112,9 +112,9 @@ test('vercel.json keeps the hardening headers and the vendor cache rule', () => 
 });
 
 // The reviewed set: a feature joins only after a check that Chrome does not flag it as
-// unrecognised (#37: the retired browsing-topics did). This test pins the header to that
-// set, so a new name or a typo needs a deliberate edit here; it does not itself verify
-// what any browser recognises.
+// unrecognised (#37: browsing-topics, unrecognised where Chrome's Topics feature is
+// disabled, did). This test pins the header to that set, so a new name or a typo needs a
+// deliberate edit here; it does not itself verify what any browser recognises.
 const PERMISSIONS_POLICY_FEATURES = ['camera', 'microphone', 'geolocation', 'payment', 'usb', 'display-capture'];
 
 // Feature names of a Permissions-Policy value, each of which must deny all origins:
