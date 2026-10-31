@@ -61,6 +61,11 @@ const KINDS_MAP = [
   ['0d9e7c5b3a1f8264', 'CLIENT'], ['f1e2d3c4b5a69788', 'PRODUCER'], ['2b4d6f8091a3c5e7', 'CONSUMER'],
 ];
 
+// 2.3: a storefront CLIENT 404 Error ok; b catalog SERVER 404 Error wrong; c checkout SERVER
+// 500 Unset wrong; d inventory SERVER 200 Unset ok. 2.5: what may ride in baggage.
+const STATUS_SORT = [['a', 'ok'], ['b', 'wrong'], ['c', 'wrong'], ['d', 'ok']];
+const BAG_SORT = [['variant', 'ok'], ['tier', 'ok'], ['email', 'never'], ['token', 'never'], ['last4', 'never']];
+
 /** Pick each span, then its `attr` value (Build it), with this file's click. */
 function buildAll(attr, pairs) {
   for (const [span, value] of pairs) {
@@ -191,6 +196,43 @@ const DRIVERS = {
         click('#kinds-finish');
       },
       expect: { stars: 2, cards: ['span-kind-edges'] },
+    },
+  },
+  'status-and-errors': {
+    play() {
+      sortAll(STATUS_SORT);
+      click('#status-next');
+      click('[data-pick="stays-ok"]');
+      click('#status-finish');
+    },
+    expect: { stars: 3, cards: ['span-status'] },
+    sloppy: {
+      play() {
+        sortAll([['b', 'ok'], ...STATUS_SORT]); // one wrong placement: a SERVER 404 as Error
+        click('#status-next');
+        click('[data-pick="stays-ok"]');
+        click('#status-finish');
+      },
+      expect: { stars: 2, cards: ['span-status'] },
+    },
+  },
+  baggage: {
+    play() {
+      sortAll(BAG_SORT);
+      click('#bag-next');
+      click('[data-pick="only-if-copied"]');
+      click('#bag-finish');
+    },
+    expect: { stars: 3, cards: ['baggage-leaks'] },
+    sloppy: {
+      play() {
+        sortAll(BAG_SORT);
+        click('#bag-next');
+        click('[data-pick="yes-auto"]'); // one wrong pick
+        click('[data-pick="only-if-copied"]');
+        click('#bag-finish');
+      },
+      expect: { stars: 2, cards: ['baggage-leaks'] },
     },
   },
   'naming-your-service': {

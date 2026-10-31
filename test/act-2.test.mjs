@@ -1,8 +1,8 @@
-// Act 2 levels 2.1 and 2.2 beyond the play-through: the answer tables pinned to
-// docs/M1-DESIGN.md §6, reference solvability through the widgets' own checkers (I7),
+// Act 2 levels 2.1, 2.2, 2.3 and 2.5 beyond the play-through: the answer tables pinned
+// to docs/M1-DESIGN.md §6, reference solvability through the widgets' own checkers (I7),
 // one penalty per run from a clean start, outcomes stated in words, the "Map edges"
 // line from serviceEdges, and a focus walk that ends on Finish. Spec: docs/M1-DESIGN.md
-// §6 Act 2 and §7 P6. The happy and sloppy runs live in test/levels-play.test.mjs.
+// §6 Act 2 and §7 P6, P7. The happy and sloppy runs live in test/levels-play.test.mjs.
 // Asserts strings, numbers and booleans only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,10 +12,13 @@ import { recordFocus } from './helpers/focus.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
 import { checkBuild, newBuildState, setKind, setParent, toggleLink, validateBuildSpec } from '../lib/widgets/build-it.mjs';
 import { serviceEdges } from '../lib/widgets/trace.mjs';
+import { isComplete, newSortState, place, validateSortSpec } from '../lib/widgets/sort-it.mjs';
 import { liveRegistry } from '../app.mjs';
 import { DECK } from '../cards/deck.mjs';
 import sat, { CONTENT as SAT } from '../levels/spans-and-traces.mjs';
 import kinds, { CONTENT as KINDS } from '../levels/span-kinds.mjs';
+import status, { CONTENT as STATUS } from '../levels/status-and-errors.mjs';
+import baggage, { CONTENT as BAGGAGE } from '../levels/baggage.mjs';
 import { b1Spec } from './fixtures/build-b1.mjs';
 
 const LIVE = liveRegistry();
@@ -27,7 +30,8 @@ const read = (rel) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8'
 const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
 
 // Per level: its fields, and per step (play order) either the choice's keys, its right
-// key and words its labels carry, or the Build spec's edit and its spans. A span is
+// key and words its labels carry, the Sort spec's buckets, item -> bucket and words each
+// item label carries, or the Build spec's edit and its spans. A span is
 // `service name` -> [kind, startMs, endMs, trace, given parent, expected parent,
 // expected kind, expected links]; parents and links are named the same way, a trace
 // by its first four hex digits.
@@ -87,14 +91,70 @@ const PIN = {
       },
     ],
   },
+  'status-and-errors': {
+    prefix: 'status',
+    level: { no: '2.3', mechanics: ['sort'], cards: ['span-status'], lights: ['catalog'], scoring: { parMs: null } },
+    steps: [
+      {
+        sort: 'status-sort',
+        buckets: ['ok', 'wrong'],
+        // a storefront CLIENT 404 ERROR ok; b catalog SERVER 404 ERROR wrong (SERVER 4xx
+        // stays Unset); c checkout SERVER 500 UNSET wrong; d inventory SERVER 200 UNSET ok.
+        items: { a: 'ok', b: 'wrong', c: 'wrong', d: 'ok' },
+        says: {
+          a: ['storefront CLIENT', 'GET /products/999', '404', 'status Error'],
+          b: ['catalog SERVER', '404', 'status Error'],
+          c: ['checkout SERVER', '500', 'status Unset'],
+          d: ['inventory SERVER', '200', 'status Unset'],
+        },
+      },
+      {
+        choice: 'status',
+        keys: ['error', 'stays-ok', 'unset'],
+        right: 'stays-ok',
+        says: { 'stays-ok': 'Ok' },
+      },
+    ],
+  },
+  baggage: {
+    prefix: 'bag',
+    level: { no: '2.5', mechanics: ['sort'], cards: ['baggage-leaks'], lights: [], scoring: { parMs: null } },
+    steps: [
+      {
+        sort: 'bag-sort',
+        buckets: ['ok', 'never'],
+        items: { variant: 'ok', tier: 'ok', email: 'never', token: 'never', last4: 'never' },
+        says: {
+          variant: ['experiment.variant=B'],
+          tier: ['tenant.tier=gold'],
+          email: ['user.email'],
+          token: ['session.token'],
+          last4: ['card.last4'],
+        },
+      },
+      {
+        choice: 'bag',
+        keys: ['only-if-copied', 'root-only', 'yes-auto'],
+        right: 'only-if-copied',
+        says: { 'only-if-copied': 'only if', 'yes-auto': 'Yes' },
+      },
+    ],
+  },
 };
 
-const LEVELS = { 'spans-and-traces': [sat, SAT], 'span-kinds': [kinds, KINDS] };
+const LEVELS = {
+  'spans-and-traces': [sat, SAT],
+  'span-kinds': [kinds, KINDS],
+  'status-and-errors': [status, STATUS],
+  baggage: [baggage, BAGGAGE],
+};
 
 // The card fronts in docs/M1-DESIGN.md §6.
 const FRONTS = {
   'no-trace-object': 'There is no trace object: a trace is just the spans that share a trace ID, each exported on its own.',
   'span-kind-edges': 'Span kind is not cosmetic: service maps draw edges from CLIENT to SERVER and PRODUCER to CONSUMER pairs.',
+  'span-status': 'Status starts Unset. A 4xx is Error on the CLIENT span but stays Unset on the SERVER span. Ok is a final override.',
+  'baggage-leaks': 'Baggage is not copied onto spans for you, and it travels in plain headers to every downstream, third parties too.',
 };
 
 const nameOf = (spans, id) => {
@@ -123,6 +183,15 @@ function shape(step) {
     );
     return { build: spec.id, edit: spec.edit, spans };
   }
+  if (step.sort) {
+    const s = step.sort;
+    return {
+      sort: s.id,
+      buckets: s.buckets.map((b) => b.id),
+      items: Object.fromEntries(s.items.map((it) => [it.id, it.bucket])),
+      says: Object.fromEntries(s.items.map((it) => [it.id, plain(it.label)])),
+    };
+  }
   return {
     choice: step.id,
     keys: step.choices.map((c) => c.key).sort(),
@@ -141,6 +210,13 @@ for (const [id, [level, content]] of Object.entries(LEVELS)) {
       const want = pin.steps[i];
       if (want.build) {
         assert.deepEqual(got, { build: want.build, edit: want.edit, spans: want.spans }, `step ${i + 1} build`);
+        return;
+      }
+      if (want.sort) {
+        assert.deepEqual({ sort: got.sort, buckets: got.buckets, items: got.items }, { sort: want.sort, buckets: want.buckets, items: want.items }, `step ${i + 1} sort`);
+        for (const [item, words] of Object.entries(want.says)) {
+          for (const w of words) assert.equal(got.says[item].includes(w), true, `${item} label "${got.says[item]}" says "${w}"`);
+        }
         return;
       }
       assert.deepEqual({ choice: got.choice, keys: got.keys, right: got.right }, { choice: want.choice, keys: want.keys, right: want.right }, `step ${i + 1} choice`);
@@ -178,6 +254,18 @@ for (const [id, [level, content]] of Object.entries(LEVELS)) {
         }
         assert.deepEqual([...new Set(outcomes)], ['set'], `${spec.id}: every reference edit is accepted`);
         assert.deepEqual(checkBuild(spec, st), { ok: true, issues: [] }, `${spec.id}: the reference passes checkBuild`);
+      } else if (step.sort) {
+        const spec = step.sort;
+        assert.deepEqual(validateSortSpec(spec), [], `${spec.id} is a valid SortSpec`);
+        let state = newSortState(spec);
+        const outcomes = [];
+        for (const it of spec.items) {
+          const r = place(spec, state, it.id, it.bucket);
+          state = r.state;
+          outcomes.push(r.outcome);
+        }
+        assert.deepEqual([...new Set(outcomes)], ['right'], `${spec.id}: every reference placement is right`);
+        assert.equal(isComplete(spec, state), true, `${spec.id} completes`);
       } else {
         assert.equal(step.choices.filter((c) => c.right).length, 1, `${step.id}: exactly one right`);
         for (const c of step.choices) {
@@ -235,6 +323,24 @@ test('span-kinds copy says "backends derive", never "the spec says"', () => {
   }
 });
 
+test('baggage copy never calls baggage encrypted or private, and names the baggage span processor', () => {
+  const text = read('levels/baggage.mjs') + JSON.stringify(DECK.find((c) => c.id === 'baggage-leaks'));
+  assert.equal(/encrypt|private to|is secret/i.test(text), false);
+  assert.equal(/baggage span processor/i.test(JSON.stringify(BAGGAGE)), true, 'the right answer names it');
+});
+
+test('status-and-errors: the sort follows the HTTP rule (4xx Error only on CLIENT, 5xx Error, 2xx Unset)', () => {
+  // The status the HTTP semantic conventions give each span, from the kind and code in its label.
+  const rule = (kind, code) => (code >= 500 || (code >= 400 && kind === 'CLIENT') ? 'Error' : 'Unset');
+  for (const it of STATUS.steps[0].sort.items) {
+    const label = plain(it.label);
+    const [, kind] = label.match(/\b(CLIENT|SERVER)\b/);
+    const [, code] = label.match(/\b([1-5]\d\d)\b/);
+    const [, given] = label.match(/status (Error|Unset|Ok)\b/);
+    assert.equal(it.bucket, given === rule(kind, Number(code)) ? 'ok' : 'wrong', `${it.id}: ${label}`);
+  }
+});
+
 // ---- play: one penalty per run, words, focus ------------------------------------
 
 /** Start `id` with the real ctx and the registry's level; returns { finished, focus }. */
@@ -263,6 +369,15 @@ function buildOf(id, i) {
   return { spec, ids };
 }
 
+const put = (item, bucket) => {
+  click(`[data-item="${item}"]`);
+  click(`[data-bucket="${bucket}"]`);
+};
+/** Sort every pinned item of `step` into its bucket. */
+const sortStep = (step) => {
+  for (const [item, bucket] of Object.entries(step.items)) put(item, bucket);
+};
+
 /** Make the pinned edits of build step `i` in the DOM (parents, kinds, links), then Check. */
 function solveBuild(id, i) {
   const pin = PIN[id].steps[i];
@@ -289,6 +404,7 @@ function runWith(id, slips = {}) {
   steps.forEach((step, i) => {
     slips[i]?.();
     if (step.build) solveBuild(id, i);
+    else if (step.sort) sortStep(step);
     else click(`[data-pick="${step.right}"]`);
     click(i === steps.length - 1 ? '[data-finish]' : `#${prefix}-next`);
   });
@@ -317,7 +433,18 @@ const SLIPS = {
     'a failed check (every span left INTERNAL)': { 0: () => click('#kinds-map-check') },
     'a wrong pick in the question': { 1: () => click('[data-pick="nothing"]') },
   },
+  'status-and-errors': {
+    'a wrong placement (the SERVER 404 called right)': { 0: () => put('b', 'ok') },
+    'a wrong placement (the SERVER 200 called wrong)': { 0: () => put('d', 'wrong') },
+    'a wrong pick in the question (the last call wins)': { 1: () => click('[data-pick="error"]') },
+  },
+  baggage: {
+    'a wrong placement (an email in baggage)': { 0: () => put('email', 'ok') },
+    'a wrong placement (the experiment arm kept out)': { 0: () => put('variant', 'never') },
+    'a wrong pick in the question (copied for you)': { 1: () => click('[data-pick="yes-auto"]') },
+  },
 };
+
 
 for (const [id, slips] of Object.entries(SLIPS)) {
   test(`${id}: a clean run earns 3 stars and its card, and each penalty alone costs one`, () => {
@@ -355,6 +482,14 @@ test('every Act 2 step waits for its answer and states each outcome in words', (
         assert.equal(gate(), true);
         solveBuild(id, i);
         assert.equal(fb(), 'Right. Every span checks out.', `${id}: a passing check says so`);
+      } else if (step.sort) {
+        const fb = () => q(`#${step.sort}-feedback`).textContent;
+        const [item, bucket] = Object.entries(step.items)[0];
+        put(item, step.buckets.find((b) => b !== bucket));
+        assert.match(fb(), /^Not quite\. /, `${id}: a wrong placement says so`);
+        assert.equal(gate(), true);
+        sortStep(step);
+        assert.match(fb(), /^Right\. /, `${id}: a right placement says so`);
       } else {
         const fb = () => q(`#${step.choice}-feedback`).textContent;
         const wrong = step.keys.find((k) => k !== step.right);
@@ -400,6 +535,10 @@ test('focus walk: each step starts on its first control, moves on, and ends on F
         const firstRow = qa('[data-span]')[0].dataset.span;
         assert.equal(focus.last(), `span:${firstRow}`, `${id} step ${i + 1} starts on its first span`);
         solveBuild(id, i);
+      } else if (step.sort) {
+        const firstItem = qa('[data-item]')[0].dataset.item;
+        assert.equal(focus.last(), `item:${firstItem}`, `${id} step ${i + 1} starts on its first item`);
+        sortStep(step);
       } else {
         assert.equal(focus.last().startsWith('pick:'), true, `${id} step ${i + 1} starts on a choice`);
         click(`[data-pick="${step.right}"]`);

@@ -67,4 +67,32 @@ export const DECK = [
     specUrl: 'https://opentelemetry.io/docs/specs/otel/trace/api/#spankind',
     dash0Angle: null,
   },
+  {
+    id: 'span-status',
+    front:
+      'Status starts Unset. A 4xx is Error on the CLIENT span but stays Unset on the SERVER ' +
+      'span. Ok is a final override.',
+    back:
+      "A span's status is Unset (the default), Error or Ok. The HTTP semantic " +
+      'conventions say a 4xx MUST leave a SERVER span Unset and SHOULD make a CLIENT span ' +
+      'Error; a 5xx SHOULD be Error on both. Successes stay Unset, and instrumentation ' +
+      'SHOULD NOT set Ok. Once a span is Ok, later attempts to change its status SHOULD be ' +
+      'ignored.',
+    specUrl: 'https://opentelemetry.io/docs/specs/otel/trace/api/#set-status',
+    dash0Angle: null,
+  },
+  {
+    id: 'baggage-leaks',
+    front:
+      'Baggage is not copied onto spans for you, and it travels in plain headers to every ' +
+      'downstream, third parties too.',
+    back:
+      'Baggage is a key/value store that travels with the context, separate from span, metric ' +
+      'and log attributes. To see an entry on spans, read it and set it as an attribute, or ' +
+      'add a baggage span processor. It is sent in the W3C baggage HTTP header, which anyone ' +
+      'inspecting the traffic can read, and downstream services can pass it on outside your ' +
+      'network. Keep personal data and secrets out of it.',
+    specUrl: 'https://opentelemetry.io/docs/concepts/signals/baggage/#baggage-security-considerations',
+    dash0Angle: null,
+  },
 ];
