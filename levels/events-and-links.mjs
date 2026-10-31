@@ -8,7 +8,7 @@ import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
 import { newBuildState } from '../lib/widgets/build-it.mjs';
 
 const CHARGE = '8f14e45fceea167a';
-const ATTEMPT = '45c48cce2e2d7fbd';
+const RETRY = '45c48cce2e2d7fbd';
 const STOCK = 'a87ff679a2f3e71d';
 const P1 = '1679091c5a880faf';
 const P2 = '8e296a067a375633';
@@ -42,23 +42,24 @@ const RECORDED = [
 
 // Step 2: what happened in each span (authored), and the statuses as recorded. charge's
 // exception escaped and was recorded, yet its status is Unset; a helper set Error on
-// charge attempt 1 although the code there handled the reset and the charge went through.
+// charge with retry, a span over the whole charge, retries included, although the code
+// there handled the reset, retried, and the charge went through.
 const ERRORS = {
   id: 'evl-errors',
   spans: [
     span(CHARGE, 'c9f0f895fb98ab9159f51fd0297e236d', 'payments', 'charge', 'INTERNAL', 0, 80, 'UNSET', [
       { name: 'exception', atMs: 78, attributes: { 'exception.type': 'CardDeclinedError' } },
     ]),
-    span(ATTEMPT, 'd3d9446802a44259755d38e6d163e820', 'payments', 'charge attempt 1', 'INTERNAL', 10, 40, 'ERROR'),
+    span(RETRY, 'd3d9446802a44259755d38e6d163e820', 'payments', 'charge with retry', 'INTERNAL', 10, 40, 'ERROR'),
     span(STOCK, 'e4da3b7fbbce2345d7772b0674a318d5', 'inventory', 'GET /stock', 'SERVER', 50, 60),
   ],
   edit: ['status'],
-  answer: { [CHARGE]: { status: 'ERROR' }, [ATTEMPT]: { status: 'UNSET' } },
+  answer: { [CHARGE]: { status: 'ERROR' }, [RETRY]: { status: 'UNSET' } },
 };
 
 const STORIES = [
   ['charge', 'payments', 'The provider declined the card. <code>CardDeclinedError</code> was recorded and escaped the span: the charge failed.'],
-  ['charge attempt 1', 'payments', 'The connection was reset. The code caught it, reconnected, and the charge went through inside this span. Nothing was recorded, but a helper set Error.'],
+  ['charge with retry', 'payments', 'The span covers the whole charge, retries included. The first try hit a connection reset; the code caught it and retried, and the second try went through. Nothing was recorded, but a helper set Error.'],
   ['GET /stock', 'inventory', 'Answered 200. No exception.'],
 ];
 

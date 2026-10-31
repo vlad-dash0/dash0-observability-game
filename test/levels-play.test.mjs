@@ -67,7 +67,7 @@ const STATUS_SORT = [['a', 'ok'], ['b', 'wrong'], ['c', 'wrong'], ['d', 'ok']];
 const BAG_SORT = [['variant', 'ok'], ['tier', 'ok'], ['email', 'never'], ['token', 'never'], ['last4', 'never']];
 // 2.4: checkout's SERVER span under storefront's CLIENT span 00f067aa0ba902b7 (the parent-id).
 const PROP_TREE = [['6e0c63257de34c92', '00f067aa0ba902b7']];
-// 2.6: payments charge (exception escaped) Error; charge attempt 1 (handled) back to Unset;
+// 2.6: payments charge (exception escaped) Error; charge with retry (handled, went through) back to Unset;
 // notifications send batch links the three orders publish spans.
 const EVL_STATUS = [['8f14e45fceea167a', 'ERROR'], ['45c48cce2e2d7fbd', 'UNSET']];
 const EVL_SEND = 'd67d8ab4f4c10bf2';
@@ -284,7 +284,7 @@ const DRIVERS = {
         click('[data-pick="unset"]');
         click('#evl-next');
         buildAll('status', EVL_STATUS.slice(0, 1));
-        click('#evl-errors-check'); // one failed check: the handled attempt still Error
+        click('#evl-errors-check'); // one failed check: the retried charge still Error
         buildAll('status', EVL_STATUS);
         click('#evl-errors-check');
         click('#evl-next');

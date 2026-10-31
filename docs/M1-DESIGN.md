@@ -267,8 +267,9 @@ status is set separately, by the code or instrumentation that ends the span. Ste
 code records an exception (`span.recordException(err)`, rethrows, `span.end()` in `finally`)
 and never sets a status → status unset (decoys: "Error: recording marked it failed"; "Error if
 a span event, Unset if logged"). Step 2 Build `edit:['status']`: payments `charge` exception
-recorded and escaped, given UNSET → ERROR; `charge attempt 1` handled inside the span, nothing
-recorded, given ERROR (set by a helper) → UNSET; inventory `GET /stock` no exception → UNSET.
+recorded and escaped, given UNSET → ERROR; `charge with retry` (one span over the whole
+charge, retries included) handled a reset and retried inside the span, nothing recorded,
+given ERROR (set by a helper) → UNSET; inventory `GET /stock` no exception → UNSET.
 Step 3 Build `edit:['links']`: notifications `send batch` CONSUMER (root) links the three
 `orders publish` spans from three traces. Cards: "Recording an exception does not set the span
 status. Status is set separately, and a handled exception leaves it Unset." (true in every

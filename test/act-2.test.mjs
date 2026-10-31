@@ -196,7 +196,7 @@ const PIN = {
         edit: ['status'],
         spans: {
           'payments charge': ['INTERNAL', 0, 80, 'c9f0', null, null, 'INTERNAL', [], 'UNSET', 'ERROR'],
-          'payments charge attempt 1': ['INTERNAL', 10, 40, 'd3d9', null, null, 'INTERNAL', [], 'ERROR', 'UNSET'],
+          'payments charge with retry': ['INTERNAL', 10, 40, 'd3d9', null, null, 'INTERNAL', [], 'ERROR', 'UNSET'],
           'inventory GET /stock': ['SERVER', 50, 60, 'e4da', null, null, 'SERVER', [], 'UNSET', 'UNSET'],
         },
       },
@@ -453,10 +453,10 @@ test('context-propagation: the hops show nginx dropping traceparent, and the bre
   assert.notEqual(roots[0].traceId, roots[1].traceId, 'two traces');
 });
 
-test('events-and-links: an exception record never decides the status; a failed charge is Error, a handled attempt Unset', () => {
+test('events-and-links: an exception record never decides the status; a failed charge is Error, a retried one that went through Unset', () => {
   const spec = EVL.steps[1].build;
   const want = Object.fromEntries(answered(spec).map((s) => [s.name, s.status]));
-  assert.deepEqual(want, { charge: 'ERROR', 'charge attempt 1': 'UNSET', 'GET /stock': 'UNSET' });
+  assert.deepEqual(want, { charge: 'ERROR', 'charge with retry': 'UNSET', 'GET /stock': 'UNSET' });
   const charge = spec.spans.find((s) => s.name === 'charge');
   assert.deepEqual(charge.events.map((e) => e.name), ['exception'], 'charge recorded its exception');
   assert.equal(charge.status, 'UNSET', 'and the record left its status Unset');
@@ -599,7 +599,7 @@ const SLIPS = {
   },
   'events-and-links': {
     'a wrong pick in the question (the event sets Error)': { 0: () => click('[data-pick="error"]') },
-    'a failed check (charge fixed, the handled attempt left Error)': {
+    'a failed check (charge fixed, the retried charge left Error)': {
       1: () => {
         const ids = buildOf('events-and-links', 1).ids;
         click(`[data-span="${ids['payments charge']}"]`);
