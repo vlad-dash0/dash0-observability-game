@@ -34,7 +34,7 @@ const SHA = '([0-9a-f]{7,40})';
 const REVIEW = new RegExp(String.raw`^(?:independent\s+)?(?:re-?)?review\s+of\s+${SHA}(?![0-9a-z])`, 'i');
 const DISPOSITIONS = new RegExp(String.raw`^dispositions\s+for\s+the\s+(?:re-?)?review\s+of\s+${SHA}(?![0-9a-z])`, 'i');
 // A read-only audit section: it carries no findings, and its only table is "Gate | Result".
-const AUDIT = new RegExp(String.raw`^pre-merge\s+audit\s+at\s+${SHA}(?![0-9a-z])`, 'i');
+const AUDIT = new RegExp(String.raw`^pre-merge\s+audit\s+at\s+${SHA}\s*$`, 'i');
 const AUDIT_COLS = ['gate', 'result'];
 // NOT CLEAN in plain ASCII: the words in any case with whitespace between ("not clean"
 // in prose included, as before), or in capitals glued or joined by "_"/"-" ("NOTCLEAN",

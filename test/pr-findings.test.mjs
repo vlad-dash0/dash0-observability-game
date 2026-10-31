@@ -838,3 +838,11 @@ test('fetchPr asks GitHub for the rendered body, not the markdown', async () => 
   const queries = calls.map((a) => a.find((x) => x.startsWith('query=')));
   assert.equal(queries.filter((q) => /\bbodyHTML\b/.test(q)).length, 2, 'comments and reviews');
 });
+
+test('M1: an audit heading is exactly "Pre-merge audit at <sha>"; any other text is an unrecognised heading', () => {
+  for (const name of ['m1-audit-not-clean', 'm1-audit-findings', 'm1-audit-not-clean-table']) {
+    const r = decide('review', 'dispositions-all', name);
+    assert.equal(r.exit, 2, name);
+    assert.match(errs(r), /unrecognised review heading/, name);
+  }
+});
