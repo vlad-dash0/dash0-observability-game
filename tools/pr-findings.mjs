@@ -32,10 +32,13 @@ const SHA = '([0-9a-f]{7,40})';
 const REVIEW = new RegExp(String.raw`^(?:independent\s+)?(?:re-?)?review\s+of\s+${SHA}(?![0-9a-z])`, 'i');
 const DISPOSITIONS = new RegExp(String.raw`^dispositions\s+for\s+the\s+(?:re-?)?review\s+of\s+${SHA}(?![0-9a-z])`, 'i');
 const NOT_CLEAN = /\bnot\s+clean\b/i;
+const CLEAN = /\bclean\b/i;
 const HEX = String.raw`\b[0-9a-f]{7,40}\b`;
 const REVIEW_OF = new RegExp(String.raw`\b(?:re-?)?review\s+of\s+${SHA}(?![0-9a-z])`, 'i');
-// Starts a review in prose: "Re-review" (not "Re-review requested"), "Independent review".
-const REVIEW_START = /^(?:re-?review(?!\s+requested\b)|independent\s+review)\b/i;
+// Starts a review in prose: "Re-review(s)", "Re review", "Independent review(s)".
+const REVIEW_START = /^(?:re[\s-]*reviews?|independent\s+reviews?)\b/i;
+// Not a review: a block (or line) that is only "Re-review requested", with punctuation.
+const REQUESTED = /^re[\s-]*review\s+requested[\s\p{P}]*$/iu;
 // "finding(s)" as a word, not part of a name such as pr-findings.mjs.
 const FINDING = String.raw`(?<![\w./-])findings?(?![\w/-]|\.\w)`;
 // "Review(s)"/"Reviewer(s)" that then reports problems ("Reviewers found problems in ...").
@@ -59,21 +62,52 @@ const RESERVED = [
 // above." are audit lines). A table cell that is only a form name ("Disposition",
 // "Independent review") is a column or row label, not a review.
 const RESERVED_TEXT = [NOT_CLEAN, REVIEW_OF, REVIEW_START, REVIEWER_FOUND, FINDINGS_SHA, DISPOSITION_START];
-const LABEL = /^(?:re-?reviews?|independent\s+reviews?|reviews?|dispositions?)$/i;
-const matches = (patterns) => (t) => patterns.some((re) => re.test(t));
+const LABEL = /^(?:re[\s-]*reviews?|independent\s+reviews?|reviews?|dispositions?)$/i;
+const matches = (patterns) => (t) => !REQUESTED.test(t) && patterns.some((re) => re.test(t));
 const reserved = matches(RESERVED);
 const reservedText = matches(RESERVED_TEXT);
 const NO_FINDINGS = /^no findings\.?$/i;
 // A disposition cell with no letter or digit, or that is only one of these words (or one
 // of them followed by a separator, e.g. "TODO: later"), leaves the finding open.
-const PLACEHOLDER = /^(?:tbd|todo|open|n\/a|pending|none)(?:\s*(?:[—–:(,]|-\s).*)?$/i;
+const PLACEHOLDER = /^(?:tbd|todo|open|n\/a|pending|none)(?:\s*[-:(,].*)?$/i;
 const FINDING_COLS = ['finding', 'findings', 'issue', 'issues', 'problem', 'problems'];
 
-// The one normalisation every text accessor applies before any match: format characters
-// (\p{Cf}: zero-width space and joiners, soft hyphen, word joiner, bidi marks) are
-// removed and every run of whitespace (any Unicode space) becomes one ASCII space, so
-// "NOT CL<U+200B>EAN" or "NOT<U+00A0>CLEAN" reads as "NOT CLEAN".
-const normalize = (s) => s.replace(/\p{Cf}/gu, '').replace(/[\s\p{Zs}]+/gu, ' ').trim();
+// Latin lookalikes folded to their ASCII skeleton: Cyrillic and Greek letters that look
+// like a Latin letter, and Latin small capitals (NFKC leaves all of these alone).
+const CONFUSABLE = Object.fromEntries([
+  // Cyrillic capitals, then small letters.
+  'АA', 'ВB', 'ЕE', 'ЅS', 'ІI', 'ЈJ', 'КK', 'МM', 'НH', 'ОO', 'РP', 'СC', 'ТT', 'УY', 'ХX',
+  'ӀI', 'ԀD', 'ԌG', 'ԚQ', 'ԜW', 'ѴV', 'ЬB',
+  'аa', 'вb', 'гr', 'еe', 'кk', 'мm', 'нh', 'оo', 'пn', 'рp', 'сc', 'тt', 'уy', 'хx', 'ьb',
+  'ѕs', 'іi', 'јj', 'һh', 'ӏl', 'ԁd', 'ԍg', 'ԛq', 'ԝw', 'ѡw', 'ѵv',
+  // Greek capitals, then small letters.
+  'ΑA', 'ΒB', 'ΕE', 'ΖZ', 'ΗH', 'ΙI', 'ΚK', 'ΜM', 'ΝN', 'ΟO', 'ΡP', 'ΤT', 'ΥY', 'ΧX',
+  'ϹC', 'ϜF', 'ͿJ',
+  'αa', 'γy', 'εe', 'ηn', 'ιi', 'κk', 'νv', 'οo', 'ρp', 'τt', 'υu', 'χx', 'ωw', 'ϲc', 'ϝf', 'ϳj',
+  // Latin small capitals.
+  'ᴀA', 'ʙB', 'ᴄC', 'ᴅD', 'ᴇE', 'ꜰF', 'ɢG', 'ʜH', 'ɪI', 'ᴊJ', 'ᴋK', 'ʟL', 'ᴍM', 'ɴN', 'ᴏO',
+  'ᴘP', 'ʀR', 'ꜱS', 'ᴛT', 'ᴜU', 'ᴠV', 'ᴡW', 'ʏY', 'ᴢZ',
+].map((pair) => [...pair]));
+const LOOKALIKE = new RegExp(`[${Object.keys(CONFUSABLE).join('')}]`, 'gu');
+
+// Text as it renders, before folding: NFKC (fullwidth, ligature and mathematical letters
+// become ASCII) with format characters (\p{Cf}: zero-width space and joiners, soft
+// hyphen, word joiner, bidi marks) removed.
+const canonical = (s) => s.normalize('NFKC').replace(/\p{Cf}/gu, '');
+
+// The one normalisation every text accessor applies before any match: canonical(), then
+// every dash (\p{Pd}, U+2010/U+2011 included, and the minus sign) becomes "-", every
+// lookalike its Latin letter, and every run of whitespace (any Unicode space) one ASCII
+// space, so "ＮＯＴ CL<U+200B>EAN", "NОT<U+00A0>CLEAN" (Cyrillic О) or "Re‑review" (U+2011)
+// reads as "NOT CLEAN" or "Re-review".
+const normalize = (s) => canonical(s).replace(/[\p{Pd}\u2212]/gu, '-')
+  .replace(LOOKALIKE, (c) => CONFUSABLE[c]).replace(/[\s\p{Zs}]+/gu, ' ').trim();
+
+// A word (outside code) that mixes Latin with Cyrillic or Greek letters is a disguise, not
+// prose: returns the first, else null. Words of one script ("Проверено", "καλά") are fine.
+const LATIN = /\p{Script=Latin}/u;
+const OTHER = /[\p{Script=Cyrillic}\p{Script=Greek}]/u;
+const mixedWord = (s) => canonical(s).match(/[\p{L}\p{M}]+/gu)?.find((w) => LATIN.test(w) && OTHER.test(w)) ?? null;
 
 // Raw text of a node, a <br> as a newline; code and pre left out when `code` is false.
 function raw(node, code = true) {
@@ -142,7 +176,7 @@ function sections(root, errors) {
   const outside = (rawText, what, test = reservedText) => {
     if (cur().kind) return;
     const whole = normalize(rawText);
-    const hit = [whole, ...rawText.split('\n').map(normalize)].find((t) => t && test(t));
+    const hit = [whole, ...rawText.split(/[\n\r\v\f\x85\u2028\u2029]/).map(normalize)].find((t) => t && test(t));
     if (hit !== undefined) {
       errors.push(`"${hit}" is ${what} that reads as a review outside a review section (expected "## Review of <sha>")`);
     }
@@ -247,6 +281,8 @@ export function parseComment(html) {
   if (typeof html !== 'string') return { reviews, dispositions, errors: ['no rendered body (bodyHTML)'] };
   if (!parseHTML) throw new Error(`linkedom is not installed (run npm ci): ${domError.message}`);
   const { document } = parseHTML(`<!doctype html><html><body>${html}</body></html>`);
+  const mixed = mixedWord(raw(document.body, false));
+  if (mixed) errors.push(`"${mixed}" mixes Latin with Cyrillic or Greek letters (a lookalike of a reserved word?)`);
   for (const { kind, sha, heading, tables, items, paras, prose } of sections(document.body, errors)) {
     const where = `"${heading}"`;
     if (!kind) {
@@ -281,6 +317,11 @@ export function parseComment(html) {
     }
     const findingTables = tables.filter((t) => t.header.includes('#'));
     const noFindings = paras.some((p) => NO_FINDINGS.test(p));
+    // A CLEAN review (headed CLEAN, or "No findings.") that says NOT CLEAN in its prose
+    // contradicts itself: which one holds is for a person to read.
+    const clean = noFindings || (CLEAN.test(heading) && !NOT_CLEAN.test(heading));
+    const notClean = clean && prose.find((p) => NOT_CLEAN.test(p));
+    if (notClean) errors.push(`${where}: a CLEAN review that says NOT CLEAN in its text: ${notClean}`);
     if (noFindings) {
       if (tables.length || items.length || NOT_CLEAN.test(heading)) {
         errors.push(`${where}: "No findings." must stand alone, in a review that is not NOT CLEAN`);

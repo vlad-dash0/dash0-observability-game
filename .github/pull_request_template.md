@@ -36,7 +36,7 @@ findings, 2 inconclusive. Merge needs `All checks` green and the detector at 0.
    - `### Notes`-style subheadings and bold lines are fine inside a review.
    - A review with nothing to report says `No findings.` on its own line, with no table
      or list, under a heading that does not say NOT CLEAN; a note paragraph on what was
-     checked may follow.
+     checked may follow. A CLEAN review whose text says NOT CLEAN is inconclusive.
 
 2. Dispositions, posted after the review they answer:
 
@@ -75,10 +75,13 @@ render as one; a heading inside a blockquote counts); tables are rendered tables
 an HTML comment or code (fenced, indented or inline) is never a heading or table, so it
 does not count; a raw HTML `<h2>` or `<table>` that GitHub displays does. Review and
 dispositions headings must be level 2; the same form at another level or as a bold line
-is inconclusive. All text is read after one normalisation: format characters (zero-width
-space, soft hyphen, word joiner, bidi marks) are removed and any space becomes a plain
-space. Outside a review section, a heading that says NOT CLEAN or names "review of
-<sha>", starts with "Re-review" (not "Re-review requested"), "Independent review" or
+is inconclusive. All text is read after one normalisation: NFKC (fullwidth letters
+become ASCII), format characters (zero-width space, soft hyphen, word joiner, bidi marks)
+are removed, every dash becomes `-`, Cyrillic and Greek lookalikes of Latin letters
+become those letters, and any space becomes a plain space. A word outside code that
+mixes Latin with Cyrillic or Greek letters is inconclusive. Outside a review section, a
+heading that says NOT CLEAN or names "review of <sha>", starts with "Re-review" ("Re
+review", "Re-reviews"; a block that is only "Re-review requested" is fine), "Independent review" or
 "Disposition", starts with "Review" and names findings, dispositions or a sha, starts
 with "Review(s)"/"Reviewer(s)" and reports problems (found, problem, issue, bug,
 findings), or names findings and a sha, is inconclusive. So is any other text there

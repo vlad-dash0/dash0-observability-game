@@ -52,7 +52,7 @@ test('a combined table carries its own dispositions', () => {
   const { reviews, errors } = parseComment(fx('combined'));
   assert.deepEqual(errors, []);
   assert.deepEqual(reviews[0].findings.map((f) => [f.id, f.disposition]),
-    [['1', 'Reworded'], ['H', 'Added'], ['—', 'Filed as #39']]);
+    [['1', 'Reworded'], ['H', 'Added'], ['-', 'Filed as #39']]);
 });
 
 test('PASS: every finding has a disposition', () => {
@@ -524,6 +524,63 @@ test('H3: a "Disposition" header cell and "Reviews: ..." audit lines stay PASS',
   const r = decide('clean', 'h3-must-pass');
   assert.deepEqual(r.errors, []);
   assert.equal(r.exit, 0);
+});
+
+test('J1: fullwidth NOT CLEAN (NFKC) in a paragraph is still NOT CLEAN', () => {
+  const r = decide('clean', 'j1-fullwidth');
+  assert.match(errs(r), /"Verdict: NOT CLEAN" is a paragraph that reads as a review/);
+  assert.equal(r.exit, 2);
+});
+
+test('J1: Cyrillic and Greek lookalikes fold to their Latin letters', () => {
+  const r = decide('clean', 'j1-lookalike-words');
+  assert.match(errs(r), /"Verdict: NOT Clean" is a paragraph that reads as a review/);
+  assert.equal(r.exit, 2);
+});
+
+test('J1: a review heading with Cyrillic lookalikes is read as a review heading and flagged as mixed', () => {
+  const r = decide('clean', 'j1-cyrillic-heading');
+  assert.match(errs(r), /"Rеview" mixes Latin with Cyrillic or Greek letters/);
+  assert.match(errs(r), /"## Review of abc1234: NOT CLEAN": a table without a "#" column/);
+  assert.equal(r.exit, 2);
+});
+
+test('J1: any word mixing Latin with Cyrillic or Greek letters is inconclusive', () => {
+  const r = decide('j1-mixed-word');
+  assert.match(errs(r), /"Thе" mixes Latin with Cyrillic or Greek letters/);
+  assert.equal(r.exit, 2);
+});
+
+test('J1: prose in German, Japanese, Russian and Greek in a CLEAN review note stays PASS', () => {
+  const r = decide('j-must-pass-scripts');
+  assert.deepEqual(r.errors, []);
+  assert.equal(r.exit, 0);
+});
+
+test('J2: a CLEAN review whose prose says NOT CLEAN is inconclusive', () => {
+  const r = decide('j2-clean-says-not-clean');
+  assert.match(errs(r), /"## Review of abc1234: CLEAN": a CLEAN review that says NOT CLEAN in its text: Actually NOT CLEAN/);
+  assert.equal(r.exit, 2);
+});
+
+test('J3: "Re review", "Re‑review" (U+2011), "Re–review" (en dash) and "Re-reviews" start a review', () => {
+  for (const [name, said] of [['j3-space', 'Re review of the latest push found problems'],
+    ['j3-nb-hyphen', 'Re-review of the latest push found problems'],
+    ['j3-en-dash', 'Re-review of the latest push found problems'],
+    ['j3-plural', 'Re-reviews found problems:']]) {
+    const r = decide('clean', name);
+    assert.ok(errs(r).includes(`"${said}" is a paragraph that reads as a review`), `${name}: ${errs(r)}`);
+    assert.equal(r.exit, 2, name);
+  }
+});
+
+test('J4: "Re-review requested" exempts only a block that is just that phrase', () => {
+  const lead = decide('clean', 'j4-requested-lead-in');
+  assert.match(errs(lead), /"Re-review requested; found 3 problems in abc1234:" is a paragraph that reads as a review/);
+  assert.equal(lead.exit, 2);
+  const only = decide('clean', 'j4-requested-only');
+  assert.deepEqual(only.errors, []);
+  assert.equal(only.exit, 0);
 });
 
 // --- the gh layer -----------------------------------------------------------------
