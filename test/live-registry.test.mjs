@@ -10,11 +10,13 @@ import { liveRegistry } from '../app.mjs';
 
 const nodeIds = NODES.map((n) => n.id);
 
-// Extended on purpose with each level PR (docs/M1-DESIGN.md §5): Act 0 (P3) plays before Act 1.
+// Extended on purpose with each level PR (docs/M1-DESIGN.md §5): Act 0 (P3) plays before Act 1;
+// its boss, the pager (P4), comes after its levels.
 const EXPECTED_ORDER = [
   'monitoring-vs-observability',
   'the-signals',
   'why-opentelemetry',
+  'the-pager',
   'naming-your-service',
 ];
 
@@ -33,7 +35,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), then Act 1', ()
       name: 'Orientation',
       sub: 'Day one',
       levelIds: ['monitoring-vs-observability', 'the-signals', 'why-opentelemetry'],
-      bossId: null,
+      bossId: 'the-pager',
     },
     {
       id: 'act-1',

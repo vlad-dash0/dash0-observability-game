@@ -112,6 +112,21 @@ const DRIVERS = {
       expect: { stars: 2, cards: ['api-vs-sdk'] },
     },
   },
+  // Act 0 boss: unscored, so every run earns 0; the sloppy run takes all four looks.
+  'the-pager': {
+    play() {
+      click('[data-look="service"]');
+      click('#pager-escalate');
+    },
+    expect: { stars: 0, cards: [] },
+    sloppy: {
+      play() {
+        for (const look of ['service', 'since', 'customers', 'trace']) click(`[data-look="${look}"]`);
+        click('#pager-escalate');
+      },
+      expect: { stars: 0, cards: [] },
+    },
+  },
   'naming-your-service': {
     play() {
       click('[data-pick="fallback"]');
