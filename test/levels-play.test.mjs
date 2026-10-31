@@ -37,8 +37,81 @@ const FIXED_ENV = [
   'OTEL_RESOURCE_ATTRIBUTES=service.version=1.4.2,deployment.environment.name=production',
 ].join('\n');
 
+/** Sort every `[item, bucket]` pair with this file's click (item, then bucket). */
+function sortAll(pairs) {
+  for (const [item, bucket] of pairs) {
+    click(`[data-item="${item}"]`);
+    click(`[data-bucket="${bucket}"]`);
+  }
+}
+
+// Act 0 answers (docs/M1-DESIGN.md §6), spelled out here so a wrong key in a level fails.
+const MVO_SORT = [['cpu', 'known'], ['5xx', 'known'], ['disk', 'known'], ['ios', 'new'], ['cust', 'new'], ['coupon', 'new']];
+const SIG_DATA = [['duration', 'metric'], ['cpu-time', 'metric'], ['declined', 'log'], ['checkout-span', 'trace'], ['stacks', 'profile']];
+const SIG_ASK = [['rps', 'metric'], ['slow-call', 'trace'], ['provider', 'log'], ['cpu-fn', 'profile']];
+const OTEL_PARTS = [['start-span', 'api'], ['batch', 'sdk'], ['wire', 'otlp'], ['pipeline', 'collector'], ['method', 'semconv']];
+
 /** One driver per registered level id. */
 const DRIVERS = {
+  'monitoring-vs-observability': {
+    play() {
+      sortAll(MVO_SORT);
+      click('#mvo-next');
+      click('[data-pick="rich"]');
+      click('#mvo-finish');
+    },
+    expect: { stars: 3, cards: [] },
+    sloppy: {
+      play() {
+        sortAll([['cpu', 'new'], ...MVO_SORT]); // one wrong placement
+        click('#mvo-next');
+        click('[data-pick="rich"]');
+        click('#mvo-finish');
+      },
+      expect: { stars: 2, cards: [] },
+    },
+  },
+  'the-signals': {
+    play() {
+      sortAll(SIG_DATA);
+      click('#sig-next');
+      sortAll(SIG_ASK);
+      click('#sig-next');
+      click('[data-pick="profiles"]');
+      click('#sig-finish');
+    },
+    expect: { stars: 3, cards: ['profiles-signal'] },
+    sloppy: {
+      play() {
+        sortAll(SIG_DATA);
+        click('#sig-next');
+        sortAll(SIG_ASK);
+        click('#sig-next');
+        click('[data-pick="logs"]'); // one wrong pick
+        click('[data-pick="profiles"]');
+        click('#sig-finish');
+      },
+      expect: { stars: 2, cards: ['profiles-signal'] },
+    },
+  },
+  'why-opentelemetry': {
+    play() {
+      sortAll(OTEL_PARTS);
+      click('#otel-next');
+      click('[data-pick="api"]');
+      click('#otel-finish');
+    },
+    expect: { stars: 3, cards: ['api-vs-sdk'] },
+    sloppy: {
+      play() {
+        sortAll([['batch', 'collector'], ...OTEL_PARTS]); // one wrong placement
+        click('#otel-next');
+        click('[data-pick="api"]');
+        click('#otel-finish');
+      },
+      expect: { stars: 2, cards: ['api-vs-sdk'] },
+    },
+  },
   'naming-your-service': {
     play() {
       click('[data-pick="fallback"]');
