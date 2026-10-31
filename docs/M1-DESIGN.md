@@ -89,14 +89,16 @@ remaining(spec, state) → itemIds not yet right, spec order
 untried(spec, state, itemId) → bucketIds not yet tried, spec order
 isComplete(spec, state) → boolean
 ```
-View `lib/widgets/sort-it-view.mjs`: `renderSort(spec, state, {selected, escapeHtml})` (item
-buttons `data-item` + `aria-pressed`; bucket buttons `data-bucket`, disabled when tried for the
-selected item or nothing selected; `[data-bucket-list]` of placed items; `#ID-feedback`).
+View `lib/widgets/sort-it-view.mjs`: `renderSort(spec, state, {selected, escapeHtml,
+labelledBy?})` (item buttons `data-item` + `aria-pressed`; bucket buttons `data-bucket`,
+disabled when tried for the selected item or nothing selected; `[data-bucket-list]` of placed
+items; `#ID-feedback`; `labelledBy`, a plain-token heading id, makes the widget a labelled group).
 `mountSort(ctx, spec, {onComplete})`: tap-to-place (item then bucket; keyboard-native); drag is
 an enhancement calling the same path. Only `'wrong'` costs a mistake. Feedback: `Right. <label>
 goes in <bucket>. <why>` / `Not quite. <label> is not <bucket>. <whyNot?>` (doesn't reveal the
-answer) / `Pick an item first.` Focus: first remaining item → its first untried bucket → after
-wrong, next untried bucket → after right, next remaining item → `onComplete()`'s return.
+answer) / `You already tried <bucket> for <label>.` (a repeat; free) / `Pick an item first.`
+Focus: first remaining item → its first untried bucket → after wrong, next untried bucket →
+after right, next remaining item → `onComplete()`'s return.
 
 ### 4.2 Build it, trace waterfall (P5)
 Core `lib/widgets/trace.mjs`:
@@ -182,28 +184,32 @@ disk full?" known; ios "Why are only iOS 5.2 checkouts from Germany slow since 1
 cust "Which customer IDs hit a payment timeout in the last hour?" new; coupon "Did the coupon
 path slow carts with over 20 items?" new. Step 2 choice "What makes the second kind
 answerable?" → `rich` (telemetry with many attributes you can slice after the fact); decoys
-dash, alerts, retention. Spec: https://opentelemetry.io/docs/concepts/observability-primer/
+dash, alerts, retention. Spec: https://opentelemetry.io/docs/concepts/observability-primer/#what-is-observability
 
 **0.2 `the-signals`**: sort; cards `['profiles-signal']`. Step 1 Sort into metric/log/trace/
 profile: `http.server.request.duration` histogram point → metric; `process.cpu.time` counter →
-metric; `{severity_text:"ERROR", body:"payment declined"}` → log; span `POST /checkout` with
+metric (Release Candidate, never "stable"); `{severity_text:"ERROR", body:"payment declined"}` → log; span `POST /checkout` with
 trace_id/span_id/parent → trace; CPU stack samples per function → profile. Step 2 Sort
 questions: req/s over 30 days → metric; which downstream call made this request slow → trace;
 what exactly did the provider return → log; which function burns CPU in inventory → profile.
-Step 3 choice: newest, still-maturing signal → profiles. Card front: "Profiles are OTel's
-fourth signal and the newest; the profiles data model and its OTLP support are still
-maturing." **Verify profiles' current status before copy.** Spec:
-https://opentelemetry.io/docs/concepts/signals/ , https://opentelemetry.io/docs/specs/otel/profiles/
+Step 3 choice: newest, still-maturing signal → profiles (decoys metrics, logs, traces). Card
+front (≤140): "Profiles are OTel's fourth and newest signal. The profiles spec is Alpha, and
+profiles in OTLP are still in Development, so expect changes." Verified 2026-10-30:
+opentelemetry.io/docs/specs/otel/profiles/ "Status: Alpha"; opentelemetry.io/docs/specs/otlp/
+"Development for the profiles signal"; proto v1.11.1; Collector v0.164.0 otlpreceiver profiles
+alpha. Spec: https://opentelemetry.io/docs/concepts/signals/profiles/
 
 **0.3 `why-opentelemetry`**: sort; cards `['api-vs-sdk']`. Step 1 Sort into api/sdk/otlp/
 collector/semconv: `tracer.startActiveSpan('charge')` in a shared library → api; batch span
 processor and sampler settings → sdk; the wire format sent to port 4318 → otlp; a separate
 process that receives, filters, forwards → collector; the name `http.request.method` →
 semconv. Step 2 choice: library `kettle-payments-client` used by 30 services depends on →
-`api` (only `@opentelemetry/api`; no-op without an SDK; the app picks the SDK). Card front:
-"Libraries depend only on the OTel API; only the application installs the SDK. Without an
-SDK, API calls do nothing." Spec: https://opentelemetry.io/docs/specs/otel/overview/#api ,
-https://opentelemetry.io/docs/concepts/instrumentation/libraries/
+`api` (only `@opentelemetry/api`; no-op without an SDK; the app picks the SDK); decoys sdk,
+exporter (an OTLP exporter), collector. Card front (≤140): "Libraries depend only on the OTel
+API; only the app installs the SDK. Without an SDK, API calls are no-ops that record nothing."
+The answer's `why` and the card back carry the full wording: "... Without an SDK, API calls are
+no-ops: they record nothing and cost almost nothing." (not "do nothing": the trace API still
+propagates SpanContext). Spec: https://opentelemetry.io/docs/concepts/instrumentation/libraries/#opentelemetry-api
 
 **Boss `the-pager`**: `scored:false`; cards `[]`; lights `[]`. Alert "PAGE: checkout p95 > 2 s
 (firing)". Four looks (Which service? / Since when? / Which customers? / Show me a trace), each

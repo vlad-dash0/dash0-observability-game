@@ -16,4 +16,29 @@ export const DECK = [
       'Any backend that groups telemetry by service, Dash0 included, can tell your services ' +
       'apart only when every service carries its own service.name.',
   },
+  {
+    id: 'profiles-signal',
+    front:
+      "Profiles are OTel's fourth and newest signal. The profiles spec is Alpha, and profiles in " +
+      'OTLP are still in Development, so expect changes.',
+    back:
+      'OpenTelemetry has four signals: traces, metrics, logs and profiles. Profiles came last. ' +
+      'The profiles spec has status Alpha, and the OTLP spec marks the profiles signal as ' +
+      'Development, so its data model and wire format may still change.',
+    specUrl: 'https://opentelemetry.io/docs/concepts/signals/profiles/',
+    dash0Angle: null,
+  },
+  {
+    id: 'api-vs-sdk',
+    front:
+      'Libraries depend only on the OTel API; only the app installs the SDK. Without an SDK, ' +
+      'API calls are no-ops that record nothing.',
+    back:
+      'Libraries depend only on the OTel API; only the application installs the SDK. Without ' +
+      'an SDK, API calls are no-ops: they record nothing and cost almost nothing. So a shared ' +
+      'library can be instrumented once, and each application that uses it picks its own SDK, ' +
+      'sampling and exporter.',
+    specUrl: 'https://opentelemetry.io/docs/concepts/instrumentation/libraries/#opentelemetry-api',
+    dash0Angle: null,
+  },
 ];

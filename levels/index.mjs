@@ -12,9 +12,20 @@
 //   3. Add DRIVERS['<id>'] (happy and sloppy runs) in test/levels-play.test.mjs.
 //
 // Act: { id, no, name, sub, levels: [level, ...], boss: level | null }.
+import monitoringVsObservability from './monitoring-vs-observability.mjs';
 import namingYourService from './naming-your-service.mjs';
+import theSignals from './the-signals.mjs';
+import whyOpentelemetry from './why-opentelemetry.mjs';
 
 export const ACTS = [
+  {
+    id: 'act-0',
+    no: 0,
+    name: 'Orientation',
+    sub: 'Day one',
+    levels: [monitoringVsObservability, theSignals, whyOpentelemetry],
+    boss: null,
+  },
   {
     id: 'act-1',
     no: 1,
