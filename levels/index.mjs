@@ -14,6 +14,7 @@
 // Act: { id, no, name, sub, levels: [level, ...], boss: level | null }.
 import monitoringVsObservability from './monitoring-vs-observability.mjs';
 import namingYourService from './naming-your-service.mjs';
+import thePager from './the-pager.mjs';
 import theSignals from './the-signals.mjs';
 import whyOpentelemetry from './why-opentelemetry.mjs';
 
@@ -24,7 +25,7 @@ export const ACTS = [
     name: 'Orientation',
     sub: 'Day one',
     levels: [monitoringVsObservability, theSignals, whyOpentelemetry],
-    boss: null,
+    boss: thePager,
   },
   {
     id: 'act-1',
