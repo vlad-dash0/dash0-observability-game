@@ -24,6 +24,7 @@ findings, 2 inconclusive. Merge needs `All checks` green and the detector at 0.
    | 1 | medium | ... |
    | N1 | nit | ... |
 
+   - The comment starts with the heading: no lead-in line before it.
    - "Independent review of <sha>" and "Re-review of <sha>" are accepted too; the sha may
      be in backticks; text after it is free.
    - `#` is any id, unique within the review (1, M1, N-a). Escape a literal pipe as `\|`.
@@ -47,6 +48,9 @@ findings, 2 inconclusive. Merge needs `All checks` green and the detector at 0.
    | 1 | Fixed in <sha>: ... |
    | N1 | Won't fix: ... |
 
+   Start the comment with its heading: no lead-in line before it ("Thanks, fixed in
+   <sha>." goes under the table, or in the table). Text before the heading is outside
+   any section, and a line there naming a review or dispositions is inconclusive.
    Every `#` must exist in the latest earlier review of that sha. Other columns
    (Severity) are allowed. These cells leave the finding open (formatting such as
    bold, code, strikethrough or a trailing period ignored): no letter or digit (empty,
@@ -71,19 +75,28 @@ render as one; a heading inside a blockquote counts); tables are rendered tables
 an HTML comment or code (fenced, indented or inline) is never a heading or table, so it
 does not count; a raw HTML `<h2>` or `<table>` that GitHub displays does. Review and
 dispositions headings must be level 2; the same form at another level or as a bold line
-is inconclusive. Outside a review section, a heading that says NOT CLEAN, starts with
-"Re-review" (not "Re-review requested"), "Independent review" or "Disposition", starts
-with "Review" and names findings, dispositions or a sha, or names findings and a sha, is
-inconclusive, and so is a table with a `#` column and a Finding/Findings/Issue column.
-Outside a review section, any other text (paragraph, list item, quote, table cell,
-summary, raw HTML) that says NOT CLEAN or names "review of <sha>" (so also "re-review of"
-and "Dispositions for the review of") is inconclusive: write the review as a level-2
-heading, or say "Reviews: <sha> CLEAN" in an audit. In a dispositions section, a
-paragraph starting with `|` (a row GitHub did not render as a table) is inconclusive. "## Review notes", "## Reviewer's Guide", "## Findings from QA"
+is inconclusive. All text is read after one normalisation: format characters (zero-width
+space, soft hyphen, word joiner, bidi marks) are removed and any space becomes a plain
+space. Outside a review section, a heading that says NOT CLEAN or names "review of
+<sha>", starts with "Re-review" (not "Re-review requested"), "Independent review" or
+"Disposition", starts with "Review" and names findings, dispositions or a sha, starts
+with "Review(s)"/"Reviewer(s)" and reports problems (found, problem, issue, bug,
+findings), or names findings and a sha, is inconclusive. So is any other text there
+(paragraph, list item, quote, table cell, summary, bare text after raw HTML), tested
+whole and line by line, with the same starts except that "Review(s)" needs a problem
+word; a table cell that is only a form name ("Disposition", "Independent review") is a
+label and is fine. "findings" in a name (pr-findings.mjs) does not count. Write the review as a level-2
+heading, or say "Reviews: <sha> CLEAN" in an audit. So is a table outside a review
+section with a `#` column or a Finding/Issue/Problem column. In a dispositions section,
+a paragraph starting with `|` (a row GitHub did not render as a table) is inconclusive.
+"## Review notes", "## Reviewer's Guide", "## Findings from QA"
 and "## Pre-merge audit at <sha>" are fine.
 Override: hide (minimize) a comment the detector must not read, e.g. a bot's or an
 old-format review. Minimized comments are skipped and each is printed as SKIPPED with
-its author, so the bypass shows in the output.
+its author, so the bypass shows in the output. Minimizing removes the whole comment
+from the audit: its findings and its dispositions no longer count. To fix a malformed
+review or dispositions comment (e.g. one with a lead-in line), edit it or post a
+corrected one; minimize only what must not count at all.
 Trust: the detector does not check who posts dispositions; anyone who can comment can
 clear findings. That holds only because this repo is private and only collaborators can
 comment. Each dispositions comment is printed as DISPOSITIONS for <sha> by <login> so

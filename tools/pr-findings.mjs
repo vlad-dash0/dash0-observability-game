@@ -32,41 +32,69 @@ const SHA = '([0-9a-f]{7,40})';
 const REVIEW = new RegExp(String.raw`^(?:independent\s+)?(?:re-?)?review\s+of\s+${SHA}(?![0-9a-z])`, 'i');
 const DISPOSITIONS = new RegExp(String.raw`^dispositions\s+for\s+the\s+(?:re-?)?review\s+of\s+${SHA}(?![0-9a-z])`, 'i');
 const NOT_CLEAN = /\bnot\s+clean\b/i;
-// Headings reserved for the forms above: outside a review section, one that is not a
-// recognised form is an error, because it may hold the open finding. Reserved: says NOT
-// CLEAN; starts with "Re-review" (not "Re-review requested"), "Independent review" or
-// "Disposition(s)"; starts with "Review(s)" and names findings, dispositions or a sha; or
-// names findings and a sha. Not reserved: "Review notes", "Reviewer's Guide", "Findings
-// from QA", "Pre-merge audit at <sha>".
 const HEX = String.raw`\b[0-9a-f]{7,40}\b`;
-const RESERVED = [
-  NOT_CLEAN,
-  /^(?:re-?review(?!\s+requested\b)|independent\s+review|dispositions?)\b/i,
-  new RegExp(String.raw`^reviews?\b.*(?:\bfindings?\b|\bdispositions?\b|${HEX})`, 'i'),
-  new RegExp(String.raw`\bfindings?\b.*${HEX}|${HEX}.*\bfindings?\b`, 'i'),
-];
-const reserved = (t) => RESERVED.some((re) => re.test(t));
-// Outside a review section, any other text block (paragraph, list item, table cell,
-// summary, raw element text) that says NOT CLEAN or names "(re-)review of <sha>" (which
-// includes "Dispositions for the review of <sha>") anywhere is an error: it may be a
-// review written in a form the detector does not read. Narrower than the heading list so
-// a table header "Disposition" or "Reviews: every finding's disposition is posted" passes.
 const REVIEW_OF = new RegExp(String.raw`\b(?:re-?)?review\s+of\s+${SHA}(?![0-9a-z])`, 'i');
-const reservedText = (t) => NOT_CLEAN.test(t) || REVIEW_OF.test(t);
+// Starts a review in prose: "Re-review" (not "Re-review requested"), "Independent review".
+const REVIEW_START = /^(?:re-?review(?!\s+requested\b)|independent\s+review)\b/i;
+// "finding(s)" as a word, not part of a name such as pr-findings.mjs.
+const FINDING = String.raw`(?<![\w./-])findings?(?![\w/-]|\.\w)`;
+// "Review(s)"/"Reviewer(s)" that then reports problems ("Reviewers found problems in ...").
+const REVIEWER_FOUND = new RegExp(String.raw`^review(?:er)?s?\b.*(?<!\bno\s)(?:\b(?:found|problems?|issues?|bugs?)\b|${FINDING}(?!['’]s))`, 'i');
+const FINDINGS_SHA = new RegExp(String.raw`${FINDING}.*${HEX}|${HEX}.*${FINDING}`, 'i');
+// Outside a review section, a heading of a form reserved for reviews is an error, because
+// it may hold the open finding: one that says NOT CLEAN or names "review of <sha>"; starts
+// with "Re-review" (not "Re-review requested"), "Independent review" or "Disposition(s)";
+// starts with "Review(s)" and names findings, dispositions or a sha; starts with
+// "Review(s)/Reviewer(s)" and reports problems; or names findings and a sha. Not reserved:
+// "Review notes", "Reviewer's Guide", "Findings from QA", "Pre-merge audit at <sha>".
+const DISPOSITION_START = /^dispositions?\b/i;
+const RESERVED = [
+  NOT_CLEAN, REVIEW_OF, REVIEW_START, REVIEWER_FOUND, FINDINGS_SHA, DISPOSITION_START,
+  new RegExp(String.raw`^reviews?\b.*(?:${FINDING}|\bdispositions?\b|${HEX})`, 'i'),
+];
+// Every other text block outside a review section (paragraph, list item, table cell,
+// summary, any run of bare text) gets the same starts, tested on the whole block and on
+// each of its lines, except that "Review(s)" needs a problem word, not just a sha or
+// "finding's" ("Reviews: <sha> CLEAN", "Reviews: every finding's disposition is posted
+// above." are audit lines). A table cell that is only a form name ("Disposition",
+// "Independent review") is a column or row label, not a review.
+const RESERVED_TEXT = [NOT_CLEAN, REVIEW_OF, REVIEW_START, REVIEWER_FOUND, FINDINGS_SHA, DISPOSITION_START];
+const LABEL = /^(?:re-?reviews?|independent\s+reviews?|reviews?|dispositions?)$/i;
+const matches = (patterns) => (t) => patterns.some((re) => re.test(t));
+const reserved = matches(RESERVED);
+const reservedText = matches(RESERVED_TEXT);
 const NO_FINDINGS = /^no findings\.?$/i;
 // A disposition cell with no letter or digit, or that is only one of these words (or one
 // of them followed by a separator, e.g. "TODO: later"), leaves the finding open.
 const PLACEHOLDER = /^(?:tbd|todo|open|n\/a|pending|none)(?:\s*(?:[—–:(,]|-\s).*)?$/i;
-const FINDING_COLS = ['finding', 'findings', 'issue', 'issues'];
+const FINDING_COLS = ['finding', 'findings', 'issue', 'issues', 'problem', 'problems'];
 
-const text = (el) => el.textContent.replace(/\s+/g, ' ').trim();
+// The one normalisation every text accessor applies before any match: format characters
+// (\p{Cf}: zero-width space and joiners, soft hyphen, word joiner, bidi marks) are
+// removed and every run of whitespace (any Unicode space) becomes one ASCII space, so
+// "NOT CL<U+200B>EAN" or "NOT<U+00A0>CLEAN" reads as "NOT CLEAN".
+const normalize = (s) => s.replace(/\p{Cf}/gu, '').replace(/[\s\p{Zs}]+/gu, ' ').trim();
+
+// Raw text of a node, a <br> as a newline; code and pre left out when `code` is false.
+function raw(node, code = true) {
+  if (node.nodeType === 3) return node.textContent;
+  if (node.nodeType !== 1) return '';
+  if (node.localName === 'br') return '\n';
+  if (!code && (node.localName === 'code' || node.localName === 'pre')) return '';
+  let s = '';
+  for (const c of node.childNodes) s += raw(c, code);
+  return s;
+}
+const text = (el) => normalize(raw(el));
+// Text of an element outside code: code renders as code, never as a table row.
+const proseText = (el) => normalize(raw(el, false));
 
 // A paragraph that is only bold text reads as a heading: returns that text, else null.
 function boldLine(p) {
   const [only, ...rest] = p.children;
   if (!only || rest.length || !['strong', 'b'].includes(only.localName)) return null;
-  const bare = (s) => s.replace(/\s+/g, ' ').trim().replace(/:$/, '').trim();
-  return bare(p.textContent) === bare(only.textContent) ? bare(only.textContent) : null;
+  const bare = (el) => text(el).replace(/:$/, '').trim();
+  return bare(p) === bare(only) ? bare(only) : null;
 }
 
 // A <table> as { header, rows }; the first row is the header (GFM puts it in <thead>).
@@ -87,40 +115,36 @@ function table(el, where, errors) {
   return { header, rows };
 }
 
-// Text of an element outside code: code renders as code, never as a table row.
-function proseText(el) {
-  let s = '';
-  const visit = (n) => {
-    for (const c of n.childNodes) {
-      if (c.nodeType === 3) s += c.textContent;
-      else if (c.nodeType === 1 && c.localName !== 'code' && c.localName !== 'pre') visit(c);
-    }
-  };
-  visit(el);
-  return s.replace(/\s+/g, ' ').trim();
-}
-
-// An element's own text (its text nodes, not its children's), e.g. a raw HTML <div>.
-const ownText = (el) => [...el.childNodes].filter((n) => n.nodeType === 3)
-  .map((n) => n.textContent).join(' ').replace(/\s+/g, ' ').trim();
+// Phrasing (inline) elements: a run of these and bare text between blocks is one text
+// block. Any other element is a block, walked in turn, so no text sits outside the walk.
+const INLINE = new Set(['a', 'abbr', 'b', 'bdi', 'bdo', 'br', 'cite', 'code', 'data', 'del', 'dfn', 'em',
+  'font', 'g-emoji', 'i', 'img', 'input', 'ins', 'kbd', 'mark', 'q', 'rp', 'rt', 'ruby', 's', 'samp',
+  'small', 'span', 'strike', 'strong', 'sub', 'sup', 'time', 'tt', 'u', 'var', 'wbr']);
+const inline = (n) => n.nodeType === 3 || (n.nodeType === 1 && INLINE.has(n.localName));
 
 // Sections split at <h1>/<h2> in document order (one in a blockquote counts); each is
 // { kind, sha, heading, tables, items, paras, prose } with kind 'review', 'dispositions'
-// or null. Fail closed: outside a review section, every text-bearing block (paragraph,
-// list item, table cell, heading, summary, a raw element's own text) that reads as a
-// review is an error. Inside a review or dispositions section, <h3>-<h6> and bold lines
-// are free text unless they use a review or dispositions form; `prose` collects every
-// text block (code excluded) so the caller can reject a finding row GitHub did not
-// render as a table. Every element is walked: markdown code renders as text only, but
-// GitHub keeps a raw HTML <h2> or <table> inside <pre> and shows it.
+// or null. Fail closed: outside a review section, every text block (paragraph, list item,
+// table cell, heading, summary, and every maximal run of bare text and inline elements
+// not inside one of those, at any depth including the top level) that reads as a review
+// is an error. Inside a review or dispositions section, <h3>-<h6> and bold lines are free
+// text unless they use a review or dispositions form; `prose` collects every text block
+// (code excluded) so the caller can reject a finding row GitHub did not render as a
+// table. Every node is walked: markdown code renders as text only, but GitHub keeps a raw
+// HTML <h2> or <table> inside <pre> and shows it.
 function sections(root, errors) {
   const out = [];
   const open = (kind, sha, heading) => out.push({ kind, sha, heading, tables: [], items: [], paras: [], prose: [] });
   open(null, undefined, '(top of comment)');
   const cur = () => out.at(-1);
-  const outside = (t, what, test = reservedText) => {
-    if (!cur().kind && test(t)) {
-      errors.push(`"${t}" is ${what} that reads as a review outside a review section (expected "## Review of <sha>")`);
+  // A block's text is tested whole and line by line (lines split at <br> or a newline),
+  // so a lead-in line cannot hide a reserved start.
+  const outside = (rawText, what, test = reservedText) => {
+    if (cur().kind) return;
+    const whole = normalize(rawText);
+    const hit = [whole, ...rawText.split('\n').map(normalize)].find((t) => t && test(t));
+    if (hit !== undefined) {
+      errors.push(`"${hit}" is ${what} that reads as a review outside a review section (expected "## Review of <sha>")`);
     }
   };
   const headingLike = (t, what) => {
@@ -130,9 +154,29 @@ function sections(root, errors) {
       outside(t, what, reserved);
     }
   };
-  // inText: inside a paragraph, list item, summary or code, whose text is already read.
+  // A run of bare text and inline elements outside any text block.
+  const textRun = (nodes, parent) => {
+    const r = nodes.map((n) => raw(n)).join('');
+    if (!normalize(r)) return;
+    outside(r, parent === root ? 'text at the top level' : `text in <${parent.localName}>`);
+    cur().paras.push(normalize(r));
+    cur().prose.push(normalize(nodes.map((n) => raw(n, false)).join('')));
+  };
+  // inText: inside a paragraph, list item, summary, heading or code, whose text is already read.
   const walk = (el, inText) => {
-    for (const child of el.children) {
+    let run = [];
+    const flush = () => {
+      if (!inText && run.length) textRun(run, el);
+      run = [];
+    };
+    for (const child of el.childNodes) {
+      if (inline(child)) {
+        run.push(child);
+        if (child.nodeType === 1) walk(child, true);
+        continue;
+      }
+      flush();
+      if (child.nodeType !== 1) continue;
       const name = child.localName;
       const level = /^h[1-6]$/.test(name) ? Number(name[1]) : 0;
       if (level === 2) {
@@ -152,34 +196,32 @@ function sections(root, errors) {
       } else if (name === 'table') {
         cur().tables.push(table(child, `"${cur().heading}"`, errors));
         for (const cell of child.querySelectorAll('td, th')) {
-          if (cell.closest('table') === child) outside(text(cell), 'a table cell');
+          if (cell.closest('table') === child && !LABEL.test(text(cell))) outside(raw(cell), 'a table cell');
         }
       } else {
         let nowInText = inText;
         if (name === 'li') {
           cur().items.push(text(child));
-          outside(text(child), 'a list item');
+          outside(raw(child), 'a list item');
           nowInText = true;
         } else if (name === 'p') {
           const bold = boldLine(child);
           if (bold) headingLike(bold, 'a bold line');
-          else outside(text(child), 'a paragraph');
+          else outside(raw(child), 'a paragraph');
           cur().paras.push(text(child));
           cur().prose.push(proseText(child));
           nowInText = true;
         } else if (name === 'summary') {
-          outside(text(child), 'a summary');
+          outside(raw(child), 'a summary');
           cur().prose.push(proseText(child));
           nowInText = true;
-        } else if (name === 'pre' || name === 'code') {
+        } else if (name === 'pre') {
           nowInText = true;
-        } else if (!inText && ownText(child)) {
-          outside(ownText(child), `text in <${name}>`);
-          cur().prose.push(ownText(child));
         }
         walk(child, nowInText);
       }
     }
+    flush();
   };
   walk(root, false);
   errors.splice(0, errors.length, ...new Set(errors));
@@ -209,7 +251,8 @@ export function parseComment(html) {
     const where = `"${heading}"`;
     if (!kind) {
       for (const t of tables) {
-        if (t.header.includes('#') && t.header.some((h) => FINDING_COLS.includes(h))) {
+        // A "#" column or a Finding/Issue/Problem column: it may hold the open finding.
+        if (t.header.includes('#') || t.header.some((h) => FINDING_COLS.includes(h))) {
           errors.push(`${where}: a findings table outside a review section (${t.header.join(' | ')})`);
         }
       }

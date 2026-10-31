@@ -456,6 +456,76 @@ test('G4: each dispositions comment is returned and printed with its author', as
   assert.match(out.lines.join('\n'), /DISPOSITIONS for 2222222 by mallory: c1/);
 });
 
+// --- re-review of da420b8 (H1-H3): every text node read, normalised, reserved starts ----
+
+test('H1: text directly under the comment root is read: a review there is inconclusive, not PASS', () => {
+  const r = decide('clean', 'h1-root-outside');
+  assert.match(errs(r), /"Re-review of abc1234: NOT CLEAN[^"]*" is text at the top level that reads as a review/);
+  assert.equal(r.exit, 2);
+});
+
+test('H1: a finding row left as top-level text inside a review is inconclusive, not PASS', () => {
+  const r = decide('h1-root-review');
+  assert.match(errs(r), /abc1234.*table row outside a table.*2 \| high \| rootrow/);
+  assert.equal(r.exit, 2);
+});
+
+test('H1: each run of text between blocks in a mixed element is its own block', () => {
+  const r = decide('clean', 'h1-mixed');
+  assert.match(errs(r), /"Re-review found problems:" is text in <div> that reads as a review/);
+  assert.equal(r.exit, 2);
+});
+
+test('H2: a zero-width space inside NOT CLEAN in a paragraph is still NOT CLEAN', () => {
+  const r = decide('clean', 'h2-zero-width-paragraph');
+  assert.match(errs(r), /"Verdict: NOT CLEAN" is a paragraph that reads as a review/);
+  assert.equal(r.exit, 2);
+});
+
+test('H2: a zero-width space inside NOT CLEAN in a review heading is still NOT CLEAN', () => {
+  const r = decide('h2-zero-width-heading');
+  assert.match(errs(r), /"## Review of abc1234: NOT CLEAN".*"No findings\." must stand alone/);
+  assert.equal(r.exit, 2);
+});
+
+test('H2: soft hyphen, word joiner, bidi mark and no-break space are normalised away', () => {
+  const r = decide('clean', 'h2-format-chars');
+  assert.match(errs(r), /"Status: NOT CLEAN" is a paragraph that reads as a review/);
+  assert.equal(r.exit, 2);
+});
+
+test('H3: "Re-review found problems:" as a paragraph is inconclusive, and so is its Problem table', () => {
+  const r = decide('clean', 'h3-re-review-table');
+  assert.match(errs(r), /"Re-review found problems:" is a paragraph that reads as a review/);
+  assert.match(errs(r), /a findings table outside a review section \(item \| problem\)/);
+  assert.equal(r.exit, 2);
+});
+
+test('H3: "Re-review of the latest push" with a list is inconclusive', () => {
+  const r = decide('clean', 'h3-re-review-list');
+  assert.match(errs(r), /"Re-review of the latest push" is a paragraph that reads as a review/);
+  assert.equal(r.exit, 2);
+});
+
+test('H3: "Reviewers found problems in <sha>:" with a numbered list is inconclusive', () => {
+  const r = decide('clean', 'h3-reviewers-list');
+  assert.match(errs(r), /"Reviewers found problems in abc1234:" is a paragraph that reads as a review/);
+  assert.equal(r.exit, 2);
+});
+
+test('H3: a table outside a section with a "#" column, or with an Issue column, is inconclusive', () => {
+  const r = decide('clean', 'h3-tables');
+  assert.match(errs(r), /a findings table outside a review section \(# \| note\)/);
+  assert.match(errs(r), /a findings table outside a review section \(item \| issue\)/);
+  assert.equal(r.exit, 2);
+});
+
+test('H3: a "Disposition" header cell and "Reviews: ..." audit lines stay PASS', () => {
+  const r = decide('clean', 'h3-must-pass');
+  assert.deepEqual(r.errors, []);
+  assert.equal(r.exit, 0);
+});
+
 // --- the gh layer -----------------------------------------------------------------
 
 // A fake `gh`: pages are returned whole only under --paginate --slurp, as gh does;
