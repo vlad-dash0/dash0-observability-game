@@ -142,6 +142,51 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 }
 .sort-placed li::before { content: "\2713 "; content: "\2713 " / ""; color: var(--color-success); }
 
+/* ---------- Build it (lib/widgets/build-it-view.mjs) ---------- */
+/* The SVG waterfall is decorative (the <ol> is its text alternative), sized by its viewBox
+   and coloured here, never by a style attribute (CSP). Kind is also in the row text, so
+   colour is never the only cue; the selected bar gets an outline. Rows, panel buttons and
+   problems quote span names, so they wrap anywhere like the Sort it labels. */
+.waterfall { display: block; width: 100%; height: auto; margin: 4px 0 10px; }
+.wf-bar { fill: var(--color-text-muted); }
+.wf-bar.kind-server { fill: var(--color-accent); }
+.wf-bar.kind-client { fill: var(--color-primary); }
+.wf-bar.kind-producer, .wf-bar.kind-consumer { fill: var(--color-success); }
+.wf-bar.error { fill: var(--color-error); }
+.wf-bar.selected { stroke: var(--color-text); stroke-width: 2px; vector-effect: non-scaling-stroke; }
+.build-rows { list-style: none; display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; }
+.build-rows li[data-depth="1"] { padding-left: 14px; }
+.build-rows li[data-depth="2"] { padding-left: 28px; }
+.build-rows li[data-depth="3"] { padding-left: 42px; }
+.build-rows li[data-depth="4"] { padding-left: 56px; }
+.build-rows li[data-depth="5"] { padding-left: 70px; }
+.build-span {
+  width: 100%; text-align: left; border: 1.5px solid var(--color-border); background: var(--color-surface);
+  color: var(--color-text); border-radius: var(--radius-sm); padding: 8px 11.5px; font-family: inherit;
+  font-size: 13.5px; font-weight: 600; cursor: pointer; max-width: 100%; overflow-wrap: anywhere;
+}
+.build-span:hover { border-color: var(--color-accent); }
+/* Selected: a thicker text-coloured border (not colour alone), from the padding. */
+.build-span[aria-pressed="true"] { border: 3px solid var(--color-text); background: var(--color-surface-2); padding: 6.5px 10px; }
+.build-panel {
+  background: var(--color-surface); border: 1.5px dashed var(--color-border);
+  border-radius: var(--radius); padding: 10px; margin-bottom: 10px;
+}
+.build-pick, .build-editing, .build-group-title { color: var(--color-text-muted); font-size: 13.5px; font-weight: 600; }
+.build-editing { overflow-wrap: anywhere; }
+.build-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.build-group-title { width: 100%; }
+.build-opt {
+  border: 1.5px solid var(--color-border); background: var(--color-surface-2); color: var(--color-text);
+  border-radius: var(--radius-sm); padding: 7px 10.5px; font-family: inherit; font-size: 13.5px; font-weight: 600;
+  cursor: pointer; max-width: 100%; overflow-wrap: anywhere;
+}
+.build-opt:hover:not(:disabled) { border-color: var(--color-accent); }
+.build-opt[aria-pressed="true"] { border: 3px solid var(--color-text); padding: 5.5px 9px; }
+.build-opt:disabled { opacity: .4; cursor: not-allowed; }
+.build-issues { margin: 8px 0 0 18px; }
+.build-issues li { max-width: 100%; overflow-wrap: anywhere; }
+
 /* ---------- Config editor (level 1.2) ---------- */
 .env-label { display: block; font-weight: 700; font-size: 14px; margin-bottom: 6px; }
 .env-editor {
