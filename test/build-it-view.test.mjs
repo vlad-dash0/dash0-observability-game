@@ -195,6 +195,25 @@ test('a failing Check costs one mistake and lists the problems; an identical rec
   assert.equal(counts.done, 0);
 });
 
+test('a recheck with the same links in another order is free', () => {
+  const spec = b1Spec();
+  spec.edit = ['links'];
+  spec.answer = { [E]: { links: [A] } };
+  const { counts, mount } = setup(spec);
+  mount();
+  click(`[data-span="${E}"]`);
+  click(`[data-link="${B}"]`);
+  click(`[data-link="${C}"]`);
+  click('#b1-check');
+  assert.equal(counts.mistakes, 1);
+  assert.equal(q('#b1-feedback').firstChild.textContent, 'Not yet: 3 problems.');
+  click(`[data-link="${B}"]`);
+  click(`[data-link="${B}"]`);
+  click('#b1-check');
+  assert.equal(counts.mistakes, 1, 'links {B, C} added as C then B are the same graded state');
+  assert.equal(q('#b1-feedback').firstChild.textContent, 'Same as last time: 3 problems.');
+});
+
 test('a passing Check calls onComplete once, focuses its return and locks the controls', () => {
   const { focus, counts, mount } = setup();
   mount();

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {
   applyState,
   checkBuild,
+  gradedKey,
   newBuildState,
   setKind,
   setParent,
@@ -95,6 +96,30 @@ test('validateBuildSpec: an answer must name known spans, editable fields and va
   assert.equal(has(problems, 'answer: unknown span "ffffffffffffffff"'), true);
   assert.equal(has(problems, `answer ${B}: parentId "0123456789abcdef" is not a span`), true);
   assert.equal(has(problems, `answer ${B}: kind is not editable`), true);
+});
+
+test('validateBuildSpec: a given link must be a known span other than itself, listed once', () => {
+  const spec = b1Spec();
+  spec.spans[1].links = ['ffffffffffffffff'];
+  spec.spans[2].links = [C];
+  spec.spans[3].links = [A, A];
+  assert.deepEqual(validateBuildSpec(spec), [
+    'span 1: link "ffffffffffffffff" is not a span',
+    'span 2: links to itself',
+    `span 3: duplicate link "${A}"`,
+  ]);
+});
+
+test('validateBuildSpec: an answer link must be a known span other than itself, listed once', () => {
+  const spec = b1Spec();
+  spec.edit = ['parent', 'links'];
+  spec.answer = { [A]: { links: ['ffffffffffffffff'] }, [B]: { links: [B] }, [C]: { links: [A, A] }, [D]: { links: 'x' } };
+  assert.deepEqual(validateBuildSpec(spec), [
+    `answer ${A}: link "ffffffffffffffff" is not a span`,
+    `answer ${B}: links to itself`,
+    `answer ${C}: duplicate link "${A}"`,
+    `answer ${D}: links is not a list of span ids`,
+  ]);
 });
 
 test('validateBuildSpec refuses an answer that makes a loop', () => {
@@ -235,6 +260,27 @@ test('checkBuild: wrong-kind, wrong-status, missing-link and extra-link', () => 
     'GET /products (storefront): a link is missing.',
     'GET /products (storefront): links POST api-gateway (storefront), which it should not.',
   ]);
+});
+
+test('gradedKey: links are a set, so the order they were added in does not matter', () => {
+  const spec = allSpec();
+  const one = newBuildState(spec);
+  toggleLink(spec, one, E, B);
+  toggleLink(spec, one, E, C);
+  const two = newBuildState(spec);
+  toggleLink(spec, two, E, C);
+  toggleLink(spec, two, E, B);
+  assert.equal(gradedKey(spec, one), gradedKey(spec, two));
+  assert.deepEqual(codes(checkBuild(spec, one)), codes(checkBuild(spec, two)));
+  toggleLink(spec, two, E, B);
+  assert.notEqual(gradedKey(spec, one), gradedKey(spec, two), 'a different set is a different key');
+  const three = newBuildState(spec);
+  toggleLink(spec, three, E, B);
+  toggleLink(spec, three, E, C);
+  setKind(spec, three, A, 'CLIENT');
+  assert.notEqual(gradedKey(spec, one), gradedKey(spec, three), 'a graded field changed');
+  spec.edit = ['parent', 'status', 'links'];
+  assert.equal(gradedKey(spec, one), gradedKey(spec, three), 'an ungraded field is not in the key');
 });
 
 test('checkBuild grades only the edit fields', () => {
