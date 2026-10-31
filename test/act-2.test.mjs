@@ -1,0 +1,415 @@
+// Act 2 levels 2.1 and 2.2 beyond the play-through: the answer tables pinned to
+// docs/M1-DESIGN.md §6, reference solvability through the widgets' own checkers (I7),
+// one penalty per run from a clean start, outcomes stated in words, the "Map edges"
+// line from serviceEdges, and a focus walk that ends on Finish. Spec: docs/M1-DESIGN.md
+// §6 Act 2 and §7 P6. The happy and sloppy runs live in test/levels-play.test.mjs.
+// Asserts strings, numbers and booleans only.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { makeDom, q, qa, click } from './helpers/dom.mjs';
+import { recordFocus } from './helpers/focus.mjs';
+import { createLevelContext } from '../lib/level-context.mjs';
+import { checkBuild, newBuildState, setKind, setParent, toggleLink, validateBuildSpec } from '../lib/widgets/build-it.mjs';
+import { serviceEdges } from '../lib/widgets/trace.mjs';
+import { liveRegistry } from '../app.mjs';
+import { DECK } from '../cards/deck.mjs';
+import sat, { CONTENT as SAT } from '../levels/spans-and-traces.mjs';
+import kinds, { CONTENT as KINDS } from '../levels/span-kinds.mjs';
+import { b1Spec } from './fixtures/build-b1.mjs';
+
+const LIVE = liveRegistry();
+const plain = (html) => html.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&gt;/g, '>');
+const read = (rel) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
+
+// ---- content pin: docs/M1-DESIGN.md §6 Act 2 ---------------------------------------
+
+const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
+
+// Per level: its fields, and per step (play order) either the choice's keys, its right
+// key and words its labels carry, or the Build spec's edit and its spans. A span is
+// `service name` -> [kind, startMs, endMs, trace, given parent, expected parent,
+// expected kind, expected links]; parents and links are named the same way, a trace
+// by its first four hex digits.
+const PIN = {
+  'spans-and-traces': {
+    prefix: 'sat',
+    level: { no: '2.1', mechanics: ['build'], cards: ['no-trace-object'], lights: ['storefront', 'api-gateway'], scoring: { parMs: null } },
+    steps: [
+      {
+        choice: 'sat',
+        question: 'What makes these spans one trace?',
+        keys: ['trace-id', 'trace-object'],
+        right: 'trace-id',
+        says: { 'trace-id': 'trace ID', 'trace-object': 'The SDK sends a trace object at the end' },
+      },
+      {
+        build: 'sat-tree',
+        edit: ['parent'],
+        spans: {
+          'storefront POST /checkout': ['SERVER', 0, 100, '4bf9', null, null, 'SERVER', []],
+          'storefront POST api-gateway': ['CLIENT', 10, 90, '4bf9', null, 'storefront POST /checkout', 'CLIENT', []],
+          'api-gateway POST /checkout': ['SERVER', 15, 85, '4bf9', null, 'storefront POST api-gateway', 'SERVER', []],
+          'api-gateway validate cart': ['INTERNAL', 20, 30, '4bf9', null, 'api-gateway POST /checkout', 'INTERNAL', []],
+          'storefront GET /products': ['SERVER', 40, 60, '0af7', null, null, 'SERVER', []],
+        },
+      },
+      {
+        choice: 'sat-e',
+        keys: ['late-child', 'lost-parent', 'other-request'],
+        right: 'other-request',
+        says: { 'other-request': 'another request' },
+      },
+    ],
+  },
+  'span-kinds': {
+    prefix: 'kinds',
+    level: { no: '2.2', mechanics: ['build'], cards: ['span-kind-edges'], lights: ['payments'], scoring: { parMs: null } },
+    steps: [
+      {
+        build: 'kinds-map',
+        edit: ['kind'],
+        spans: {
+          'checkout POST /checkout': ['INTERNAL', 0, 120, 'c4e1', null, null, 'SERVER', []],
+          'checkout POST payments': ['INTERNAL', 20, 100, 'c4e1', 'checkout POST /checkout', 'checkout POST /checkout', 'CLIENT', []],
+          'payments POST /charge': ['INTERNAL', 25, 95, 'c4e1', 'checkout POST payments', 'checkout POST payments', 'SERVER', []],
+          'payments POST provider/charges': ['INTERNAL', 30, 90, 'c4e1', 'payments POST /charge', 'payments POST /charge', 'CLIENT', []],
+          'checkout compute totals': ['INTERNAL', 5, 15, 'c4e1', 'checkout POST /checkout', 'checkout POST /checkout', 'INTERNAL', []],
+          'orders orders publish': ['INTERNAL', 130, 135, 'a1b2', null, null, 'PRODUCER', []],
+          'shipping orders process': ['INTERNAL', 150, 170, '7d3e', null, null, 'CONSUMER', ['orders orders publish']],
+        },
+      },
+      {
+        choice: 'kinds',
+        keys: ['loses-edge', 'nothing', 'provider'],
+        right: 'loses-edge',
+        says: { 'loses-edge': 'checkout → payments' },
+      },
+    ],
+  },
+};
+
+const LEVELS = { 'spans-and-traces': [sat, SAT], 'span-kinds': [kinds, KINDS] };
+
+// The card fronts in docs/M1-DESIGN.md §6.
+const FRONTS = {
+  'no-trace-object': 'There is no trace object: a trace is just the spans that share a trace ID, each exported on its own.',
+  'span-kind-edges': 'Span kind is not cosmetic: service maps draw edges from CLIENT to SERVER and PRODUCER to CONSUMER pairs.',
+};
+
+const nameOf = (spans, id) => {
+  const s = spans.find((x) => x.spanId === id);
+  return s ? `${s.service} ${s.name}` : null;
+};
+
+/** The reference answer applied to the spec's spans (fresh copies). */
+function answered(spec) {
+  return spec.spans.map((s) => ({ ...s, links: [...s.links], ...spec.answer[s.spanId] }));
+}
+
+/** A step of CONTENT as the pin's plain shape (strings, numbers, booleans only). */
+function shape(step) {
+  if (step.build) {
+    const spec = step.build;
+    const want = answered(spec);
+    const spans = Object.fromEntries(
+      spec.spans.map((s, i) => {
+        const w = want[i];
+        return [
+          `${s.service} ${s.name}`,
+          [s.kind, s.startMs, s.endMs, s.traceId.slice(0, 4), nameOf(spec.spans, s.parentId), nameOf(spec.spans, w.parentId), w.kind, w.links.map((l) => nameOf(spec.spans, l))],
+        ];
+      }),
+    );
+    return { build: spec.id, edit: spec.edit, spans };
+  }
+  return {
+    choice: step.id,
+    keys: step.choices.map((c) => c.key).sort(),
+    right: step.choices.filter((c) => c.right).map((c) => c.key).join(','),
+    says: Object.fromEntries(step.choices.map((c) => [c.key, plain(c.label)])),
+    question: step.question,
+  };
+}
+
+for (const [id, [level, content]] of Object.entries(LEVELS)) {
+  test(`${id}: answer tables match docs/M1-DESIGN.md §6`, () => {
+    const pin = PIN[id];
+    assert.equal(content.steps.length, pin.steps.length, 'step count');
+    content.steps.forEach((step, i) => {
+      const got = shape(step);
+      const want = pin.steps[i];
+      if (want.build) {
+        assert.deepEqual(got, { build: want.build, edit: want.edit, spans: want.spans }, `step ${i + 1} build`);
+        return;
+      }
+      assert.deepEqual({ choice: got.choice, keys: got.keys, right: got.right }, { choice: want.choice, keys: want.keys, right: want.right }, `step ${i + 1} choice`);
+      if (want.question) assert.equal(got.question, want.question, `step ${i + 1} question`);
+      for (const [key, words] of Object.entries(want.says)) {
+        assert.equal(got.says[key].includes(words), true, `${key} label "${got.says[key]}" says "${words}"`);
+      }
+    });
+  });
+
+  test(`${id}: level fields (Act 2, scoring.parMs null, lights)`, () => {
+    const p = PIN[id].level;
+    assert.deepEqual(
+      { no: level.no, mechanics: level.mechanics, cards: level.cards, lights: level.lights, scoring: level.scoring },
+      p,
+    );
+    const built = LIVE.levels[id];
+    assert.equal(built.actId, 'act-2');
+    assert.equal(built.scored, true);
+    assert.equal(built.scoring.parMs, null);
+  });
+
+  test(`${id}: the reference answers pass the widgets' own checkers (I7)`, () => {
+    for (const step of content.steps) {
+      if (step.build) {
+        const spec = step.build;
+        assert.deepEqual(validateBuildSpec(spec), [], `${spec.id} is a valid BuildSpec`);
+        assert.equal(checkBuild(spec, newBuildState(spec)).ok, false, `${spec.id}: the given state is not already right`);
+        const st = newBuildState(spec);
+        const outcomes = [];
+        for (const [sid, want] of Object.entries(spec.answer)) {
+          if (Object.hasOwn(want, 'parentId')) outcomes.push(setParent(spec, st, sid, want.parentId));
+          if (Object.hasOwn(want, 'kind')) outcomes.push(setKind(spec, st, sid, want.kind));
+          for (const l of want.links ?? []) if (!st.spans[sid].links.includes(l)) outcomes.push(toggleLink(spec, st, sid, l) === 'linked' ? 'set' : 'unlinked');
+        }
+        assert.deepEqual([...new Set(outcomes)], ['set'], `${spec.id}: every reference edit is accepted`);
+        assert.deepEqual(checkBuild(spec, st), { ok: true, issues: [] }, `${spec.id}: the reference passes checkBuild`);
+      } else {
+        assert.equal(step.choices.filter((c) => c.right).length, 1, `${step.id}: exactly one right`);
+        for (const c of step.choices) {
+          assert.equal(typeof c.why === 'string' && c.why.length > 0, true, `${step.id}/${c.key} has a why`);
+        }
+      }
+    }
+  });
+}
+
+test('spans-and-traces: the trace is 4bf9..., and the overlapping span sits in another trace', () => {
+  const spec = SAT.steps[1].build;
+  const ids = spec.spans.map((s) => s.traceId);
+  assert.equal(ids.slice(0, 4).every((t) => t === TRACE), true);
+  assert.equal(ids[4].startsWith('0af7'), true);
+  // Parenting the other trace's span under api-gateway's POST /checkout is a cross-trace parent.
+  const [, , c, , e] = spec.spans.map((s) => s.spanId);
+  const st = newBuildState(spec);
+  setParent(spec, st, e, c);
+  assert.deepEqual(checkBuild(spec, st).issues.filter((i) => i.spanId === e).map((i) => i.code), ['cross-trace-parent']);
+});
+
+test('fixture B1 (test/fixtures/build-b1.mjs) is level 2.1\'s trace: same spans, same answer', () => {
+  const spec = SAT.steps[1].build;
+  const b1 = b1Spec();
+  assert.equal(JSON.stringify(b1.spans), JSON.stringify(spec.spans));
+  assert.equal(JSON.stringify(b1.answer), JSON.stringify(spec.answer));
+  assert.equal(JSON.stringify(b1.edit), JSON.stringify(spec.edit));
+});
+
+test('span-kinds: the map edges come from serviceEdges, and /charge as INTERNAL loses checkout → payments', () => {
+  const spec = KINDS.steps[0].build;
+  const edges = (spans) => serviceEdges(spans).map((x) => `${x.from}>${x.to}:${x.via}`);
+  assert.deepEqual(edges(spec.spans), [], 'all INTERNAL: no edges');
+  const right = answered(spec);
+  assert.deepEqual(edges(right), ['checkout>payments:client-server', 'orders>shipping:producer-consumer']);
+  const charge = right.map((s) => (s.name === 'POST /charge' ? { ...s, kind: 'INTERNAL' } : s));
+  assert.deepEqual(edges(charge), ['orders>shipping:producer-consumer']);
+});
+
+test('Act 2 card fronts match docs/M1-DESIGN.md §6 and fit a card (<=140)', () => {
+  for (const [id, front] of Object.entries(FRONTS)) {
+    const card = DECK.find((c) => c.id === id);
+    assert.equal(card?.front, front, id);
+    assert.equal(front.length <= 140, true, `${id} front is ${front.length} characters`);
+    assert.equal(card.specUrl.startsWith('https://opentelemetry.io/'), true, `${id} specUrl`);
+  }
+});
+
+test('span-kinds copy says "backends derive", never "the spec says"', () => {
+  const text = read('levels/span-kinds.mjs') + JSON.stringify(DECK.find((c) => c.id === 'span-kind-edges'));
+  assert.equal(/backends derive/i.test(text), true);
+  for (const f of ['levels/spans-and-traces.mjs', 'levels/span-kinds.mjs']) {
+    assert.equal(/the spec says/i.test(read(f)), false, f);
+  }
+});
+
+// ---- play: one penalty per run, words, focus ------------------------------------
+
+/** Start `id` with the real ctx and the registry's level; returns { finished, focus }. */
+function start(id) {
+  const dom = makeDom();
+  const focus = recordFocus(dom.window);
+  const finished = [];
+  const ctx = createLevelContext({
+    level: LIVE.levels[id],
+    ovBody: dom.body,
+    ovActions: dom.actions,
+    now: () => 0,
+    shuffle: (a) => a,
+    reduceMotion: true,
+    onFinish: (_id, r) => finished.push(r),
+    signal: new AbortController().signal,
+  });
+  LIVE.levels[id].run(ctx);
+  return { finished, focus };
+}
+
+/** The Build spec of `id`'s step `i`, and its span ids by `service name`. */
+function buildOf(id, i) {
+  const spec = LEVELS[id][1].steps[i].build;
+  const ids = Object.fromEntries(spec.spans.map((s) => [`${s.service} ${s.name}`, s.spanId]));
+  return { spec, ids };
+}
+
+/** Make the pinned edits of build step `i` in the DOM (parents, kinds, links), then Check. */
+function solveBuild(id, i) {
+  const pin = PIN[id].steps[i];
+  const { ids } = buildOf(id, i);
+  for (const [name, [kind, , , , given, parent, wantKind, links]] of Object.entries(pin.spans)) {
+    const edits = [];
+    if (pin.edit.includes('parent') && parent !== given) edits.push(`[data-parent="${parent === null ? 'none' : ids[parent]}"]`);
+    if (pin.edit.includes('kind') && wantKind !== kind) edits.push(`[data-kind="${wantKind}"]`);
+    if (pin.edit.includes('links')) for (const l of links) edits.push(`[data-link="${ids[l]}"]`);
+    if (edits.length === 0) continue;
+    click(`[data-span="${ids[name]}"]`);
+    for (const sel of edits) click(sel);
+  }
+  click(`#${pin.build}-check`);
+}
+
+/**
+ * Play `id` through from a clean start; `slips[i]` (a function) runs at the start of
+ * step i, before the right answers. Returns the stars earned.
+ */
+function runWith(id, slips = {}) {
+  const { finished } = start(id);
+  const { prefix, steps } = PIN[id];
+  steps.forEach((step, i) => {
+    slips[i]?.();
+    if (step.build) solveBuild(id, i);
+    else click(`[data-pick="${step.right}"]`);
+    click(i === steps.length - 1 ? '[data-finish]' : `#${prefix}-next`);
+  });
+  assert.equal(finished.length, 1, 'finished once');
+  return finished[0];
+}
+
+const SAT_IDS = () => buildOf('spans-and-traces', 1).ids;
+
+const SLIPS = {
+  'spans-and-traces': {
+    'a wrong pick in the first question': { 0: () => click('[data-pick="trace-object"]') },
+    'a failed check (every span left a root)': { 1: () => click('#sat-tree-check') },
+    'a failed check (a cross-trace parent), then undone': {
+      1: () => {
+        const ids = SAT_IDS();
+        click(`[data-span="${ids['storefront GET /products']}"]`);
+        click(`[data-parent="${ids['api-gateway POST /checkout']}"]`);
+        click('#sat-tree-check');
+        click('[data-parent="none"]');
+      },
+    },
+    'a wrong pick in the last question': { 2: () => click('[data-pick="lost-parent"]') },
+  },
+  'span-kinds': {
+    'a failed check (every span left INTERNAL)': { 0: () => click('#kinds-map-check') },
+    'a wrong pick in the question': { 1: () => click('[data-pick="nothing"]') },
+  },
+};
+
+for (const [id, slips] of Object.entries(SLIPS)) {
+  test(`${id}: a clean run earns 3 stars and its card, and each penalty alone costs one`, () => {
+    const clean = runWith(id);
+    assert.equal(clean.stars, 3, 'a clean run');
+    assert.deepEqual(clean.cards, PIN[id].level.cards);
+    for (const [name, slip] of Object.entries(slips)) {
+      assert.equal(runWith(id, slip).stars, 2, name);
+    }
+  });
+}
+
+test('spans-and-traces: an identical failed recheck is free (one slip, 2 stars)', () => {
+  const slip = {
+    1: () => {
+      click('#sat-tree-check');
+      click('#sat-tree-check');
+    },
+  };
+  assert.equal(runWith('spans-and-traces', slip).stars, 2);
+});
+
+test('every Act 2 step waits for its answer and states each outcome in words', () => {
+  for (const id of Object.keys(PIN)) {
+    start(id);
+    const { prefix, steps } = PIN[id];
+    steps.forEach((step, i) => {
+      const last = i === steps.length - 1;
+      const gate = () => q(last ? '[data-finish]' : `#${prefix}-next`).disabled;
+      assert.equal(gate(), true, `${id} step ${i + 1}: gated before the answer`);
+      if (step.build) {
+        const fb = () => q(`#${step.build}-feedback`).textContent;
+        click(`#${step.build}-check`);
+        assert.match(fb(), /^Not yet: \d+ problems?\./, `${id}: a failed check says so`);
+        assert.equal(gate(), true);
+        solveBuild(id, i);
+        assert.equal(fb(), 'Right. Every span checks out.', `${id}: a passing check says so`);
+      } else {
+        const fb = () => q(`#${step.choice}-feedback`).textContent;
+        const wrong = step.keys.find((k) => k !== step.right);
+        click(`[data-pick="${wrong}"]`);
+        assert.match(fb(), /^Not quite\. /, `${id}: a wrong pick says so`);
+        assert.equal(gate(), true);
+        click(`[data-pick="${step.right}"]`);
+        assert.match(fb(), /^Right\. /, `${id}: the right pick says so`);
+      }
+      assert.equal(gate(), false, `${id} step ${i + 1}: open after the answer`);
+      if (!last) click(`#${prefix}-next`);
+    });
+  }
+});
+
+test('spans-and-traces: the cross-trace parent is named in words', () => {
+  start('spans-and-traces');
+  click('[data-pick="trace-id"]');
+  click('#sat-next');
+  const ids = SAT_IDS();
+  click(`[data-span="${ids['storefront GET /products']}"]`);
+  click(`[data-parent="${ids['api-gateway POST /checkout']}"]`);
+  click('#sat-tree-check');
+  assert.equal(q('#sat-tree-feedback').textContent.includes('GET /products (storefront): its parent is in another trace.'), true);
+});
+
+test('span-kinds: the "Map edges" line is a status region, from serviceEdges before and after', () => {
+  start('span-kinds');
+  const line = () => q('#kinds-edges');
+  assert.equal(line().getAttribute('role'), 'status');
+  assert.equal(line().textContent, 'Map edges: none.');
+  solveBuild('span-kinds', 0);
+  assert.equal(line().textContent, 'Map edges: checkout → payments, orders → shipping.');
+});
+
+test('focus walk: each step starts on its first control, moves on, and ends on Finish', () => {
+  for (const id of Object.keys(PIN)) {
+    const { focus } = start(id);
+    const { prefix, steps } = PIN[id];
+    steps.forEach((step, i) => {
+      const last = i === steps.length - 1;
+      if (step.build) {
+        const firstRow = qa('[data-span]')[0].dataset.span;
+        assert.equal(focus.last(), `span:${firstRow}`, `${id} step ${i + 1} starts on its first span`);
+        solveBuild(id, i);
+      } else {
+        assert.equal(focus.last().startsWith('pick:'), true, `${id} step ${i + 1} starts on a choice`);
+        click(`[data-pick="${step.right}"]`);
+      }
+      const target = last ? `#${prefix}-finish` : `#${prefix}-next`;
+      assert.equal(focus.last(), target, `${id} step ${i + 1} hands focus to ${target}`);
+      if (!last) click(target);
+    });
+    assert.equal(q('[data-finish]').id, `${prefix}-finish`, `${id}: the walk ends on [data-finish]`);
+    assert.deepEqual(focus.unfocusable(), [], `${id}: focused only enabled, connected controls`);
+    assert.equal(focus.names().includes('body'), false);
+  }
+});
