@@ -1,8 +1,8 @@
-// Act 2 levels 2.1 to 2.6 beyond the play-through: the answer tables pinned to
+// Act 2 levels 2.1 to 2.7 beyond the play-through: the answer tables pinned to
 // docs/M1-DESIGN.md §6, reference solvability through the widgets' own checkers (I7),
 // one penalty per run from a clean start, outcomes stated in words, the "Map edges"
 // line from serviceEdges, and a focus walk that ends on Finish. Spec: docs/M1-DESIGN.md
-// §6 Act 2 and §7 P6, P7, P8. The happy and sloppy runs live in test/levels-play.test.mjs.
+// §6 Act 2 and §7 P6, P7, P8, P9. The happy and sloppy runs live in test/levels-play.test.mjs.
 // Asserts strings, numbers and booleans only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,6 +21,7 @@ import status, { CONTENT as STATUS } from '../levels/status-and-errors.mjs';
 import baggage, { CONTENT as BAGGAGE } from '../levels/baggage.mjs';
 import prop, { CONTENT as PROP } from '../levels/context-propagation.mjs';
 import evl, { CONTENT as EVL } from '../levels/events-and-links.mjs';
+import avm, { CONTENT as AVM } from '../levels/auto-vs-manual.mjs';
 import { b1Spec } from './fixtures/build-b1.mjs';
 
 const LIVE = liveRegistry();
@@ -212,6 +213,37 @@ const PIN = {
       },
     ],
   },
+  'auto-vs-manual': {
+    prefix: 'avm',
+    level: { no: '2.7', mechanics: ['sort'], cards: ['double-instrumentation'], lights: ['cart'], scoring: { parMs: null } },
+    steps: [
+      {
+        sort: 'avm-sort',
+        buckets: ['auto', 'manual'],
+        items: { server: 'auto', redis: 'auto', client: 'auto', loyalty: 'manual', coupon: 'manual', 'item-count': 'manual' },
+        says: {
+          server: ['server spans'],
+          redis: ['Redis'],
+          client: ['client spans'],
+          loyalty: ['applyLoyaltyDiscount()'],
+          coupon: ['app.coupon.code'],
+          'item-count': ['app.cart.item_count'],
+        },
+      },
+      {
+        choice: 'avm-why',
+        keys: ['collector', 'retries', 'two-setups'],
+        right: 'two-setups',
+        says: { 'two-setups': 'Two setups', retries: 'retries', collector: 'Collector' },
+      },
+      {
+        choice: 'avm-fix',
+        keys: ['dedupe', 'keep-one', 'sample'],
+        right: 'keep-one',
+        says: { 'keep-one': 'one', sample: '50%', dedupe: 'Collector' },
+      },
+    ],
+  },
 };
 
 const LEVELS = {
@@ -221,6 +253,7 @@ const LEVELS = {
   baggage: [baggage, BAGGAGE],
   'context-propagation': [prop, PROP],
   'events-and-links': [evl, EVL],
+  'auto-vs-manual': [avm, AVM],
 };
 
 // The card fronts in docs/M1-DESIGN.md §6.
@@ -232,6 +265,7 @@ const FRONTS = {
   'broken-propagation': 'When a hop drops the traceparent header, one request becomes two traces: look for unexpected root spans.',
   'exception-no-status': 'An exception record and the span status are separate fields: recording one never sets the other. Set Error when the operation fails.',
   'batch-links': 'A span has at most one parent. A consumer handling a batch from many traces links to each message\'s context.',
+  'double-instrumentation': 'Instrument the same library twice, say an injected agent plus your own SDK setup, and each call can appear twice.',
 };
 
 /** A span's pin key: `service name`, plus its trace's first four hex digits when another span shares both. */
@@ -617,6 +651,12 @@ const SLIPS = {
       },
     },
   },
+  'auto-vs-manual': {
+    'a wrong placement (the Redis spans called manual)': { 0: () => put('redis', 'manual') },
+    'a wrong placement (the loyalty span called automatic)': { 0: () => put('loyalty', 'auto') },
+    'a wrong pick in the first question (retries blamed)': { 1: () => click('[data-pick="retries"]') },
+    'a wrong pick in the fix question (sample 50%)': { 2: () => click('[data-pick="sample"]') },
+  },
 };
 
 
@@ -725,4 +765,20 @@ test('focus walk: each step starts on its first control, moves on, and ends on F
     assert.deepEqual(focus.unfocusable(), [], `${id}: focused only enabled, connected controls`);
     assert.equal(focus.names().includes('body'), false);
   }
+});
+
+test('auto-vs-manual: the card back says duplicates depend on the instrumentation, with fetch client spans as today\'s case', () => {
+  const card = DECK.find((c) => c.id === 'double-instrumentation');
+  assert.equal(/depend/i.test(card.back), true, 'duplicates depend on the instrumentation');
+  assert.equal(/fetch/i.test(card.back) && /undici/i.test(card.back), true, 'fetch/undici client spans are named');
+  assert.equal(/every (request|span)/i.test(card.back), false, 'no claim that everything doubles');
+  assert.equal(/zero-code\/js/.test(read('levels/auto-vs-manual.mjs')), true, 'the level cites the zero-code JS page');
+});
+
+test('auto-vs-manual: step 2 names the fetch CLIENT spans and both setups, not doubled requests', () => {
+  const src = read('levels/auto-vs-manual.mjs');
+  for (const w of ['fetch', 'CLIENT', 'NODE_OPTIONS', 'tracing.js', 'getNodeAutoInstrumentations()']) {
+    assert.equal(src.includes(w), true, w);
+  }
+  assert.equal(/every request twice/i.test(src), false);
 });

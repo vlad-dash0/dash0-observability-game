@@ -135,4 +135,19 @@ export const DECK = [
     specUrl: 'https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#batch-receiving',
     dash0Angle: null,
   },
+  {
+    id: 'double-instrumentation',
+    front:
+      'Instrument the same library twice, say an injected agent plus your own SDK setup, and ' +
+      'each call can appear twice.',
+    back:
+      'Whether a second setup duplicates spans depends on the instrumentation. Patch-based ' +
+      'ones, such as the http and express server spans, unwrap before they wrap again, so ' +
+      'they stay single. Instrumentations built on diagnostics_channel, such as undici and ' +
+      "Node's fetch, subscribe once per setup, so each fetch call gets two CLIENT spans " +
+      "today. Run one setup: the operator's injected agent or your own SDK, and add business " +
+      'spans and attributes with the API.',
+    specUrl: 'https://opentelemetry.io/docs/zero-code/js/',
+    dash0Angle: null,
+  },
 ];

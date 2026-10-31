@@ -288,12 +288,19 @@ https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/
 **2.7 `auto-vs-manual`**: cards `['double-instrumentation']`. Step 1 Sort `auto` / `manual`:
 HTTP server spans per route auto; Redis command spans auto; outgoing HTTP client spans auto;
 span around `applyLoyaltyDiscount()` manual; `app.coupon.code` on checkout span manual;
-`app.cart.item_count` manual. Step 2 choice: cart shows every request twice (operator-injected
+`app.cart.item_count` manual. Step 2 choice: each of cart's outgoing `fetch` calls shows two
+CLIENT spans (operator-injected
 `NODE_OPTIONS=--require @opentelemetry/auto-instrumentations-node/register` plus `tracing.js`
 NodeSDK with `getNodeAutoInstrumentations()`) → two setups. Step 3 choice fix → keep one, add
 business spans via the API (decoys: sample 50%, dedupe in Collector). Card: "Instrument the
 same library twice, say an injected agent plus your own SDK setup, and each call can appear
-twice." **Verify Node duplicate behaviour before copy.** Spec:
+twice." The card's back says duplicates depend on the instrumentation, and that fetch/undici
+client spans are the case that doubles today. Verified 2026-10-31 (P9): with
+auto-instrumentations-node 0.82 and sdk-node 0.300, an operator `--require .../register` agent
+plus a `tracing.js` NodeSDK does not duplicate http/express server spans (patch-based
+instrumentations unwrap before re-wrapping; the second SDK's global API registration fails),
+but does duplicate the diagnostics_channel-based undici/fetch CLIENT spans
+(opentelemetry-js-contrib #2229). Spec:
 https://opentelemetry.io/docs/zero-code/js/ ,
 https://opentelemetry.io/docs/platforms/kubernetes/operator/automatic/
 
