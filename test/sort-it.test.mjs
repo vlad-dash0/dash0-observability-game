@@ -58,7 +58,7 @@ test('validateSortSpec reports every problem at once, not just the first', () =>
   assert.equal(has(problems, '"Not Kebab"'), true);
   assert.equal(has(problems, 'duplicate bucket id "metric"'), true);
   assert.equal(has(problems, 'unknown bucket "span"'), true);
-  assert.equal(has(problems, 'item "i2": empty why'), true);
+  assert.equal(has(problems, 'item "i2": why is not non-empty text'), true);
   assert.equal(has(problems, 'duplicate item id "i1"'), true);
   assert.equal(problems.length, 5);
 });
@@ -112,22 +112,36 @@ test('validateSortSpec: every bucket and item needs a non-empty string label', (
   const spec = fixture();
   spec.buckets[0].label = '  ';
   delete spec.buckets[1].label;
+  spec.buckets[2].label = 7;
   spec.items[0].label = 7;
   spec.items[1].label = '';
   const problems = validateSortSpec(spec);
-  assert.equal(has(problems, 'bucket "metric": empty label'), true);
-  assert.equal(has(problems, 'bucket "log": empty label'), true);
-  assert.equal(has(problems, 'item "i1": empty label'), true);
-  assert.equal(has(problems, 'item "i2": empty label'), true);
-  assert.equal(problems.length, 4);
+  assert.equal(has(problems, 'bucket "metric": label is not non-empty text'), true);
+  assert.equal(has(problems, 'bucket "log": label is not non-empty text'), true);
+  assert.equal(has(problems, 'bucket "trace": label is not non-empty text'), true);
+  assert.equal(has(problems, 'item "i1": label is not non-empty text'), true);
+  assert.equal(has(problems, 'item "i2": label is not non-empty text'), true);
+  assert.equal(problems.length, 5);
+});
+
+test('validateSortSpec: every item needs a non-empty string why', () => {
+  const spec = fixture();
+  spec.items[0].why = 7;
+  spec.items[1].why = ' ';
+  delete spec.items[2].why;
+  const problems = validateSortSpec(spec);
+  assert.equal(has(problems, 'item "i1": why is not non-empty text'), true);
+  assert.equal(has(problems, 'item "i2": why is not non-empty text'), true);
+  assert.equal(has(problems, 'item "i3": why is not non-empty text'), true);
+  assert.equal(problems.length, 3);
 });
 
 test('validateSortSpec: every whyNot value must be a non-empty string', () => {
   const spec = fixture();
   spec.items[1].whyNot = { metric: '', trace: 3 };
   const problems = validateSortSpec(spec);
-  assert.equal(has(problems, 'item "i2": whyNot "metric" is empty'), true);
-  assert.equal(has(problems, 'item "i2": whyNot "trace" is empty'), true);
+  assert.equal(has(problems, 'item "i2": whyNot "metric" is not non-empty text'), true);
+  assert.equal(has(problems, 'item "i2": whyNot "trace" is not non-empty text'), true);
   assert.equal(problems.length, 2);
 });
 

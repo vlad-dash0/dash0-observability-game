@@ -316,7 +316,7 @@ test('an invalid spec is a TypeError naming the id and its problems, and nothing
   assert.throws(() => mount(), (err) => err instanceof TypeError
     && err.message.startsWith('sort "signals":')
     && err.message.includes('unknown bucket "span"')
-    && err.message.includes('empty why'));
+    && err.message.includes('why is not non-empty text'));
   assert.equal(typeof q('[data-item="i1"]').onclick, 'object');
   assert.equal(counts.mistakes, 0);
   const { mount: bad } = setup(null);
@@ -344,16 +344,16 @@ test('whyNot is read for its own keys only: a "constructor" bucket never shows O
   assert.equal(feedback().includes('native code'), false);
 });
 
-test('long labels wrap: .sort-item, the bucket button and placed items cap their width and break anywhere', () => {
+test('long labels wrap: .sort-item, the bucket button and placed items cap their width; they and feedback break anywhere', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const css = readFileSync(join(root, 'styles', 'base.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, sel, body]) => ({
     sels: sel.split(',').map((s) => s.trim()),
     body: body.replace(/\s+/g, ' '),
   }));
-  for (const sel of ['.sort-item', '.sort-bucket-btn', '.sort-placed li']) {
+  for (const sel of ['.sort-item', '.sort-bucket-btn', '.sort-placed li', '.feedback']) {
     const body = rules.filter((r) => r.sels.includes(sel)).map((r) => r.body).join(';');
-    assert.equal(/max-width:\s*100%/.test(body), true, `${sel} max-width: 100%`);
+    if (sel !== '.feedback') assert.equal(/max-width:\s*100%/.test(body), true, `${sel} max-width: 100%`);
     assert.equal(/overflow-wrap:\s*anywhere/.test(body), true, `${sel} overflow-wrap: anywhere`);
   }
 });
