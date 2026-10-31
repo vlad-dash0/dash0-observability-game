@@ -10,12 +10,40 @@ import { liveRegistry } from '../app.mjs';
 
 const nodeIds = NODES.map((n) => n.id);
 
-const EXPECTED_ORDER = ['naming-your-service'];
+// Extended on purpose with each level PR (docs/M1-DESIGN.md §5): Act 0 (P3) plays before Act 1.
+const EXPECTED_ORDER = [
+  'monitoring-vs-observability',
+  'the-signals',
+  'why-opentelemetry',
+  'naming-your-service',
+];
 
 test('the live registry builds against the real deck and map nodes', () => {
   const reg = buildRegistry(ACTS, { deck: DECK, nodeIds });
   assert.deepEqual(reg.order, EXPECTED_ORDER);
   assert.deepEqual(liveRegistry().order, EXPECTED_ORDER, 'app.mjs builds the same registry');
+});
+
+test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), then Act 1', () => {
+  const acts = liveRegistry().acts.map((a) => ({ id: a.id, no: a.no, name: a.name, sub: a.sub, levelIds: [...a.levelIds], bossId: a.bossId }));
+  assert.deepEqual(acts, [
+    {
+      id: 'act-0',
+      no: 0,
+      name: 'Orientation',
+      sub: 'Day one',
+      levelIds: ['monitoring-vs-observability', 'the-signals', 'why-opentelemetry'],
+      bossId: null,
+    },
+    {
+      id: 'act-1',
+      no: 1,
+      name: 'Resources and identity',
+      sub: 'Who is talking?',
+      levelIds: ['naming-your-service'],
+      bossId: null,
+    },
+  ]);
 });
 
 test('map nodes: the §2.7 ids, unique, valid kinds and positions in the viewBox', () => {
