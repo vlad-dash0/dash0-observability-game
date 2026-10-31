@@ -52,7 +52,7 @@ test('a combined table carries its own dispositions', () => {
   const { reviews, errors } = parseComment(fx('combined'));
   assert.deepEqual(errors, []);
   assert.deepEqual(reviews[0].findings.map((f) => [f.id, f.disposition]),
-    [['1', 'Reworded'], ['H', 'Added'], ['-', 'Filed as #39']]);
+    [['1', 'Fixed: reworded'], ['H', 'Fixed in c39c18d'], ['-', 'Filed as #39']]);
 });
 
 test('PASS: every finding has a disposition', () => {
@@ -186,10 +186,10 @@ test('#1: a level-2 heading that names findings and a sha but no recognised form
   assert.equal(r.exit, 2);
 });
 
-test('#1: a findings table outside a review section is an error', () => {
+test('#1/L1: any table outside a recognised section is an error', () => {
   const r = decide('clean', 'table-outside');
-  assert.match(errs(r), /"\(top of comment\)": a findings table outside a review/);
-  assert.match(errs(r), /"## Extra": a findings table outside a review/);
+  assert.match(errs(r), /"\(top of comment\)": a table outside a review, dispositions or pre-merge audit section/);
+  assert.match(errs(r), /"## Extra": a table outside a review, dispositions or pre-merge audit section/);
   assert.equal(r.exit, 2);
 });
 
@@ -279,7 +279,7 @@ test('R1: GFM rows and tables without outer pipes are read, in and out of a revi
   assert.deepEqual(ids(leadless.open), ['3']);
   assert.equal(leadless.exit, 1);
   const outside = decide('base-review', 'base-dispositions', 'r1-outside');
-  assert.match(errs(outside), /"## Notes": a findings table outside a review/);
+  assert.match(errs(outside), /"## Notes": a table outside a review, dispositions or pre-merge audit section/);
   assert.equal(outside.exit, 2);
   const headless = decide('r1-headless-row', 'base-dispositions');
   assert.match(errs(headless), /row outside a table/);
@@ -319,7 +319,7 @@ test('R5: an indented code block hides what it holds; a table in a list item is 
 test('R6: each #-and-finding/findings/issue table outside a review section is an error', () => {
   const r = decide('clean', 'r6-tables-outside');
   for (const col of ['finding', 'findings', 'issue', 'issues']) {
-    assert.match(errs(r), new RegExp(`outside a review section \\(# \\| severity \\| ${col}\\)`), col);
+    assert.match(errs(r), new RegExp(`outside a review, dispositions or pre-merge audit section \\(# \\| severity \\| ${col}\\)`), col);
   }
   assert.equal(r.exit, 2);
 });
@@ -497,7 +497,7 @@ test('H2: soft hyphen, word joiner, bidi mark and no-break space are normalised 
 test('H3: "Re-review found problems:" as a paragraph is inconclusive, and so is its Problem table', () => {
   const r = decide('clean', 'h3-re-review-table');
   assert.match(errs(r), /"Re-review found problems:" is a paragraph that reads as a review/);
-  assert.match(errs(r), /a findings table outside a review section \(item \| problem\)/);
+  assert.match(errs(r), /a table outside a review, dispositions or pre-merge audit section \(item \| problem\)/);
   assert.equal(r.exit, 2);
 });
 
@@ -515,8 +515,8 @@ test('H3: "Reviewers found problems in <sha>:" with a numbered list is inconclus
 
 test('H3: a table outside a section with a "#" column, or with an Issue column, is inconclusive', () => {
   const r = decide('clean', 'h3-tables');
-  assert.match(errs(r), /a findings table outside a review section \(# \| note\)/);
-  assert.match(errs(r), /a findings table outside a review section \(item \| issue\)/);
+  assert.match(errs(r), /a table outside a review, dispositions or pre-merge audit section \(# \| note\)/);
+  assert.match(errs(r), /a table outside a review, dispositions or pre-merge audit section \(item \| issue\)/);
   assert.equal(r.exit, 2);
 });
 
@@ -615,7 +615,8 @@ test('K1: a CLEAN review whose prose says a disguised NOT CLEAN is inconclusive'
 
 test('K1: capitals glued with "_" (NOT_CLEAN) read as NOT CLEAN; lowercase prose reads as before', () => {
   const glued = decide('clean', 'k1-glued');
-  assert.deepEqual(glued.errors, ['c1: "Verdict: NOT_CLEAN" is a paragraph that reads as a review outside a review section (expected "## Review of <sha>")']);
+  assert.deepEqual(glued.errors, ['c1: "Verdict: NOT_CLEAN" is a paragraph that reads as a review outside a review section (expected "## Review of <sha>")',
+    'c1: "(top of comment)": a table outside a review, dispositions or pre-merge audit section (item | detail)']);
   assert.equal(glued.exit, 2);
   const lower = decide('clean', 'k1-lowercase-prose');
   assert.deepEqual(lower.errors, ['c1: "The old parser is not clean code." is a paragraph that reads as a review outside a review section (expected "## Review of <sha>")']);
@@ -632,10 +633,13 @@ test('K2: units and math (10µs, μs, μm, Δt, kΩ, μservice) in a review note
   assert.equal(cell.exit, 0);
 });
 
-test('K2: a reserved word spelled with an accent ("fóund") is still inconclusive', () => {
-  const r = decide('k2-disguised-word');
-  assert.deepEqual(r.errors, [`c0: ${disguise('f\u00f3und', 'found')}`]);
-  assert.equal(r.exit, 2);
+test('K2/L2: a reserved word with a Latin accent ("fóund") reads as prose; a Cyrillic lookalike ("fоund") is inconclusive', () => {
+  const latin = decide('k2-disguised-word');
+  assert.deepEqual(latin.errors, []);
+  assert.equal(latin.exit, 0);
+  const cyrillic = decide('l2-cyrillic-word');
+  assert.deepEqual(cyrillic.errors, [`c0: ${disguise('f\u043eund', 'found')}`]);
+  assert.equal(cyrillic.exit, 2);
 });
 
 test('K2: honest prose (e-mail, re-run, pre-review, review-ready, Re-reviewing, Zürich, Łódź, °, Å, ™, André, Problème) stays PASS', () => {
@@ -647,10 +651,60 @@ test('K2: honest prose (e-mail, re-run, pre-review, review-ready, Re-reviewing, 
   assert.equal(outside.exit, 0);
 });
 
-test('K3: a hyphen joining letters makes a disposition; any other non-letter after the word is a separator', () => {
+test('K3/L3: only a positive form is a disposition, so hyphenated and placeholder words stay open', () => {
   const r = decide('k3-review', 'k3-dispositions');
   assert.deepEqual(r.errors, []);
-  assert.deepEqual(ids(r.open), ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11']);
+  // H2 and H3 name a commit; "Open-source fix" and "Pending-review fix applied" name none.
+  assert.deepEqual(ids(r.open), ['H1', 'H4', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11']);
+  assert.equal(r.exit, 1);
+});
+
+// --- re-review of 43cab98 (L1-L3) ---------------------------------------------------------
+
+test('L1: a table under an unrecognised heading or paragraph is inconclusive, whatever its columns', () => {
+  for (const [name, heading] of [['l1-spaced-heading', '## Re view of abc1234: N OT CLEAN'], ['l1-digit-heading', '## R3view of abc1234: N0T CLEAN'],
+    ['l1-split-heading', '## Revie w of abc1234: NO T CLE AN']]) {
+    const r = decide('clean', name);
+    assert.ok(r.errors.includes(`c1: "${heading}": a table outside a review, dispositions or pre-merge audit section (no | severity | defect)`), `${name}: ${errs(r)}`);
+    assert.equal(r.exit, 2, name);
+  }
+  const para = decide('clean', 'l1-paragraph-table');
+  assert.deepEqual(para.errors, ['c1: "(top of comment)": a table outside a review, dispositions or pre-merge audit section (no | defect)']);
+  assert.equal(para.exit, 2);
+});
+
+test('L1: an audit section holds only a "Gate | Result" table; a table inside a table is inconclusive', () => {
+  const audit = decide('clean', 'l1-audit-other-table');
+  assert.deepEqual(audit.errors, ['c1: "## Pre-merge audit at abc1234": an audit table other than "Gate | Result" (no | defect)']);
+  assert.equal(audit.exit, 2);
+  const nested = decide('l1-nested-table');
+  assert.ok(nested.errors.includes('c0: "## Review of abc1234: NOT CLEAN": a table inside a table'), errs(nested));
+  assert.equal(nested.exit, 2);
+});
+
+test('L1: real pre-merge audits (PRs 63, 64, 67) stay PASS', () => {
+  for (const names of [['l1-real-audit-67'], ['clean', 'l1-real-audit-64'], ['clean', 'h3-must-pass']]) {
+    const r = decide(...names);
+    assert.deepEqual(r.errors, [], names.join());
+    assert.equal(r.exit, 0, names.join());
+  }
+});
+
+test('L2: Latin accents inside a word (Préviewed, problém, Réview) stay PASS; a Cyrillic letter in one does not', () => {
+  const latin = decide('l2-accented-words');
+  assert.deepEqual(latin.errors, []);
+  assert.equal(latin.exit, 0);
+  const cyrillic = decide('l2-cyrillic-part');
+  assert.deepEqual(cyrillic.errors, [`c0: ${disguise('R\u0435view', 'review')}`]);
+  assert.equal(cyrillic.exit, 2);
+});
+
+const L3_OPEN = Array.from({ length: 9 }, (_, i) => `T${i + 1}`);
+
+test('L3: a disposition must start with a verdict or name a commit or #N; every real form counts', () => {
+  const r = decide('l3-review', 'l3-dispositions');
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(ids(r.open), L3_OPEN);
   assert.equal(r.exit, 1);
 });
 

@@ -1,0 +1,6 @@
+## Review of ba3e827: CLEAN
+
+No findings.
+
+Every AC in #50 was checked against the diff, section 6 for 2.3 and 2.5, sections 1 and 7, the Q3 decision and PR #66's tests. Question 1: mechanics sort is right. Q3 builds 2.3 on Sort it, section 6 specifies a Sort, and the issue title says Sort-based, so OUTLINE's "Spot it" is only stale wording. Question 2: the section anchors are right. All four URLs return 200, the ids status, set-status and baggage-security-considerations exist, and the cited wording is present. That wording says a 4xx stays Unset on SERVER spans and is Error on CLIENT spans, a 5xx is Error, and Ok is final. Buckets, answers, labels, choice keys and card fronts match section 6 word for word. Both Sort specs validate, the drivers earn 3 and 2 stars, and each level has three single-penalty runs. The focus walk ends on data-finish, parMs is null, the lights are right, and the star pin of 24 matches eight scored levels. There are no em or en dashes. The authored copy is technically correct about HTTP span status and baggage, the decoys are wrong, and the item labels are unambiguous. 507/507 pass (heap-capped). Mutation: changing the 404 Error labels to Unset turned 2 tests red; the file was restored and the tree is clean.
+

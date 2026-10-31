@@ -52,14 +52,14 @@ findings, 2 inconclusive. Merge needs `All checks` green and the detector at 0.
    <sha>." goes under the table, or in the table). Text before the heading is outside
    any section, and a line there naming a review or dispositions is inconclusive.
    Every `#` must exist in the latest earlier review of that sha. Other columns
-   (Severity) are allowed. These cells leave the finding open (formatting such as
-   bold, code, strikethrough or a trailing period ignored): no letter or digit (empty,
-   `&nbsp;`, `-`, `—`, `?`), `TBD`, `TODO`, `open`, `N/A`, `pending`, `none`, or one of
-   those words followed by a separator and more text: after the word (and any spaces),
-   any character but a letter or digit (`TODO: later`, `TODO (later)`, `TODO, later`,
-   `TBD—later`, `TODO - later`, `TBD-`). A hyphen joining letters makes a new word, so
-   `Open-source fix` or `Todo-list item done` is a disposition, as is a word followed by
-   a space and a word (`Open question answered in #12`).
+   (Severity, Note) are allowed. A disposition counts only in a positive form
+   (allowlist; bold, code, a trailing period and the case ignored, struck-through text
+   dropped): it starts with `Fixed` (`Fixed in <sha>`, `Fixed: ...`), `Won't fix`
+   (`Wont fix`), `By design`, `False positive`, `Not a bug`, `Deferred to #N`,
+   `Documented`, `Duplicate of`, `Out of scope` or `Accepted`; or it names a commit
+   (7-40 hex digits, at least one a digit) or an issue or PR (`#12`). Anything else
+   leaves the finding open: `TODO later`, `pending review`, `none yet`, `Reworded`,
+   `Deferred to later`, `~~Fixed~~`, empty or `-`.
    If the review is edited, dispositions last written (posted or edited) before that
    edit no longer count: post or edit in a fresh one for every finding.
 
@@ -69,7 +69,26 @@ findings, 2 inconclusive. Merge needs `All checks` green and the detector at 0.
 
    | # | Severity | Finding | Disposition |
    |---|---|---|---|
-   | 1 | nit | ... | Reworded |
+   | 1 | nit | ... | Fixed: reworded |
+
+4. Pre-merge audit, read-only (it carries no findings):
+
+   ## Pre-merge audit at <sha>
+
+   | Gate | Result |
+   |---|---|
+   | CI on head | pass |
+
+   Its only table is `Gate | Result`; its text is read like text outside a section.
+
+Tables: a table counts only inside one of these four sections. Any other table in a
+comment (under another heading, at the top, after a paragraph, inside a table cell) is
+inconclusive, whatever its columns are called, because it may hold a finding the
+detector cannot read. Put notes as prose, or in an audit's `Gate | Result` table. A
+finding written only as prose outside a review section is not read (it has no id to
+disposition): post it as a review.
+The PR body is not read: only comments, review bodies and review threads. A finding or
+disposition in the body does not count, and the body may hold checklists and tables.
 
 Inline review threads count as findings; resolve a thread when it is addressed.
 
@@ -89,9 +108,12 @@ only a-z and 0-9 kept; a Latin, Greek, Cyrillic or Armenian letter that folds to
 is a one-letter wildcard). Where that skeleton spells a reserved word or phrase (review,
 clean, disposition, finding anywhere in a word; found, problem(s), issue(s), bug(s) as a
 whole word; NOT CLEAN, Re-review, Independent review starting a word; "review of" before
-a sha) and the text there has a non-ASCII letter or mark or is letter-spaced (`N O T`),
-the comment is inconclusive, wherever it is. Plain-ASCII text is read by the forms
-below, unchanged: so `10µs`, `Δt`, `kΩ`, Zürich, André reviewed, Problème, Cyrillic or
+a sha), the comment is inconclusive, wherever it is, when: for one of the phrases, the
+text there has any non-ASCII letter or mark; for a single word, it has a cross-script
+lookalike (a Cyrillic, Greek or other non-Latin letter, a Latin small capital, or a
+letter that folds to nothing), not just a Latin accent or stroke; or it is
+letter-spaced (`N O T`). Plain-ASCII text is read by the forms below, unchanged: so
+`10µs`, `Δt`, `kΩ`, Zürich, André reviewed, Problème, problém, Préviewed, Cyrillic or
 Greek words, e-mail and Re-reviewing are fine, and `NØT CLEAN`, `N̈OT CLEAN`,
 `NOT CLÉAN`, `Rеview` (Cyrillic е) are not. NOT CLEAN in plain ASCII is the two words in
 any case with whitespace between (so "not clean" in prose outside a review section is
@@ -105,8 +127,7 @@ findings), or names findings and a sha, is inconclusive. So is any other text th
 whole and line by line, with the same starts except that "Review(s)" needs a problem
 word; a table cell that is only a form name ("Disposition", "Independent review") is a
 label and is fine. "findings" in a name (pr-findings.mjs) does not count. Write the review as a level-2
-heading, or say "Reviews: <sha> CLEAN" in an audit. So is a table outside a review
-section with a `#` column or a Finding/Issue/Problem column. In a dispositions section,
+heading, or say "Reviews: <sha> CLEAN" in an audit. In a dispositions section,
 a paragraph starting with `|` (a row GitHub did not render as a table) is inconclusive.
 "## Review notes", "## Reviewer's Guide", "## Findings from QA"
 and "## Pre-merge audit at <sha>" are fine.

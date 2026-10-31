@@ -2,6 +2,6 @@
 
 | # | Disposition |
 |---|---|
-| 1 | Comments corrected |
-| 2 | Hub made inert |
-| N9 | Notices cleared on save |
+| 1 | Fixed: comments corrected |
+| 2 | Fixed: hub made inert |
+| N9 | Fixed: notices cleared on save |

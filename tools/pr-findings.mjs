@@ -4,10 +4,12 @@
 // linkedom): sections are <h2> elements and findings and dispositions are <table>
 // elements, so text in code, an HTML comment or anything else GitHub does not render as a
 // heading or table is never read as one. The comment formats are documented in
-// .github/pull_request_template.md. It fails closed: inside a review section only the
-// recognised content is allowed, and outside one any text naming a review form is an
-// error. Prints each finding that has no disposition and who posted each dispositions
-// comment; minimized (hidden) comments are skipped and listed.
+// .github/pull_request_template.md. It fails closed: a table is allowed only inside a
+// recognised section (review, dispositions, pre-merge audit), inside a review section
+// only the recognised content is allowed, outside one any text naming a review form is an
+// error, and a disposition counts only in a positive form. The PR body is not read.
+// Prints each finding that has no disposition and who posted each dispositions comment;
+// minimized (hidden) comments are skipped and listed.
 // Usage: node tools/pr-findings.mjs <pr-number> [--repo owner/name]
 // Exit: 0 PASS, 1 open findings, 2 inconclusive (API error, no review, unparseable).
 // Needs `npm ci` (linkedom, a devDependency); the gh call is injected so the parser and
@@ -31,6 +33,9 @@ export const EXIT = { PASS: 0, OPEN: 1, INCONCLUSIVE: 2 };
 const SHA = '([0-9a-f]{7,40})';
 const REVIEW = new RegExp(String.raw`^(?:independent\s+)?(?:re-?)?review\s+of\s+${SHA}(?![0-9a-z])`, 'i');
 const DISPOSITIONS = new RegExp(String.raw`^dispositions\s+for\s+the\s+(?:re-?)?review\s+of\s+${SHA}(?![0-9a-z])`, 'i');
+// A read-only audit section: it carries no findings, and its only table is "Gate | Result".
+const AUDIT = new RegExp(String.raw`^pre-merge\s+audit\s+at\s+${SHA}(?![0-9a-z])`, 'i');
+const AUDIT_COLS = ['gate', 'result'];
 // NOT CLEAN in plain ASCII: the words in any case with whitespace between ("not clean"
 // in prose included, as before), or in capitals glued or joined by "_"/"-" ("NOTCLEAN",
 // "NOT_CLEAN", "NOT-CLEAN"). Any other spelling of it is a disguise: see disguises().
@@ -52,7 +57,8 @@ const FINDINGS_SHA = new RegExp(String.raw`${FINDING}.*${HEX}|${HEX}.*${FINDING}
 // with "Re-review" (not "Re-review requested"), "Independent review" or "Disposition(s)";
 // starts with "Review(s)" and names findings, dispositions or a sha; starts with
 // "Review(s)/Reviewer(s)" and reports problems; or names findings and a sha. Not reserved:
-// "Review notes", "Reviewer's Guide", "Findings from QA", "Pre-merge audit at <sha>".
+// "Review notes", "Reviewer's Guide", "Findings from QA" (no table may follow them), and
+// "Pre-merge audit at <sha>", which is its own read-only section.
 const DISPOSITION_START = /^dispositions?\b/i;
 const RESERVED = [
   NOT_CLEAN, REVIEW_OF, REVIEW_START, REVIEWER_FOUND, FINDINGS_SHA, DISPOSITION_START,
@@ -70,15 +76,12 @@ const matches = (patterns) => (t) => !REQUESTED.test(t) && patterns.some((re) =>
 const reserved = matches(RESERVED);
 const reservedText = matches(RESERVED_TEXT);
 const NO_FINDINGS = /^no findings\.?$/i;
-// A disposition cell with no letter or digit, or that is only one of these words (or one
-// of them followed by a separator, e.g. "TODO: later", "TODO (later)", "TODO, later"),
-// leaves the finding open. After the word (and any spaces) a separator is any character
-// but a letter or digit; a hyphen counts unless it joins letters ("Open-source fix",
-// "Todo-list item done" make a new word, so the cell is a disposition). A word then a
-// space then a word ("Open question answered") is a disposition. Tested before dashes
-// are folded, so "TBD—later" (em dash) stays a separator.
-const PLACEHOLDER = /^(?:tbd|todo|open|n\/a|pending|none)(?:\s*|\s+[-\u2010\u2011\u2212].*|\s*(?![\p{L}\p{N}\s\-\u2010\u2011\u2212]).+|[-\u2010\u2011\u2212](?![\p{L}\p{N}]).*)$/iu;
-const FINDING_COLS = ['finding', 'findings', 'issue', 'issues', 'problem', 'problems'];
+// A disposition counts only in a positive form (allowlist): it starts with a verdict, or it
+// names a commit (7-40 hex digits with at least one digit) or an issue or PR ("#12").
+// Anything else ("TODO later", "pending review", "Reworded") leaves the finding open.
+const VERDICT = /^(?:fixed|won['\u2019]?t\s+fix|by\s+design|false\s+positive|not\s+a\s+bug|deferred\s+to\s+#\d+|documented|duplicate\s+of|out\s+of\s+scope|accepted)(?![\p{L}\p{N}])/iu;
+const COMMIT_REF = /(?<![0-9a-z])(?=[0-9a-f]*[0-9])[0-9a-f]{7,40}(?![0-9a-z])/i;
+const ISSUE_REF = /(?<![\p{L}\p{N}&])#\d+(?![\p{L}\p{N}])/u;
 
 // Latin lookalikes folded to their ASCII letter: Cyrillic and Greek letters that look
 // like a Latin letter, and Latin small capitals (NFKC leaves all of these alone).
@@ -155,6 +158,12 @@ const GAP = new RegExp(`[^${WORDISH}]`, 'u');
 const GAPS = new RegExp(`[^${WORDISH}]+`, 'u');
 // A letter or mark that is not ASCII: a lookalike, an accent, U+FE0F, a stroke letter.
 const FOREIGN = /(?![\x00-\x7f])[\p{L}\p{M}]/u;
+// A cross-script lookalike: after NFKD and marks stripped, a letter folded by CONFUSABLE
+// (Cyrillic, Greek, Latin small capitals), a letter of another script, or a letter that
+// folds to nothing (a wildcard). A Latin letter with a diacritic or stroke is not one.
+const crossScript = (span) => [...span.normalize('NFKD').replace(/\p{M}/gu, '')].some((d) =>
+  d in CONFUSABLE || (/\p{L}/u.test(d) && (!/\p{Script=Latin}/u.test(d)
+    || !(STROKE[d] ?? d).toLowerCase().replace(/[^a-z0-9]/g, ''))));
 
 /**
  * Every reserved word or phrase in s (text outside code) that is spelled other than in
@@ -187,20 +196,24 @@ export function disguises(s) {
       if (mode === 'word' && /^\p{L}/u.test(s.slice(end))) continue;
       // Letter-spaced: two or more one-letter pieces ("N O T"), not a plural "Issue(s)".
       const spaced = crossing && span.split(GAPS).filter((r) => (r.match(/\p{L}/gu) ?? []).length === 1).length >= 2;
-      if (FOREIGN.test(span) || spaced) out.push({ span, w });
+      // A phrase ("NÖT CLEAN") is flagged for any non-ASCII letter or mark; a single word
+      // ("problém", "Préviewed") only for a cross-script lookalike ("Rеview", Cyrillic е).
+      if ((mode === 'phrase' ? FOREIGN.test(span) : crossScript(span)) || spaced) out.push({ span, w });
     }
   }
   return out;
 }
 
-// Raw text of a node, a <br> as a newline; code and pre left out when `code` is false.
-function raw(node, code = true) {
+// Raw text of a node, a <br> as a newline; code and pre left out when `code` is false,
+// struck-through text (del, s, strike) when `struck` is false.
+function raw(node, code = true, struck = true) {
   if (node.nodeType === 3) return node.textContent;
   if (node.nodeType !== 1) return '';
   if (node.localName === 'br') return '\n';
   if (!code && (node.localName === 'code' || node.localName === 'pre')) return '';
+  if (!struck && ['del', 's', 'strike'].includes(node.localName)) return '';
   let s = '';
-  for (const c of node.childNodes) s += raw(c, code);
+  for (const c of node.childNodes) s += raw(c, code, struck);
   return s;
 }
 const text = (el) => normalize(raw(el));
@@ -231,19 +244,19 @@ function table(el, where, errors) {
   const cellsOf = (tr, f = text) => [...tr.children].filter((c) => c.localName === 'td' || c.localName === 'th').map(f);
   const header = trs.length ? cellsOf(trs[0]).map((h) => h.toLowerCase()) : [];
   const rows = [];
-  // Each row's cells before dashes are folded (a hyphen and a dash differ there).
-  const unfolded = [];
+  // Each row's cells without struck-through text ("~~Fixed~~" is not a verdict).
+  const unstruck = [];
   for (const tr of trs.slice(1)) {
     const row = cellsOf(tr);
     if (row.length !== header.length) {
       errors.push(`${where}: row has ${row.length} cells, header has ${header.length}: ${row.join(' | ')}`);
       continue;
     }
-    const before = cellsOf(tr, (c) => canonical(raw(c)).replace(/[\s\p{Zs}]+/gu, ' ').trim());
+    const kept = cellsOf(tr, (c) => normalize(raw(c, true, false)));
     rows.push(Object.fromEntries(header.map((h, k) => [h, row[k]])));
-    unfolded.push(Object.fromEntries(header.map((h, k) => [h, before[k]])));
+    unstruck.push(Object.fromEntries(header.map((h, k) => [h, kept[k]])));
   }
-  return { header, rows, unfolded };
+  return { header, rows, unstruck };
 }
 
 // Phrasing (inline) elements: a run of these and bare text between blocks is one text
@@ -254,8 +267,8 @@ const INLINE = new Set(['a', 'abbr', 'b', 'bdi', 'bdo', 'br', 'cite', 'code', 'd
 const inline = (n) => n.nodeType === 3 || (n.nodeType === 1 && INLINE.has(n.localName));
 
 // Sections split at <h1>/<h2> in document order (one in a blockquote counts); each is
-// { kind, sha, heading, tables, items, paras, prose } with kind 'review', 'dispositions'
-// or null. Fail closed: outside a review section, every text block (paragraph, list item,
+// { kind, sha, heading, tables, items, paras, prose } with kind 'review', 'dispositions',
+// 'audit' (read-only; its text is checked as if outside a section) or null. Fail closed: outside a review section, every text block (paragraph, list item,
 // table cell, heading, summary, and every maximal run of bare text and inline elements
 // not inside one of those, at any depth including the top level) that reads as a review
 // is an error. Inside a review or dispositions section, <h3>-<h6> and bold lines are free
@@ -271,7 +284,7 @@ function sections(root, errors) {
   // A block's text is tested whole and line by line (lines split at <br> or a newline),
   // so a lead-in line cannot hide a reserved start.
   const outside = (rawText, what, test = reservedText) => {
-    if (cur().kind) return;
+    if (cur().kind && cur().kind !== 'audit') return;
     const whole = normalize(rawText);
     const hit = [whole, ...rawText.split(/[\n\r\v\f\x85\u2028\u2029]/).map(normalize)].find((t) => t && test(t));
     if (hit !== undefined) {
@@ -314,18 +327,23 @@ function sections(root, errors) {
         const t = text(child);
         const d = DISPOSITIONS.exec(t);
         const r = !d && REVIEW.exec(t);
-        if (!d && !r && reserved(t)) {
+        const a = !d && !r && AUDIT.exec(t);
+        if (!d && !r && !a && reserved(t)) {
           errors.push(`"## ${t}": unrecognised review heading (expected "Review of <sha>" or "Dispositions for the review of <sha>")`);
         }
-        const kind = d ? 'dispositions' : r ? 'review' : null;
-        open(kind, kind ? (d || r)[1].toLowerCase() : undefined, `## ${t}`);
+        const kind = d ? 'dispositions' : r ? 'review' : a ? 'audit' : null;
+        open(kind, kind ? (d || r || a)[1].toLowerCase() : undefined, `## ${t}`);
       } else if (level) {
         const t = text(child);
         if (level === 1) open(null, undefined, `# ${t}`);
         headingLike(t, `a level-${level} heading`);
         cur().prose.push(proseText(child));
       } else if (name === 'table') {
-        cur().tables.push(table(child, `"${cur().heading}"`, errors));
+        // Structure, not words: a table is read only inside a recognised section, and a
+        // table inside a table is never read, so either is an error.
+        const where = `"${cur().heading}"`;
+        if (child.querySelector('table')) errors.push(`${where}: a table inside a table`);
+        cur().tables.push(table(child, where, errors));
         for (const cell of child.querySelectorAll('td, th')) {
           if (cell.closest('table') === child && !LABEL.test(text(cell))) outside(raw(cell), 'a table cell');
         }
@@ -365,11 +383,13 @@ function needColumns(t, cols, where, errors) {
   return missing.length === 0;
 }
 
-// `cell` as normalized; `before` the same cell before dashes are folded.
-function disposition(cell, before = cell) {
-  const bare = (s) => (s ?? '').replace(/[*_`~]/g, '').trim().replace(/[.!,;:]+$/, '').trim();
-  return !/[\p{L}\p{N}]/u.test(bare(cell)) || PLACEHOLDER.test(bare(before)) ? null : cell;
+// `cell` as normalized; `kept` the cell without struck-through text. Returns the cell if
+// it is a disposition (a positive form), else null.
+function disposition(cell, kept) {
+  const t = (kept ?? '').replace(/[*_`~]/g, '').trim().replace(/[.!,;:]+$/, '').trim();
+  return VERDICT.test(t) || COMMIT_REF.test(t) || ISSUE_REF.test(t) ? cell : null;
 }
+const dispositionOf = (t, j) => disposition(t.rows[j].disposition, t.unstruck[j].disposition);
 
 /** Parse one comment's rendered HTML (bodyHTML) into the reviews and dispositions it declares. */
 export function parseComment(html) {
@@ -389,10 +409,18 @@ export function parseComment(html) {
   for (const { kind, sha, heading, tables, items, paras, prose } of sections(document.body, errors)) {
     const where = `"${heading}"`;
     if (!kind) {
+      // Any table outside a recognised section may hold an open finding, whatever its
+      // columns are called.
       for (const t of tables) {
-        // A "#" column or a Finding/Issue/Problem column: it may hold the open finding.
-        if (t.header.includes('#') || t.header.some((h) => FINDING_COLS.includes(h))) {
-          errors.push(`${where}: a findings table outside a review section (${t.header.join(' | ')})`);
+        errors.push(`${where}: a table outside a review, dispositions or pre-merge audit section (${t.header.join(' | ')})`);
+      }
+      continue;
+    }
+    if (kind === 'audit') {
+      // Read-only: its only table is "Gate | Result"; it carries no findings.
+      for (const t of tables) {
+        if (t.header.join('|') !== AUDIT_COLS.join('|')) {
+          errors.push(`${where}: an audit table other than "Gate | Result" (${t.header.join(' | ')})`);
         }
       }
       continue;
@@ -404,7 +432,7 @@ export function parseComment(html) {
       for (const t of tables) {
         if (!needColumns(t, ['#', 'disposition'], where, errors)) continue;
         for (const [j, row] of t.rows.entries()) {
-          entries.push({ id: row['#'], disposition: disposition(row.disposition, t.unfolded[j].disposition) });
+          entries.push({ id: row['#'], disposition: dispositionOf(t, j) });
         }
       }
       dispositions.push({ sha, heading, entries });
@@ -443,7 +471,7 @@ export function parseComment(html) {
           id: row['#'],
           severity: row.severity ?? '',
           finding: row.finding,
-          disposition: combined ? disposition(row.disposition, t.unfolded[j].disposition) : null,
+          disposition: combined ? dispositionOf(t, j) : null,
         });
       }
     }

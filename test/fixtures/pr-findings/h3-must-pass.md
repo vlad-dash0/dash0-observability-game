@@ -1,7 +1,8 @@
 ## Pre-merge audit at bcfc316
 
-| Check | Disposition |
+| Gate | Result |
 |---|---|
+| Disposition | posted for every finding |
 | CI | green |
 
 - **Reviews:** every finding's disposition is posted above.
