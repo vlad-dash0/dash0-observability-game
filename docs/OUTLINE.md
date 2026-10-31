@@ -91,7 +91,7 @@ Each level lists **concept** / **OTel nuance** / **Dash0 tie-in** / **mechanic**
 | 2.4 Context propagation | W3C `traceparent` / `tracestate` across HTTP and queues | A proxy that drops headers splits one trace into two; async work needs links, not parents | Broken traces show as orphan roots | Spot it + Build it |
 | 2.5 Baggage | Key/values that travel with the context | Baggage isn't added to spans automatically, and it leaks to third parties | n/a | Sort it |
 | 2.6 Events and links | Span events (exceptions), span links (batch consumers, fan-in) | `exception` events vs separate logs; recording an exception doesn't set status | Exceptions surfaced on spans | Build it |
-| 2.7 Auto vs manual | Zero-code instrumentation, then adding business spans and attributes | Double instrumentation (agent + library) gives duplicate spans | Operator-injected auto-instrumentation | Configure it |
+| 2.7 Auto vs manual | Zero-code instrumentation, then adding business spans and attributes | Double instrumentation (injected agent + your own SDK setup) can duplicate spans, depending on the instrumentation: fetch client spans do today | Operator-injected auto-instrumentation | Configure it |
 | Boss: "Checkout is slow" | Latency spike; find the span that changed | n/a | Dash0 triage: compare attribute distributions of slow vs normal spans | Incident |
 
 ### Act 3: Metrics ("How much, how often")

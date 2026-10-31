@@ -12,6 +12,7 @@
 //   3. Add DRIVERS['<id>'] (happy and sloppy runs) in test/levels-play.test.mjs.
 //
 // Act: { id, no, name, sub, levels: [level, ...], boss: level | null }.
+import autoVsManual from './auto-vs-manual.mjs';
 import baggage from './baggage.mjs';
 import contextPropagation from './context-propagation.mjs';
 import eventsAndLinks from './events-and-links.mjs';
@@ -46,7 +47,7 @@ export const ACTS = [
     no: 2,
     name: 'Traces',
     sub: 'Follow the request',
-    levels: [spansAndTraces, spanKinds, statusAndErrors, contextPropagation, baggage, eventsAndLinks],
+    levels: [spansAndTraces, spanKinds, statusAndErrors, contextPropagation, baggage, eventsAndLinks, autoVsManual],
     boss: null,
   },
 ];

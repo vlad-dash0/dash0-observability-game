@@ -72,6 +72,8 @@ const PROP_TREE = [['6e0c63257de34c92', '00f067aa0ba902b7']];
 const EVL_STATUS = [['8f14e45fceea167a', 'ERROR'], ['45c48cce2e2d7fbd', 'UNSET']];
 const EVL_SEND = 'd67d8ab4f4c10bf2';
 const EVL_LINKS = [[EVL_SEND, '1679091c5a880faf'], [EVL_SEND, '8e296a067a375633'], [EVL_SEND, 'a5771bce93e200c3']];
+// 2.7: what the agent covers (auto) and what only your code adds (manual).
+const AVM_SORT = [['server', 'auto'], ['loyalty', 'manual'], ['redis', 'auto'], ['coupon', 'manual'], ['client', 'auto'], ['item-count', 'manual']];
 
 /** Pick each span, then its `attr` value (Build it), with this file's click. */
 function buildAll(attr, pairs) {
@@ -293,6 +295,29 @@ const DRIVERS = {
         click('#evl-finish');
       },
       expect: { stars: 2, cards: ['exception-no-status', 'batch-links'] },
+    },
+  },
+  'auto-vs-manual': {
+    play() {
+      sortAll(AVM_SORT);
+      click('#avm-next');
+      click('[data-pick="two-setups"]');
+      click('#avm-next');
+      click('[data-pick="keep-one"]');
+      click('#avm-finish');
+    },
+    expect: { stars: 3, cards: ['double-instrumentation'] },
+    sloppy: {
+      play() {
+        sortAll(AVM_SORT);
+        click('#avm-next');
+        click('[data-pick="retries"]'); // one wrong pick
+        click('[data-pick="two-setups"]');
+        click('#avm-next');
+        click('[data-pick="keep-one"]');
+        click('#avm-finish');
+      },
+      expect: { stars: 2, cards: ['double-instrumentation'] },
     },
   },
   'naming-your-service': {
