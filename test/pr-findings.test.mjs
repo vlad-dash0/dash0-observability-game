@@ -538,17 +538,17 @@ test('J1: Cyrillic and Greek lookalikes fold to their Latin letters', () => {
   assert.equal(r.exit, 2);
 });
 
-test('J1: a review heading with Cyrillic lookalikes is read as a review heading and flagged as mixed', () => {
+test('J1: a review heading with Cyrillic lookalikes is read as a review heading and flagged as disguised', () => {
   const r = decide('clean', 'j1-cyrillic-heading');
-  assert.match(errs(r), /"Rеview" mixes Latin with Cyrillic or Greek letters/);
+  assert.match(errs(r), /"Rеview" spells the reserved "review" with non-ASCII letters/);
   assert.match(errs(r), /"## Review of abc1234: NOT CLEAN": a table without a "#" column/);
   assert.equal(r.exit, 2);
 });
 
-test('J1: any word mixing Latin with Cyrillic or Greek letters is inconclusive', () => {
+test('K2: a word mixing Latin with Cyrillic that spells no reserved word ("Thе") stays PASS', () => {
   const r = decide('j1-mixed-word');
-  assert.match(errs(r), /"Thе" mixes Latin with Cyrillic or Greek letters/);
-  assert.equal(r.exit, 2);
+  assert.deepEqual(r.errors, []);
+  assert.equal(r.exit, 0);
 });
 
 test('J1: prose in German, Japanese, Russian and Greek in a CLEAN review note stays PASS', () => {
@@ -581,6 +581,77 @@ test('J4: "Re-review requested" exempts only a block that is just that phrase', 
   const only = decide('clean', 'j4-requested-only');
   assert.deepEqual(only.errors, []);
   assert.equal(only.exit, 0);
+});
+
+const disguise = (span, w) => `"${span}" spells the reserved "${w}" with non-ASCII letters, marks or letter-spacing (write it in plain ASCII)`;
+
+test('K1: NOT CLEAN with a combining mark after a CLEAN review is inconclusive', () => {
+  const r = decide('clean', 'k1-diaeresis-after-clean');
+  assert.deepEqual(r.errors, [`c1: ${disguise('N\u0308OT CLEAN', 'notclean')}`]);
+  assert.equal(r.exit, 2);
+});
+
+test('K1: a review heading "N̈OT CLEAN" over "No findings." is inconclusive', () => {
+  const r = decide('k1-heading-diaeresis');
+  assert.ok(r.errors.includes(`c0: ${disguise('N\u0308OT CLEAN', 'notclean')}`), errs(r));
+  assert.equal(r.exit, 2);
+});
+
+test('K1: accent, U+FE0F, U+0338, stroke, unlisted lookalike and letter-spaced NOT CLEAN are all inconclusive', () => {
+  for (const [name, span] of [['k1-acute', 'NOT CL\u00c9AN'], ['k1-fe0f', 'NOT\ufe0f CLEAN'],
+    ['k1-solidus', 'N\u0338OT CLEAN'], ['k1-stroke', 'N\u00d8T CLEAN'], ['k1-spaced', 'N O T C L E A N'],
+    ['k1-unlisted-lookalike', 'N\u0585T CLEAN']]) {
+    const r = decide('clean', name);
+    assert.ok(r.errors.includes(`c1: ${disguise(span, 'notclean')}`), `${name}: ${errs(r)}`);
+    assert.equal(r.exit, 2, name);
+  }
+});
+
+test('K1: a CLEAN review whose prose says a disguised NOT CLEAN is inconclusive', () => {
+  const r = decide('k1-clean-review-says');
+  assert.deepEqual(r.errors, [`c0: ${disguise('N\u00d8T CLEAN', 'notclean')}`]);
+  assert.equal(r.exit, 2);
+});
+
+test('K1: capitals glued with "_" (NOT_CLEAN) read as NOT CLEAN; lowercase prose reads as before', () => {
+  const glued = decide('clean', 'k1-glued');
+  assert.deepEqual(glued.errors, ['c1: "Verdict: NOT_CLEAN" is a paragraph that reads as a review outside a review section (expected "## Review of <sha>")']);
+  assert.equal(glued.exit, 2);
+  const lower = decide('clean', 'k1-lowercase-prose');
+  assert.deepEqual(lower.errors, ['c1: "The old parser is not clean code." is a paragraph that reads as a review outside a review section (expected "## Review of <sha>")']);
+  assert.equal(lower.exit, 2);
+});
+
+test('K2: units and math (10µs, μs, μm, Δt, kΩ, μservice) in a review note and a disposition stay PASS', () => {
+  const note = decide('k2-units-review');
+  assert.deepEqual(note.errors, []);
+  assert.equal(note.exit, 0);
+  const cell = decide('k2-units-review-open', 'k2-units-dispositions');
+  assert.deepEqual(cell.errors, []);
+  assert.deepEqual(ids(cell.open), []);
+  assert.equal(cell.exit, 0);
+});
+
+test('K2: a reserved word spelled with an accent ("fóund") is still inconclusive', () => {
+  const r = decide('k2-disguised-word');
+  assert.deepEqual(r.errors, [`c0: ${disguise('f\u00f3und', 'found')}`]);
+  assert.equal(r.exit, 2);
+});
+
+test('K2: honest prose (e-mail, re-run, pre-review, review-ready, Re-reviewing, Zürich, Łódź, °, Å, ™, André, Problème) stays PASS', () => {
+  const inside = decide('k-must-pass-honest');
+  assert.deepEqual(inside.errors, []);
+  assert.equal(inside.exit, 0);
+  const outside = decide('clean', 'k-must-pass-outside');
+  assert.deepEqual(outside.errors, []);
+  assert.equal(outside.exit, 0);
+});
+
+test('K3: a hyphen joining letters makes a disposition; any other non-letter after the word is a separator', () => {
+  const r = decide('k3-review', 'k3-dispositions');
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(ids(r.open), ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11']);
+  assert.equal(r.exit, 1);
 });
 
 // --- the gh layer -----------------------------------------------------------------

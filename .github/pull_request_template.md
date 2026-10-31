@@ -55,7 +55,11 @@ findings, 2 inconclusive. Merge needs `All checks` green and the detector at 0.
    (Severity) are allowed. These cells leave the finding open (formatting such as
    bold, code, strikethrough or a trailing period ignored): no letter or digit (empty,
    `&nbsp;`, `-`, `—`, `?`), `TBD`, `TODO`, `open`, `N/A`, `pending`, `none`, or one of
-   those words followed by `:`/`—` and more text.
+   those words followed by a separator and more text: after the word (and any spaces),
+   any character but a letter or digit (`TODO: later`, `TODO (later)`, `TODO, later`,
+   `TBD—later`, `TODO - later`, `TBD-`). A hyphen joining letters makes a new word, so
+   `Open-source fix` or `Todo-list item done` is a disposition, as is a word followed by
+   a space and a word (`Open question answered in #12`).
    If the review is edited, dispositions last written (posted or edited) before that
    edit no longer count: post or edit in a fresh one for every finding.
 
@@ -78,9 +82,21 @@ dispositions headings must be level 2; the same form at another level or as a bo
 is inconclusive. All text is read after one normalisation: NFKC (fullwidth letters
 become ASCII), format characters (zero-width space, soft hyphen, word joiner, bidi marks)
 are removed, every dash becomes `-`, Cyrillic and Greek lookalikes of Latin letters
-become those letters, and any space becomes a plain space. A word outside code that
-mixes Latin with Cyrillic or Greek letters is inconclusive. Outside a review section, a
-heading that says NOT CLEAN or names "review of <sha>", starts with "Re-review" ("Re
+become those letters, and any space becomes a plain space. Disguises are caught by
+skeleton, not by a list of spellings: text outside code is reduced to what it spells
+(NFKD, marks stripped, lookalikes and stroke letters such as Ø, Ł, Đ, Ħ folded, lowercase,
+only a-z and 0-9 kept; a Latin, Greek, Cyrillic or Armenian letter that folds to nothing
+is a one-letter wildcard). Where that skeleton spells a reserved word or phrase (review,
+clean, disposition, finding anywhere in a word; found, problem(s), issue(s), bug(s) as a
+whole word; NOT CLEAN, Re-review, Independent review starting a word; "review of" before
+a sha) and the text there has a non-ASCII letter or mark or is letter-spaced (`N O T`),
+the comment is inconclusive, wherever it is. Plain-ASCII text is read by the forms
+below, unchanged: so `10µs`, `Δt`, `kΩ`, Zürich, André reviewed, Problème, Cyrillic or
+Greek words, e-mail and Re-reviewing are fine, and `NØT CLEAN`, `N̈OT CLEAN`,
+`NOT CLÉAN`, `Rеview` (Cyrillic е) are not. NOT CLEAN in plain ASCII is the two words in
+any case with whitespace between (so "not clean" in prose outside a review section is
+inconclusive, as before), or the capitals glued or joined by `_`/`-` (`NOT_CLEAN`).
+Outside a review section, a heading that says NOT CLEAN or names "review of <sha>", starts with "Re-review" ("Re
 review", "Re-reviews"; a block that is only "Re-review requested" is fine), "Independent review" or
 "Disposition", starts with "Review" and names findings, dispositions or a sha, starts
 with "Review(s)"/"Reviewer(s)" and reports problems (found, problem, issue, bug,

@@ -31,7 +31,10 @@ export const EXIT = { PASS: 0, OPEN: 1, INCONCLUSIVE: 2 };
 const SHA = '([0-9a-f]{7,40})';
 const REVIEW = new RegExp(String.raw`^(?:independent\s+)?(?:re-?)?review\s+of\s+${SHA}(?![0-9a-z])`, 'i');
 const DISPOSITIONS = new RegExp(String.raw`^dispositions\s+for\s+the\s+(?:re-?)?review\s+of\s+${SHA}(?![0-9a-z])`, 'i');
-const NOT_CLEAN = /\bnot\s+clean\b/i;
+// NOT CLEAN in plain ASCII: the words in any case with whitespace between ("not clean"
+// in prose included, as before), or in capitals glued or joined by "_"/"-" ("NOTCLEAN",
+// "NOT_CLEAN", "NOT-CLEAN"). Any other spelling of it is a disguise: see disguises().
+const NOT_CLEAN = { test: (t) => /\bnot\s+clean\b/i.test(t) || /(?<![A-Za-z0-9])NOT[\s_-]*CLEAN(?![A-Za-z0-9])/.test(t) };
 const CLEAN = /\bclean\b/i;
 const HEX = String.raw`\b[0-9a-f]{7,40}\b`;
 const REVIEW_OF = new RegExp(String.raw`\b(?:re-?)?review\s+of\s+${SHA}(?![0-9a-z])`, 'i');
@@ -68,11 +71,16 @@ const reserved = matches(RESERVED);
 const reservedText = matches(RESERVED_TEXT);
 const NO_FINDINGS = /^no findings\.?$/i;
 // A disposition cell with no letter or digit, or that is only one of these words (or one
-// of them followed by a separator, e.g. "TODO: later"), leaves the finding open.
-const PLACEHOLDER = /^(?:tbd|todo|open|n\/a|pending|none)(?:\s*[-:(,].*)?$/i;
+// of them followed by a separator, e.g. "TODO: later", "TODO (later)", "TODO, later"),
+// leaves the finding open. After the word (and any spaces) a separator is any character
+// but a letter or digit; a hyphen counts unless it joins letters ("Open-source fix",
+// "Todo-list item done" make a new word, so the cell is a disposition). A word then a
+// space then a word ("Open question answered") is a disposition. Tested before dashes
+// are folded, so "TBD—later" (em dash) stays a separator.
+const PLACEHOLDER = /^(?:tbd|todo|open|n\/a|pending|none)(?:\s*|\s+[-\u2010\u2011\u2212].*|\s*(?![\p{L}\p{N}\s\-\u2010\u2011\u2212]).+|[-\u2010\u2011\u2212](?![\p{L}\p{N}]).*)$/iu;
 const FINDING_COLS = ['finding', 'findings', 'issue', 'issues', 'problem', 'problems'];
 
-// Latin lookalikes folded to their ASCII skeleton: Cyrillic and Greek letters that look
+// Latin lookalikes folded to their ASCII letter: Cyrillic and Greek letters that look
 // like a Latin letter, and Latin small capitals (NFKC leaves all of these alone).
 const CONFUSABLE = Object.fromEntries([
   // Cyrillic capitals, then small letters.
@@ -103,11 +111,87 @@ const canonical = (s) => s.normalize('NFKC').replace(/\p{Cf}/gu, '');
 const normalize = (s) => canonical(s).replace(/[\p{Pd}\u2212]/gu, '-')
   .replace(LOOKALIKE, (c) => CONFUSABLE[c]).replace(/[\s\p{Zs}]+/gu, ' ').trim();
 
-// A word (outside code) that mixes Latin with Cyrillic or Greek letters is a disguise, not
-// prose: returns the first, else null. Words of one script ("Проверено", "καλά") are fine.
-const LATIN = /\p{Script=Latin}/u;
-const OTHER = /[\p{Script=Cyrillic}\p{Script=Greek}]/u;
-const mixedWord = (s) => canonical(s).match(/[\p{L}\p{M}]+/gu)?.find((w) => LATIN.test(w) && OTHER.test(w)) ?? null;
+// Latin letters with a stroke or bar, which NFKD does not decompose.
+const STROKE = Object.fromEntries(['Øo', 'øo', 'Łl', 'łl', 'Đd', 'đd', 'Ðd', 'ðd', 'Ħh', 'ħh', 'Ŧt', 'ŧt',
+  'Ɨi', 'ɨi', 'Ƶz', 'ƶz', 'Ƀb', 'ƀb', 'ıi', 'ȷj', 'Ɉj', 'ɉj', 'Ꝋo', 'ꝋo'].map((pair) => [...pair]));
+// Letters of the alphabets lookalikes come from: one that does not fold to ASCII is a
+// wildcard ("?") in the skeleton, so an unlisted lookalike still spells the word.
+const WILD = /[\p{Script=Latin}\p{Script=Greek}\p{Script=Cyrillic}\p{Script=Armenian}\p{Script=Cherokee}\p{Script=Coptic}\p{Script=Lisu}]/u;
+
+/**
+ * The skeleton of s, what it spells whatever the letters look like: each code point is
+ * NFKD-decomposed, its marks (\p{M}) stripped, lookalikes and stroke letters folded to
+ * ASCII, lowercased, and only [a-z0-9] kept (a lookalike-alphabet letter that folds to
+ * nothing becomes "?"). Returns { sk, at }: at[i] is the [start, end) in s of the code
+ * point that sk[i] came from.
+ */
+export function skeleton(s) {
+  let sk = '';
+  const at = [];
+  for (const m of s.matchAll(/./gsu)) {
+    for (const d of m[0].normalize('NFKD').replace(/\p{M}/gu, '')) {
+      let out = (CONFUSABLE[d] ?? STROKE[d] ?? d).toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!out && /\p{L}/u.test(d) && WILD.test(d)) out = '?';
+      for (const c of out) {
+        sk += c;
+        at.push([m.index, m.index + m[0].length]);
+      }
+    }
+  }
+  return { sk, at };
+}
+
+// Reserved skeletons. 'part': found anywhere, even inside a longer word ("Rеviewers").
+// 'word': a whole word ("fóund", not "Problème"). 'phrase': starts a word and may span
+// words ("NØT CLEAN"). "reviewof" counts only before a sha ("Review öffentlich" is prose).
+const RESERVED_SKELETONS = [
+  ...['review', 'clean', 'disposition', 'finding'].map((w) => ({ w, mode: 'part' })),
+  ...['found', 'problem', 'problems', 'issue', 'issues', 'bug', 'bugs'].map((w) => ({ w, mode: 'word' })),
+  ...['notclean', 'rereview', 'independentreview'].map((w) => ({ w, mode: 'phrase' })),
+  { w: 'reviewof', mode: 'phrase', then: /^[0-9a-f]{7,40}/ },
+];
+const WORDISH = String.raw`\p{L}\p{M}\p{Cf}`;
+const GAP = new RegExp(`[^${WORDISH}]`, 'u');
+const GAPS = new RegExp(`[^${WORDISH}]+`, 'u');
+// A letter or mark that is not ASCII: a lookalike, an accent, U+FE0F, a stroke letter.
+const FOREIGN = /(?![\x00-\x7f])[\p{L}\p{M}]/u;
+
+/**
+ * Every reserved word or phrase in s (text outside code) that is spelled other than in
+ * plain ASCII: its skeleton matches a reserved skeleton (at most one wildcard, none in a
+ * word shorter than 5 letters) and the matched text holds a non-ASCII letter or mark, or
+ * is letter-spaced (two or more single letters between gaps). Plain-ASCII spellings are
+ * left to the reserved-form patterns, so honest prose reads as before. Returns
+ * [{ span, w }].
+ */
+export function disguises(s) {
+  const { sk, at } = skeleton(s);
+  const out = [];
+  for (const { w, mode, then } of RESERVED_SKELETONS) {
+    for (let i = 0; i + w.length <= sk.length; i++) {
+      let wild = 0;
+      let k = 0;
+      for (; k < w.length; k++) {
+        if (sk[i + k] === '?') wild++;
+        else if (sk[i + k] !== w[k]) break;
+      }
+      if (k < w.length || wild > (w.length >= 5 ? 1 : 0)) continue;
+      if (then && !then.test(sk.slice(i + w.length))) continue;
+      const start = at[i][0];
+      let end = at[i + w.length - 1][1];
+      for (let c; end < s.length && /[\p{M}\p{Cf}]/u.test(c = String.fromCodePoint(s.codePointAt(end)));) end += c.length;
+      const span = s.slice(start, end);
+      const crossing = GAP.test(span);
+      const wordBefore = /[\p{L}\p{M}]\p{Cf}*$/u.test(s.slice(Math.max(0, start - 8), start));
+      if ((crossing || mode !== 'part') && wordBefore) continue;
+      if (mode === 'word' && /^\p{L}/u.test(s.slice(end))) continue;
+      // Letter-spaced: two or more one-letter pieces ("N O T"), not a plural "Issue(s)".
+      const spaced = crossing && span.split(GAPS).filter((r) => (r.match(/\p{L}/gu) ?? []).length === 1).length >= 2;
+      if (FOREIGN.test(span) || spaced) out.push({ span, w });
+    }
+  }
+  return out;
+}
 
 // Raw text of a node, a <br> as a newline; code and pre left out when `code` is false.
 function raw(node, code = true) {
@@ -120,6 +204,15 @@ function raw(node, code = true) {
   return s;
 }
 const text = (el) => normalize(raw(el));
+// Text outside code with each block on its own line, so blocks never run together.
+function blocks(node) {
+  if (node.nodeType === 3) return node.textContent;
+  if (node.nodeType !== 1 || node.localName === 'code' || node.localName === 'pre') return '';
+  if (node.localName === 'br') return '\n';
+  let s = '';
+  for (const c of node.childNodes) s += blocks(c);
+  return INLINE.has(node.localName) ? s : `\n${s}\n`;
+}
 // Text of an element outside code: code renders as code, never as a table row.
 const proseText = (el) => normalize(raw(el, false));
 
@@ -135,18 +228,22 @@ function boldLine(p) {
 // GFM pads or trims every row to the header; a raw HTML table may not, which is an error.
 function table(el, where, errors) {
   const trs = [...el.querySelectorAll('tr')].filter((tr) => tr.closest('table') === el);
-  const cellsOf = (tr) => [...tr.children].filter((c) => c.localName === 'td' || c.localName === 'th').map(text);
+  const cellsOf = (tr, f = text) => [...tr.children].filter((c) => c.localName === 'td' || c.localName === 'th').map(f);
   const header = trs.length ? cellsOf(trs[0]).map((h) => h.toLowerCase()) : [];
   const rows = [];
+  // Each row's cells before dashes are folded (a hyphen and a dash differ there).
+  const unfolded = [];
   for (const tr of trs.slice(1)) {
     const row = cellsOf(tr);
     if (row.length !== header.length) {
       errors.push(`${where}: row has ${row.length} cells, header has ${header.length}: ${row.join(' | ')}`);
       continue;
     }
+    const before = cellsOf(tr, (c) => canonical(raw(c)).replace(/[\s\p{Zs}]+/gu, ' ').trim());
     rows.push(Object.fromEntries(header.map((h, k) => [h, row[k]])));
+    unfolded.push(Object.fromEntries(header.map((h, k) => [h, before[k]])));
   }
-  return { header, rows };
+  return { header, rows, unfolded };
 }
 
 // Phrasing (inline) elements: a run of these and bare text between blocks is one text
@@ -268,9 +365,10 @@ function needColumns(t, cols, where, errors) {
   return missing.length === 0;
 }
 
-function disposition(cell) {
-  const bare = (cell ?? '').replace(/[*_`~]/g, '').trim().replace(/[.!,;:]+$/, '').trim();
-  return !/[\p{L}\p{N}]/u.test(bare) || PLACEHOLDER.test(bare) ? null : cell;
+// `cell` as normalized; `before` the same cell before dashes are folded.
+function disposition(cell, before = cell) {
+  const bare = (s) => (s ?? '').replace(/[*_`~]/g, '').trim().replace(/[.!,;:]+$/, '').trim();
+  return !/[\p{L}\p{N}]/u.test(bare(cell)) || PLACEHOLDER.test(bare(before)) ? null : cell;
 }
 
 /** Parse one comment's rendered HTML (bodyHTML) into the reviews and dispositions it declares. */
@@ -281,8 +379,13 @@ export function parseComment(html) {
   if (typeof html !== 'string') return { reviews, dispositions, errors: ['no rendered body (bodyHTML)'] };
   if (!parseHTML) throw new Error(`linkedom is not installed (run npm ci): ${domError.message}`);
   const { document } = parseHTML(`<!doctype html><html><body>${html}</body></html>`);
-  const mixed = mixedWord(raw(document.body, false));
-  if (mixed) errors.push(`"${mixed}" mixes Latin with Cyrillic or Greek letters (a lookalike of a reserved word?)`);
+  const seen = new Set();
+  for (const { span, w } of disguises(blocks(document.body))) {
+    const shown = span.replace(/\s+/g, ' ').trim();
+    if (seen.has(shown)) continue;
+    seen.add(shown);
+    errors.push(`"${shown}" spells the reserved "${w}" with non-ASCII letters, marks or letter-spacing (write it in plain ASCII)`);
+  }
   for (const { kind, sha, heading, tables, items, paras, prose } of sections(document.body, errors)) {
     const where = `"${heading}"`;
     if (!kind) {
@@ -300,7 +403,9 @@ export function parseComment(html) {
       if (!tables.length) errors.push(`${where}: no dispositions table`);
       for (const t of tables) {
         if (!needColumns(t, ['#', 'disposition'], where, errors)) continue;
-        for (const row of t.rows) entries.push({ id: row['#'], disposition: disposition(row.disposition) });
+        for (const [j, row] of t.rows.entries()) {
+          entries.push({ id: row['#'], disposition: disposition(row.disposition, t.unfolded[j].disposition) });
+        }
       }
       dispositions.push({ sha, heading, entries });
       continue;
@@ -333,12 +438,12 @@ export function parseComment(html) {
     for (const t of findingTables) {
       if (!needColumns(t, ['#', 'finding'], where, errors)) continue;
       const combined = t.header.includes('disposition');
-      for (const row of t.rows) {
+      for (const [j, row] of t.rows.entries()) {
         findings.push({
           id: row['#'],
           severity: row.severity ?? '',
           finding: row.finding,
-          disposition: combined ? disposition(row.disposition) : null,
+          disposition: combined ? disposition(row.disposition, t.unfolded[j].disposition) : null,
         });
       }
     }
