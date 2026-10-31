@@ -29,3 +29,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+
+  # The merge gate (#35): branch protection is unavailable on this plan, so merges wait on
+  # this one status. It must need every other job (test/ci.test.mjs checks) and run even
+  # when one fails, so a failed or skipped dependency reports as a failed `All checks`.
+  all-checks:
+    name: All checks
+    if: always()
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every needed job to succeed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "needed job results: ${RESULTS:-<none>}"
+          [ -n "$RESULTS" ] || { echo "no results to check"; exit 1; }
+          for r in $RESULTS; do
+            [ "$r" = success ] || { echo "a needed job ended with: $r"; exit 1; }
+          done
