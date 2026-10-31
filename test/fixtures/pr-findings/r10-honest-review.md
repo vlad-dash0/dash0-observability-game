@@ -10,10 +10,6 @@
 
 **Findings**
 
-| File | Notes |
-|---|---|
-| a.js | ok |
-
 ### Findings
 
 | # | Severity | Finding |

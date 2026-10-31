@@ -4,8 +4,10 @@
 // linkedom): sections are <h2> elements and findings and dispositions are <table>
 // elements, so text in code, an HTML comment or anything else GitHub does not render as a
 // heading or table is never read as one. The comment formats are documented in
-// .github/pull_request_template.md. Prints each finding that has no disposition;
-// minimized (hidden) comments are skipped and listed.
+// .github/pull_request_template.md. It fails closed: inside a review section only the
+// recognised content is allowed, and outside one any text naming a review form is an
+// error. Prints each finding that has no disposition and who posted each dispositions
+// comment; minimized (hidden) comments are skipped and listed.
 // Usage: node tools/pr-findings.mjs <pr-number> [--repo owner/name]
 // Exit: 0 PASS, 1 open findings, 2 inconclusive (API error, no review, unparseable).
 // Needs `npm ci` (linkedom, a devDependency); the gh call is injected so the parser and
@@ -44,6 +46,13 @@ const RESERVED = [
   new RegExp(String.raw`\bfindings?\b.*${HEX}|${HEX}.*\bfindings?\b`, 'i'),
 ];
 const reserved = (t) => RESERVED.some((re) => re.test(t));
+// Outside a review section, any other text block (paragraph, list item, table cell,
+// summary, raw element text) that says NOT CLEAN or names "(re-)review of <sha>" (which
+// includes "Dispositions for the review of <sha>") anywhere is an error: it may be a
+// review written in a form the detector does not read. Narrower than the heading list so
+// a table header "Disposition" or "Reviews: every finding's disposition is posted" passes.
+const REVIEW_OF = new RegExp(String.raw`\b(?:re-?)?review\s+of\s+${SHA}(?![0-9a-z])`, 'i');
+const reservedText = (t) => NOT_CLEAN.test(t) || REVIEW_OF.test(t);
 const NO_FINDINGS = /^no findings\.?$/i;
 // A disposition cell with no letter or digit, or that is only one of these words (or one
 // of them followed by a separator, e.g. "TODO: later"), leaves the finding open.
@@ -78,23 +87,51 @@ function table(el, where, errors) {
   return { header, rows };
 }
 
+// Text of an element outside code: code renders as code, never as a table row.
+function proseText(el) {
+  let s = '';
+  const visit = (n) => {
+    for (const c of n.childNodes) {
+      if (c.nodeType === 3) s += c.textContent;
+      else if (c.nodeType === 1 && c.localName !== 'code' && c.localName !== 'pre') visit(c);
+    }
+  };
+  visit(el);
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+// An element's own text (its text nodes, not its children's), e.g. a raw HTML <div>.
+const ownText = (el) => [...el.childNodes].filter((n) => n.nodeType === 3)
+  .map((n) => n.textContent).join(' ').replace(/\s+/g, ' ').trim();
+
 // Sections split at <h1>/<h2> in document order (one in a blockquote counts); each is
-// { kind, sha, heading, tables, items, paras } with kind 'review', 'dispositions' or null.
-// Inside a review or dispositions section, <h3>-<h6> and bold lines are free text unless
-// they use a review or dispositions form. Every element is walked: markdown code renders
-// as text only, but GitHub keeps a raw HTML <h2> or <table> inside <pre> and shows it.
+// { kind, sha, heading, tables, items, paras, prose } with kind 'review', 'dispositions'
+// or null. Fail closed: outside a review section, every text-bearing block (paragraph,
+// list item, table cell, heading, summary, a raw element's own text) that reads as a
+// review is an error. Inside a review or dispositions section, <h3>-<h6> and bold lines
+// are free text unless they use a review or dispositions form; `prose` collects every
+// text block (code excluded) so the caller can reject a finding row GitHub did not
+// render as a table. Every element is walked: markdown code renders as text only, but
+// GitHub keeps a raw HTML <h2> or <table> inside <pre> and shows it.
 function sections(root, errors) {
   const out = [];
-  const open = (kind, sha, heading) => out.push({ kind, sha, heading, tables: [], items: [], paras: [] });
+  const open = (kind, sha, heading) => out.push({ kind, sha, heading, tables: [], items: [], paras: [], prose: [] });
   open(null, undefined, '(top of comment)');
-  const headingLike = (t, what) => {
-    if (DISPOSITIONS.test(t) || REVIEW.test(t)) {
-      errors.push(`"${t}" is ${what}; review and dispositions headings must be level 2 ("## ")`);
-    } else if (!out.at(-1).kind && reserved(t)) {
+  const cur = () => out.at(-1);
+  const outside = (t, what, test = reservedText) => {
+    if (!cur().kind && test(t)) {
       errors.push(`"${t}" is ${what} that reads as a review outside a review section (expected "## Review of <sha>")`);
     }
   };
-  const walk = (el) => {
+  const headingLike = (t, what) => {
+    if (DISPOSITIONS.test(t) || REVIEW.test(t)) {
+      errors.push(`"${t}" is ${what}; review and dispositions headings must be level 2 ("## ")`);
+    } else {
+      outside(t, what, reserved);
+    }
+  };
+  // inText: inside a paragraph, list item, summary or code, whose text is already read.
+  const walk = (el, inText) => {
     for (const child of el.children) {
       const name = child.localName;
       const level = /^h[1-6]$/.test(name) ? Number(name[1]) : 0;
@@ -109,22 +146,43 @@ function sections(root, errors) {
         open(kind, kind ? (d || r)[1].toLowerCase() : undefined, `## ${t}`);
       } else if (level) {
         const t = text(child);
-        headingLike(t, `a level-${level} heading`);
         if (level === 1) open(null, undefined, `# ${t}`);
+        headingLike(t, `a level-${level} heading`);
+        cur().prose.push(proseText(child));
       } else if (name === 'table') {
-        out.at(-1).tables.push(table(child, `"${out.at(-1).heading}"`, errors));
+        cur().tables.push(table(child, `"${cur().heading}"`, errors));
+        for (const cell of child.querySelectorAll('td, th')) {
+          if (cell.closest('table') === child) outside(text(cell), 'a table cell');
+        }
       } else {
-        if (name === 'li') out.at(-1).items.push(text(child));
-        if (name === 'p') {
+        let nowInText = inText;
+        if (name === 'li') {
+          cur().items.push(text(child));
+          outside(text(child), 'a list item');
+          nowInText = true;
+        } else if (name === 'p') {
           const bold = boldLine(child);
           if (bold) headingLike(bold, 'a bold line');
-          out.at(-1).paras.push(text(child));
+          else outside(text(child), 'a paragraph');
+          cur().paras.push(text(child));
+          cur().prose.push(proseText(child));
+          nowInText = true;
+        } else if (name === 'summary') {
+          outside(text(child), 'a summary');
+          cur().prose.push(proseText(child));
+          nowInText = true;
+        } else if (name === 'pre' || name === 'code') {
+          nowInText = true;
+        } else if (!inText && ownText(child)) {
+          outside(ownText(child), `text in <${name}>`);
+          cur().prose.push(ownText(child));
         }
-        walk(child);
+        walk(child, nowInText);
       }
     }
   };
-  walk(root);
+  walk(root, false);
+  errors.splice(0, errors.length, ...new Set(errors));
   return out;
 }
 
@@ -139,8 +197,6 @@ function disposition(cell) {
   return !/[\p{L}\p{N}]/u.test(bare) || PLACEHOLDER.test(bare) ? null : cell;
 }
 
-const looksLikeFindings = (t) => t.header.includes('#') || t.header.some((h) => FINDING_COLS.includes(h));
-
 /** Parse one comment's rendered HTML (bodyHTML) into the reviews and dispositions it declares. */
 export function parseComment(html) {
   const reviews = [];
@@ -149,7 +205,7 @@ export function parseComment(html) {
   if (typeof html !== 'string') return { reviews, dispositions, errors: ['no rendered body (bodyHTML)'] };
   if (!parseHTML) throw new Error(`linkedom is not installed (run npm ci): ${domError.message}`);
   const { document } = parseHTML(`<!doctype html><html><body>${html}</body></html>`);
-  for (const { kind, sha, heading, tables, items, paras } of sections(document.body, errors)) {
+  for (const { kind, sha, heading, tables, items, paras, prose } of sections(document.body, errors)) {
     const where = `"${heading}"`;
     if (!kind) {
       for (const t of tables) {
@@ -159,8 +215,8 @@ export function parseComment(html) {
       }
       continue;
     }
-    if (paras.some((p) => p.startsWith('|'))) errors.push(`${where}: a table row outside a table (no header and delimiter row)`);
     if (kind === 'dispositions') {
+      if (paras.some((p) => p.startsWith('|'))) errors.push(`${where}: a table row outside a table (no header and delimiter row)`);
       const entries = [];
       if (!tables.length) errors.push(`${where}: no dispositions table`);
       for (const t of tables) {
@@ -170,11 +226,19 @@ export function parseComment(html) {
       dispositions.push({ sha, heading, entries });
       continue;
     }
-    // A review: findings live in tables with "#" and "Finding"; other tables (a file list,
-    // a summary) are skipped unless they look like findings ("#" or an issue column).
-    const findingTables = tables.filter(looksLikeFindings);
+    // A review holds only (allowlist, fail closed): a standalone "No findings." (a review
+    // that is not NOT CLEAN), findings tables (a "#" column) with at least one row, and
+    // prose with no "|" outside code. Anything else is an error, never skipped: a "|" in
+    // text may be a finding row GitHub did not render as a table.
+    const stray = prose.find((p) => p.includes('|'));
+    if (stray) errors.push(`${where}: a table row outside a table ("|" in text; put a literal pipe in backticks): ${stray}`);
     if (items.length) errors.push(`${where}: a list item in a review section (findings go in the table): ${items[0]}`);
-    if (paras.some((p) => NO_FINDINGS.test(p))) {
+    for (const t of tables) {
+      if (!t.header.includes('#')) errors.push(`${where}: a table without a "#" column in a review section (only findings tables): ${t.header.join(' | ')}`);
+    }
+    const findingTables = tables.filter((t) => t.header.includes('#'));
+    const noFindings = paras.some((p) => NO_FINDINGS.test(p));
+    if (noFindings) {
       if (tables.length || items.length || NOT_CLEAN.test(heading)) {
         errors.push(`${where}: "No findings." must stand alone, in a review that is not NOT CLEAN`);
       }
@@ -194,6 +258,9 @@ export function parseComment(html) {
         });
       }
     }
+    if (!noFindings && findingTables.length && !findings.length) {
+      errors.push(`${where}: a findings table with no finding rows (a review with nothing to report says "No findings.")`);
+    }
     reviews.push({ sha, heading, findings });
   }
   return { reviews, dispositions, errors };
@@ -206,8 +273,10 @@ const lastWritten = (c) => (c.edited == null ? time(c.at) : Math.max(time(c.at),
 
 /**
  * Decide from comments ({ at, edited?, minimized?, author?, url, html }) and review threads
- * ({ isResolved, where, url, body }). Returns { exit, open, errors, skipped, reviews,
- * findings }. Any error, or no review at all, is inconclusive: the open list may then be
+ * ({ isResolved, where, url, body }). Returns { exit, open, errors, skipped, dispositions,
+ * reviews, findings }; `dispositions` lists each dispositions comment's sha, author and
+ * url so who cleared which findings is visible (any commenter may: see the trust note in
+ * .github/pull_request_template.md). Any error, or no review at all, is inconclusive: the open list may then be
  * incomplete, so it never reads as PASS. Minimized comments are skipped (the override for
  * a comment the parser must not read) and returned in `skipped` so the bypass is visible.
  */
@@ -216,6 +285,7 @@ export function evaluate({ comments, threads }) {
   const reviews = [];
   const visible = [];
   const skipped = [];
+  const dispositions = [];
   for (const c of comments) {
     if (c.minimized) { skipped.push({ url: c.url, author: c.author ?? '(unknown)' }); continue; }
     if (!Number.isFinite(time(c.at))) errors.push(`${c.url}: no usable timestamp (${c.at})`);
@@ -236,6 +306,7 @@ export function evaluate({ comments, threads }) {
       reviews.push({ ...review, url: c.url, edited: c.edited ?? null });
     }
     for (const disp of parsed.dispositions) {
+      dispositions.push({ sha: disp.sha, author: c.author ?? '(unknown)', url: c.url });
       // The latest review of that commit posted before these dispositions.
       const review = reviews.findLast((r) => sameSha(r.sha, disp.sha));
       if (!review) {
@@ -264,7 +335,7 @@ export function evaluate({ comments, threads }) {
   if (!reviews.length) errors.push('no review found: no "## Review of <sha>" comment on this PR');
   const findings = reviews.reduce((n, r) => n + r.findings.length, 0) + threads.length;
   const exit = errors.length ? EXIT.INCONCLUSIVE : open.length ? EXIT.OPEN : EXIT.PASS;
-  return { exit, open, errors, skipped, reviews: reviews.length, findings };
+  return { exit, open, errors, skipped, dispositions, reviews: reviews.length, findings };
 }
 
 // --- gh layer -------------------------------------------------------------------------
@@ -350,6 +421,7 @@ export async function run({ repo, pr, gh = defaultGh, log = console.log }) {
     return EXIT.INCONCLUSIVE;
   }
   for (const s of result.skipped) log(`SKIPPED minimized comment by ${s.author}: ${s.url}`);
+  for (const d of result.dispositions) log(`DISPOSITIONS for ${d.sha} by ${d.author}: ${d.url}`);
   for (const f of result.open) {
     const at = f.sha ? `${f.sha} #${f.id}` : `thread ${f.where}`;
     const stale = f.stale ? ` (dispositioned before the review was edited at ${f.stale})` : '';

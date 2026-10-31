@@ -27,11 +27,15 @@ findings, 2 inconclusive. Merge needs `All checks` green and the detector at 0.
    - "Independent review of <sha>" and "Re-review of <sha>" are accepted too; the sha may
      be in backticks; text after it is free.
    - `#` is any id, unique within the review (1, M1, N-a). Escape a literal pipe as `\|`.
-   - Findings go in tables only; a list item in a review section is inconclusive. Other
-     tables (a file list, a summary) are fine if they have no `#`/Finding/Issue column.
+   - A review section holds only: findings tables (a `#` column, at least one row),
+     `No findings.`, and prose (subheadings, bold lines, notes). Anything else is
+     inconclusive: a list item, any other table, an empty findings table, or a `|` in
+     text outside code (a row GitHub did not render as a table, e.g. after a blank
+     line). Put a literal pipe in prose in backticks.
    - `### Notes`-style subheadings and bold lines are fine inside a review.
    - A review with nothing to report says `No findings.` on its own line, with no table
-     or list, under a heading that does not say NOT CLEAN.
+     or list, under a heading that does not say NOT CLEAN; a note paragraph on what was
+     checked may follow.
 
 2. Dispositions, posted after the review they answer:
 
@@ -71,10 +75,17 @@ is inconclusive. Outside a review section, a heading that says NOT CLEAN, starts
 "Re-review" (not "Re-review requested"), "Independent review" or "Disposition", starts
 with "Review" and names findings, dispositions or a sha, or names findings and a sha, is
 inconclusive, and so is a table with a `#` column and a Finding/Findings/Issue column.
-In a review or dispositions section, a paragraph starting with `|` (a row GitHub did not render as
-a table) is inconclusive. "## Review notes", "## Reviewer's Guide", "## Findings from QA"
+Outside a review section, any other text (paragraph, list item, quote, table cell,
+summary, raw HTML) that says NOT CLEAN or names "review of <sha>" (so also "re-review of"
+and "Dispositions for the review of") is inconclusive: write the review as a level-2
+heading, or say "Reviews: <sha> CLEAN" in an audit. In a dispositions section, a
+paragraph starting with `|` (a row GitHub did not render as a table) is inconclusive. "## Review notes", "## Reviewer's Guide", "## Findings from QA"
 and "## Pre-merge audit at <sha>" are fine.
 Override: hide (minimize) a comment the detector must not read, e.g. a bot's or an
 old-format review. Minimized comments are skipped and each is printed as SKIPPED with
 its author, so the bypass shows in the output.
+Trust: the detector does not check who posts dispositions; anyone who can comment can
+clear findings. That holds only because this repo is private and only collaborators can
+comment. Each dispositions comment is printed as DISPOSITIONS for <sha> by <login> so
+who cleared what is visible; revisit (enforce an author list) if the repo opens up.
 -->

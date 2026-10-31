@@ -335,7 +335,7 @@ test('R9: "No findings." must stand alone in a review that is not NOT CLEAN; no 
 
 test('R10: honest review layouts are not blocked', () => {
   const ok = {
-    'subheadings, a bold line, "### Verdict: NOT CLEAN" and a summary table in a review': ['r10-honest-review', 'base-dispositions'],
+    'subheadings, a bold line and "### Verdict: NOT CLEAN" in a review': ['r10-honest-review', 'base-dispositions'],
     'sha in backticks': ['r10-backtick-sha'],
     'dispositions sha in backticks': ['base-review', 'r10-backtick-disp'],
     'human and bot headings, "Re-review requested", <!-- in inline code': ['clean', 'r10-human'],
@@ -388,6 +388,72 @@ test('F2: a NOT CLEAN heading outside a recognised review section is inconclusiv
   const h3 = decide('clean', 'f2-not-clean-h3');
   assert.match(errs(h3), /Status: NOT CLEAN" is a level-3 heading/);
   assert.equal(h3.exit, 2);
+});
+
+// --- re-review of 147192b (G1-G4): fail closed by allowlist ------------------------------
+// A review section holds only a standalone "No findings.", findings tables (a "#" column)
+// with rows, and prose with no "|" outside code; anything else is an error. Outside a
+// section, any text block naming a review form is an error.
+
+test('G1: a findings table with a header and no rows is inconclusive, not PASS', () => {
+  const r = decide('g1-empty-table');
+  assert.match(errs(r), /Review of abc1234: NOT CLEAN.*findings table with no finding rows/);
+  assert.equal(r.exit, 2);
+});
+
+test('G2: a finding row GitHub rendered as a paragraph is inconclusive, not PASS', () => {
+  const r = decide('g2-row-after-blank', 'g2-dispositions');
+  assert.match(errs(r), /abc1234.*table row outside a table.*2 \| high \| real bug/);
+  assert.equal(r.exit, 2);
+});
+
+test('G2: a "|" row in a subheading, a summary or a raw element in a review is inconclusive', () => {
+  const r = decide('g2-pipes');
+  assert.match(errs(r), /4444441.*table row outside a table.*in a subheading/);
+  assert.match(errs(r), /4444442.*table row outside a table.*in a summary/);
+  assert.match(errs(r), /4444443.*table row outside a table.*in a raw div/);
+  assert.equal(r.exit, 2);
+});
+
+test('G2: a table without a "#" column in a review section is inconclusive (allowlist)', () => {
+  const r = decide('allowlist-other-table', 'base-dispositions');
+  assert.match(errs(r), /2222222.*table without a "#" column.*item \| problem/);
+  assert.equal(r.exit, 2);
+});
+
+test('G2: a CLEAN review keeps its note paragraph after "No findings." (a pipe in code is fine)', () => {
+  const r = decide('clean-note');
+  assert.deepEqual(r.errors, []);
+  assert.equal(r.exit, 0);
+});
+
+test('G3: a review written as a paragraph outside a section is inconclusive, not PASS', () => {
+  const table = decide('clean', 'g3-paragraph-table');
+  assert.match(errs(table), /"Re-review of abc1234 found problems \(NOT CLEAN\):" is a paragraph that reads as a review/);
+  assert.equal(table.exit, 2);
+  const list = decide('clean', 'g3-paragraph-list');
+  assert.match(errs(list), /"Review of abc1234: NOT CLEAN" is a paragraph that reads as a review/);
+  assert.equal(list.exit, 2);
+});
+
+test('G3: every text block outside a section is checked: quote, cell, summary, heading, raw element, list item', () => {
+  const r = decide('clean', 'g3-blocks');
+  for (const [what, sha] of [['a paragraph', '5555551'], ['a table cell', 'NOT CLEAN in a cell'], ['a summary', '5555553'],
+    ['a level-4 heading', 'NOT CLEAN in a level-4'], ['text in <div>', '5555555'], ['a list item', '5555556']]) {
+    assert.match(errs(r), new RegExp(`${sha}[^"]*" is ${what} that reads as a review`), what);
+  }
+  assert.equal(r.exit, 2);
+});
+
+test('G4: each dispositions comment is returned and printed with its author', async () => {
+  const r = evaluate({ comments: [{ at: at(0), url: 'rev', html: fx('base-review') },
+    { at: at(1), url: 'disp', author: 'mallory', html: fx('base-dispositions') }], threads: [] });
+  assert.deepEqual(r.dispositions, [{ sha: '2222222', author: 'mallory', url: 'disp' }]);
+  assert.equal(r.exit, 0);
+  const { gh } = fakeGh({ comments: [[issueComment(0, 'base-review'), issueComment(1, 'base-dispositions', { author: { login: 'mallory' } })]] });
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 0);
+  assert.match(out.lines.join('\n'), /DISPOSITIONS for 2222222 by mallory: c1/);
 });
 
 // --- the gh layer -----------------------------------------------------------------
