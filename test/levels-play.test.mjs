@@ -51,6 +51,29 @@ const SIG_DATA = [['duration', 'metric'], ['cpu-time', 'metric'], ['declined', '
 const SIG_ASK = [['rps', 'metric'], ['slow-call', 'trace'], ['provider', 'log'], ['cpu-fn', 'profile']];
 const OTEL_PARTS = [['start-span', 'api'], ['batch', 'sdk'], ['wire', 'otlp'], ['pipeline', 'collector'], ['method', 'semconv']];
 
+// Act 2 answers (docs/M1-DESIGN.md §6), span ids spelled out here so a wrong id in a level fails.
+// 2.1 (trace 4bf9...): B under A, C under B, D under C; E (trace 0af7...) stays a root.
+const SAT_TREE = [['b7ad6b7169203331', '00f067aa0ba902b7'], ['53995c3f42cd8ad8', 'b7ad6b7169203331'], ['1d5c3a2f8e4b6a90', '53995c3f42cd8ad8']];
+// 2.2: checkout POST /checkout, POST payments; payments POST /charge, POST provider/charges;
+// orders publish; shipping orders process. checkout compute totals stays INTERNAL.
+const KINDS_MAP = [
+  ['3a7f5c9e1b2d4f60', 'SERVER'], ['6c2d8e0f4a1b3957', 'CLIENT'], ['b5f3a1c7e9d20486', 'SERVER'],
+  ['0d9e7c5b3a1f8264', 'CLIENT'], ['f1e2d3c4b5a69788', 'PRODUCER'], ['2b4d6f8091a3c5e7', 'CONSUMER'],
+];
+
+// 2.3: a storefront CLIENT 404 Error ok; b catalog SERVER 404 Error wrong; c checkout SERVER
+// 500 Unset wrong; d inventory SERVER 200 Unset ok. 2.5: what may ride in baggage.
+const STATUS_SORT = [['a', 'ok'], ['b', 'wrong'], ['c', 'wrong'], ['d', 'ok']];
+const BAG_SORT = [['variant', 'ok'], ['tier', 'ok'], ['email', 'never'], ['token', 'never'], ['last4', 'never']];
+
+/** Pick each span, then its `attr` value (Build it), with this file's click. */
+function buildAll(attr, pairs) {
+  for (const [span, value] of pairs) {
+    click(`[data-span="${span}"]`);
+    click(`[data-${attr}="${value}"]`);
+  }
+}
+
 /** One driver per registered level id. */
 const DRIVERS = {
   'monitoring-vs-observability': {
@@ -125,6 +148,91 @@ const DRIVERS = {
         click('#pager-escalate');
       },
       expect: { stars: 0, cards: [] },
+    },
+  },
+  'spans-and-traces': {
+    play() {
+      click('[data-pick="trace-id"]');
+      click('#sat-next');
+      buildAll('parent', SAT_TREE);
+      click('#sat-tree-check');
+      click('#sat-next');
+      click('[data-pick="other-request"]');
+      click('#sat-finish');
+    },
+    expect: { stars: 3, cards: ['no-trace-object'] },
+    sloppy: {
+      play() {
+        click('[data-pick="trace-id"]');
+        click('#sat-next');
+        buildAll('parent', [['9e1f2a3b4c5d6e7f', '53995c3f42cd8ad8']]); // E under C: another trace
+        click('#sat-tree-check'); // one failed check
+        click('[data-parent="none"]');
+        buildAll('parent', SAT_TREE);
+        click('#sat-tree-check');
+        click('#sat-next');
+        click('[data-pick="other-request"]');
+        click('#sat-finish');
+      },
+      expect: { stars: 2, cards: ['no-trace-object'] },
+    },
+  },
+  'span-kinds': {
+    play() {
+      buildAll('kind', KINDS_MAP);
+      click('#kinds-map-check');
+      click('#kinds-next');
+      click('[data-pick="loses-edge"]');
+      click('#kinds-finish');
+    },
+    expect: { stars: 3, cards: ['span-kind-edges'] },
+    sloppy: {
+      play() {
+        buildAll('kind', KINDS_MAP);
+        click('#kinds-map-check');
+        click('#kinds-next');
+        click('[data-pick="nothing"]'); // one wrong pick
+        click('[data-pick="loses-edge"]');
+        click('#kinds-finish');
+      },
+      expect: { stars: 2, cards: ['span-kind-edges'] },
+    },
+  },
+  'status-and-errors': {
+    play() {
+      sortAll(STATUS_SORT);
+      click('#status-next');
+      click('[data-pick="stays-ok"]');
+      click('#status-finish');
+    },
+    expect: { stars: 3, cards: ['span-status'] },
+    sloppy: {
+      play() {
+        sortAll([['b', 'ok'], ...STATUS_SORT]); // one wrong placement: a SERVER 404 as Error
+        click('#status-next');
+        click('[data-pick="stays-ok"]');
+        click('#status-finish');
+      },
+      expect: { stars: 2, cards: ['span-status'] },
+    },
+  },
+  baggage: {
+    play() {
+      sortAll(BAG_SORT);
+      click('#bag-next');
+      click('[data-pick="only-if-copied"]');
+      click('#bag-finish');
+    },
+    expect: { stars: 3, cards: ['baggage-leaks'] },
+    sloppy: {
+      play() {
+        sortAll(BAG_SORT);
+        click('#bag-next');
+        click('[data-pick="yes-auto"]'); // one wrong pick
+        click('[data-pick="only-if-copied"]');
+        click('#bag-finish');
+      },
+      expect: { stars: 2, cards: ['baggage-leaks'] },
     },
   },
   'naming-your-service': {

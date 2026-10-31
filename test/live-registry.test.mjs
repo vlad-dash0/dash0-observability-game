@@ -11,13 +11,17 @@ import { liveRegistry } from '../app.mjs';
 const nodeIds = NODES.map((n) => n.id);
 
 // Extended on purpose with each level PR (docs/M1-DESIGN.md §5): Act 0 (P3) plays before Act 1;
-// its boss, the pager (P4), comes after its levels.
+// its boss, the pager (P4), comes after its levels; Act 2 (P6: 2.1, 2.2) plays after Act 1.
 const EXPECTED_ORDER = [
   'monitoring-vs-observability',
   'the-signals',
   'why-opentelemetry',
   'the-pager',
   'naming-your-service',
+  'spans-and-traces',
+  'span-kinds',
+  'status-and-errors',
+  'baggage',
 ];
 
 test('the live registry builds against the real deck and map nodes', () => {
@@ -26,7 +30,7 @@ test('the live registry builds against the real deck and map nodes', () => {
   assert.deepEqual(liveRegistry().order, EXPECTED_ORDER, 'app.mjs builds the same registry');
 });
 
-test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), then Act 1', () => {
+test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, then Act 2 "Traces"', () => {
   const acts = liveRegistry().acts.map((a) => ({ id: a.id, no: a.no, name: a.name, sub: a.sub, levelIds: [...a.levelIds], bossId: a.bossId }));
   assert.deepEqual(acts, [
     {
@@ -43,6 +47,14 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), then Act 1', ()
       name: 'Resources and identity',
       sub: 'Who is talking?',
       levelIds: ['naming-your-service'],
+      bossId: null,
+    },
+    {
+      id: 'act-2',
+      no: 2,
+      name: 'Traces',
+      sub: 'Follow the request',
+      levelIds: ['spans-and-traces', 'span-kinds', 'status-and-errors', 'baggage'],
       bossId: null,
     },
   ]);

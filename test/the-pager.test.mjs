@@ -51,11 +51,12 @@ test('the-pager: an unscored Act 0 boss with no cards and no lights', () => {
   assert.equal(LIVE.acts.find((a) => a.id === 'act-0').bossId, 'the-pager');
 });
 
-test('the-pager: star totals are unchanged by the boss (4 scored levels, max 12)', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 12 });
+// Raised with each scored level PR, like EXPECTED_ORDER (P6 added 2.1 and 2.2, P7 2.3 and 2.5).
+test('the-pager: star totals are unchanged by the boss (8 scored levels, max 24)', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 24 });
   const all = emptyProgress();
   for (const id of LIVE.order) all.levels[id] = { stars: 3, at: null };
-  assert.deepEqual(starTotals(all, LIVE), { earned: 12, max: 12 }, 'the boss adds nothing');
+  assert.deepEqual(starTotals(all, LIVE), { earned: 24, max: 24 }, 'the boss adds nothing');
 });
 
 // ---- play -------------------------------------------------------------------------

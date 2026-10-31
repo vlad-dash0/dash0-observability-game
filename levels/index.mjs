@@ -12,8 +12,12 @@
 //   3. Add DRIVERS['<id>'] (happy and sloppy runs) in test/levels-play.test.mjs.
 //
 // Act: { id, no, name, sub, levels: [level, ...], boss: level | null }.
+import baggage from './baggage.mjs';
 import monitoringVsObservability from './monitoring-vs-observability.mjs';
 import namingYourService from './naming-your-service.mjs';
+import spanKinds from './span-kinds.mjs';
+import spansAndTraces from './spans-and-traces.mjs';
+import statusAndErrors from './status-and-errors.mjs';
 import thePager from './the-pager.mjs';
 import theSignals from './the-signals.mjs';
 import whyOpentelemetry from './why-opentelemetry.mjs';
@@ -33,6 +37,14 @@ export const ACTS = [
     name: 'Resources and identity',
     sub: 'Who is talking?',
     levels: [namingYourService],
+    boss: null,
+  },
+  {
+    id: 'act-2',
+    no: 2,
+    name: 'Traces',
+    sub: 'Follow the request',
+    levels: [spansAndTraces, spanKinds, statusAndErrors, baggage],
     boss: null,
   },
 ];
