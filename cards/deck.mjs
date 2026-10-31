@@ -112,8 +112,8 @@ export const DECK = [
   {
     id: 'exception-no-status',
     front:
-      'Recording an exception does not set the span status. Status is set separately, and a ' +
-      'handled exception leaves it Unset.',
+      'An exception record and the span status are separate fields: recording one never sets ' +
+      'the other. Set Error when the operation fails.',
     back:
       'An exception can be recorded as a span event (the Trace API RecordException, still ' +
       'Stable) or as a log record, which semantic conventions 1.44 now recommend: they mark ' +

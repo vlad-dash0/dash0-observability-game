@@ -230,7 +230,7 @@ const FRONTS = {
   'span-status': 'Status starts Unset. A 4xx is Error on the CLIENT span but stays Unset on the SERVER span. Ok is a final override.',
   'baggage-leaks': 'Baggage is not copied onto spans for you, and it travels in plain headers to every downstream, third parties too.',
   'broken-propagation': 'When a hop drops the traceparent header, one request becomes two traces: look for unexpected root spans.',
-  'exception-no-status': 'Recording an exception does not set the span status. Status is set separately, and a handled exception leaves it Unset.',
+  'exception-no-status': 'An exception record and the span status are separate fields: recording one never sets the other. Set Error when the operation fails.',
   'batch-links': 'A span has at most one parent. A consumer handling a batch from many traces links to each message\'s context.',
 };
 

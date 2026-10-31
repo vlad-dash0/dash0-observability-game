@@ -271,8 +271,8 @@ recorded and escaped, given UNSET → ERROR; `charge with retry` (one span over 
 charge, retries included) handled a reset and retried inside the span, nothing recorded,
 given ERROR (set by a helper) → UNSET; inventory `GET /stock` no exception → UNSET.
 Step 3 Build `edit:['links']`: notifications `send batch` CONSUMER (root) links the three
-`orders publish` spans from three traces. Cards: "Recording an exception does not set the span
-status. Status is set separately, and a handled exception leaves it Unset." (true in every
+`orders publish` spans from three traces. Cards: "An exception record and the span status are
+separate fields: recording one never sets the other. Set Error when the operation fails." (true in every
 language, Python's context manager included: it sets Error on an escaping exception as a
 separate step) / "A span has at most one parent. A consumer handling a batch from many traces
 links to each message's context." The first card's back says semantic conventions 1.44 mark
