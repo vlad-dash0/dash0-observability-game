@@ -45,10 +45,11 @@ findings, 2 inconclusive. Merge needs `All checks` green and the detector at 0.
 
    Every `#` must exist in the latest earlier review of that sha. Other columns
    (Severity) are allowed. These cells leave the finding open (formatting such as
-   `**`, backticks or a trailing period ignored): empty, `&nbsp;`, `-`, `—`, `?`, `TBD`,
-   `TODO`, `open`, `N/A`, or one of the last four followed by `:`/`—` and more text.
-   If the review is edited, dispositions posted before the edit no longer count: post a
-   fresh one for every finding.
+   bold, code, strikethrough or a trailing period ignored): no letter or digit (empty,
+   `&nbsp;`, `-`, `—`, `?`), `TBD`, `TODO`, `open`, `N/A`, `pending`, `none`, or one of
+   those words followed by `:`/`—` and more text.
+   If the review is edited, dispositions last written (posted or edited) before that
+   edit no longer count: post or edit in a fresh one for every finding.
 
 3. Combined, when the fixes land before the comment is posted:
 
@@ -60,17 +61,19 @@ findings, 2 inconclusive. Merge needs `All checks` green and the detector at 0.
 
 Inline review threads count as findings; resolve a thread when it is addressed.
 
-What the detector reads is what GitHub renders. Tables are GFM tables, found by their
-delimiter row, with or without outer pipes (`# | Finding` / `--- | ---` works); a second
-table needs a blank line before it. Blockquoted text is read. Text in an HTML comment, a
-fenced code block or a 4-space/tab indented code block does not count; an unterminated
-comment or fence is inconclusive. Review and dispositions headings must be level 2
-("## "); the same form at another level, setext or as a bold line is inconclusive.
-Outside a review section, a heading that starts with "Re-review", "Independent review"
-or "Disposition", starts with "Review" and names findings, dispositions or a sha, or
-names findings and a sha, is inconclusive, and so is a table with a `#` column and a
-Finding/Findings/Issue column. "## Review notes", "## Reviewer's Guide", "## Findings
-from QA" and "## Pre-merge audit at <sha>" are fine.
+What the detector reads is what GitHub renders: each comment's HTML (`bodyHTML`, so run
+`npm ci` first). Sections start at level-1/2 headings (`##` or a `---` underline both
+render as one; a heading inside a blockquote counts); tables are rendered tables. Text in
+an HTML comment or code (fenced, indented or inline) is never a heading or table, so it
+does not count; a raw HTML `<h2>` or `<table>` that GitHub displays does. Review and
+dispositions headings must be level 2; the same form at another level or as a bold line
+is inconclusive. Outside a review section, a heading that says NOT CLEAN, starts with
+"Re-review" (not "Re-review requested"), "Independent review" or "Disposition", starts
+with "Review" and names findings, dispositions or a sha, or names findings and a sha, is
+inconclusive, and so is a table with a `#` column and a Finding/Findings/Issue column.
+In a review or dispositions section, a paragraph starting with `|` (a row GitHub did not render as
+a table) is inconclusive. "## Review notes", "## Reviewer's Guide", "## Findings from QA"
+and "## Pre-merge audit at <sha>" are fine.
 Override: hide (minimize) a comment the detector must not read, e.g. a bot's or an
 old-format review. Minimized comments are skipped and each is printed as SKIPPED with
 its author, so the bypass shows in the output.
