@@ -21,7 +21,9 @@ const EXPECTED_ORDER = [
   'spans-and-traces',
   'span-kinds',
   'status-and-errors',
+  'context-propagation',
   'baggage',
+  'events-and-links',
 ];
 
 test('the live registry builds against the real deck and map nodes', () => {
@@ -54,7 +56,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, then Act
       no: 2,
       name: 'Traces',
       sub: 'Follow the request',
-      levelIds: ['spans-and-traces', 'span-kinds', 'status-and-errors', 'baggage'],
+      levelIds: ['spans-and-traces', 'span-kinds', 'status-and-errors', 'context-propagation', 'baggage', 'events-and-links'],
       bossId: null,
     },
   ]);

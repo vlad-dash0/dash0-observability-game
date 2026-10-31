@@ -13,6 +13,8 @@
 //
 // Act: { id, no, name, sub, levels: [level, ...], boss: level | null }.
 import baggage from './baggage.mjs';
+import contextPropagation from './context-propagation.mjs';
+import eventsAndLinks from './events-and-links.mjs';
 import monitoringVsObservability from './monitoring-vs-observability.mjs';
 import namingYourService from './naming-your-service.mjs';
 import spanKinds from './span-kinds.mjs';
@@ -44,7 +46,7 @@ export const ACTS = [
     no: 2,
     name: 'Traces',
     sub: 'Follow the request',
-    levels: [spansAndTraces, spanKinds, statusAndErrors, baggage],
+    levels: [spansAndTraces, spanKinds, statusAndErrors, contextPropagation, baggage, eventsAndLinks],
     boss: null,
   },
 ];

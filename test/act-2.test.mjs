@@ -1,8 +1,8 @@
-// Act 2 levels 2.1, 2.2, 2.3 and 2.5 beyond the play-through: the answer tables pinned
-// to docs/M1-DESIGN.md §6, reference solvability through the widgets' own checkers (I7),
+// Act 2 levels 2.1 to 2.6 beyond the play-through: the answer tables pinned to
+// docs/M1-DESIGN.md §6, reference solvability through the widgets' own checkers (I7),
 // one penalty per run from a clean start, outcomes stated in words, the "Map edges"
 // line from serviceEdges, and a focus walk that ends on Finish. Spec: docs/M1-DESIGN.md
-// §6 Act 2 and §7 P6, P7. The happy and sloppy runs live in test/levels-play.test.mjs.
+// §6 Act 2 and §7 P6, P7, P8. The happy and sloppy runs live in test/levels-play.test.mjs.
 // Asserts strings, numbers and booleans only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { makeDom, q, qa, click } from './helpers/dom.mjs';
 import { recordFocus } from './helpers/focus.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
-import { checkBuild, newBuildState, setKind, setParent, toggleLink, validateBuildSpec } from '../lib/widgets/build-it.mjs';
+import { checkBuild, newBuildState, setKind, setParent, setStatus, toggleLink, validateBuildSpec } from '../lib/widgets/build-it.mjs';
 import { serviceEdges } from '../lib/widgets/trace.mjs';
 import { isComplete, newSortState, place, validateSortSpec } from '../lib/widgets/sort-it.mjs';
 import { liveRegistry } from '../app.mjs';
@@ -19,9 +19,12 @@ import sat, { CONTENT as SAT } from '../levels/spans-and-traces.mjs';
 import kinds, { CONTENT as KINDS } from '../levels/span-kinds.mjs';
 import status, { CONTENT as STATUS } from '../levels/status-and-errors.mjs';
 import baggage, { CONTENT as BAGGAGE } from '../levels/baggage.mjs';
+import prop, { CONTENT as PROP } from '../levels/context-propagation.mjs';
+import evl, { CONTENT as EVL } from '../levels/events-and-links.mjs';
 import { b1Spec } from './fixtures/build-b1.mjs';
 
 const LIVE = liveRegistry();
+const SPEC_HOSTS = ['opentelemetry.io', 'www.w3.org'];
 const plain = (html) => html.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&gt;/g, '>');
 const read = (rel) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 
@@ -33,8 +36,9 @@ const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
 // key and words its labels carry, the Sort spec's buckets, item -> bucket and words each
 // item label carries, or the Build spec's edit and its spans. A span is
 // `service name` -> [kind, startMs, endMs, trace, given parent, expected parent,
-// expected kind, expected links]; parents and links are named the same way, a trace
-// by its first four hex digits.
+// expected kind, expected links, given status, expected status]; parents and links are
+// named the same way, a trace by its first four hex digits. Spans that share a service
+// and name are told apart by their trace: `service name trace`.
 const PIN = {
   'spans-and-traces': {
     prefix: 'sat',
@@ -51,11 +55,11 @@ const PIN = {
         build: 'sat-tree',
         edit: ['parent'],
         spans: {
-          'storefront POST /checkout': ['SERVER', 0, 100, '4bf9', null, null, 'SERVER', []],
-          'storefront POST api-gateway': ['CLIENT', 10, 90, '4bf9', null, 'storefront POST /checkout', 'CLIENT', []],
-          'api-gateway POST /checkout': ['SERVER', 15, 85, '4bf9', null, 'storefront POST api-gateway', 'SERVER', []],
-          'api-gateway validate cart': ['INTERNAL', 20, 30, '4bf9', null, 'api-gateway POST /checkout', 'INTERNAL', []],
-          'storefront GET /products': ['SERVER', 40, 60, '0af7', null, null, 'SERVER', []],
+          'storefront POST /checkout': ['SERVER', 0, 100, '4bf9', null, null, 'SERVER', [], 'UNSET', 'UNSET'],
+          'storefront POST api-gateway': ['CLIENT', 10, 90, '4bf9', null, 'storefront POST /checkout', 'CLIENT', [], 'UNSET', 'UNSET'],
+          'api-gateway POST /checkout': ['SERVER', 15, 85, '4bf9', null, 'storefront POST api-gateway', 'SERVER', [], 'UNSET', 'UNSET'],
+          'api-gateway validate cart': ['INTERNAL', 20, 30, '4bf9', null, 'api-gateway POST /checkout', 'INTERNAL', [], 'UNSET', 'UNSET'],
+          'storefront GET /products': ['SERVER', 40, 60, '0af7', null, null, 'SERVER', [], 'UNSET', 'UNSET'],
         },
       },
       {
@@ -74,13 +78,13 @@ const PIN = {
         build: 'kinds-map',
         edit: ['kind'],
         spans: {
-          'checkout POST /checkout': ['INTERNAL', 0, 120, 'c4e1', null, null, 'SERVER', []],
-          'checkout POST payments': ['INTERNAL', 20, 100, 'c4e1', 'checkout POST /checkout', 'checkout POST /checkout', 'CLIENT', []],
-          'payments POST /charge': ['INTERNAL', 25, 95, 'c4e1', 'checkout POST payments', 'checkout POST payments', 'SERVER', []],
-          'payments POST provider/charges': ['INTERNAL', 30, 90, 'c4e1', 'payments POST /charge', 'payments POST /charge', 'CLIENT', []],
-          'checkout compute totals': ['INTERNAL', 5, 15, 'c4e1', 'checkout POST /checkout', 'checkout POST /checkout', 'INTERNAL', []],
-          'orders orders publish': ['INTERNAL', 130, 135, 'a1b2', null, null, 'PRODUCER', []],
-          'shipping orders process': ['INTERNAL', 150, 170, '7d3e', null, null, 'CONSUMER', ['orders orders publish']],
+          'checkout POST /checkout': ['INTERNAL', 0, 120, 'c4e1', null, null, 'SERVER', [], 'UNSET', 'UNSET'],
+          'checkout POST payments': ['INTERNAL', 20, 100, 'c4e1', 'checkout POST /checkout', 'checkout POST /checkout', 'CLIENT', [], 'UNSET', 'UNSET'],
+          'payments POST /charge': ['INTERNAL', 25, 95, 'c4e1', 'checkout POST payments', 'checkout POST payments', 'SERVER', [], 'UNSET', 'UNSET'],
+          'payments POST provider/charges': ['INTERNAL', 30, 90, 'c4e1', 'payments POST /charge', 'payments POST /charge', 'CLIENT', [], 'UNSET', 'UNSET'],
+          'checkout compute totals': ['INTERNAL', 5, 15, 'c4e1', 'checkout POST /checkout', 'checkout POST /checkout', 'INTERNAL', [], 'UNSET', 'UNSET'],
+          'orders orders publish': ['INTERNAL', 130, 135, 'a1b2', null, null, 'PRODUCER', [], 'UNSET', 'UNSET'],
+          'shipping orders process': ['INTERNAL', 150, 170, '7d3e', null, null, 'CONSUMER', ['orders orders publish'], 'UNSET', 'UNSET'],
         },
       },
       {
@@ -140,6 +144,74 @@ const PIN = {
       },
     ],
   },
+  'context-propagation': {
+    prefix: 'prop',
+    level: { no: '2.4', mechanics: ['build'], cards: ['broken-propagation'], lights: ['orders'], scoring: { parMs: null } },
+    steps: [
+      {
+        choice: 'prop',
+        question: 'Where did the trace break?',
+        keys: ['checkout', 'proxy', 'storefront'],
+        right: 'proxy',
+        says: { proxy: 'nginx', checkout: 'checkout', storefront: 'storefront' },
+      },
+      {
+        choice: 'prop-tp',
+        question: 'Which traceparent would checkout accept?',
+        keys: ['short-parent', 'uppercase', 'valid', 'zero-trace'],
+        right: 'valid',
+        says: {
+          valid: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
+          'zero-trace': '00-00000000000000000000000000000000-00f067aa0ba902b7-01',
+          uppercase: '00-4BF92F3577B34DA6A3CE929D0E0E4736-00F067AA0BA902B7-01',
+          'short-parent': '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b-01',
+        },
+      },
+      {
+        build: 'prop-tree',
+        edit: ['parent'],
+        spans: {
+          'storefront POST /checkout': ['SERVER', 0, 100, '4bf9', null, null, 'SERVER', [], 'UNSET', 'UNSET'],
+          'storefront POST checkout': ['CLIENT', 10, 90, '4bf9', 'storefront POST /checkout', 'storefront POST /checkout', 'CLIENT', [], 'UNSET', 'UNSET'],
+          'checkout POST /checkout': ['SERVER', 15, 85, '4bf9', null, 'storefront POST checkout', 'SERVER', [], 'UNSET', 'UNSET'],
+          'checkout POST orders': ['CLIENT', 30, 60, '4bf9', 'checkout POST /checkout', 'checkout POST /checkout', 'CLIENT', [], 'UNSET', 'UNSET'],
+          'orders POST /orders': ['SERVER', 32, 58, '4bf9', 'checkout POST orders', 'checkout POST orders', 'SERVER', [], 'UNSET', 'UNSET'],
+        },
+      },
+    ],
+  },
+  'events-and-links': {
+    prefix: 'evl',
+    level: { no: '2.6', mechanics: ['build'], cards: ['exception-no-status', 'batch-links'], lights: [], scoring: { parMs: null } },
+    steps: [
+      {
+        choice: 'evl',
+        question: 'What status does the span end with?',
+        keys: ['error', 'event-only', 'unset'],
+        right: 'unset',
+        says: { unset: 'Unset', error: 'Error', 'event-only': 'span event' },
+      },
+      {
+        build: 'evl-errors',
+        edit: ['status'],
+        spans: {
+          'payments charge': ['INTERNAL', 0, 80, 'c9f0', null, null, 'INTERNAL', [], 'UNSET', 'ERROR'],
+          'payments charge attempt 1': ['INTERNAL', 10, 40, 'd3d9', null, null, 'INTERNAL', [], 'ERROR', 'UNSET'],
+          'inventory GET /stock': ['SERVER', 50, 60, 'e4da', null, null, 'SERVER', [], 'UNSET', 'UNSET'],
+        },
+      },
+      {
+        build: 'evl-batch',
+        edit: ['links'],
+        spans: {
+          'orders orders publish 6512': ['PRODUCER', 0, 5, '6512', null, null, 'PRODUCER', [], 'UNSET', 'UNSET'],
+          'orders orders publish c20a': ['PRODUCER', 10, 15, 'c20a', null, null, 'PRODUCER', [], 'UNSET', 'UNSET'],
+          'orders orders publish c51c': ['PRODUCER', 20, 25, 'c51c', null, null, 'PRODUCER', [], 'UNSET', 'UNSET'],
+          'notifications send batch': ['CONSUMER', 40, 70, 'aab3', null, null, 'CONSUMER', ['orders orders publish 6512', 'orders orders publish c20a', 'orders orders publish c51c'], 'UNSET', 'UNSET'],
+        },
+      },
+    ],
+  },
 };
 
 const LEVELS = {
@@ -147,6 +219,8 @@ const LEVELS = {
   'span-kinds': [kinds, KINDS],
   'status-and-errors': [status, STATUS],
   baggage: [baggage, BAGGAGE],
+  'context-propagation': [prop, PROP],
+  'events-and-links': [evl, EVL],
 };
 
 // The card fronts in docs/M1-DESIGN.md §6.
@@ -155,11 +229,19 @@ const FRONTS = {
   'span-kind-edges': 'Span kind is not cosmetic: service maps draw edges from CLIENT to SERVER and PRODUCER to CONSUMER pairs.',
   'span-status': 'Status starts Unset. A 4xx is Error on the CLIENT span but stays Unset on the SERVER span. Ok is a final override.',
   'baggage-leaks': 'Baggage is not copied onto spans for you, and it travels in plain headers to every downstream, third parties too.',
+  'broken-propagation': 'When a hop drops the traceparent header, one request becomes two traces: look for unexpected root spans.',
+  'exception-no-status': 'Recording an exception does not set the span status. Status is set separately, and a handled exception leaves it Unset.',
+  'batch-links': 'A span has at most one parent. A consumer handling a batch from many traces links to each message\'s context.',
 };
 
+/** A span's pin key: `service name`, plus its trace's first four hex digits when another span shares both. */
+const keyOf = (spans, s) => {
+  const twin = spans.some((x) => x !== s && x.service === s.service && x.name === s.name);
+  return `${s.service} ${s.name}${twin ? ` ${s.traceId.slice(0, 4)}` : ''}`;
+};
 const nameOf = (spans, id) => {
   const s = spans.find((x) => x.spanId === id);
-  return s ? `${s.service} ${s.name}` : null;
+  return s ? keyOf(spans, s) : null;
 };
 
 /** The reference answer applied to the spec's spans (fresh copies). */
@@ -176,8 +258,8 @@ function shape(step) {
       spec.spans.map((s, i) => {
         const w = want[i];
         return [
-          `${s.service} ${s.name}`,
-          [s.kind, s.startMs, s.endMs, s.traceId.slice(0, 4), nameOf(spec.spans, s.parentId), nameOf(spec.spans, w.parentId), w.kind, w.links.map((l) => nameOf(spec.spans, l))],
+          keyOf(spec.spans, s),
+          [s.kind, s.startMs, s.endMs, s.traceId.slice(0, 4), nameOf(spec.spans, s.parentId), nameOf(spec.spans, w.parentId), w.kind, w.links.map((l) => nameOf(spec.spans, l)), s.status, w.status],
         ];
       }),
     );
@@ -250,6 +332,7 @@ for (const [id, [level, content]] of Object.entries(LEVELS)) {
         for (const [sid, want] of Object.entries(spec.answer)) {
           if (Object.hasOwn(want, 'parentId')) outcomes.push(setParent(spec, st, sid, want.parentId));
           if (Object.hasOwn(want, 'kind')) outcomes.push(setKind(spec, st, sid, want.kind));
+          if (Object.hasOwn(want, 'status')) outcomes.push(setStatus(spec, st, sid, want.status));
           for (const l of want.links ?? []) if (!st.spans[sid].links.includes(l)) outcomes.push(toggleLink(spec, st, sid, l) === 'linked' ? 'set' : 'unlinked');
         }
         assert.deepEqual([...new Set(outcomes)], ['set'], `${spec.id}: every reference edit is accepted`);
@@ -311,14 +394,18 @@ test('Act 2 card fronts match docs/M1-DESIGN.md §6 and fit a card (<=140)', () 
     const card = DECK.find((c) => c.id === id);
     assert.equal(card?.front, front, id);
     assert.equal(front.length <= 140, true, `${id} front is ${front.length} characters`);
-    assert.equal(card.specUrl.startsWith('https://opentelemetry.io/'), true, `${id} specUrl`);
+    assert.equal(SPEC_HOSTS.includes(new URL(card.specUrl).host), true, `${id} specUrl ${card.specUrl}`);
   }
 });
 
-test('span-kinds copy says "backends derive", never "the spec says"', () => {
+/** The level files of Act 2, from the live registry (never a hand list). */
+const ACT2_FILES = LIVE.acts.find((a) => a.id === 'act-2').levelIds.map((id) => `levels/${id}.mjs`);
+
+test('span-kinds copy says "backends derive", and no Act 2 level file says "the spec says"', () => {
   const text = read('levels/span-kinds.mjs') + JSON.stringify(DECK.find((c) => c.id === 'span-kind-edges'));
   assert.equal(/backends derive/i.test(text), true);
-  for (const f of ['levels/spans-and-traces.mjs', 'levels/span-kinds.mjs']) {
+  assert.equal(ACT2_FILES.length, Object.keys(LEVELS).length, 'every Act 2 level file is scanned');
+  for (const f of ACT2_FILES) {
     assert.equal(/the spec says/i.test(read(f)), false, f);
   }
 });
@@ -339,6 +426,62 @@ test('status-and-errors: the sort follows the HTTP rule (4xx Error only on CLIEN
     const [, given] = label.match(/status (Error|Unset|Ok)\b/);
     assert.equal(it.bucket, given === rule(kind, Number(code)) ? 'ok' : 'wrong', `${it.id}: ${label}`);
   }
+});
+
+/** W3C Trace Context traceparent, version 00: lowercase hex, IDs not all zero. */
+const TRACEPARENT = /^00-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-[0-9a-f]{2}$/;
+
+test('context-propagation: only the right traceparent is valid, and its parent-id is checkout\'s parent', () => {
+  const choices = PROP.steps[1].choices;
+  const valid = choices.filter((c) => TRACEPARENT.test(plain(c.label))).map((c) => c.key);
+  assert.deepEqual(valid, ['valid']);
+  const [, traceId, parentId] = plain(choices.find((c) => c.right).label).split('-');
+  const spec = PROP.steps[2].build;
+  const checkout = spec.spans.find((s) => s.service === 'checkout' && s.kind === 'SERVER');
+  assert.equal(spec.answer[checkout.spanId].parentId, parentId, 'the parent named by parent-id');
+  assert.equal(spec.spans.every((s) => s.traceId === traceId), true, 'every span carries the header\'s trace ID');
+  assert.equal(checkout.parentId, null, 'checkout starts as a root');
+});
+
+test('context-propagation: the hops show nginx dropping traceparent, and the break makes two roots', () => {
+  const hops = PROP.steps[0].hops;
+  assert.deepEqual(hops.map((h) => `${h.from}>${h.to}`), ['storefront>nginx', 'nginx>checkout']);
+  assert.equal(TRACEPARENT.test(hops[0].traceparent), true, 'storefront sends a valid traceparent');
+  assert.equal(hops[1].traceparent, null, 'nginx forwards none');
+  const roots = PROP.steps[0].roots;
+  assert.equal(roots.length, 2);
+  assert.notEqual(roots[0].traceId, roots[1].traceId, 'two traces');
+});
+
+test('events-and-links: an exception record never decides the status; a failed charge is Error, a handled attempt Unset', () => {
+  const spec = EVL.steps[1].build;
+  const want = Object.fromEntries(answered(spec).map((s) => [s.name, s.status]));
+  assert.deepEqual(want, { charge: 'ERROR', 'charge attempt 1': 'UNSET', 'GET /stock': 'UNSET' });
+  const charge = spec.spans.find((s) => s.name === 'charge');
+  assert.deepEqual(charge.events.map((e) => e.name), ['exception'], 'charge recorded its exception');
+  assert.equal(charge.status, 'UNSET', 'and the record left its status Unset');
+  for (const s of spec.spans.filter((x) => x.name !== 'charge')) {
+    assert.deepEqual(s.events, [], `${s.name}: nothing recorded`);
+  }
+  const why = plain(EVL.steps[0].choices.find((c) => c.right).why);
+  assert.equal(/span event/.test(why) && /log record/.test(why), true, 'however it is recorded');
+});
+
+test('events-and-links: the batch consumer is a root that links one publish from each of three traces', () => {
+  const spec = EVL.steps[2].build;
+  const send = spec.spans.find((s) => s.name === 'send batch');
+  assert.equal(send.kind, 'CONSUMER');
+  assert.equal(send.parentId, null);
+  const linked = spec.answer[send.spanId].links.map((id) => spec.spans.find((s) => s.spanId === id));
+  assert.deepEqual(linked.map((s) => `${s.kind} ${s.name}`), ['PRODUCER orders publish', 'PRODUCER orders publish', 'PRODUCER orders publish']);
+  assert.equal(new Set([send.traceId, ...linked.map((s) => s.traceId)]).size, 4, 'four traces');
+  const edges = serviceEdges(answered(spec)).map((x) => `${x.from}>${x.to}:${x.via}`);
+  assert.deepEqual(edges, ['orders>notifications:producer-consumer']);
+});
+
+test('events-and-links: the exception card names the semconv deprecation and the Stable Trace API', () => {
+  const back = DECK.find((c) => c.id === 'exception-no-status')?.back ?? '';
+  assert.equal(/log record/.test(back) && /Deprecated/.test(back) && /Stable/.test(back), true, back);
 });
 
 // ---- play: one penalty per run, words, focus ------------------------------------
@@ -365,7 +508,7 @@ function start(id) {
 /** The Build spec of `id`'s step `i`, and its span ids by `service name`. */
 function buildOf(id, i) {
   const spec = LEVELS[id][1].steps[i].build;
-  const ids = Object.fromEntries(spec.spans.map((s) => [`${s.service} ${s.name}`, s.spanId]));
+  const ids = Object.fromEntries(spec.spans.map((s) => [keyOf(spec.spans, s), s.spanId]));
   return { spec, ids };
 }
 
@@ -378,18 +521,23 @@ const sortStep = (step) => {
   for (const [item, bucket] of Object.entries(step.items)) put(item, bucket);
 };
 
-/** Make the pinned edits of build step `i` in the DOM (parents, kinds, links), then Check. */
+/** Make the pinned edits of build step `i` in the DOM (parents, kinds, statuses, links), then Check. */
 function solveBuild(id, i) {
   const pin = PIN[id].steps[i];
   const { ids } = buildOf(id, i);
-  for (const [name, [kind, , , , given, parent, wantKind, links]] of Object.entries(pin.spans)) {
+  for (const [name, [kind, , , , given, parent, wantKind, links, status, wantStatus]] of Object.entries(pin.spans)) {
     const edits = [];
     if (pin.edit.includes('parent') && parent !== given) edits.push(`[data-parent="${parent === null ? 'none' : ids[parent]}"]`);
     if (pin.edit.includes('kind') && wantKind !== kind) edits.push(`[data-kind="${wantKind}"]`);
+    if (pin.edit.includes('status') && wantStatus !== status) edits.push(`[data-status="${wantStatus}"]`);
     if (pin.edit.includes('links')) for (const l of links) edits.push(`[data-link="${ids[l]}"]`);
     if (edits.length === 0) continue;
     click(`[data-span="${ids[name]}"]`);
-    for (const sel of edits) click(sel);
+    // A link already pressed (by an earlier slip) stays: clicking it again would unlink it.
+    for (const sel of edits) {
+      const linked = sel.startsWith('[data-link') && q(sel).getAttribute('aria-pressed') === 'true';
+      if (!linked) click(sel);
+    }
   }
   click(`#${pin.build}-check`);
 }
@@ -442,6 +590,32 @@ const SLIPS = {
     'a wrong placement (an email in baggage)': { 0: () => put('email', 'ok') },
     'a wrong placement (the experiment arm kept out)': { 0: () => put('variant', 'never') },
     'a wrong pick in the question (copied for you)': { 1: () => click('[data-pick="yes-auto"]') },
+  },
+  'context-propagation': {
+    'a wrong pick in the first question (storefront blamed)': { 0: () => click('[data-pick="storefront"]') },
+    'a wrong pick in the traceparent question (uppercase hex)': { 1: () => click('[data-pick="uppercase"]') },
+    'a wrong pick in the traceparent question (all-zero trace ID)': { 1: () => click('[data-pick="zero-trace"]') },
+    'a failed check (checkout left a root)': { 2: () => click('#prop-tree-check') },
+  },
+  'events-and-links': {
+    'a wrong pick in the question (the event sets Error)': { 0: () => click('[data-pick="error"]') },
+    'a failed check (charge fixed, the handled attempt left Error)': {
+      1: () => {
+        const ids = buildOf('events-and-links', 1).ids;
+        click(`[data-span="${ids['payments charge']}"]`);
+        click('[data-status="ERROR"]');
+        click('#evl-errors-check');
+      },
+    },
+    'a failed check (two of the three links)': {
+      2: () => {
+        const ids = buildOf('events-and-links', 2).ids;
+        click(`[data-span="${ids['notifications send batch']}"]`);
+        click(`[data-link="${ids['orders orders publish 6512']}"]`);
+        click(`[data-link="${ids['orders orders publish c20a']}"]`);
+        click('#evl-batch-check');
+      },
+    },
   },
 };
 

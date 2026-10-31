@@ -261,15 +261,25 @@ span processor). Card: "Baggage is not copied onto spans for you, and it travels
 headers to every downstream, third parties too." Spec:
 https://opentelemetry.io/docs/concepts/signals/baggage/ , https://www.w3.org/TR/baggage/
 
-**2.6 `events-and-links`**: cards `['exception-no-status','batch-links']`. Step 1 choice:
-span with an `exception` event → status unset. Step 2 Build `edit:['status']`: payments
-`charge` exception escaped → ERROR; `charge attempt 1` handled and retried → UNSET; inventory
-`GET /stock` no exception → UNSET. Step 3 Build `edit:['links']`: notifications `send batch`
-CONSUMER (root) links the three `orders publish` spans from three traces. Cards: "Recording an
-exception adds an exception event; it does not set the span status to Error. Set that
-yourself." / "A span has at most one parent. A consumer handling a batch from many traces
-links to each message's context." **Verify the span-event deprecation (OTEP 4430) and
-language context-manager behaviour before copy.** Spec:
+**2.6 `events-and-links`**: cards `['exception-no-status','batch-links']`. Teaches that an
+exception, however it is recorded (span event or log record), does not set the span status;
+status is set separately, by the code or instrumentation that ends the span. Step 1 choice:
+code records an exception (`span.recordException(err)`, rethrows, `span.end()` in `finally`)
+and never sets a status → status unset (decoys: "Error: recording marked it failed"; "Error if
+a span event, Unset if logged"). Step 2 Build `edit:['status']`: payments `charge` exception
+recorded and escaped, given UNSET → ERROR; `charge attempt 1` handled inside the span, nothing
+recorded, given ERROR (set by a helper) → UNSET; inventory `GET /stock` no exception → UNSET.
+Step 3 Build `edit:['links']`: notifications `send batch` CONSUMER (root) links the three
+`orders publish` spans from three traces. Cards: "Recording an exception does not set the span
+status. Status is set separately, and a handled exception leaves it Unset." (true in every
+language, Python's context manager included: it sets Error on an escaping exception as a
+separate step) / "A span has at most one parent. A consumer handling a batch from many traces
+links to each message's context." The first card's back says semantic conventions 1.44 mark
+exceptions on spans Deprecated in favour of log records, while the Trace API RecordException is
+still Stable. Verified 2026-10-31 (P8): OTEP 4430 (merged 2025-04-25) only plans to deprecate
+RecordException and AddEvent; spec v1.62.0 has not; semconv 1.44.0
+`exceptions/exceptions-spans` is Deprecated, and `general/recording-errors` says to record an
+exception as a log record and not to record handled ones. Spec:
 https://opentelemetry.io/docs/specs/otel/trace/api/#record-exception ,
 https://opentelemetry.io/docs/specs/semconv/general/recording-errors/ ,
 https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/

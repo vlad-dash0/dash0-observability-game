@@ -95,4 +95,44 @@ export const DECK = [
     specUrl: 'https://opentelemetry.io/docs/concepts/signals/baggage/#baggage-security-considerations',
     dash0Angle: null,
   },
+  {
+    id: 'broken-propagation',
+    front:
+      'When a hop drops the traceparent header, one request becomes two traces: look for ' +
+      'unexpected root spans.',
+    back:
+      'Each hop passes the trace context on in the W3C traceparent header: version 00, the ' +
+      "32-hex trace ID, the caller's 16-hex span ID as parent-id, and the flags. A proxy or " +
+      'gateway that does not forward it makes the next service start a new trace, so one ' +
+      'request shows up as two traces, each with its own root span. A receiver also MUST ' +
+      'ignore a traceparent whose IDs are all zeros or not lowercase hex.',
+    specUrl: 'https://www.w3.org/TR/trace-context/#traceparent-header',
+    dash0Angle: null,
+  },
+  {
+    id: 'exception-no-status',
+    front:
+      'Recording an exception does not set the span status. Status is set separately, and a ' +
+      'handled exception leaves it Unset.',
+    back:
+      'An exception can be recorded as a span event (the Trace API RecordException, still ' +
+      'Stable) or as a log record, which semantic conventions 1.44 now recommend: they mark ' +
+      'exceptions on spans Deprecated. Either way the record leaves the status alone. The ' +
+      'code or instrumentation that ends the span sets Error when the operation failed, and ' +
+      'a handled exception that let it complete leaves the status Unset.',
+    specUrl: 'https://opentelemetry.io/docs/specs/semconv/general/recording-errors/',
+    dash0Angle: null,
+  },
+  {
+    id: 'batch-links',
+    front:
+      'A span has at most one parent. A consumer handling a batch from many traces links to ' +
+      "each message's context.",
+    back:
+      'A span gets one parent, from the context it starts in. A consumer that processes a ' +
+      'batch of messages, each sent by a different request, cannot have them all as parents, ' +
+      "so it adds a link to each message's span context. Links can join spans across traces.",
+    specUrl: 'https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/#batch-receiving',
+    dash0Angle: null,
+  },
 ];
