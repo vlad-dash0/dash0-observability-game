@@ -23,6 +23,7 @@ import baggage from './baggage.mjs';
 import cardinality from './cardinality.mjs';
 import checkoutIsSlow from './checkout-is-slow.mjs';
 import contextPropagation from './context-propagation.mjs';
+import correlation from './correlation.mjs';
 import detectorsAndKubernetes from './detectors-and-kubernetes.mjs';
 import eventsAndLinks from './events-and-links.mjs';
 import histograms from './histograms.mjs';
@@ -35,6 +36,7 @@ import redAndUse from './red-and-use.mjs';
 import spanKinds from './span-kinds.mjs';
 import spansAndTraces from './spans-and-traces.mjs';
 import statusAndErrors from './status-and-errors.mjs';
+import structuredLogs from './structured-logs.mjs';
 import temporality from './temporality.mjs';
 import thePager from './the-pager.mjs';
 import theSignals from './the-signals.mjs';
@@ -71,6 +73,14 @@ export const ACTS = [
     name: 'Metrics',
     sub: 'How much, how often',
     levels: [instruments, temporality, histograms, promqlBasics, cardinality, redAndUse],
+    boss: null,
+  },
+  {
+    id: 'act-4',
+    no: 4,
+    name: 'Logs',
+    sub: 'What did it say?',
+    levels: [structuredLogs, correlation],
     boss: null,
   },
 ];
