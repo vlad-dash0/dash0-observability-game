@@ -11,7 +11,7 @@ import { liveRegistry } from '../app.mjs';
 const nodeIds = NODES.map((n) => n.id);
 
 // Extended on purpose with each level PR (docs/M1-DESIGN.md §5): Act 0 (P3) plays before Act 1;
-// its boss, the pager (P4), comes after its levels; Act 2 (P6: 2.1, 2.2) plays after Act 1.
+// its boss, the pager (P4), comes after its levels; Act 2 (P6: 2.1, 2.2) plays after Act 1; its boss, checkout-is-slow (P11), comes last.
 const EXPECTED_ORDER = [
   'monitoring-vs-observability',
   'the-signals',
@@ -25,6 +25,7 @@ const EXPECTED_ORDER = [
   'baggage',
   'events-and-links',
   'auto-vs-manual',
+  'checkout-is-slow',
 ];
 
 test('the live registry builds against the real deck and map nodes', () => {
@@ -58,7 +59,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, then Act
       name: 'Traces',
       sub: 'Follow the request',
       levelIds: ['spans-and-traces', 'span-kinds', 'status-and-errors', 'context-propagation', 'baggage', 'events-and-links', 'auto-vs-manual'],
-      bossId: null,
+      bossId: 'checkout-is-slow',
     },
   ]);
 });

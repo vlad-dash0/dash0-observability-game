@@ -52,12 +52,12 @@ test('the-pager: an unscored Act 0 boss with no cards and no lights', () => {
 });
 
 // Raised with each scored level PR, like EXPECTED_ORDER (P6 added 2.1 and 2.2, P7 2.3 and 2.5,
-// P8 2.4 and 2.6, P9 2.7).
-test('the-pager: star totals are unchanged by the boss (11 scored levels, max 33)', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 33 });
+// P8 2.4 and 2.6, P9 2.7, P11 the scored Act 2 boss).
+test('the-pager: star totals ignore this boss (12 scored levels, max 36)', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 36 });
   const all = emptyProgress();
   for (const id of LIVE.order) all.levels[id] = { stars: 3, at: null };
-  assert.deepEqual(starTotals(all, LIVE), { earned: 33, max: 33 }, 'the boss adds nothing');
+  assert.deepEqual(starTotals(all, LIVE), { earned: 36, max: 36 }, 'the pager adds nothing');
 });
 
 // ---- play -------------------------------------------------------------------------
