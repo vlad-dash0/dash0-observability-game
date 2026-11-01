@@ -38,11 +38,11 @@ const rightOf = (levelId, widgetId) => choiceOf(levelId, widgetId).find((c) => c
 
 // ---- the act and the players already in it ------------------------------------------
 
-test('act-1 plays 1.1 before 1.2 and 1.3 after it, and keeps its name and no boss', () => {
+test('act-1 plays 1.1 before 1.2 and 1.3 after it, and keeps its name, and its boss is who-is-talking', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-1');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 1, name: 'Resources and identity', sub: 'Who is talking?', levelIds: ['resources', 'naming-your-service', 'detectors-and-kubernetes'], bossId: null },
+    { no: 1, name: 'Resources and identity', sub: 'Who is talking?', levelIds: ['resources', 'naming-your-service', 'detectors-and-kubernetes'], bossId: 'who-is-talking' },
   );
   assert.deepEqual(
     ['resources', 'naming-your-service', 'detectors-and-kubernetes'].map((id) => LIVE.levels[id].no),
@@ -78,7 +78,9 @@ test('existing players: a saved 1.2 and Act 0 stay valid; Act 2 waits for 1.1 an
   assert.equal(isActUnlocked(2, old, LIVE), false, 'Act 1 gained two levels, so it is no longer complete');
   assert.deepEqual(lockReason('spans-and-traces', old, LIVE), { kind: 'act', actId: 'act-1' });
 
-  const afterBoth = progressOf([...act0, 'resources', 'naming-your-service', 'detectors-and-kubernetes']);
+  const noBoss = progressOf([...act0, 'resources', 'naming-your-service', 'detectors-and-kubernetes']);
+  assert.equal(levelState('spans-and-traces', noBoss, LIVE), 'locked', 'Act 2 now also waits for the Act 1 boss');
+  const afterBoth = progressOf([...act0, 'resources', 'naming-your-service', 'detectors-and-kubernetes', 'who-is-talking']);
   assert.equal(levelState('spans-and-traces', afterBoth, LIVE), 'open');
 
   // A player who already started Act 2 keeps it open.
