@@ -104,7 +104,7 @@ const FIX = [
   {
     key: 'in-message',
     label: 'Write the trace id into the message text',
-    why: 'A backend links records through the TraceId and SpanId fields of the record, or for non-OTLP logs through recognised attribute names. Text inside the Body is neither, so the record stays unlinked, as the worker\'s record shows.',
+    why: 'A backend links records through the TraceId and SpanId fields of the record, or for non-OTLP logs through recognised attribute names. Text inside the Body is neither, so the record stays unlinked.',
   },
 ];
 
@@ -146,7 +146,8 @@ export default {
           'From a log, an engineer wants to jump to its trace. That works when the record carries a ' +
           '<code>trace_id</code> and a <code>span_id</code>, and a log call gets them only from the span that is the ' +
           'current span when it runs. Kettle &amp; Co logged these six records while order 8841 was paid, with order 8842 ' +
-          'in flight at checkout. Attach each record to the span it was written in, or to none.',
+          'in flight at checkout. When spans nest, the innermost span that was current is the one the call ran in. ' +
+          'Attach each record to the span it was written in, or to none.',
         build: BUILD,
       },
       {
@@ -158,7 +159,7 @@ export default {
       {
         intro:
           'The payments retry worker picks failed charges off a queue on its own thread pool and logs through the ' +
-          'same bridged logger. Its records are the blank ones.',
+          'same bridged logger. Its record is one of the unlinked ones.',
         question: 'How do you get its records linked?',
         qid: 'cor-q-fix',
         choice: { id: 'cor-fix', choices: FIX },

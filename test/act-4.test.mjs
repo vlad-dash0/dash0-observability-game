@@ -356,6 +356,11 @@ test('correlation: the records of the two orders are told apart by order.id, and
   assert.equal(at('cart').name, 'validate cart');
   assert.equal(at('cart').parentId, SPAN.checkout, 'nested inside the request span, same service, same trace');
   assert.equal(/current span/.test(LIVE.levels.correlation.play.steps[0].intro), true, 'the copy says the span was started as the current one');
+  assert.equal(/innermost span that was current/.test(LIVE.levels.correlation.play.steps[0].intro), true, 'innermost holds only for spans made current');
+  const fixIntro = LIVE.levels.correlation.play.steps[2].intro;
+  assert.equal(/Its record is one of the unlinked ones\./.test(fixIntro) && !/blank ones/.test(fixIntro), true, 'one worker record, not all the unlinked ones');
+  const inMessage = choiceOf('correlation', 'cor-fix').find((c) => c.key === 'in-message').why;
+  assert.equal(/record shows/.test(inMessage), false, 'no pointer at evidence the player never sees');
 });
 
 
