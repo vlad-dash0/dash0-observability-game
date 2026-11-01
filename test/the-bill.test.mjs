@@ -361,6 +361,7 @@ test('the-bill: the closing step grades the fix: drop the label and keep per-use
   assert.equal(right.key, 'drop-the-label');
   const t = plain(right.label + right.why);
   for (const w of ['user.id', 'spans', 'logs', 'one value for each request']) assert.equal(t.includes(w), true, w);
+  assert.equal(/attribute filtering/i.test(JSON.stringify(BOSS.play)), false, 'a spec SHOULD is not stated as unconditional player-facing fact');
   assert.deepEqual(fix.filter((c) => !c.right).map((c) => c.key).sort(), ['cap-and-keep', 'export-less', 'spam-flag']);
   const why = (key) => plain(fix.find((c) => c.key === key).why);
   for (const w of ['SHOULD', '2000', 'otel.metric.overflow']) assert.equal(why('cap-and-keep').includes(w), true, w);

@@ -179,7 +179,7 @@ const FIX = [
     label:
       'Stop recording <code>user.id</code> on the counter (or filter it out with a view while the fix ships), and keep the per-user detail on spans or logs',
     right: true,
-    why: 'Series are the unique combinations of attribute values, so the only fix that works is fewer values: remove the attribute that has one value for each user. A per-customer lookup is what spans and logs are for, where one value for each request is normal and a user.id attribute costs no series; the 228 series that dashboards need stay. In the SDK, cardinality limit enforcement happens after attribute filtering, so a view that drops the attribute works at once. In Dash0, the Metric Explorer tree map and the metric sidebar show which metric and which attributes were behind the volume, and the guidance for random or unbounded values is to reduce them at the instrumentation layer. The same is true of <code>http.route</code> against a raw URL: a bounded template, never the raw value.',
+    why: 'Series are the unique combinations of attribute values, so the only fix that works is fewer values: remove the attribute that has one value for each user. A per-customer lookup is what spans and logs are for, where one value for each request is normal and a user.id attribute costs no series; the 228 series that dashboards need stay. In Dash0, the Metric Explorer tree map and the metric sidebar show which metric and which attributes were behind the volume, and the guidance for random or unbounded values is to reduce them at the instrumentation layer. The same is true of <code>http.route</code> against a raw URL: a bounded template, never the raw value.',
   },
   {
     key: 'export-less',
