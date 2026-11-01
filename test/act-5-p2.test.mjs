@@ -56,9 +56,9 @@ for (const [id, want] of Object.entries(FIELDS)) {
   });
 }
 
-test('star totals: 28 scored levels, max 84, and the two new levels add 6', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 84 });
-  assert.deepEqual(starTotals(progressOf(['otlp-endpoints', 'agent-vs-gateway']), LIVE), { earned: 6, max: 84 });
+test('star totals: 30 scored levels, max 90, and the two new levels add 6', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 90 });
+  assert.deepEqual(starTotals(progressOf(['otlp-endpoints', 'agent-vs-gateway']), LIVE), { earned: 6, max: 90 });
 });
 
 test('5.3 and 5.4 open in any order once Act 5 is entered; they stay locked on a fresh save', () => {

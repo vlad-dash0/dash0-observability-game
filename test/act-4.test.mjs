@@ -92,10 +92,10 @@ test('existing players: adding Act 4 changes no earlier act or level state', () 
   assert.equal(levelState('structured-logs', partway, LIVE), 'locked');
 });
 
-test('star totals count all four Act 4 entries: 28 scored levels, max 84', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 84 });
-  assert.deepEqual(starTotals(progressOf(ACT_4), LIVE), { earned: 6, max: 84 });
-  assert.deepEqual(starTotals(progressOf([...ACT_4_LEVELS, ACT_4_BOSS]), LIVE), { earned: 12, max: 84 });
+test('star totals count all four Act 4 entries: 30 scored levels, max 90', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 90 });
+  assert.deepEqual(starTotals(progressOf(ACT_4), LIVE), { earned: 6, max: 90 });
+  assert.deepEqual(starTotals(progressOf([...ACT_4_LEVELS, ACT_4_BOSS]), LIVE), { earned: 12, max: 90 });
 });
 
 // ---- level fields and lights --------------------------------------------------------

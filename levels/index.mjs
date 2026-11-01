@@ -27,6 +27,7 @@ import collectingLogs from './collecting-logs.mjs';
 import contextPropagation from './context-propagation.mjs';
 import correlation from './correlation.mjs';
 import detectorsAndKubernetes from './detectors-and-kubernetes.mjs';
+import distributions from './distributions.mjs';
 import eventsAndLinks from './events-and-links.mjs';
 import histograms from './histograms.mjs';
 import instruments from './instruments.mjs';
@@ -34,6 +35,7 @@ import monitoringVsObservability from './monitoring-vs-observability.mjs';
 import namingYourService from './naming-your-service.mjs';
 import orderMatters from './order-matters.mjs';
 import otlpEndpoints from './otlp-endpoints.mjs';
+import ottlAndTransforms from './ottl-and-transforms.mjs';
 import pipelines from './pipelines.mjs';
 import promqlBasics from './promql-basics.mjs';
 import resources from './resources.mjs';
@@ -94,7 +96,7 @@ export const ACTS = [
     no: 5,
     name: 'The Collector',
     sub: 'The plumbing',
-    levels: [pipelines, orderMatters, otlpEndpoints, agentVsGateway],
+    levels: [pipelines, orderMatters, otlpEndpoints, agentVsGateway, ottlAndTransforms, distributions],
     boss: null,
   },
 ];

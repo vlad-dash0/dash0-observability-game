@@ -88,11 +88,11 @@ test('the-3am-errors: lights Orders (shared with 2.4), and the boss waits for th
   assert.equal(levelState(ID, all, LIVE), 'open');
 });
 
-test('the-3am-errors: star totals count the boss (28 scored levels, max 84), and a 3-star boss is 3 of them', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 84 });
+test('the-3am-errors: star totals count the boss (30 scored levels, max 90), and a 3-star boss is 3 of them', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 90 });
   const p = emptyProgress();
   p.levels[ID] = { stars: 3, at: null };
-  assert.deepEqual(starTotals(p, LIVE), { earned: 3, max: 84 });
+  assert.deepEqual(starTotals(p, LIVE), { earned: 3, max: 90 });
 });
 
 test('the-3am-errors: no em dash in the level file', () => {
