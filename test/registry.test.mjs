@@ -124,7 +124,7 @@ test('building copies: the source level modules are neither frozen nor annotated
 test('the built level holds exactly the §2.1 fields plus actId and kind', () => {
   const reg = buildRegistry(baseline(), { deck: DECK, nodeIds: ['n1'] });
   assert.deepEqual(Object.keys(reg.levels.x).sort(), [
-    'actId', 'cards', 'icon', 'id', 'kind', 'lights', 'mechanics', 'name', 'no',
+    'actId', 'cards', 'icon', 'id', 'kind', 'lights', 'mechanics', 'name', 'no', 'play',
     'rewardTitle', 'run', 'scored', 'scoring', 'sub',
   ]);
 });

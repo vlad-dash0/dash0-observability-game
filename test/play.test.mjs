@@ -1,0 +1,270 @@
+// Declarative levels (docs/DECLARATIVE-LEVELS.md §3-§5): lib/play.mjs, the registry's `play`
+// key and the suite generated from every play level's data. Plays the live play levels plus
+// test/fixtures/play-level.mjs; the harness checks at the end that it ran at least one.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { makeDom, q, qa, click } from './helpers/dom.mjs';
+import { recordFocus } from './helpers/focus.mjs';
+import { STEP_DRIVERS, stepsOf } from './helpers/step-drivers.mjs';
+import { createLevelContext } from '../lib/level-context.mjs';
+import { runPlay, STEP_TYPES, validatePlay } from '../lib/play.mjs';
+import { buildRegistry, RegistryError, validateRegistry } from '../lib/registry.mjs';
+import { liveRegistry } from '../app.mjs';
+import { playFixture, FIXTURE_CARD } from './fixtures/play-level.mjs';
+
+const NOW = 1767225600000;
+const KIT = { validatePlay, runPlay };
+const ID = 'play-fixture';
+const AT = `level "${ID}"`;
+const act = (levels) => [{ id: 'a', no: 0, levels, boss: null }];
+const build = (lv, extra = {}) => buildRegistry(act([lv]), { deck: [FIXTURE_CARD], nodeIds: [], play: KIT, ...extra });
+const errorsOf = (lv, extra = {}) => validateRegistry(act([lv]), { cardIds: [FIXTURE_CARD.id], nodeIds: [], play: KIT, ...extra }).errors;
+
+const FX = build(playFixture()).levels[ID];
+const LEVELS = [...Object.values(liveRegistry().levels).filter((l) => l.play), FX];
+let ran = 0;
+
+/** Start `level` with the real ctx on a fresh DOM (stub shuffle keeps spec order). */
+function start(level) {
+  const dom = makeDom();
+  const focus = recordFocus(dom.window);
+  const calls = [];
+  const ctx = createLevelContext({
+    level, ovBody: dom.body, ovActions: dom.actions, now: () => NOW, shuffle: (a) => a, reduceMotion: true,
+    onFinish: (id, result) => calls.push({ id, result }), signal: new AbortController().signal,
+    reportError: (e) => { throw e; },
+  });
+  level.run(ctx);
+  return { focus, calls };
+}
+
+const prefixOf = (level) => level.play.prefix ?? level.id;
+const advanceId = (level, i) => `#${prefixOf(level)}-${i === level.play.steps.length - 1 ? 'finish' : 'next'}`;
+const text = (sel) => q(sel).textContent;
+
+/** Play every step cleanly, calling `during(i, entry)` before step i is solved. */
+function playAll(level, during = () => {}, run = start(level)) {
+  const steps = stepsOf(level);
+  steps.forEach((entry, i) => {
+    during(i, entry, run);
+    for (const sel of entry.driver.solve(entry.spec)) click(sel);
+    click(advanceId(level, i));
+  });
+  return run;
+}
+
+const stars = (level) => (level.scored ? 3 : 0);
+
+for (const level of LEVELS) {
+  const steps = stepsOf(level);
+  const last = steps.length - 1;
+
+  test(`${level.id}: every step passes its type's validate`, () => {
+    assert.deepEqual(validatePlay(level.play).errors, []);
+    for (const { type, spec } of steps) assert.deepEqual(type.validate(spec), []);
+    ran += 1;
+  });
+
+  test(`${level.id}: a clean run finishes once, from the Finish click, with every card`, () => {
+    const { calls } = playAll(level, (i, entry, run) => assert.equal(run.calls.length, 0, `step ${i + 1} is not the end`));
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].id, level.id);
+    assert.equal(calls[0].result.stars, stars(level));
+    assert.deepEqual(calls[0].result.cards, level.cards);
+    assert.equal(calls[0].result.text, level.play.finish);
+    ran += 1;
+  });
+
+  test(`${level.id}: Next and Finish stay disabled until the step is solved`, () => {
+    playAll(level, (i) => {
+      assert.equal(q(advanceId(level, i)).disabled, true, `step ${i + 1} starts gated`);
+      assert.equal(q(advanceId(level, i)).hasAttribute('data-finish'), i === last);
+    });
+    start(level);
+    const [{ driver, spec }] = steps;
+    for (const sel of driver.solve(spec)) click(sel);
+    assert.equal(q(advanceId(level, 0)).disabled, false, 'solved: enabled');
+    ran += 1;
+  });
+
+  test(`${level.id}: the focus walk starts each step on its first control and ends on Finish`, () => {
+    const { focus } = start(level);
+    steps.forEach(({ driver, spec }, i) => {
+      const before = i === 0 ? 0 : focus.names().length;
+      if (i > 0) click(advanceId(level, i - 1));
+      assert.equal(focus.names()[before], driver.first(spec), `step ${i + 1} starts here`);
+      for (const sel of driver.solve(spec)) click(sel);
+      assert.equal(focus.last(), advanceId(level, i), `step ${i + 1} hands off to its button`);
+    });
+    assert.deepEqual(focus.unfocusable(), []);
+    assert.equal(focus.names().includes('body'), false);
+    ran += 1;
+  });
+
+  steps.forEach(({ key, driver, spec }, at) => {
+    for (const slip of driver.slips(spec)) {
+      test(`${level.id}: step ${at + 1} (${key}) slip "${slip.name}" alone costs exactly one star`, () => {
+        const { calls } = playAll(level, (i) => {
+          if (i !== at) return;
+          for (const sel of slip.clicks) click(sel);
+          assert.match(text(slip.at ?? `#${spec.id}-feedback`), slip.says);
+        });
+        assert.equal(calls[0].result.stars, level.scored ? 2 : 0);
+        ran += 1;
+      });
+      if (slip.name === 'check') {
+        test(`${level.id}: step ${at + 1} a repeated Check on the same state is free`, () => {
+          const { calls } = playAll(level, (i) => {
+            if (i !== at) return;
+            for (const sel of [...slip.clicks, ...slip.clicks]) click(sel);
+            assert.match(text(`#${spec.id}-feedback`), /^Same as last time:/);
+          });
+          assert.equal(calls[0].result.stars, level.scored ? 2 : 0);
+          ran += 1;
+        });
+      }
+    }
+  });
+
+  test(`${level.id}: a second clean run starts at step 1 and scores the same`, () => {
+    assert.equal(playAll(level).calls[0].result.stars, stars(level));
+    const second = start(level);
+    assert.equal(second.focus.names()[0], steps[0].driver.first(steps[0].spec));
+    assert.equal(qa('[data-finish]').length, 0, 'starts on a step that is not the last');
+    assert.equal(playAll(level, () => {}, second).calls[0].result.stars, stars(level));
+    ran += 1;
+  });
+}
+
+test('the suite played at least one level', () => {
+  assert.ok(LEVELS.length >= 1);
+  assert.ok(ran >= 1, `ran ${ran} generated tests`);
+});
+
+test('every step type has a driver and every driver a step type', () => {
+  assert.deepEqual(Object.keys(STEP_DRIVERS).sort(), Object.keys(STEP_TYPES).sort());
+});
+
+test('code is plain text: an <img onerror> in it renders escaped', () => {
+  const lv = playFixture();
+  const injected = '<img src=x onerror=alert(1)>';
+  lv.play.steps[0].code = injected;
+  start(build(lv).levels[ID]);
+  assert.equal(qa('img').length, 0);
+  assert.equal(text('pre code'), injected);
+});
+
+test('lib/play.mjs never charges a penalty itself (PI1)', () => {
+  const src = readFileSync(new URL('../lib/play.mjs', import.meta.url), 'utf8');
+  assert.equal(/mistake\(|hint\(/.test(src), false);
+});
+
+// ---- registry: the play key ----------------------------------------------------
+
+test('a play level derives its mechanics in order of first appearance', () => {
+  assert.deepEqual([...FX.mechanics], ['sort', 'build', 'incident']);
+  assert.equal(validatePlay(playFixture().play).mechanics.join(), 'sort,build,incident');
+});
+
+test('a declared mechanics list that equals the derived one is accepted', () => {
+  const lv = { ...playFixture(), mechanics: ['sort', 'build', 'incident'] };
+  assert.deepEqual([...build(lv).levels[ID].mechanics], ['sort', 'build', 'incident']);
+});
+
+test('registry errors for run and play together, no kit, differing mechanics, a function', () => {
+  assert.deepEqual(errorsOf({ ...playFixture(), run() {} }), [`${AT}: declares both run and play; use one`]);
+  assert.deepEqual(errorsOf(playFixture(), { play: undefined }), [`${AT}: play needs the step kit (buildRegistry option "play")`]);
+  assert.deepEqual(errorsOf({ ...playFixture(), mechanics: ['build'] }), [
+    `${AT}: declares mechanics ["build"] but its steps give ["sort","build","incident"]; fix or remove mechanics`,
+  ]);
+  const lv = playFixture();
+  lv.play.steps[0].choice.choices[0].why = () => 'x';
+  assert.deepEqual(errorsOf(lv), [
+    `${AT}: play must be plain data: steps[0].choice.choices[0].why is a function; write run(ctx) for custom behaviour`,
+  ]);
+});
+
+test('two bad steps are two errors, not one', () => {
+  const lv = playFixture();
+  lv.play.steps = [{ intro: 'x' }, { intro: 'y', choice: lv.play.steps[0].choice, sort: lv.play.steps[1].sort }];
+  assert.deepEqual(errorsOf(lv), [
+    `${AT}: step 1 has no step type (one of choice, sort, build, incident)`,
+    `${AT}: step 2 has two step types ("choice", "sort")`,
+  ]);
+  assert.throws(() => build(lv), RegistryError);
+});
+
+test('the built play is a frozen copy: mutating the source cannot reach it', () => {
+  const src = playFixture();
+  const built = build(src).levels[ID];
+  assert.equal(Object.isFrozen(built.play), true);
+  assert.equal(Object.isFrozen(built.play.steps[0].choice.choices[0]), true);
+  assert.equal(Object.isFrozen(src.play), false);
+  src.play.steps[0].intro = 'changed';
+  src.play.finish = 'changed too, and long enough';
+  assert.notEqual(built.play.steps[0].intro, 'changed');
+  assert.notEqual(built.play.finish, src.play.finish);
+});
+
+test('a run level keeps play null', () => {
+  const run = { id: 'r', no: '0.2', name: 'R', icon: '*', rewardTitle: 'R', mechanics: ['sort'], run() {} };
+  assert.equal(build(run).levels.r.play, null);
+});
+
+test('the live registry passes the kit, so it builds play levels', () => {
+  const reg = liveRegistry(act([playFixture()]), [FIXTURE_CARD]);
+  assert.deepEqual([...reg.levels[ID].mechanics], ['sort', 'build', 'incident']);
+});
+
+// ---- validatePlay: the author-facing messages (§5) ------------------------------
+
+/** validatePlay errors for the fixture after `edit(play)`. */
+function problems(edit) {
+  const lv = playFixture();
+  edit(lv.play);
+  return validatePlay(lv.play).errors;
+}
+
+test('validatePlay names each problem as the design says', () => {
+  const cases = [
+    [(p) => { p.steps[1].inrto = 'x'; }, 'step 2: unknown key "inrto" (did you mean "intro"?)'],
+    [(p) => { p.steps[2] = { intro: 'x', configure: {} }; }, 'step 3: step type "configure" is reserved for Configure it (#3) and not available yet'],
+    [(p) => { p.steps[0].choice.choices[1].right = false; }, 'step 1 (choice "fx-pick"): needs exactly one right answer, has 0'],
+    [(p) => { p.steps[1].sort.items[0].bucket = 'automatic'; }, 'step 2 (sort "fx-sort"): item "server": unknown bucket "automatic"'],
+    [(p) => { p.steps[2].build.answer = {}; }, 'step 3 (build "fx-tree"): the given state already passes Check, so there is nothing to do'],
+    [(p) => { p.steps[1].sort.id = 'fx-pick'; }, 'step 2: widget id "fx-pick" is already used by step 1'],
+    [(p) => { p.finish = 'short'; }, 'play.finish must be reward text longer than 10 characters'],
+    [(p) => { p.prefix = 'no spaces'; }, 'play.prefix must be a plain token'],
+    [(p) => { delete p.steps[0].intro; }, 'step 1: intro must be text'],
+    [(p) => { delete p.steps[0].question; }, 'step 1 (choice "fx-pick"): needs a question'],
+    [(p) => { p.steps[3].show = 5; }, 'step 4: show must be a string'],
+    [(p) => { p.steps[0].qid = p.steps[1].qid = 'same'; }, 'step 2: heading id "same" is already used by step 1'],
+    [(p) => { p.steps = []; }, 'play.steps must be a non-empty array'],
+    [(p) => { p.stpes = []; }, 'unknown key "stpes" on play (did you mean "steps"?)'],
+  ];
+  for (const [edit, want] of cases) {
+    const got = problems(edit);
+    assert.ok(got.includes(want), `${want}\n  got: ${JSON.stringify(got)}`);
+  }
+});
+
+test('a build whose answer fails checkBuild names the issue', () => {
+  const got = problems((p) => { p.steps[2].build.spans[0].traceId = '0af7651916cd43dd8448eb211c80319c'; });
+  assert.ok(got.some((e) => /^step 3 \(build "fx-tree"\): answer does not pass checkBuild: cross-trace-parent aaaaaaaaaaaaaaa2/.test(e)), JSON.stringify(got));
+});
+
+test('only choice steps is an error at registry level', () => {
+  const lv = playFixture();
+  lv.play.steps = [lv.play.steps[0]];
+  assert.deepEqual(errorsOf(lv), [`${AT}: play.steps has only choice steps; a level needs at least one mechanic step`]);
+});
+
+test('validatePlay never throws, whatever it is given', () => {
+  const cyclic = { steps: [] };
+  cyclic.steps.push(cyclic);
+  for (const v of [undefined, null, 3, 'x', [], {}, cyclic, { steps: [null, 4, []] }, { steps: [{ intro: 'x', sort: null }] }, { get steps() { throw new Error('boom'); } }]) {
+    const r = validatePlay(v);
+    assert.ok(Array.isArray(r.errors) && r.errors.length > 0, JSON.stringify(r));
+  }
+});

@@ -45,12 +45,13 @@ default with an explicit light toggle; star rule as §2.6; Martian Mono self-hos
 | sub | string | `''` | |
 | icon | string | required | non-empty |
 | rewardTitle | string | required | non-empty, unique |
-| mechanics | string[] | required | ≥1, unique, from `sort build configure query spot incident tradeoff` |
+| mechanics | string[] | required with `run`; with `play` derived, optional | ≥1, unique, from `sort build configure query spot incident tradeoff`; with `play` a declared list must equal the one derived from the steps (docs/DECLARATIVE-LEVELS.md §2) |
 | cards | string[] | `[]` | ids that exist in DECK, unique |
 | lights | string[] | `[]` | ids that exist in map NODES, unique |
 | scored | boolean | `true` | `false`: always 0 stars, excluded from both sides of star totals |
 | scoring | `{parMs: number\|null}` | `{parMs: null}` | positive integer or null |
-| run | `(ctx) => void` | required | function |
+| run | `(ctx) => void` | required without `play` | function; forbidden with `play` |
+| play | `{prefix?, steps, finish}` | none | declarative level, plain data only (docs/DECLARATIVE-LEVELS.md §2); needs the registry's `play` kit; the registry builds `run` from it |
 | act, kind | forbidden | | |
 
 Rule: when `ctx.reduceMotion` is true a level must not wait on any timer (the harness
@@ -73,12 +74,14 @@ non-empty string or `null`. Checked by `validateDeck`.
 ```
 Registry = {
   acts:   [{ id, no, name, sub, levelIds: string[], bossId: string|null }],
-  levels: { [id]: Level },  // null-prototype; Level = §2.1 + defaults + actId + kind:'level'|'boss'
+  levels: { [id]: Level },  // null-prototype; Level = §2.1 + defaults + actId + kind:'level'|'boss';
+                            // `play` is a deep-frozen copy of the declared play, or null; `mechanics` derived for play levels
   order:  string[],         // per act: its levels, then its boss
   cardIds: string[],        // sorted DECK ids
 }
 ```
-Deep-frozen. `buildRegistry(ACTS, {deck, nodeIds})` throws one `RegistryError` listing
+Deep-frozen. `buildRegistry(ACTS, {deck, nodeIds, play})` (`play` is the kit `{validatePlay, runPlay}` from
+`lib/play.mjs`, passed in so the registry never imports it; `liveRegistry` supplies it) throws one `RegistryError` listing
 every problem; `validateRegistry(ACTS, {cardIds, nodeIds})` returns `{ok, errors}` and
 never throws. F4 codes against this shape with hand-written fixtures and does not import F3.
 

@@ -2,14 +2,20 @@
 // order and an optional boss. lib/registry.mjs buildRegistry validates and freezes
 // it; act and kind come from the position here (docs/FOUNDATION.md §2.1-2.2).
 //
-// TO ADD A LEVEL: one file, one line here, one driver.
-//   1. levels/<id>.mjs default-exports { id, no, name, sub?, icon, rewardTitle,
-//      mechanics, cards?, lights?, scored?, scoring?, run(ctx) }; never `act` or
-//      `kind`. Wire buttons with `el.onclick = ...` after ctx.renderStep (CSP), give
-//      the Finish button `data-finish`, and skip timers when ctx.reduceMotion.
+// TO ADD A LEVEL: one file, one line here, one answer line (or one driver).
+//   1. levels/<id>.mjs default-exports { id, no, name, sub?, icon, rewardTitle, cards?,
+//      lights?, scored?, scoring?, ... } and one of two modes; never `act` or `kind`:
+//      - declarative: `play: { prefix?, steps: [...], finish }` (choice, sort, build and
+//        incident steps; docs/DECLARATIVE-LEVELS.md §2). `mechanics` is derived; leave it out.
+//        Spec URLs stay as `// Spec: <https URL>` comment lines.
+//      - hand-written: `mechanics` and `run(ctx)`, for anything that needs a function. Wire
+//        buttons with `el.onclick = ...` after ctx.renderStep (CSP), give the Finish button
+//        `data-finish`, and skip timers when ctx.reduceMotion.
 //   2. Import it here and add it to an act's `levels` (or as its `boss`). New cards
 //      go in cards/deck.mjs; `lights` names node ids from the map.
-//   3. Add DRIVERS['<id>'] (happy and sloppy runs) in test/levels-play.test.mjs.
+//   3. Declarative: add ANSWERS['<id>'] (one line per step) in test/answers.test.mjs; the
+//      generated suites (test/play.test.mjs, levels-play) cover the rest. Hand-written: add
+//      DRIVERS['<id>'] (happy and sloppy runs) in test/levels-play.test.mjs.
 //
 // Act: { id, no, name, sub, levels: [level, ...], boss: level | null }.
 import autoVsManual from './auto-vs-manual.mjs';
