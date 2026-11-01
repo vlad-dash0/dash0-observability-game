@@ -1,6 +1,6 @@
 // Level copy rules (docs/M1-DESIGN.md §1, §7): every level file names its spec in a
 // `// Spec: <https URL>` line, level and card copy has no em dash, and every spec URL,
-// in a level file or on a card, points at opentelemetry.io or www.w3.org.
+// in a level file or on a card, points at opentelemetry.io, www.w3.org or prometheus.io.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -14,7 +14,7 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 const LEVEL_FILES = readdirSync(join(ROOT, 'levels'))
   .filter((f) => f.endsWith('.mjs') && f !== 'index.mjs')
   .sort();
-const SPEC_HOSTS = ['opentelemetry.io', 'www.w3.org'];
+const SPEC_HOSTS = ['opentelemetry.io', 'www.w3.org', 'prometheus.io'];
 
 // M0's level 1.2 predates the rule: its Spec line cites docs/FOUNDATION.md. Remove it
 // from this list when that file gains an https Spec line (the last test below insists).
@@ -35,7 +35,7 @@ test('the level files are the registered levels (nothing scanned is unregistered
   assert.deepEqual(ids, [...liveRegistry().order].sort());
 });
 
-test('every level file has a `// Spec: <https URL>` line on opentelemetry.io or www.w3.org', () => {
+test('every level file has a `// Spec: <https URL>` line on opentelemetry.io, www.w3.org or prometheus.io', () => {
   for (const f of LEVEL_FILES) {
     if (NO_SPEC_URL_YET.includes(f)) continue;
     const urls = specUrls(read(`levels/${f}`));
@@ -54,7 +54,7 @@ test('no em dash in level files or cards', () => {
   }
 });
 
-test('every card specUrl is on opentelemetry.io or www.w3.org', () => {
+test('every card specUrl is on opentelemetry.io, www.w3.org or prometheus.io', () => {
   for (const c of DECK) {
     assert.equal(SPEC_HOSTS.includes(hostOf(c.specUrl)), true, `${c.id}: ${c.specUrl}`);
   }
