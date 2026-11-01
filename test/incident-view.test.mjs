@@ -40,6 +40,7 @@ test('render: alert, meter, labelled view buttons, locked hypotheses', () => {
   assert.equal(q('meter').getAttribute('min'), '0');
   assert.equal(q('meter').getAttribute('max'), '100');
   assert.equal(meterValue(), '100');
+  assert.equal(q('meter').getAttribute('aria-label'), 'Error budget');
   assert.equal(budgetText(), 'Error budget: 100% left (0 min in).');
   assert.equal(qa('[data-view]').map((b) => b.textContent).join('|'), 'Traces (3 min)|Database metrics (4 min)|Deploy log (6 min)|Status page (2 min)');
   assert.equal(hypDisabled().join(), 'true,true,true');
@@ -152,4 +153,33 @@ test('no timers and no Alpine attributes in the incident files (I2, I6)', () => 
   }
   setup();
   assert.equal(/\s(?:x-[\w.:-]+|@[\w.:-]+)=/.test(q('[data-incident]').outerHTML), false);
+});
+
+test('a fractional burn rate shows a clean, matching meter value and text', () => {
+  const s = incidentScenario();
+  s.budget = { startPct: 100, burnPctPerMin: 2.3 };
+  s.views = [
+    { id: 'a', label: 'A', costMin: 14, html: 'a', kind: 'clue' },
+    { id: 'b', label: 'B', costMin: 1, html: 'b', kind: 'neutral' },
+  ];
+  s.answerAfterViews = 1;
+  setup(s);
+  click('[data-view="a"]');
+  assert.equal(meterValue(), '67.8');
+  assert.equal(budgetText(), 'Error budget: 67.8% left (14 min in).');
+});
+
+test('a herring that also exhausts the budget costs two mistakes and one combined line', () => {
+  const s = incidentScenario();
+  s.budget = { startPct: 10, burnPctPerMin: 5 };
+  s.views = [
+    { id: 'a', label: 'A', costMin: 1, html: 'a', kind: 'clue' },
+    { id: 'h', label: 'Herring', costMin: 1, html: 'h', kind: 'herring' },
+  ];
+  s.answerAfterViews = 1;
+  const { counts } = setup(s);
+  click('[data-view="a"]');
+  click('[data-view="h"]');
+  assert.equal(counts.mistakes, 2);
+  assert.equal(feedback(), 'Herring was a red herring, and the error budget is spent.');
 });
