@@ -153,12 +153,15 @@ const DRIVERS = {
     play() {
       click('[data-look="service"]');
       click('#pager-escalate');
+      for (const k of ['service', 'since', 'customers', 'trace']) click(`[data-ask="${k}"]`);
+      click('#pager-finish');
     },
     expect: { stars: 0, cards: [] },
     sloppy: {
       play() {
         for (const look of ['service', 'since', 'customers', 'trace']) click(`[data-look="${look}"]`);
-        click('#pager-escalate');
+        for (const k of ['service', 'since', 'customers', 'trace']) click(`[data-ask="${k}"]`); // budget 0 moved on
+        click('#pager-finish');
       },
       expect: { stars: 0, cards: [] },
     },

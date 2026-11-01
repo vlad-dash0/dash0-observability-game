@@ -446,11 +446,21 @@ The answer's `why` and the card back carry the full wording: "... Without an SDK
 no-ops: they record nothing and cost almost nothing." (not "do nothing": the trace API still
 propagates SpanContext). Spec: https://opentelemetry.io/docs/concepts/instrumentation/libraries/#opentelemetry-api
 
-**Boss `the-pager`**: `scored:false`; cards `[]`; lights `[]`. Alert "PAGE: checkout p95 > 2 s
-(firing)". Four looks (Which service? / Since when? / Which customers? / Show me a trace), each
-reveals "No data. …" with the reason and drops "Error budget: N% left" by 25. Finish
-`#pager-escalate` "Escalate" (`data-finish`) enabled after the first look. Reward: "You could
-not answer one question. Time to instrument."
+**Boss `the-pager`**: `scored:false`; cards `[]`; lights `[]`. Two parts. Part 1, blind: the
+intro states the goal ("Try the four questions below: you will find you cannot answer them,
+because nothing sends telemetry yet. Each try burns error budget. When you give up, press
+Escalate."). Alert "PAGE: checkout p95 > 2 s (firing)". Four looks (Which service? / Since
+when? / Which customers? / Show me a trace), each reveals "No data. …" with the reason and
+drops "Error budget: N% left" by 25. `#pager-escalate` "Escalate" (no `data-finish`) is
+enabled after the first look and moves to part 2; the budget reaching 0 moves to part 2 by
+itself. Part 2, with telemetry: "Same alert, now with telemetry. Ask the same four questions.
+The data is made up, for illustration. Ask all four to finish." The same four questions are
+buttons (`data-ask`); clicking one reveals a made-up answer (service.name, a metric over time
+with service.version, a span attribute, a trace; `CONTENT.telemetry` in
+`levels/the-pager.mjs` cites the OpenTelemetry specs). Finish `#pager-finish` "Finish"
+(`data-finish`) is enabled after all four are asked. Each part has its own status regions
+(part 1: budget and feedback; part 2: answers), never both at once. Reward: "You could not
+answer one question. Time to instrument."
 
 ### Act 2
 **2.1 `spans-and-traces`**: build; cards `['no-trace-object']`. Step 1 choice "What makes these
