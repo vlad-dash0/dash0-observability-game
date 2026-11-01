@@ -248,4 +248,39 @@ export const DECK = [
       'The Dash0 operator adds k8s.namespace.name, k8s.pod.name, k8s.pod.uid and k8s.container.name to workloads in namespaces ' +
       'enabled for Dash0 monitoring, so you do not set them by hand.',
   },
+  {
+    id: 'series-are-combinations',
+    front:
+      'A metric has one series per attribute combination: keep user ids and raw URLs off metrics, and use http.route.',
+    back:
+      'Every unique combination of attribute values is its own time series, so the worst case is the product of the ' +
+      'number of values of each attribute: 5 methods, 14 routes and 9 status codes make at most 630 series, and adding ' +
+      'user.id with 31,402 values makes it 19,783,260. Series cost memory, storage and query time, and the Prometheus ' +
+      'guidance is not to use labels for unbounded values such as user IDs. http.route is the low-cardinality choice: ' +
+      'a route template with placeholders for the dynamic segments. An SDK that implements the specification\'s ' +
+      'cardinality limit (2,000 per metric by default) folds the combinations it had not seen yet into one overflow ' +
+      'point. Keep per-user detail on spans and logs.',
+    specUrl: 'https://opentelemetry.io/docs/specs/otel/metrics/sdk/#cardinality-limits',
+    dash0Angle:
+      'Dash0\'s Metric Explorer tree map sizes each metric by its cardinality, so you can see what drives volume. A ' +
+      'spam filter drops matching data points at ingestion, but fixing the source is the cheaper answer.',
+  },
+  {
+    id: 'red-and-use',
+    front:
+      'RED (rate, errors, duration) reads a service\'s requests; USE (utilisation, saturation, errors) reads a resource.',
+    back:
+      'RED is Tom Wilkie\'s checklist for each request-driven service: Rate, the requests per second; Errors, the share ' +
+      'of them that fail; Duration, how long they take, as a distribution. USE is Brendan Gregg\'s checklist for each ' +
+      'resource, such as a CPU or a disk: Utilisation, how busy it is; Saturation, how much work waits for it, often a ' +
+      'queue; Errors, the count of error events. A burst can saturate a resource while its average utilisation looks ' +
+      'low. When a service sends traces but no metrics, the Collector\'s spanmetrics connector (contrib) turns the spans ' +
+      'into a calls counter and a duration histogram: rate is the calls, errors are the calls with an error status, and ' +
+      'the metric names and the duration unit depend on the version, so check yours. Count a service\'s own requests ' +
+      'from its SERVER spans, and keep span names low-cardinality, because every distinct name is a series.',
+    specUrl: 'https://opentelemetry.io/docs/collector/components/connector/',
+    dash0Angle:
+      'Dash0 derives RED from the spans it receives (dash0.spans.red) for its Service Catalog and Service Map, so you ' +
+      'do not run a connector for them.',
+  },
 ];
