@@ -283,4 +283,33 @@ export const DECK = [
       'Dash0 derives RED from the spans it receives (dash0.spans.red) for its Service Catalog and Service Map, so you ' +
       'do not run a connector for them.',
   },
+  {
+    id: 'severity-number-not-text',
+    front:
+      'Filter logs on SeverityNumber, not SeverityText: the text is whatever the source printed, the number is normalised.',
+    back:
+      'A log record keeps the message in the Body, facts about this one event in Attributes, and the source that emitted it in ' +
+      'the Resource. Severity comes twice: SeverityText is the original string from the source (WARN, warning, Warn) and ' +
+      'SeverityNumber is an integer from 1 to 24 in six ranges: TRACE 1-4, DEBUG 5-8, INFO 9-12, WARN 13-16, ERROR 17-20, ' +
+      'FATAL 21-24. Compare and filter on the number, because one library\'s "warning" is another\'s "WARN". Keep your own ' +
+      'logging library: the Logs Bridge API is for logging library authors, who build the appenders that bridge into ' +
+      'OpenTelemetry.',
+    specUrl: 'https://opentelemetry.io/docs/specs/otel/logs/data-model/',
+    dash0Angle: null,
+  },
+  {
+    id: 'logs-need-an-active-span',
+    front: 'A log record gets TraceId and SpanId only if the log call ran inside an active span, through a bridged logger.',
+    back:
+      'TraceId and SpanId are fields of the log record, not attributes. They are set when the record is emitted with a context ' +
+      'that holds a span: the Logs API uses the current context when none is passed, and the appender or bridge for your ' +
+      'logging library passes it. A call outside any span, such as startup code or a background worker whose context was not ' +
+      'carried over, leaves them empty. An all-zero trace id or span id is invalid under W3C Trace Context, so a record with ' +
+      'zeros is not linked either, and a trace id written into the message text is not a link at all.',
+    specUrl: 'https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-traceid',
+    dash0Angle:
+      'Dash0 shows the span a log was created in from the log, and the logs of a span from the span. The span view lists the ' +
+      'logs of the same trace by default and can switch to the same resource, which finds logs outside the trace, such as ' +
+      'background jobs.',
+  },
 ];

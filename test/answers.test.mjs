@@ -68,6 +68,18 @@ const ANSWERS = {
     'query ru-duration: checkout-spanmetrics@3600 histogram_quantile(0.95, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER"}[5m])))',
     'choice ru-dash0: derived',
   ],
+  'structured-logs': [
+    'sort sl-sort: msg-declined=body order-id=attributes severity-text=severity service-name=resource trace-id=trace msg-retry=body payment-method=attributes severity-number=severity pod-name=resource span-id=trace retry-attempt=attributes trace-flags=trace',
+    'choice sl-attrs: short-message',
+    'choice sl-severity: number',
+    'choice sl-bridge: keep-logger',
+  ],
+  correlation: [
+    'spot cor-spot: checkout-startup,payments-worker,notifications-email',
+    'choice cor-why: no-active-span',
+    'choice cor-fix: run-in-span',
+    'choice cor-dash0: resource-mode',
+  ],
   'play-fixture': [
     'choice fx-pick: trace',
     'sort fx-sort: server=auto loyalty=manual',
