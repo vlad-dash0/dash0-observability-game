@@ -60,7 +60,7 @@ A level file keeps today's metadata (FOUNDATION §2.1) and declares `play` inste
 |---|---|---|---|
 | `choice` | `{id, choices: [{key, label, why, right?}]}`, at least 2 choices | none | live (`choiceHtml`/`mountChoice`) |
 | `sort` | SortSpec (M1-DESIGN §4.1) | sort | live |
-| `build` | BuildSpec (§4.2) | build | live |
+| `build` | BuildSpec (§4.2); `edit` is a list of span fields (`parent`, `kind`, `status`, `links`) or exactly `['logs']` (logs mode: attach each record of `logs` to a span or to none; spans are read-only) | build | live |
 | `incident` | Scenario (§4.3) | incident | live |
 | `configure` | ConfigureSpec (§4.9 of M1-DESIGN): `{id, schema: '<name>', given: '<yaml>', reference: '<yaml>', target?: [pipeline], uses?: {pipeline: [component id]}, hint?, explain}`, checked by the checker core (§4.8) | configure | live |
 | `query` | QuerySpec (§4.7 of M1-DESIGN): `{id, dataset: '<name>', at, reference: '<query>', given?, hint?, explain}`, graded by comparing result series | query | live |
@@ -192,7 +192,7 @@ STEP_TYPES[key] = {
 The live adapters are thin wrappers:
 - **choice:** `choiceHtml`, `mountChoice` with `onRight: onDone`, and `validateChoiceSpec` plus "at least 2 choices".
 - **sort:** `renderSort(spec, newSortState(spec), …)`, `mountSort`, `validateSortSpec`.
-- **build:** `renderBuild`, `mountBuild`, and `validateBuildSpec` plus `checkBuild(spec, newBuildState(spec)).ok === false`.
+- **build:** `renderBuild`, `mountBuild`, and `validateBuildSpec` plus `checkBuild(spec, newBuildState(spec)).ok === false`. The same adapter serves logs mode (`edit: ['logs']`): no new step type, and the given state (every record as given) must fail Check like any other.
 - **incident:** `renderIncident`, `mountIncident`, `validateScenario`.
 - **spot:** `renderSpot(spec, newSpotState(spec), …)`, `mountSpot`, `validateSpotSpec`.
 - **tradeoff:** `renderTradeoff(spec, newTradeoffState(spec), …)`, `mountTradeoff`, `validateTradeoffSpec`.
@@ -250,10 +250,11 @@ Each type also has a test driver in `test/helpers/step-drivers.mjs` (§4). Addin
 - `slips(spec) → [{name, clicks, says: RegExp}]`, each costing exactly one penalty:
   - choice: each wrong key;
   - sort: each item's first wrong bucket;
-  - build: Check on the given state, plus the hint if any;
+  - build: Check on the given state, plus the hint if any. In logs mode also `orphan` (every record right except the first one that has a span, which is left without span context);
   - incident: the first herring, and a wrong hypothesis.
-- `first(spec) → focusName`: `pick:`, `item:<id>`, `span:<first row>` or `view:<id>`.
-- `answerKey(spec) → string`
+- `first(spec) → focusName`: `pick:`, `item:<id>`, `span:<first row>` (logs mode: `log:<first record id>`) or `view:<id>`.
+- `answerKey(spec) → string` (logs mode: `build <id>: <logId>=<spanId|none> …` in record order)
+- `solve` in logs mode sets every record explicitly (select the record, then its span or "No span context"), so it never depends on the given state.
 
 A meta test checks that every `STEP_TYPES` key has a driver and that every driver has a type.
 

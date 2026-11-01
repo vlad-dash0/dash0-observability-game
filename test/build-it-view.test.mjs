@@ -12,6 +12,7 @@ import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { newBuildState, setParent } from '../lib/widgets/build-it.mjs';
 import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
 import { A, B, C, D, E, b1Spec } from './fixtures/build-b1.mjs';
+import { S1, S2, S3, S4, T2, logsSpec } from './fixtures/build-logs.mjs';
 
 /** A counting stub ctx on a fresh DOM with the widget rendered; `finish` is onComplete's target. */
 function setup(spec = b1Spec()) {
@@ -370,4 +371,316 @@ test('styles: rows, panel buttons and problems wrap anywhere; bars are coloured 
   }
   assert.equal(/fill:/.test(bodyOf('.wf-bar')), true, '.wf-bar has a fill');
   assert.equal(/stroke:/.test(bodyOf('.wf-bar.selected')), true, 'the selected bar is outlined, not colour alone');
+});
+
+// ---- logs mode (#113, phase B): fixture L1 (test/fixtures/build-logs.mjs) -------------------
+// Axis: min -40, max 100, range 140. Rows: S1, S2, S3 (trace 4bf9, from 0) then S4 (trace 0af7, from 30).
+
+const LOG_IDS = ['l-boot', 'l-cart', 'l-other', 'l-charge', 'l-worker'];
+const logLines = () => qa('[data-log]').map((b) => b.textContent);
+const logIds = () => qa('[data-log]').map((b) => b.dataset.log);
+const lfeedback = () => q('#l1-feedback').textContent;
+const lines = (cls) => qa(`svg line.${cls}`).map((l) => ['x1', 'x2', 'y1', 'y2'].map((a) => l.getAttribute(a)).join(' '));
+const attach = (log, span) => {
+  click(`[data-log="${log}"]`);
+  click(`[data-attach="${span}"]`);
+};
+const solveLogs = () => {
+  attach('l-boot', 'none');
+  attach('l-cart', S2);
+  attach('l-other', S4);
+  attach('l-charge', S3);
+  attach('l-worker', 'none');
+};
+
+test('V1 logs mode: a log stream of data-log buttons, one line per record, and the waterfall keeps one row per span', () => {
+  setup(logsSpec());
+  assert.deepEqual(logIds(), LOG_IDS, 'spec order');
+  assert.deepEqual(qa('[data-log]').map((b) => b.getAttribute('aria-pressed')), ['false', 'false', 'false', 'false', 'false']);
+  assert.equal(qa('ol.build-logs > li > button.build-log').length, 5);
+  assert.deepEqual(logLines(), [
+    '-40 ms · INFO · checkout · trace_id=(none) · span_id=(none) · Application started · thread.name=main',
+    '30 ms · DEBUG · checkout · trace_id=(none) · span_id=(none) · Cart validated · order.id=8841',
+    '60 ms · INFO · checkout · trace_id=(none) · span_id=(none) · Order accepted · order.id=8842',
+    '70 ms · INFO · payments · trace_id=(none) · span_id=(none) · Charge submitted · thread.name=http-exec-1',
+    '75 ms · ERROR · payments · trace_id=(none) · span_id=(none) · Retry worker gave up on charge · thread.name=retry-worker-2',
+  ]);
+  assert.deepEqual(spanIds(), [S1, S2, S3, S4], 'one row per span, never one per record');
+  assert.equal(qa('svg rect').length, 4);
+  assert.deepEqual(rects(), ['28.57 0 71.43 4', '42.86 6 14.29 4', '64.29 12 28.57 4', '50 18 35.71 4'], 'the record times widen the axis');
+  assert.equal(q('svg').getAttribute('viewBox'), '0 0 100 24');
+  assert.deepEqual([qa('svg line').length, qa('[data-attach]').length, qa('[data-parent]').length], [0, 0, 0]);
+  assert.equal(rows()[1], 'validate cart · checkout · INTERNAL · UNSET · 20–40 ms · Parent: POST /checkout (checkout)');
+  assert.equal(q('[data-build-panel]').textContent, 'Pick a record to attach it, or a span to see its records.');
+});
+
+test('V1 selecting a record presses it and offers "No span context" first, then every span in row order', () => {
+  const { counts, mount } = setup(logsSpec());
+  mount();
+  click('[data-log="l-worker"]');
+  assert.deepEqual(qa('[data-log]').map((b) => b.getAttribute('aria-pressed')), ['false', 'false', 'false', 'false', 'true']);
+  assert.equal(q('[data-build-panel] .build-editing').textContent, 'Span context for "Retry worker gave up on charge" (payments, 75 ms)');
+  assert.deepEqual(qa('[data-attach]').map((b) => b.dataset.attach), ['none', S1, S2, S3, S4]);
+  assert.deepEqual(qa('[data-attach]').map((b) => b.textContent), [
+    'No span context',
+    'POST /checkout (checkout) · 0–100 ms',
+    'validate cart (checkout) · 20–40 ms',
+    'POST /charge (payments) · 50–90 ms',
+    'POST /checkout (checkout) · 30–80 ms',
+  ]);
+  assert.deepEqual(qa('[data-attach]').map((b) => b.getAttribute('aria-pressed')), ['true', 'false', 'false', 'false', 'false']);
+  assert.deepEqual(qa('[data-span]').map((b) => b.getAttribute('aria-pressed')), ['false', 'false', 'false', 'false']);
+  assert.deepEqual([panel('data-parent'), panel('data-kind'), panel('data-status'), panel('data-link')], [[], [], [], []], 'spans are read-only');
+  assert.equal(counts.mistakes, 0, 'selecting is free');
+});
+
+test('V2 attaching fills in the record ids, lights a tick at the record time on the span row and counts "Logs: N"', () => {
+  const { counts, mount } = setup(logsSpec());
+  mount();
+  attach('l-other', S4);
+  assert.equal(logLines()[2], `60 ms · INFO · checkout · trace_id=${T2} · span_id=${S4} · Order accepted · order.id=8842`);
+  assert.deepEqual(lines('wf-log'), ['71.43 71.43 18 22'], 'row 4, at the record time on the shared axis');
+  assert.equal(rows()[3].endsWith(' · Logs: 1'), true);
+  assert.deepEqual(rows().map((t) => t.includes('Logs:')), [false, false, false, true]);
+  assert.deepEqual(logIds(), LOG_IDS, 'the record stays in the stream');
+  assert.equal(qa('svg rect').length, 4);
+  assert.equal(lfeedback(), `"Order accepted" now carries span_id=${S4} and trace_id=${T2} from POST /checkout (checkout).`);
+  assert.equal(q(`[data-attach="${S4}"]`).getAttribute('aria-pressed'), 'true');
+  assert.equal(q('[data-attach="none"]').getAttribute('aria-pressed'), 'false');
+  attach('l-boot', S1);
+  assert.deepEqual(lines('wf-log'), ['0 0 0 4', '71.43 71.43 18 22'], 'a timestamp outside the bar hangs off it (the bar starts at 28.57)');
+  attach('l-cart', S1);
+  assert.equal(rows()[0].endsWith(' · Logs: 2'), true);
+  attach('l-boot', 'none');
+  assert.equal(logLines()[0].includes('trace_id=(none) · span_id=(none)'), true, 'blank ids read (none)');
+  assert.equal(rows()[0].endsWith(' · Logs: 1'), true);
+  assert.deepEqual(lines('wf-log'), ['50 50 0 4', '71.43 71.43 18 22']);
+  assert.equal(lfeedback(), '"Application started" now has no span context: trace_id=(none) and span_id=(none).');
+  assert.equal(counts.mistakes, 0, 'attaching and detaching are free');
+});
+
+test('V3 the cursor marks the selected record time across the waterfall and only then', () => {
+  const { mount } = setup(logsSpec());
+  mount();
+  assert.deepEqual(lines('wf-cursor'), []);
+  click('[data-log="l-boot"]');
+  assert.deepEqual(lines('wf-cursor'), ['0 0 0 24']);
+  click('[data-log="l-cart"]');
+  assert.deepEqual(lines('wf-cursor'), ['50 50 0 24']);
+  click('[data-log="l-worker"]');
+  assert.deepEqual(lines('wf-cursor'), ['82.14 82.14 0 24']);
+  click(`[data-span="${S3}"]`);
+  assert.deepEqual(lines('wf-cursor'), [], 'a span selection has no cursor');
+  assert.equal(qa('svg [style]').length, 0);
+});
+
+test('V4 span mode has no logs markup at all', () => {
+  const { mount } = setup({ ...b1Spec(), edit: ['parent', 'kind', 'status', 'links'] });
+  mount();
+  click(`[data-span="${C}"]`);
+  assert.deepEqual([qa('[data-log]').length, qa('.build-logs').length, qa('svg line').length, qa('[data-attach]').length, qa('[data-show-log]').length], [0, 0, 0, 0, 0]);
+  assert.equal(rows().some((t) => t.includes('Logs:')), false);
+  assert.equal(q('[data-build-panel] .build-editing').textContent.startsWith('Editing '), true);
+});
+
+test('V5 penalties: a failing Check costs one, the same graded records again is free, a changed record costs again', () => {
+  const { counts, mount } = setup(logsSpec());
+  mount();
+  attach('l-cart', S2);
+  click('#l1-check');
+  assert.equal(counts.mistakes, 1);
+  assert.equal(q('#l1-feedback').firstChild.textContent, 'Not yet: 2 problems.');
+  assert.deepEqual(qa('#l1-feedback li').map((li) => li.textContent), [
+    '"Order accepted" (checkout, 60 ms): it has no span context yet.',
+    '"Charge submitted" (payments, 70 ms): it has no span context yet.',
+  ]);
+  click('#l1-check');
+  assert.equal(counts.mistakes, 1, 'the same state again is free');
+  assert.equal(q('#l1-feedback').firstChild.textContent, 'Same as last time: 2 problems.');
+  attach('l-cart', S1);
+  attach('l-cart', S2);
+  click('#l1-check');
+  assert.equal(counts.mistakes, 1, 'an attach undone is the same state');
+  attach('l-other', S3);
+  click('#l1-check');
+  assert.equal(counts.mistakes, 2, 'a changed record is a new state, though the problem count is the same');
+  assert.equal(q('#l1-feedback').firstChild.textContent, 'Not yet: 2 problems.');
+  assert.equal(qa('#l1-feedback li')[0].textContent.includes('another service'), true);
+  assert.equal(counts.done, 0);
+});
+
+test('V5 a recheck after attaching the same records in another order is free', () => {
+  const { counts, mount } = setup(logsSpec());
+  mount();
+  attach('l-cart', S2);
+  attach('l-charge', S3);
+  click('#l1-check');
+  attach('l-charge', 'none');
+  attach('l-cart', 'none');
+  attach('l-charge', S3);
+  attach('l-cart', S2);
+  click('#l1-check');
+  assert.equal(counts.mistakes, 1);
+  assert.equal(q('#l1-feedback').firstChild.textContent, 'Same as last time: 1 problem.');
+});
+
+test('V6 a passing Check says every record checks out with the explain, locks the attach controls and still lets you inspect', () => {
+  const spec = { ...logsSpec(), explain: 'The worker thread is not the request <b>thread</b>.' };
+  const { focus, counts, mount } = setup(spec);
+  mount();
+  solveLogs();
+  click('#l1-check');
+  assert.deepEqual(counts, { mistakes: 0, hints: 0, done: 1 });
+  assert.equal(lfeedback(), 'Right. Every record checks out. The worker thread is not the request thread.');
+  assert.equal(q('#l1-feedback b').textContent, 'thread', 'explain is authored HTML');
+  assert.equal(q('#l1-feedback').className, 'feedback good show');
+  assert.equal(focus.last(), '#finish');
+  assert.equal(q('#l1-check').disabled, true);
+  assert.deepEqual(qa('[data-attach]').map((b) => b.disabled), [true, true, true, true, true]);
+  assert.equal(qa('[data-log]').every((b) => !b.disabled) && qa('[data-span]').every((b) => !b.disabled), true);
+  const before = logLines();
+  q(`[data-attach="${S1}"]`).onclick({});
+  assert.deepEqual(logLines(), before, 'a click that gets through does not change a record');
+  click('[data-log="l-cart"]');
+  assert.equal(q('[data-log="l-cart"]').getAttribute('aria-pressed'), 'true');
+  click(`[data-span="${S3}"]`);
+  assert.equal(qa('[data-show-log]').length, 1, 'inspecting still works');
+  assert.equal(counts.done, 1);
+});
+
+test('V6 the same passing run without explain says only the pass line', () => {
+  const { mount } = setup(logsSpec());
+  mount();
+  solveLogs();
+  click('#l1-check');
+  assert.equal(lfeedback(), 'Right. Every record checks out.');
+});
+
+test('V7 the reverse view: a span shows its attributes read-only and the records carrying its span_id', () => {
+  const { mount } = setup(logsSpec());
+  mount();
+  click(`[data-span="${S3}"]`);
+  assert.equal(q(`[data-span="${S3}"]`).getAttribute('aria-pressed'), 'true');
+  assert.equal(q('[data-build-panel] .build-editing').textContent, `POST /charge (payments), trace 4bf92f3577b34da6a3ce929d0e0e4736, span_id ${S3}`);
+  assert.deepEqual(qa('[data-build-panel] .build-attrs li').map((li) => li.textContent), ['thread.name=http-exec-1']);
+  assert.equal(qa('[data-show-log]').length, 0);
+  assert.equal(q('[data-build-panel]').textContent.includes('No record carries this span_id yet.'), true);
+  assert.deepEqual([qa('[data-attach]').length, qa('[data-parent]').length, qa('[data-build-panel] input, [data-build-panel] select').length], [0, 0, 0]);
+  attach('l-charge', S3);
+  attach('l-worker', S3);
+  click(`[data-span="${S3}"]`);
+  assert.deepEqual(qa('[data-show-log]').map((b) => b.dataset.showLog), ['l-charge', 'l-worker'], 'spec order');
+  assert.equal(qa('[data-show-log]')[0].textContent, '70 ms · INFO · Charge submitted');
+  click('[data-show-log="l-worker"]');
+  assert.equal(q('[data-log="l-worker"]').getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(qa('[data-span]').map((b) => b.getAttribute('aria-pressed')), ['false', 'false', 'false', 'false'], 'choosing a record clears the span selection');
+  assert.equal(q('[data-build-panel] [data-panel-title]').dataset.panelTitle, 'log', 'the span panel is closed');
+  assert.equal(q(`[data-attach="${S3}"]`).getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(lines('wf-cursor'), ['82.14 82.14 0 24']);
+  click(`[data-span="${S1}"]`);
+  assert.deepEqual(qa('[data-build-panel] .build-attrs li').map((li) => li.textContent), ['order.id=8841']);
+  click(`[data-span="${S2}"]`);
+  assert.equal(qa('[data-build-panel] .build-attrs li').length, 0);
+  assert.equal(q('[data-build-panel]').textContent.includes('No attributes.'), true);
+});
+
+test('V8 data text is escaped everywhere in logs mode: stream, panel, feedback and problems', () => {
+  const spec = logsSpec();
+  spec.logs[1].body = '<img src=x>Cart & "ok"';
+  spec.logs[1].service = '<b>shop</b>';
+  spec.logs[1].attributes = { '<i>k</i>': '<u>v</u>' };
+  spec.spans[1].name = '<s>cart</s>';
+  spec.spans[1].service = '<b>shop</b>';
+  spec.spans[1].attributes = { '<em>a</em>': '<code>b</code>' };
+  const { mount } = setup(spec);
+  mount();
+  const hostile = () => qa('img, b, i, u, s, em').length;
+  assert.equal(hostile(), 0);
+  assert.equal(logLines()[1], '30 ms · DEBUG · <b>shop</b> · trace_id=(none) · span_id=(none) · <img src=x>Cart & "ok" · <i>k</i>=<u>v</u>');
+  attach('l-cart', S2);
+  assert.equal(lfeedback().startsWith('"<img src=x>Cart & "ok"" now carries'), true);
+  assert.equal(rows()[1].startsWith('<s>cart</s> · <b>shop</b> · INTERNAL'), true);
+  click(`[data-span="${S2}"]`);
+  assert.deepEqual(qa('[data-build-panel] .build-attrs li').map((li) => li.textContent), ['<em>a</em>=<code>b</code>']);
+  assert.equal(qa('[data-show-log]')[0].textContent, '30 ms · DEBUG · <img src=x>Cart & "ok"');
+  click('[data-log="l-cart"]');
+  assert.equal(q(`[data-attach="${S2}"]`).textContent, '<s>cart</s> (<b>shop</b>) · 20–40 ms');
+  attach('l-cart', S3);
+  click('#l1-check');
+  assert.equal(qa('#l1-feedback li')[0].textContent.startsWith('"<img src=x>Cart & "ok"" (<b>shop</b>, 30 ms):'), true);
+  assert.equal(hostile() + qa('code').length - qa('[data-build-panel] code').length, 0, 'no element came from data text');
+});
+
+test('V9 focus: the first record on mount, the first control after a pick, the attach button after an attach, the feedback after a failing Check', () => {
+  const spec = { ...logsSpec(), hint: 'Compare the thread names.' };
+  const { focus, mount } = setup(spec);
+  mount();
+  assert.equal(focus.last(), 'log:l-boot');
+  click('[data-log="l-cart"]');
+  assert.equal(focus.last(), 'attach:none');
+  click(`[data-attach="${S2}"]`);
+  assert.equal(focus.last(), `attach:${S2}`);
+  click(`[data-span="${S3}"]`);
+  assert.equal(focus.last(), 'panel-title:span', 'a span with no records: its heading');
+  attach('l-charge', S3);
+  click(`[data-span="${S3}"]`);
+  assert.equal(focus.last(), 'show-log:l-charge');
+  click('[data-show-log="l-charge"]');
+  assert.equal(focus.last(), 'attach:none');
+  click('#l1-check');
+  assert.equal(focus.last(), '#l1-feedback');
+  click('#l1-hint');
+  assert.equal(focus.last(), '#l1-hint-text');
+  solveLogs();
+  click('#l1-check');
+  assert.equal(focus.last(), '#finish');
+  click('[data-log="l-cart"]');
+  assert.equal(focus.last(), 'panel-title:log', 'locked: the attach buttons are disabled, so the heading takes focus');
+  assert.deepEqual(focus.unfocusable(), []);
+});
+
+test('V10 no em dash, no zero ids and no style, Alpine or on* attributes in any logs-mode state', () => {
+  const { dom, mount } = setup({ ...logsSpec(), hint: 'Look at the thread.', explain: 'Done.' });
+  mount();
+  const html = () => dom.body.innerHTML;
+  const seen = [html()];
+  click('[data-log="l-worker"]');
+  seen.push(html());
+  attach('l-worker', S3);
+  seen.push(html());
+  click(`[data-span="${S3}"]`);
+  seen.push(html());
+  click('#l1-check');
+  seen.push(html());
+  click('#l1-hint');
+  solveLogs();
+  click('#l1-check');
+  seen.push(html());
+  assert.equal(seen.length, 6);
+  for (const markup of seen) {
+    assert.equal(markup.includes('—'), false, 'em dash');
+    assert.equal(/0{16}/.test(markup), false, 'zero ids');
+    assert.equal(/\sstyle=/.test(markup) || ALPINE.test(markup) || /\son\w+=/.test(markup), false);
+  }
+});
+
+test('V11 styles: the log stream, the pressed record, the tick and the cursor are drawn from existing tokens, without inline style', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const css = readFileSync(join(root, 'styles', 'base.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, sel, body]) => ({
+    sels: sel.split(',').map((s) => s.trim()),
+    body: body.replace(/\s+/g, ' '),
+  }));
+  const bodyOf = (sel) => rules.filter((r) => r.sels.includes(sel)).map((r) => r.body).join(';');
+  assert.equal(/max-width:\s*100%/.test(bodyOf('.build-log')), true, '.build-log max-width: 100%');
+  assert.equal(/overflow-wrap:\s*anywhere/.test(bodyOf('.build-log')), true, '.build-log overflow-wrap: anywhere');
+  assert.equal(bodyOf('.build-logs').length > 0, true, '.build-logs');
+  assert.equal(/border:\s*3px solid var\(--color-text\)/.test(bodyOf('.build-log[aria-pressed="true"]')), true, 'the pressed record is not colour alone');
+  for (const sel of ['.wf-log', '.wf-cursor']) {
+    assert.equal(/stroke:\s*var\(--color-[\w-]+\)/.test(bodyOf(sel)), true, `${sel} stroke is a token`);
+    assert.equal(/vector-effect:\s*non-scaling-stroke/.test(bodyOf(sel)), true, `${sel} keeps its stroke width under preserveAspectRatio none`);
+  }
+  assert.equal(/stroke-dasharray:/.test(bodyOf('.wf-cursor')), true, 'the cursor is dashed');
+  const mine = ['.build-logs', '.build-log', '.build-log[aria-pressed="true"]', '.wf-log', '.wf-cursor'].map(bodyOf).join(' ');
+  assert.equal(/#[0-9a-fA-F]{3,8}\b|rgb\(|hsl\(/.test(mine), false, 'tokens only, so both themes follow');
 });

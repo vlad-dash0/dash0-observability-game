@@ -129,7 +129,7 @@ Parent: …`); a panel for the selected span with only editable controls (`data-
 (`ctx.hint()` once). A new failing Check costs a mistake; an identical recheck is free
 (`Same as last time: N problems.`); a refused cycle/self is free ("would make a loop").
 
-**Logs mode (#113, phase A: core only, the view is pending).** `edit: ['logs']` is its own
+**Logs mode (#113: core in phase A, view in phase B).** `edit: ['logs']` is its own
 mode (exactly that list; a mix with span fields is refused), with the same step type and
 mechanic (`build`). Spans are read-only and not graded; a log record is a standalone
 record that carries `trace_id` / `span_id` (OTel logs data model), never a child span, so
@@ -151,8 +151,35 @@ checkBuild → issues {code, logId, message}; one per record, first that applies
 validateBuildSpec applies the log answer before the I7 check, so the rule codes grade the reference answer
 timeAxis(spans, times = []) → {min, range, pct(ms)}; waterfall(spans, {times}) uses it (same output with no times)
 ```
-`play.mjs` accepts `logs` and `explain` on a build step but refuses logs mode in levels
-(`edit: logs is not available in levels yet`) until the view lands in phase B.
+`play.mjs` accepts `logs` and `explain` on a build step, and logs mode in levels (phase B
+removed the "not available in levels yet" guard). `explain` is shown only in logs mode, so
+`validateBuildSpec` refuses it elsewhere (`explain: only shown in logs mode`) rather than
+letting an author's text vanish.
+
+Logs mode view (#113 phase B), same `renderBuild` / `mountBuild`, span mode unchanged:
+- **Board.** The read-only waterfall (one row per span, widened by the record times through
+  `waterfall(spans, {times})`), its `<ol>` of span rows (`… · Parent: … · Logs: N` once N >= 1
+  records are attached), then the log stream `<ol class="build-logs">`: one `button.build-log`
+  per record with `data-log` first and `aria-pressed`, spec order, text `time ms · SEVERITY ·
+  service · trace_id=… · span_id=… · body · k=v, …`; a blank id reads `(none)`.
+- **Select a record.** A dashed `<line class="wf-cursor">` at its time (`timeAxis(...).pct`)
+  and the panel "Span context for "body" (service, time ms)": `data-attach` buttons, "No span
+  context" (`data-attach="none"`) first, then every span in row order. Attaching is free and
+  says `"body" now carries span_id=… and trace_id=… from <span>.` (or `now has no span context`).
+  The ids come from `applyLogs`, never from the view.
+- **Ticks.** A `<line class="wf-log">` on the row of the record's span at the record's time,
+  hanging off the bar when the time is outside it. Positions are SVG attributes; CSS sets
+  `vector-effect: non-scaling-stroke`.
+- **Select a span.** Read-only: its attributes (`.build-attrs`) and "Records carrying this
+  span_id" as `data-show-log` buttons (from `recordsBySpan`), each opening that record's
+  attach panel. A panel with nothing to press focuses its heading (`data-panel-title`).
+- **Check.** Same penalties as span mode (a failing Check costs one unless `gradedKey`, which
+  includes the records, equals the last failed one). Pass: `Right. Every record checks out.`
+  plus `explain` (authored HTML); the attach buttons lock, inspecting still works.
+- **Focus.** Mount: first `[data-log]`; a record: "No span context"; an attach: that button;
+  a failing Check: the feedback; a pass: `onComplete()`'s return.
+- **Driver.** `solve` selects each record and sets it explicitly; slips `check`, `orphan`,
+  `hint`; `first()` is `log:<first record id>`.
 
 ### 4.3 Incident engine (P10, M1b)
 Core `lib/widgets/incident.mjs`:

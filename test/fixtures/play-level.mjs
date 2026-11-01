@@ -4,6 +4,7 @@
 // call, so a test may edit it.
 import { incidentScenario } from './incident-scenario.mjs';
 import { FIXTURE_CARD } from './fixture-level.mjs';
+import { logsSpec } from './build-logs.mjs';
 
 export { FIXTURE_CARD };
 
@@ -164,6 +165,16 @@ export function playFixture() {
             uses: { traces: ['batch'] },
             hint: 'Compare the exporter name in the pipeline with the one defined above it.',
             explain: 'A pipeline can only use components that are defined, and the names must match exactly.',
+          },
+        },
+        {
+          intro: 'The checkout and payments logs carry no trace context yet.',
+          question: 'Attach each log record to the span it was written in, or to none.',
+          build: {
+            ...logsSpec(),
+            id: 'fx-logs',
+            hint: 'A record belongs to a span only if that span was active when it was written. Compare the thread names.',
+            explain: 'A log record carries a span_id only when it was written while that span was active.',
           },
         },
       ],
