@@ -12,7 +12,7 @@ import { runPlay, validatePlay } from '../lib/play.mjs';
 const nodeIds = NODES.map((n) => n.id);
 
 // Extended on purpose with each level PR (docs/M1-DESIGN.md §5): Act 0 (P3) plays before Act 1;
-// its boss, the pager (P4), comes after its levels; Act 2 (P6: 2.1, 2.2) plays after Act 1; its boss, checkout-is-slow (P11), comes last.
+// its boss, the pager (P4), comes after its levels; Act 2 (P6: 2.1, 2.2) plays after Act 1; its boss, checkout-is-slow (P11), comes last; Act 3 (M3 P1: 3.1, 3.2) plays after Act 2.
 const EXPECTED_ORDER = [
   'monitoring-vs-observability',
   'the-signals',
@@ -27,6 +27,8 @@ const EXPECTED_ORDER = [
   'events-and-links',
   'auto-vs-manual',
   'checkout-is-slow',
+  'instruments',
+  'temporality',
 ];
 
 test('the live registry builds against the real deck and map nodes', () => {
@@ -35,7 +37,7 @@ test('the live registry builds against the real deck and map nodes', () => {
   assert.deepEqual(liveRegistry().order, EXPECTED_ORDER, 'app.mjs builds the same registry');
 });
 
-test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, then Act 2 "Traces"', () => {
+test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "Traces", then Act 3 "Metrics"', () => {
   const acts = liveRegistry().acts.map((a) => ({ id: a.id, no: a.no, name: a.name, sub: a.sub, levelIds: [...a.levelIds], bossId: a.bossId }));
   assert.deepEqual(acts, [
     {
@@ -61,6 +63,14 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, then Act
       sub: 'Follow the request',
       levelIds: ['spans-and-traces', 'span-kinds', 'status-and-errors', 'context-propagation', 'baggage', 'events-and-links', 'auto-vs-manual'],
       bossId: 'checkout-is-slow',
+    },
+    {
+      id: 'act-3',
+      no: 3,
+      name: 'Metrics',
+      sub: 'How much, how often',
+      levelIds: ['instruments', 'temporality'],
+      bossId: null,
     },
   ]);
 });

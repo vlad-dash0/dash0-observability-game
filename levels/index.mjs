@@ -23,11 +23,13 @@ import baggage from './baggage.mjs';
 import checkoutIsSlow from './checkout-is-slow.mjs';
 import contextPropagation from './context-propagation.mjs';
 import eventsAndLinks from './events-and-links.mjs';
+import instruments from './instruments.mjs';
 import monitoringVsObservability from './monitoring-vs-observability.mjs';
 import namingYourService from './naming-your-service.mjs';
 import spanKinds from './span-kinds.mjs';
 import spansAndTraces from './spans-and-traces.mjs';
 import statusAndErrors from './status-and-errors.mjs';
+import temporality from './temporality.mjs';
 import thePager from './the-pager.mjs';
 import theSignals from './the-signals.mjs';
 import whyOpentelemetry from './why-opentelemetry.mjs';
@@ -56,5 +58,13 @@ export const ACTS = [
     sub: 'Follow the request',
     levels: [spansAndTraces, spanKinds, statusAndErrors, contextPropagation, baggage, eventsAndLinks, autoVsManual],
     boss: checkoutIsSlow,
+  },
+  {
+    id: 'act-3',
+    no: 3,
+    name: 'Metrics',
+    sub: 'How much, how often',
+    levels: [instruments, temporality],
+    boss: null,
   },
 ];
