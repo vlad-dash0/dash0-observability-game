@@ -186,16 +186,18 @@ Core `lib/widgets/incident.mjs`:
 ```
 Scenario = { id, alert: {title, html}, budget: {startPct 1..100, burnPctPerMin > 0},
   views: [{id, label, costMin, html, kind: clue|herring|neutral}],
-  hypotheses: [{id, label, right, why}], answerAfterViews }
-validateScenario(s) → string[]   // unique ids; exactly one right; all clues affordable
+  hypotheses: [{id, label, right, why}], answerAfterViews }   // answerAfterViews = clue views to open first
+validateScenario(s) → string[]   // unique ids; exactly one right; all clues affordable; answerAfterViews 0..clues
 newIncident(s) → {opened: [], minutes: 0, wrong: [], solved: false}
 budgetLeft(s, st) → max(0, startPct - minutes * burnPctPerMin)       // the ONLY budget expression
 openView(s, st, id) → {state, outcome: opened|repeat|unknown|closed, herring, exhaustedNow}
-canAnswer(s, st); answer(s, st, id) → right|wrong|repeat|locked|unknown|closed
+canAnswer(s, st)   // the ONE unlock rule: not solved and >= answerAfterViews CLUE-kind views opened;
+                   // neutral and herring opens never count (#120)
+answer(s, st, id) → right|wrong|repeat|locked|unknown|closed
 ```
 View: alert, `<meter min=0 max=100 value=…>` + `Error budget: N% left (M min in).`, view
 buttons `Label (N min)`, opened panels with `tabindex="-1"` headings, hypothesis buttons
-disabled until `canAnswer`. Mistakes: first open of a herring, a wrong hypothesis (repeat free),
+disabled until `canAnswer` (enough clues opened). Mistakes: first open of a herring, a wrong hypothesis (repeat free),
 `exhaustedNow` exactly once.
 
 ### 4.4 Spot it (M2, #5)
@@ -527,7 +529,7 @@ but does duplicate the diagnostics_channel-based undici/fetch CLIENT spans
 https://opentelemetry.io/docs/zero-code/js/ ,
 https://opentelemetry.io/docs/platforms/kubernetes/operator/automatic/
 
-**Boss `checkout-is-slow` (M1b)**: scored; budget start 100, burn 4%/min, `answerAfterViews:1`.
+**Boss `checkout-is-slow` (M1b)**: scored; budget start 100, burn 4%/min, `answerAfterViews:1` (one clue view: `trace-slow` or `triage`; the neutral `deploys` does not unlock).
 Views: trace-slow 5 clue (inventory `GET /stock` with 40 sequential `SELECT stock` CLIENT
 spans); triage 4 clue (`service.version` 2.4.0 = 100% of slow vs 7% of normal; region even);
 deploys 2 neutral (2.4.0 at 14:03); checkout-logs 4, db-metrics 6, gateway-latency 4 neutral;

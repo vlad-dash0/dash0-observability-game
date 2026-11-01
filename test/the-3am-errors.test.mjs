@@ -230,6 +230,17 @@ test('the-3am-errors: it takes two looks to unlock the answers (answerAfterViews
   assert.equal(locked(), 'false,false,false,false');
 });
 
+test('the-3am-errors: neutral and herring views never unlock the answers; only clue views do', () => {
+  start();
+  for (const id of ['db-metrics', 'gateway-traffic', 'orders-pods']) open(id);
+  for (const id of ['warn-noise', 'provider-errors']) open(id);
+  assert.equal(locked(), 'true,true,true,true', 'every neutral and herring view is open and the answers are still locked');
+  open('error-patterns');
+  assert.equal(locked(), 'true,true,true,true', 'one clue is still not enough');
+  open('trace-of-error');
+  assert.equal(locked(), 'false,false,false,false');
+});
+
 // ---- reference path (I7) -------------------------------------------------------------
 
 test('the-3am-errors: the reference path (logs, trace, deploy, then inventory-reply) solves with 40% of the budget left and no penalty', () => {
@@ -282,8 +293,9 @@ test('the-3am-errors: the second herring is a second mistake; a wrong answer on 
   open('warn-noise');
   open('provider-errors');
   assert.equal(slips.mistakes, 2);
+  for (const id of ['error-patterns', 'trace-of-error']) open(id);
   guess('database');
-  assert.equal(slips.mistakes, 3, 'the two herrings count as the two looks that unlock the answers');
+  assert.equal(slips.mistakes, 3, 'the herrings do not unlock; the two clues do');
   guess('inventory-reply');
   finish();
   assert.equal(slips.mistakes, 3);

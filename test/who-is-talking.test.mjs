@@ -249,6 +249,17 @@ test('who-is-talking: it takes two looks to unlock the answers (answerAfterViews
   assert.equal(locked(), 'false,false,false,false');
 });
 
+test('who-is-talking: neutral and herring views never unlock the answers; only clue views do', () => {
+  start();
+  for (const id of ['collector-restart', 'message-volume', 'pod-health']) open(id);
+  for (const id of ['catalog-rename', 'k8s-warnings']) open(id);
+  assert.equal(locked(), 'true,true,true,true', 'every neutral and herring view is open and the answers are still locked');
+  open('alert-resource');
+  assert.equal(locked(), 'true,true,true,true', 'one clue is still not enough');
+  open('deploy-history');
+  assert.equal(locked(), 'false,false,false,false');
+});
+
 // ---- reference path (I7) and shortcuts -----------------------------------------------
 
 test('who-is-talking: the reference path (resource, deploys, pod env, then name-dropped) solves with 40% left and no penalty', () => {
@@ -349,8 +360,9 @@ test('who-is-talking: the second herring is a second mistake; a wrong answer on 
   open('catalog-rename');
   open('k8s-warnings');
   assert.equal(slips.mistakes, 2);
+  for (const id of CLUES.slice(0, 2)) open(id);
   guess('new-service');
-  assert.equal(slips.mistakes, 3, 'the two herrings count as the two looks that unlock the answers');
+  assert.equal(slips.mistakes, 3, 'the herrings do not unlock; the two clues do');
   guess('name-dropped');
   finish();
   assert.equal(slips.mistakes, 3);

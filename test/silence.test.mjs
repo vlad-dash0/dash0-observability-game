@@ -256,6 +256,18 @@ test('silence: it takes three looks to unlock the answers (answerAfterViews 3): 
   assert.equal(locked(), 'false,false,false,false');
 });
 
+test('silence: neutral and herring views never unlock the answers; only clue views do', () => {
+  start();
+  for (const id of ['app-pods', 'nodes', 'backend-ingest']) open(id);
+  for (const id of ['network-blip', 'memory-limiter-refusals']) open(id);
+  assert.equal(locked(), 'true,true,true,true', 'every neutral and herring view is open and the answers are still locked');
+  open('arrival-by-cluster');
+  open('collector-log');
+  assert.equal(locked(), 'true,true,true,true', 'two clues are still not enough');
+  open('config-diff');
+  assert.equal(locked(), 'false,false,false,false');
+});
+
 // ---- reference path (I7) and shortcuts -----------------------------------------------
 
 test('silence: the reference path (the four clues, then exporter-renamed) solves with 40% of the budget left and no penalty', () => {
@@ -306,25 +318,28 @@ test('silence: shortcut: clues in any order are never penalised, and every clue 
   assert.equal(budgetLeft(S, st), 5);
 });
 
-test('silence: shortcut: the engine counts any three views toward the unlock, so three neutrals and a lucky first guess win with no penalty and 65% left (no clue is required)', () => {
+test('silence: shortcut impossible: three neutrals leave every hypothesis disabled at 65%, so no lucky first guess can win without a clue', () => {
   const { finished, slips } = start();
   for (const id of NEUTRALS) open(id);
   assert.equal(budget(), 'Error budget: 65% left (7 min in).');
+  assert.equal(locked(), 'true,true,true,true');
+  assert.equal(q('#sil-next').disabled, true);
+  assert.equal(finished.length, 0);
+  assert.equal(slips.mistakes, 0);
+});
+
+test('silence: shortcut impossible: three neutrals plus two clues still lock the answers; the third clue unlocks them and a first-try right guess wins with 3 stars', () => {
+  const { finished, slips } = start();
+  for (const id of NEUTRALS) open(id);
+  open('arrival-by-cluster');
+  open('collector-log');
+  assert.equal(locked(), 'true,true,true,true');
+  open('config-diff');
+  assert.equal(locked(), 'false,false,false,false');
   guess(RIGHT);
   finish();
   assert.equal(slips.mistakes, 0);
   assert.equal(finished[0].stars, 3);
-});
-
-test('silence: shortcut: the same three neutrals and a blind run through the wrong answers costs three mistakes and 1 star', () => {
-  const { finished, slips } = start();
-  for (const id of NEUTRALS) open(id);
-  for (const id of ['memory-limiter', 'wrong-port', 'apps-stopped']) guess(id);
-  assert.equal(slips.mistakes, 3);
-  guess(RIGHT);
-  finish();
-  assert.equal(slips.mistakes, 3);
-  assert.equal(finished[0].stars, 1);
 });
 
 test('silence: shortcut: solving the incident does not finish the level; there is no Finish on the incident screen', () => {
@@ -358,6 +373,7 @@ test('silence: a herring costs one mistake on its first open only, and the run s
   assert.equal(text(FEEDBACK).includes('red herring'), true);
   open('network-blip');
   assert.equal(slips.mistakes, 1, 'a repeat open is free');
+  open('arrival-by-cluster');
   open('collector-log');
   open('config-diff');
   guess(RIGHT);
@@ -370,7 +386,9 @@ test('silence: the second herring is a second mistake; a wrong answer on top is 
   const { slips, finished } = start();
   open('network-blip');
   open('memory-limiter-refusals');
+  open('arrival-by-cluster');
   open('collector-log');
+  open('config-diff');
   assert.equal(slips.mistakes, 2);
   guess('wrong-port');
   assert.equal(slips.mistakes, 3);

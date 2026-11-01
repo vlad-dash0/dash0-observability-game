@@ -144,9 +144,20 @@ test('checkout-is-slow: deploys names 2.4.0 at 14:03', () => {
   assert.equal(panel('deploys').includes('14:03'), true);
 });
 
-test('checkout-is-slow: one view unlocks the answers (answerAfterViews 1)', () => {
+test('checkout-is-slow: one clue view unlocks the answers (answerAfterViews 1); a neutral view does not', () => {
   start();
   open('deploys');
+  assert.equal(locked(), 'true,true,true,true');
+  open('triage');
+  assert.equal(locked(), 'false,false,false,false');
+});
+
+test('checkout-is-slow: neutral and herring views never unlock the answers; only clue views do', () => {
+  start();
+  for (const id of ['deploys', 'checkout-logs', 'db-metrics', 'gateway-latency']) open(id);
+  for (const id of ['payments-errors', 'redis-cpu']) open(id);
+  assert.equal(locked(), 'true,true,true,true', 'every neutral and herring view is open and the answers are still locked');
+  open('triage');
   assert.equal(locked(), 'false,false,false,false');
 });
 
@@ -198,6 +209,8 @@ test('checkout-is-slow: the second herring is a second mistake (1 star after a w
   const { slips, finished } = start();
   open('payments-errors');
   open('redis-cpu');
+  assert.equal(slips.mistakes, 2);
+  open('trace-slow');
   guess('redis');
   assert.equal(slips.mistakes, 3);
   guess('n-plus-one');
