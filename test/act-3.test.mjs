@@ -38,13 +38,13 @@ const rightOf = (levelId, widgetId) => choiceOf(levelId, widgetId).find((c) => c
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-3 "Metrics" holds 3.1 to 3.7, after Act 2, with no boss yet', () => {
+test('act-3 "Metrics" holds 3.1 to 3.7, after Act 2, with the boss "The bill"', () => {
   const index = LIVE.acts.findIndex((a) => a.id === 'act-3');
   assert.equal(index, 3, 'act-3 follows act-0, act-1 and act-2');
   const act = LIVE.acts[index];
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 3, name: 'Metrics', sub: 'How much, how often', levelIds: ['instruments', 'temporality', 'histograms', 'promql-basics', 'cardinality', 'exemplars', 'red-and-use'], bossId: null },
+    { no: 3, name: 'Metrics', sub: 'How much, how often', levelIds: ['instruments', 'temporality', 'histograms', 'promql-basics', 'cardinality', 'exemplars', 'red-and-use'], bossId: 'the-bill' },
   );
 });
 

@@ -121,6 +121,10 @@ const ANSWERS = {
     'incident who-is-talking: alert-resource,deploy-history > name-dropped',
     'choice wit-fix: env-var',
   ],
+  'the-bill': [
+    'incident the-bill: volume-by-metric,label-breakdown > user-id-label',
+    'choice tbl-fix: drop-the-label',
+  ],
   'ottl-and-transforms': [
     'choice ottl-rename: set-then-delete',
     'spot ottl-spot: resource-map,copy-only,admin-only,typo-key',

@@ -47,6 +47,7 @@ import statusAndErrors from './status-and-errors.mjs';
 import structuredLogs from './structured-logs.mjs';
 import temporality from './temporality.mjs';
 import the3amErrors from './the-3am-errors.mjs';
+import theBill from './the-bill.mjs';
 import thePager from './the-pager.mjs';
 import theSignals from './the-signals.mjs';
 import whoIsTalking from './who-is-talking.mjs';
@@ -83,7 +84,7 @@ export const ACTS = [
     name: 'Metrics',
     sub: 'How much, how often',
     levels: [instruments, temporality, histograms, promqlBasics, cardinality, exemplars, redAndUse],
-    boss: null,
+    boss: theBill,
   },
   {
     id: 'act-4',
