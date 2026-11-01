@@ -54,8 +54,8 @@ test('checkout-is-slow: a scored Act 2 boss lighting inventory, no cards', () =>
   assert.equal(LIVE.acts.find((a) => a.id === 'act-2').bossId, 'checkout-is-slow');
 });
 
-test('checkout-is-slow: star totals count the boss (16 scored levels, max 48)', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 48 });
+test('checkout-is-slow: star totals count the boss (18 scored levels, max 54)', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 54 });
 });
 
 test('checkout-is-slow: no em dash in the level file', () => {

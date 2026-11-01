@@ -216,4 +216,36 @@ export const DECK = [
       'Dash0 exposes each metric under both names, and the otel_metric_name label selects the original one. It also ' +
       'derives metrics from logs and spans, which you query with the same PromQL.',
   },
+  {
+    id: 'resource-not-span-attribute',
+    front:
+      'What the telemetry is about (service, pod, host, region) goes on the Resource once, not on every span as a span attribute.',
+    back:
+      'A Resource describes the entity that produces telemetry, as resource attributes such as service.name, k8s.pod.name, ' +
+      'host.name and cloud.region. It is attached to the tracer, meter and logger providers when they are created, and ' +
+      'cannot be changed later, so every span, metric and log from the provider carries it. Attributes such as ' +
+      'http.request.method, http.route or http.response.status_code describe one operation, so they belong on that span. ' +
+      'Setting k8s.pod.name on every span as a span attribute repeats one value on each span and leaves metrics and logs ' +
+      'without it.',
+    specUrl: 'https://opentelemetry.io/docs/specs/otel/resource/sdk/',
+    dash0Angle:
+      "Dash0's Resources view is built from the resource attributes on your telemetry, such as k8s.pod.uid, so what you put on the " +
+      'Resource decides what Dash0 can show.',
+  },
+  {
+    id: 'k8sattributes-in-collector',
+    front:
+      'Add pod metadata in the Collector with k8sattributes, and list it in the pipeline: configured but not listed, it does nothing.',
+    back:
+      'SDK resource detectors run once, when the SDK starts, and the Resource cannot change afterwards. Kubernetes metadata is better ' +
+      'added once in the Collector by the k8sattributes processor, which looks up the pod each piece of telemetry came from through ' +
+      'the Kubernetes API (by default through the IP address of the incoming connection) and adds attributes such as ' +
+      'k8s.pod.name and k8s.namespace.name as resource attributes. The Collector service account needs get, watch and list ' +
+      'permissions on pods and namespaces. It is a contrib component, so use a contrib or Kubernetes distribution. ' +
+      'Configuring a processor does not enable it: it must also be listed under a pipeline in the service section.',
+    specUrl: 'https://opentelemetry.io/docs/platforms/kubernetes/collector/components/#kubernetes-attributes-processor',
+    dash0Angle:
+      'The Dash0 operator adds k8s.namespace.name, k8s.pod.name, k8s.pod.uid and k8s.container.name to workloads in namespaces ' +
+      'enabled for Dash0 monitoring, so you do not set them by hand.',
+  },
 ];
