@@ -788,3 +788,12 @@ test('3.5 and 3.7 cite the pages their facts come from, and the sources that are
   assert.equal(dash0('cardinality').includes('identify-high-cardinality-metrics') && dash0('cardinality').includes('cost-control/spam-filters'), true);
   assert.equal(dash0('red-and-use').includes('monitoring/services/built-in-metrics'), true);
 });
+
+test('cardinality: the budget intro says what a plan costs without calling the span attribute a metric', () => {
+  const steps = LIVE.levels.cardinality.play.steps;
+  const intro = plain(steps[2].intro);
+  assert.equal(intro.includes('A plan costs the sum of the series of its metrics; a span attribute is not a metric series, so it costs 0.'), true, intro);
+  assert.equal(/three metrics/.test(intro + plain(steps[2].question)), false, 'only two of the three knobs are metrics');
+  const knobs = budget().knobs;
+  assert.deepEqual(knobs.map((k) => /<code>(?:http\.server\.requests|recommendations\.served)<\/code>/.test(k.label)), [true, true, false]);
+});

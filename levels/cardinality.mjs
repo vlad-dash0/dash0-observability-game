@@ -197,8 +197,8 @@ export default {
           'The team has a budget of ' +
           `${n(CAP)} series for the recommendations metrics, and three questions to keep answering. ` +
           'Every option shows its worst case: the product of the number of values of the attributes it keeps, for one ' +
-          'metric. A plan costs the sum of its three metrics.',
-        question: 'Pick a setting for each metric: keep every need and stay within the budget.',
+          'metric. A plan costs the sum of the series of its metrics; a span attribute is not a metric series, so it costs 0.',
+        question: 'Pick a setting for each of the three: keep every need and stay within the budget.',
         qid: 'cdn-q-budget',
         tradeoff: BUDGET,
       },
