@@ -3,9 +3,6 @@
 // spans (an injected agent plus a tracing.js NodeSDK), and picks the fix.
 // Spec: docs/M1-DESIGN.md §6 Act 2.
 // Spec: https://opentelemetry.io/docs/zero-code/js/ , https://opentelemetry.io/docs/platforms/kubernetes/operator/automatic/
-import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
-import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
-import { newSortState } from '../lib/widgets/sort-it.mjs';
 
 // Step 1. Items interleave the buckets so their order gives nothing away.
 const SORT = {
@@ -94,13 +91,46 @@ const FIX = [
   },
 ];
 
-/** The level's answer tables, in play order (pinned by test/act-2.test.mjs). */
-export const CONTENT = {
+const PLAY = {
+  prefix: 'avm',
   steps: [
-    { sort: SORT },
-    { id: 'avm-why', question: 'Why does each fetch call show two CLIENT spans?', choices: WHY },
-    { id: 'avm-fix', question: 'What is the fix?', choices: FIX },
+    {
+      intro:
+        'Cart runs with zero-code instrumentation, so it already emits spans. Some of what ' +
+        'you want to see in them comes with that, and some only your own code can add.',
+      question: 'Pick an item, then say whether it comes automatically or needs your code.',
+      qid: 'avm-q-sort',
+      sort: SORT,
+    },
+    {
+      intro:
+        'Now cart\'s traces look wrong: each outgoing <code>fetch</code> call shows two CLIENT ' +
+        'spans. The operator injects ' +
+        '<code>NODE_OPTIONS=--require @opentelemetry/auto-instrumentations-node/register</code> ' +
+        'into the pod, and cart\'s own <code>tracing.js</code> starts a NodeSDK with ' +
+        '<code>getNodeAutoInstrumentations()</code>.',
+      question: 'Why does each fetch call show two CLIENT spans?',
+      qid: 'avm-q-why',
+      choice: { id: 'avm-why', choices: WHY },
+    },
+    {
+      intro:
+        'Cart still needs spans for <code>applyLoyaltyDiscount()</code> and the coupon, which ' +
+        'no agent can add for you.',
+      question: 'What is the fix?',
+      qid: 'avm-q-fix',
+      choice: { id: 'avm-fix', choices: FIX },
+    },
   ],
+  finish:
+    'You know what zero-code instrumentation covers, and that a second setup can double some spans. Run one and add business spans through the API.',
+};
+
+/** The level's answer tables, in play order (pinned by test/act-2.test.mjs); derived from PLAY, never written by hand. */
+export const CONTENT = {
+  steps: PLAY.steps.map((s) =>
+    s.choice ? { id: s.choice.id, question: s.question, choices: s.choice.choices } : { sort: s.sort },
+  ),
 };
 
 export default {
@@ -114,84 +144,5 @@ export default {
   cards: ['double-instrumentation'],
   lights: ['cart'],
   scoring: { parMs: null },
-  run(ctx) {
-    const actions = ctx.ovActions;
-
-    const stepSort = () => {
-      ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
-          'Cart runs with zero-code instrumentation, so it already emits spans. Some of what ' +
-            'you want to see in them comes with that, and some only your own code can add.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="avm-q-sort">Pick an item, then say whether it comes automatically or needs your code.</h3>
-          ${renderSort(SORT, newSortState(SORT), { escapeHtml: ctx.escapeHtml, labelledBy: 'avm-q-sort' })}
-        </div>`,
-        '<button class="btn" id="avm-next" disabled>Next</button>',
-      );
-      const next = actions.querySelector('#avm-next');
-      mountSort(ctx, SORT, {
-        onComplete: () => {
-          next.disabled = false;
-          return next;
-        },
-      });
-      next.onclick = stepWhy;
-    };
-
-    const stepWhy = () => {
-      ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
-          'Now cart\'s traces look wrong: each outgoing <code>fetch</code> call shows two CLIENT ' +
-            'spans. The operator injects ' +
-            '<code>NODE_OPTIONS=--require @opentelemetry/auto-instrumentations-node/register</code> ' +
-            'into the pod, and cart\'s own <code>tracing.js</code> starts a NodeSDK with ' +
-            '<code>getNodeAutoInstrumentations()</code>.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="avm-q-why">${CONTENT.steps[1].question}</h3>
-          ${choiceHtml(ctx, WHY, { id: 'avm-why', labelledBy: 'avm-q-why' })}
-        </div>`,
-        '<button class="btn" id="avm-next" disabled>Next</button>',
-      );
-      const next = actions.querySelector('#avm-next');
-      mountChoice(ctx, WHY, {
-        id: 'avm-why',
-        onRight: () => {
-          next.disabled = false;
-          return next;
-        },
-      });
-      next.onclick = stepFix;
-    };
-
-    const stepFix = () => {
-      ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
-          'Cart still needs spans for <code>applyLoyaltyDiscount()</code> and the coupon, which ' +
-            'no agent can add for you.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="avm-q-fix">${CONTENT.steps[2].question}</h3>
-          ${choiceHtml(ctx, FIX, { id: 'avm-fix', labelledBy: 'avm-q-fix' })}
-        </div>`,
-        '<button class="btn" id="avm-finish" data-finish disabled>Finish</button>',
-      );
-      const finish = actions.querySelector('#avm-finish');
-      mountChoice(ctx, FIX, {
-        id: 'avm-fix',
-        onRight: () => {
-          finish.disabled = false;
-          return finish;
-        },
-      });
-      finish.onclick = () =>
-        ctx.finish({
-          text: 'You know what zero-code instrumentation covers, and that a second setup can double some spans. Run one and add business spans through the API.',
-          cards: ['double-instrumentation'],
-        });
-    };
-
-    stepSort();
-  },
+  play: PLAY,
 };
