@@ -121,6 +121,14 @@ const ANSWERS = {
     'incident silence: arrival-by-cluster,collector-pods,collector-log > exporter-renamed',
     'choice sil-rule: listed-must-be-defined',
   ],
+  'head-sampling': [
+    'tradeoff hs-plan: sampler=ratio-10pct',
+    'choice hs-why: own-decision',
+  ],
+  'tail-sampling': [
+    'tradeoff ts-budget: policies=errors-slow-baseline wait=wait-30s',
+    'spot ts-spot: traces',
+  ],
   'who-is-talking': [
     'incident who-is-talking: alert-resource,deploy-history > name-dropped',
     'choice wit-fix: env-var',

@@ -96,7 +96,7 @@ test('silence: lights the Collector (shared with 5.1 to 5.6), and the boss waits
   const all = emptyProgress();
   for (const id of [...earlier, ...act]) all.levels[id] = { stars: 3, at: null };
   assert.equal(levelState(ID, all, LIVE), 'open');
-  assert.equal(LIVE.order[LIVE.order.length - 1], ID, 'the boss is the last level of the last act');
+  assert.equal(LIVE.order[LIVE.order.indexOf(act[act.length - 1]) + 1], ID, 'the boss comes right after its act\'s levels');
 });
 
 test('silence: star totals count the boss (the derived scored-level max), and a 3-star boss is 3 of them', () => {
