@@ -342,4 +342,37 @@ export const DECK = [
     specUrl: 'https://opentelemetry.io/docs/collector/configuration/#processors',
     dash0Angle: null,
   },
+  {
+    id: 'otlp-ports-and-paths',
+    front:
+      'OTLP/gRPC is port 4317, OTLP/HTTP 4318. A general HTTP endpoint gets /v1/traces added; a per-signal one is used as is.',
+    back:
+      'OTLP has two transports with their own default ports: OTLP/gRPC on 4317 and OTLP/HTTP on 4318. A gRPC endpoint is a ' +
+      'host and a port with no path. For OTLP/HTTP, OTEL_EXPORTER_OTLP_ENDPOINT is a base URL: the exporter adds /v1/traces, ' +
+      '/v1/metrics or /v1/logs to it. The per-signal variables, such as OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, are used as they ' +
+      'are, with no path added: set to http://collector:4318 it sends traces to the root path, so it has to carry /v1/traces ' +
+      "itself. The Collector's otlphttp exporter follows the same rule: endpoint is a base URL that gets the signal path, " +
+      'traces_endpoint is used as is.',
+    specUrl: 'https://opentelemetry.io/docs/specs/otel/protocol/exporter/#endpoint-urls-for-otlphttp',
+    dash0Angle:
+      'Dash0 takes OTLP over gRPC and over HTTP. The Collector example in the Dash0 docs uses the OTLP/gRPC ingress endpoint ' +
+      'of your organization, whose URL shows your region, with your auth token in an Authorization: Bearer header, read from ' +
+      'an environment variable so the token is not written into the file.',
+  },
+  {
+    id: 'tail-sampling-needs-one-collector',
+    front:
+      'Tail sampling needs every span of a trace in one Collector: put a load_balancing exporter on traceID in front of the gateways.',
+    back:
+      'An agent Collector runs next to the workload, as a sidecar or as a DaemonSet pod on each node. A gateway is a standalone ' +
+      'Collector service, such as a Kubernetes Deployment, that apps or agents send to: one OTLP endpoint per cluster, data ' +
+      'center or region. The tail_sampling processor keeps spans in memory until it can decide on the whole trace, so all spans ' +
+      'of a trace must reach the same Collector instance, and several gateway replicas behind an ordinary load balancer split ' +
+      'a trace between them. A first tier, the agents or a Collector that only routes, uses the load_balancing exporter with ' +
+      'routing_key: traceID, so every span of a trace goes to the same second-tier replica, where tail_sampling runs. ' +
+      'routing_key: service would keep a service together but split its traces. The exporter was renamed from loadbalancing, ' +
+      'and the old name still works as a deprecated alias.',
+    specUrl: 'https://opentelemetry.io/docs/collector/deployment/gateway/#load-balancing-exporter',
+    dash0Angle: null,
+  },
 ];
