@@ -71,7 +71,7 @@ const GIVEN = [
   '    limit_mib: 400',
   '  batch:',
   'exporters:',
-  '  otlp/gateway:',
+  '  otlp_grpc/gateway:',
   '    endpoint: gateway-collector:4317',
   'service:',
   '  pipelines:',
@@ -82,14 +82,14 @@ const GIVEN = [
   '    metrics:',
   '      receivers: [otlp]',
   '      processors: [memory_limiter, batch]',
-  '      exporters: [otlp/gateway]',
+  '      exporters: [otlp_grpc/gateway]',
   '',
 ].join('\n');
 
 const REFERENCE = GIVEN.replace(
-  '  otlp/gateway:\n    endpoint: gateway-collector:4317\n',
+  '  otlp_grpc/gateway:\n    endpoint: gateway-collector:4317\n',
   [
-    '  otlp/gateway:',
+    '  otlp_grpc/gateway:',
     '    endpoint: gateway-collector:4317',
     '  load_balancing:',
     '    routing_key: traceID',
@@ -112,7 +112,7 @@ const CONFIG = {
   uses: { traces: ['load_balancing'] },
   hint: 'The <code>traces</code> pipeline lists an exporter. Look under <code>exporters</code>: is it defined there?',
   explain:
-    'A pipeline can only list an exporter that is defined, and one that is defined but not listed does nothing. Pointing traces at <code>otlp/gateway</code>, the Service in front of the replicas, ' +
+    'A pipeline can only list an exporter that is defined, and one that is defined but not listed does nothing. Pointing traces at <code>otlp_grpc/gateway</code>, the Service in front of the replicas, ' +
     'would start the Collector and still split traces between them. <code>load_balancing</code> picks a replica by hashing a routing key: with <code>routing_key: traceID</code> every span of a trace goes to the same replica, ' +
     'so tail sampling there sees whole traces. For traces, <code>traceID</code> is also the default, so spelling it out only makes the intent clear. The resolver, DNS on a headless Service here, lists the replicas. ' +
     'Metrics are not routed by trace ID, which is not a valid key for metrics, so they keep their own exporter. The exporter\'s type was renamed from <code>loadbalancing</code>; the old name still works in the Collector as a deprecated alias, ' +

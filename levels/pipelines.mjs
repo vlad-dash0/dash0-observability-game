@@ -6,6 +6,7 @@
 // Spec: https://opentelemetry.io/docs/collector/configuration/#service , https://opentelemetry.io/docs/collector/configuration/#connectors , https://opentelemetry.io/docs/collector/configuration/#extensions
 // Spec: https://opentelemetry.io/docs/collector/configuration/#processors , https://opentelemetry.io/docs/collector/components/
 // Docs (GitHub READMEs, not an allowed Spec host): https://github.com/open-telemetry/opentelemetry-collector/blob/main/connector/README.md , https://github.com/open-telemetry/opentelemetry-collector/blob/main/processor/memorylimiterprocessor/README.md , https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/extension/healthcheckextension/README.md
+// Docs (exporter type names, Collector v0.164.0; the one place Act 5 says the old names are deprecated aliases): https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/otlpexporter/metadata.yaml , https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/otlpexporter/factory.go , https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/otlphttpexporter/metadata.yaml , https://github.com/open-telemetry/opentelemetry-collector/blob/main/CHANGELOG.md (v0.144.0: #14403, #14396)
 //
 // The configure step grades the config through COLLECTOR_SCHEMA (docs/M1-DESIGN.md §4.8), which does
 // not model component settings, so the step grades the wiring (defined, the Collector would start,
@@ -48,7 +49,7 @@ const GIVEN = [
   '    spike_limit_mib: 100',
   '  batch:',
   'exporters:',
-  '  otlp/dash0:',
+  '  otlp_grpc/dash0:',
   '    endpoint: ${env:DASH0_ENDPOINT}',
   'service:',
   '  extensions: [health_check]',
@@ -56,11 +57,11 @@ const GIVEN = [
   '    traces:',
   '      receivers: [otlp]',
   '      processors: [batch]',
-  '      exporters: [otlp/dash0]',
+  '      exporters: [otlp_grpc/dash0]',
   '    metrics:',
   '      receivers: [otlp]',
   '      processors: [batch]',
-  '      exporters: [otlp/dash0]',
+  '      exporters: [otlp_grpc/dash0]',
   '',
 ].join('\n');
 
@@ -78,7 +79,7 @@ const REFERENCE = [
   '    spike_limit_mib: 100',
   '  batch:',
   'exporters:',
-  '  otlp/dash0:',
+  '  otlp_grpc/dash0:',
   '    endpoint: ${env:DASH0_ENDPOINT}',
   'service:',
   '  extensions: [health_check]',
@@ -86,11 +87,11 @@ const REFERENCE = [
   '    traces:',
   '      receivers: [otlp]',
   '      processors: [memory_limiter, batch]',
-  '      exporters: [otlp/dash0]',
+  '      exporters: [otlp_grpc/dash0]',
   '    metrics:',
   '      receivers: [otlp]',
   '      processors: [memory_limiter, batch]',
-  '      exporters: [otlp/dash0]',
+  '      exporters: [otlp_grpc/dash0]',
   '',
 ].join('\n');
 
@@ -107,7 +108,9 @@ const CONFIG = {
     'Defined but not listed, the component is not enabled and does nothing: <code>memory_limiter</code> was sitting under ' +
     '<code>processors</code> while both pipelines ran without it. Deleting it, listing it in only one pipeline, or giving it another name would all leave a pipeline ' +
     'unprotected, so the task needs it listed in both. Each pipeline gets its own instance of a processor listed in several. ' +
-    'The order of each list is the next level\'s question, and this game checks the wiring, not the settings.',
+    'The order of each list is the next level\'s question, and this game checks the wiring, not the settings. ' +
+    'In Collector v0.164.0 the OTLP gRPC exporter is <code>otlp_grpc</code> and the OTLP HTTP exporter is <code>otlp_http</code>; ' +
+    '<code>otlp</code> and <code>otlphttp</code> are deprecated aliases that still resolve, and every config in this act uses the new names.',
 };
 
 // Step 3: extensions. `why` follows "Right." or "Not quite.".

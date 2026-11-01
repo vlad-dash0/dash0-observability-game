@@ -114,19 +114,19 @@ test('silence: no em dash in the level file', () => {
 
 const minutes = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
 
-test('one exporter id runs through the log, the diff and the answer: the pipelines list otlp/dash0, the config now defines otlp/dash0-eu', () => {
+test('one exporter id runs through the log, the diff and the answer: the pipelines list otlp_grpc/dash0, the config now defines otlp_grpc/dash0-eu', () => {
   const diff = view('config-diff').html;
-  assert.equal(/-\s+otlp\/dash0:/.test(diff), true, 'the diff removes the old id');
-  assert.equal(/\+\s+otlp\/dash0-eu:/.test(diff), true, 'the diff adds the new id');
-  assert.equal((diff.match(/exporters: \[otlp\/dash0\]/g) ?? []).length, 3, 'traces, metrics and logs still list the old id, unchanged');
-  assert.equal(diff.includes('otlp/dash0-eu]'), false, 'no pipeline lists the new id');
+  assert.equal(/-\s+otlp_grpc\/dash0:/.test(diff), true, 'the diff removes the old id');
+  assert.equal(/\+\s+otlp_grpc\/dash0-eu:/.test(diff), true, 'the diff adds the new id');
+  assert.equal((diff.match(/exporters: \[otlp_grpc\/dash0\]/g) ?? []).length, 3, 'traces, metrics and logs still list the old id, unchanged');
+  assert.equal(diff.includes('otlp_grpc/dash0-eu]'), false, 'no pipeline lists the new id');
   const log = plain(view('collector-log').html);
-  assert.equal(log.includes('references exporter "otlp/dash0" which is not configured'), true);
+  assert.equal(log.includes('references exporter "otlp_grpc/dash0" which is not configured'), true);
   assert.equal(log.includes('service::pipelines::'), true);
   assert.equal(log.includes('naming one of the three pipelines (traces, metrics or logs)'), true, 'the log does not claim a fixed pipeline');
   assert.equal(log.includes('same two lines'), false, 'no claim that every restart prints identical lines');
   const right = plain(S.hypotheses.find((h) => h.id === RIGHT).label + S.hypotheses.find((h) => h.id === RIGHT).why);
-  for (const w of ['otlp/dash0-eu', 'otlp/dash0', 'service.pipelines', 'refuses to start']) assert.equal(right.includes(w), true, w);
+  for (const w of ['otlp_grpc/dash0-eu', 'otlp_grpc/dash0', 'service.pipelines', 'refuses to start']) assert.equal(right.includes(w), true, w);
 });
 
 test('the rollout is a minute before the silence, only eu-west has it, and the other clusters keep sending', () => {
@@ -148,8 +148,8 @@ test('the pods view shows restarts, not a limit: the Collector never stays up, a
   for (const w of ['k8s.container.restart.count', 'Ready 0/1', 'last terminated reason', 'Error', 'otel-collector', 'eu-west', 'no restarts']) {
     assert.equal(pods.includes(w), true, `collector-pods says "${w}"`);
   }
-  assert.equal(pods.includes('otlp/dash0'), false, 'the pod view does not give the cause away');
-  assert.equal(plain(view('arrival-by-cluster').html).includes('otlp/dash0'), false);
+  assert.equal(pods.includes('otlp_grpc/dash0'), false, 'the pod view does not give the cause away');
+  assert.equal(plain(view('arrival-by-cluster').html).includes('otlp_grpc/dash0'), false);
   assert.equal(/renam/.test(plain(view('collector-log').html)), false, 'the log says what is missing, not why');
 });
 
@@ -441,7 +441,7 @@ test('silence: the closing step grades the wiring rule: a listed id must be defi
   const right = pick.find((c) => c.right);
   assert.equal(right.key, 'listed-must-be-defined');
   const t = plain(right.label + right.why);
-  for (const w of ['service.pipelines', 'otlp/dash0', 'otlp/dash0-eu', 'not configured', 'validation']) {
+  for (const w of ['service.pipelines', 'otlp_grpc/dash0', 'otlp_grpc/dash0-eu', 'not configured', 'validation']) {
     assert.equal(t.includes(w), true, w);
   }
   assert.deepEqual(pick.filter((c) => !c.right).map((c) => c.key).sort(), ['defined-not-listed', 'same-exporter']);

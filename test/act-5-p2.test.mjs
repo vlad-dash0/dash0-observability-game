@@ -88,8 +88,9 @@ const CARDS = {
       'host and a port with no path. For OTLP/HTTP, OTEL_EXPORTER_OTLP_ENDPOINT is a base URL: the exporter adds /v1/traces, ' +
       '/v1/metrics or /v1/logs to it. The per-signal variables, such as OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, are used as they ' +
       'are, with no path added: set to http://collector:4318 it sends traces to the root path, so it has to carry /v1/traces ' +
-      'itself. The Collector\'s otlphttp exporter follows the same rule: endpoint is a base URL that gets the signal path, ' +
-      'traces_endpoint is used as is.',
+      'itself. The Collector\'s otlp_http exporter follows the same rule: endpoint is a base URL that gets the signal path, ' +
+      'traces_endpoint is used as is. Its gRPC counterpart, otlp_grpc, takes a host and a port with no path. In Collector v0.164.0 ' +
+      'otlp and otlphttp are deprecated aliases for these two exporter types and still resolve.',
     specUrl: 'https://opentelemetry.io/docs/specs/otel/protocol/exporter/#endpoint-urls-for-otlphttp',
     dash0Angle:
       'Dash0 takes OTLP over gRPC and over HTTP. The Collector example in the Dash0 docs uses the OTLP/gRPC ingress endpoint ' +
@@ -165,27 +166,27 @@ const runOt = (text, state = newConfigureState()) => runConfigure(otlp(), state,
 const verdictOf = (r) => ({ outcome: r.outcome, reason: r.reason, unmet: r.unmet });
 const errorsOf = (r) => r.result.errors.map((e) => `${e.kind} ${e.path}`);
 const replaced = (text, from, to) => { assert.equal(text.includes(from), true, from); return text.replace(from, to); };
-const DEFINED = '  otlp/dash0:\n    endpoint: ${env:DASH0_ENDPOINT}\n    auth:\n      authenticator: headers_setter\n';
+const DEFINED = '  otlp_grpc/dash0:\n    endpoint: ${env:DASH0_ENDPOINT}\n    auth:\n      authenticator: headers_setter\n';
 
-test('otlp config: the given does not start (metrics names an exporter nobody defined) and leaves otlp/dash0 unused', () => {
+test('otlp config: the given does not start (metrics names an exporter nobody defined) and leaves otlp_grpc/dash0 unused', () => {
   const given = checkConfig(otlp().given, COLLECTOR_SCHEMA);
   assert.equal(given.ok, false);
   assert.deepEqual(given.errors.map((e) => `${e.kind} ${e.path}`), ['unknown-ref service.pipelines.metrics.exporters[0]']);
-  assert.deepEqual(given.verdict.inactive, [{ section: 'exporters', id: 'otlp/dash0' }], 'defined, in no pipeline');
+  assert.deepEqual(given.verdict.inactive, [{ section: 'exporters', id: 'otlp_grpc/dash0' }], 'defined, in no pipeline');
   assert.deepEqual(given.doc.service.pipelines.traces.exporters, ['debug']);
-  assert.deepEqual(given.doc.service.pipelines.metrics.exporters, ['otlphttp/dash0']);
+  assert.deepEqual(given.doc.service.pipelines.metrics.exporters, ['otlp_http/dash0']);
 });
 
-test('otlp config: the reference starts, wires otlp/dash0 into traces and metrics, enables the auth extension, leaves nothing unused', () => {
+test('otlp config: the reference starts, wires otlp_grpc/dash0 into traces and metrics, enables the auth extension, leaves nothing unused', () => {
   const ref = checkConfig(OT_REF(), COLLECTOR_SCHEMA);
   assert.equal(ref.ok, true);
   assert.equal(ref.verdict.flowing, true);
   assert.deepEqual(ref.verdict.pipelines.map((p) => `${p.name}=${p.flowing}`), ['traces=true', 'metrics=true']);
   assert.deepEqual(ref.verdict.inactive, []);
-  assert.deepEqual(ref.doc.service.pipelines.traces.exporters, ['debug', 'otlp/dash0']);
-  assert.deepEqual(ref.doc.service.pipelines.metrics.exporters, ['otlp/dash0']);
+  assert.deepEqual(ref.doc.service.pipelines.traces.exporters, ['debug', 'otlp_grpc/dash0']);
+  assert.deepEqual(ref.doc.service.pipelines.metrics.exporters, ['otlp_grpc/dash0']);
   assert.deepEqual(ref.doc.service.extensions, ['headers_setter']);
-  assert.deepEqual(otlp().uses, { traces: ['otlp/dash0'], metrics: ['otlp/dash0'] });
+  assert.deepEqual(otlp().uses, { traces: ['otlp_grpc/dash0'], metrics: ['otlp_grpc/dash0'] });
   assert.equal(Object.hasOwn(otlp(), 'target'), false, '`uses` names both pipelines, so they are also the target');
   assert.deepEqual(verdictOf(runOt(OT_REF())), { outcome: 'right', reason: undefined, unmet: undefined });
 });
@@ -194,22 +195,22 @@ test('otlp config: the reference shows both ports and the token read from the en
   const ref = checkConfig(OT_REF(), COLLECTOR_SCHEMA).doc;
   assert.equal(ref.receivers.otlp.protocols.grpc.endpoint, '0.0.0.0:4317');
   assert.equal(ref.receivers.otlp.protocols.http.endpoint, '0.0.0.0:4318');
-  assert.equal(ref.exporters['otlp/dash0'].endpoint, '${env:DASH0_ENDPOINT}');
-  assert.equal(ref.exporters['otlp/dash0'].auth.authenticator, 'headers_setter');
+  assert.equal(ref.exporters['otlp_grpc/dash0'].endpoint, '${env:DASH0_ENDPOINT}');
+  assert.equal(ref.exporters['otlp_grpc/dash0'].auth.authenticator, 'headers_setter');
   const header = ref.extensions.headers_setter.headers[0];
   assert.deepEqual({ key: header.key, value: header.value }, { key: 'Authorization', value: 'Bearer ${env:DASH0_TOKEN}' });
   assert.equal(OT_REF().includes('auth_'), false, 'no token-shaped text in the config');
 });
 
 test('otlp config: leaving metrics on the undefined HTTP exporter is invalid: the Collector would not start', () => {
-  const r = runOt(replaced(OT_REF(), '      exporters: [otlp/dash0]\n', '      exporters: [otlphttp/dash0]\n'));
+  const r = runOt(replaced(OT_REF(), '      exporters: [otlp_grpc/dash0]\n', '      exporters: [otlp_http/dash0]\n'));
   assert.deepEqual(verdictOf(r), { outcome: 'wrong', reason: 'invalid', unmet: undefined });
   assert.deepEqual(errorsOf(r), ['unknown-ref service.pipelines.metrics.exporters[0]']);
 });
 
 test('otlp config: defining the HTTP exporter and keeping metrics on it starts the Collector but `uses` refuses it', () => {
-  const http = replaced(OT_REF(), DEFINED, `${DEFINED}  otlphttp/dash0:\n    endpoint: \${env:DASH0_ENDPOINT}\n`);
-  const text = replaced(http, '    metrics:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [otlp/dash0]\n', '    metrics:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [otlphttp/dash0]\n');
+  const http = replaced(OT_REF(), DEFINED, `${DEFINED}  otlp_http/dash0:\n    endpoint: \${env:DASH0_ENDPOINT}\n`);
+  const text = replaced(http, '    metrics:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [otlp_grpc/dash0]\n', '    metrics:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [otlp_http/dash0]\n');
   assert.equal(checkConfig(text, COLLECTOR_SCHEMA).ok, true, 'a valid config, so only `uses` can refuse it');
   const wrong = runOt(text);
   assert.deepEqual(verdictOf(wrong), { outcome: 'wrong', reason: 'uses', unmet: ['metrics'] });
@@ -218,26 +219,26 @@ test('otlp config: defining the HTTP exporter and keeping metrics on it starts t
 });
 
 test('otlp config: traces left on the debug exporter alone (the given) never reaches Dash0: `uses` names traces', () => {
-  const text = replaced(OT_REF(), '      exporters: [debug, otlp/dash0]\n', '      exporters: [debug]\n');
+  const text = replaced(OT_REF(), '      exporters: [debug, otlp_grpc/dash0]\n', '      exporters: [debug]\n');
   assert.equal(checkConfig(text, COLLECTOR_SCHEMA).ok, true);
   assert.deepEqual(verdictOf(runOt(text)), { outcome: 'wrong', reason: 'uses', unmet: ['traces'] });
 });
 
 test('otlp config: debug in both pipelines and no Dash0 exporter at all is valid and refused by `uses` for both', () => {
-  const noDash0 = replaced(OT_REF(), DEFINED, '').split('exporters: [otlp/dash0]').join('exporters: [debug]').replace('exporters: [debug, otlp/dash0]', 'exporters: [debug]');
-  assert.equal(noDash0.includes('otlp/dash0'), false);
+  const noDash0 = replaced(OT_REF(), DEFINED, '').split('exporters: [otlp_grpc/dash0]').join('exporters: [debug]').replace('exporters: [debug, otlp_grpc/dash0]', 'exporters: [debug]');
+  assert.equal(noDash0.includes('otlp_grpc/dash0'), false);
   assert.equal(checkConfig(noDash0, COLLECTOR_SCHEMA).ok, true);
   assert.deepEqual(verdictOf(runOt(noDash0)), { outcome: 'wrong', reason: 'uses', unmet: ['traces', 'metrics'] });
 });
 
-test('otlp config: renaming otlp/dash0 (a new id used everywhere) is a different component, so `uses` refuses it', () => {
-  const renamed = OT_REF().split('otlp/dash0').join('otlp/backend');
+test('otlp config: renaming otlp_grpc/dash0 (a new id used everywhere) is a different component, so `uses` refuses it', () => {
+  const renamed = OT_REF().split('otlp_grpc/dash0').join('otlp_grpc/backend');
   assert.equal(checkConfig(renamed, COLLECTOR_SCHEMA).ok, true, 'a valid config under another name');
   assert.deepEqual(verdictOf(runOt(renamed)), { outcome: 'wrong', reason: 'uses', unmet: ['traces', 'metrics'] });
 });
 
 test('otlp config: deleting the metrics pipeline leaves a required pipeline that does not flow', () => {
-  const noMetrics = replaced(OT_REF(), '    metrics:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [otlp/dash0]\n', '');
+  const noMetrics = replaced(OT_REF(), '    metrics:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [otlp_grpc/dash0]\n', '');
   assert.equal(noMetrics.includes('metrics:'), false);
   assert.equal(checkConfig(noMetrics, COLLECTOR_SCHEMA).ok, true);
   assert.deepEqual(verdictOf(runOt(noMetrics)), { outcome: 'wrong', reason: 'target', unmet: ['metrics'] });
@@ -252,7 +253,7 @@ test('otlp config: the explain says a second Dash0 exporter under another name i
   const text = plain(otlp().explain);
   assert.equal(text.includes('leave one pipeline'), false, 'a second Dash0 exporter in both pipelines does reach Dash0');
   assert.equal(text.includes('a second Dash0 exporter under another name would be a different component'), true);
-  assert.equal(text.includes('this task asks for otlp/dash0 in both'), true);
+  assert.equal(text.includes('this task asks for otlp_grpc/dash0 in both'), true);
 });
 
 test('otlp config: settings are not graded here (auth, headers, endpoints), the wiring is; the explain says so and names the Choice step', () => {
@@ -261,7 +262,7 @@ test('otlp config: settings are not graded here (auth, headers, endpoints), the 
   assert.equal(noExt.includes('headers_setter'), false);
   assert.equal(runOt(noExt).outcome, 'right', 'the wiring is what counts');
   const text = plain(otlp().explain);
-  for (const w of ['wiring', 'not the settings', 'Authorization', 'gRPC', 'no path', 'otlphttp']) assert.equal(text.includes(w), true, w);
+  for (const w of ['wiring', 'not the settings', 'Authorization', 'gRPC', 'no path', 'otlp_http']) assert.equal(text.includes(w), true, w);
 });
 
 // ---- 5.4 Agent vs gateway: Choice steps ---------------------------------------------
@@ -303,14 +304,14 @@ const AG_REF = () => agw().reference;
 const runAg = (text, state = newConfigureState()) => runConfigure(agw(), state, text);
 const LB_DEF = '  load_balancing:\n    routing_key: traceID\n    protocol:\n      otlp:\n        tls:\n          insecure: true\n    resolver:\n      dns:\n        hostname: gateway-collector-headless\n';
 const TRACES_LB = '      processors: [memory_limiter, batch]\n      exporters: [load_balancing]\n';
-const TRACES_GW = '      processors: [memory_limiter, batch]\n      exporters: [otlp/gateway]\n';
+const TRACES_GW = '      processors: [memory_limiter, batch]\n      exporters: [otlp_grpc/gateway]\n';
 
 test('agent config: the given does not start (traces names a load_balancing exporter nobody defined)', () => {
   const given = checkConfig(agw().given, COLLECTOR_SCHEMA);
   assert.equal(given.ok, false);
   assert.deepEqual(given.errors.map((e) => `${e.kind} ${e.path}`), ['unknown-ref service.pipelines.traces.exporters[0]']);
   assert.deepEqual(given.doc.service.pipelines.traces.exporters, ['load_balancing']);
-  assert.deepEqual(given.doc.service.pipelines.metrics.exporters, ['otlp/gateway']);
+  assert.deepEqual(given.doc.service.pipelines.metrics.exporters, ['otlp_grpc/gateway']);
   assert.deepEqual(given.verdict.inactive, []);
 });
 
@@ -320,7 +321,7 @@ test('agent config: the reference sends traces through load_balancing keyed by t
   assert.deepEqual(ref.verdict.pipelines.map((p) => `${p.name}=${p.flowing}`), ['traces=true', 'metrics=true']);
   assert.deepEqual(ref.verdict.inactive, []);
   assert.deepEqual(ref.doc.service.pipelines.traces.exporters, ['load_balancing']);
-  assert.deepEqual(ref.doc.service.pipelines.metrics.exporters, ['otlp/gateway']);
+  assert.deepEqual(ref.doc.service.pipelines.metrics.exporters, ['otlp_grpc/gateway']);
   assert.equal(ref.doc.exporters.load_balancing.routing_key, 'traceID');
   assert.equal(ref.doc.exporters.load_balancing.resolver.dns.hostname, 'gateway-collector-headless');
   assert.deepEqual(agw().uses, { traces: ['load_balancing'] });
@@ -338,7 +339,7 @@ test('agent config: pointing traces at the gateway Service (the usual shortcut) 
   assert.equal(runAg(AG_REF(), wrong.state).outcome, 'right');
 });
 
-test('agent config: defining load_balancing but leaving traces on otlp/gateway is refused: defined is not wired', () => {
+test('agent config: defining load_balancing but leaving traces on otlp_grpc/gateway is refused: defined is not wired', () => {
   const text = replaced(AG_REF(), TRACES_LB, TRACES_GW);
   const r = runAg(text);
   assert.deepEqual(verdictOf(r), { outcome: 'wrong', reason: 'uses', unmet: ['traces'] });
