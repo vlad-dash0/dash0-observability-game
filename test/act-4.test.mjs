@@ -34,17 +34,19 @@ const choiceOf = (levelId, widgetId) => stepOf(levelId, 'choice', widgetId).choi
 const rightOf = (levelId, widgetId) => choiceOf(levelId, widgetId).find((c) => c.right);
 
 const ACT_4 = ['structured-logs', 'correlation'];
+const ACT_4_LEVELS = [...ACT_4, 'collecting-logs'];
+const ACT_4_BOSS = 'the-3am-errors';
 const BEFORE_4 = ['act-0', 'act-1', 'act-2', 'act-3'];
 
 // ---- the act and the players already in the others ----------------------------------
 
-test('act-4 "Logs" holds 4.1 and 4.2 in that order, with no boss yet, and is ordered by no', () => {
+test('act-4 "Logs" holds 4.1, 4.2 and 4.3 in that order and the boss "The 3 a.m. errors", and is ordered by no', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-4');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 4, name: 'Logs', sub: 'What did it say?', levelIds: ACT_4, bossId: null },
+    { no: 4, name: 'Logs', sub: 'What did it say?', levelIds: ACT_4_LEVELS, bossId: ACT_4_BOSS },
   );
-  assert.deepEqual(ACT_4.map((id) => LIVE.levels[id].no), ['4.1', '4.2']);
+  assert.deepEqual(ACT_4_LEVELS.map((id) => LIVE.levels[id].no), ['4.1', '4.2', '4.3']);
   const nos = LIVE.acts.map((a) => a.no);
   assert.deepEqual(nos, [...nos].sort((a, b) => a - b), 'acts are listed in order of no');
   assert.equal(LIVE.acts.findIndex((a) => a.id === 'act-4') > LIVE.acts.findIndex((a) => a.id === 'act-3'), true);
@@ -90,9 +92,10 @@ test('existing players: adding Act 4 changes no earlier act or level state', () 
   assert.equal(levelState('structured-logs', partway, LIVE), 'locked');
 });
 
-test('star totals count both new levels: 26 scored levels, max 78', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 78 });
-  assert.deepEqual(starTotals(progressOf(ACT_4), LIVE), { earned: 6, max: 78 });
+test('star totals count all four Act 4 entries: 28 scored levels, max 84', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 84 });
+  assert.deepEqual(starTotals(progressOf(ACT_4), LIVE), { earned: 6, max: 84 });
+  assert.deepEqual(starTotals(progressOf([...ACT_4_LEVELS, ACT_4_BOSS]), LIVE), { earned: 12, max: 84 });
 });
 
 // ---- level fields and lights --------------------------------------------------------

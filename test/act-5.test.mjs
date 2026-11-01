@@ -74,9 +74,9 @@ test('act-5 levels are scored with no par time, and belong to act-5', () => {
   }
 });
 
-test('star totals count 5.1 and 5.2 among 26 scored levels, max 78', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 78 });
-  assert.deepEqual(starTotals(progressOf(['pipelines', 'order-matters']), LIVE), { earned: 6, max: 78 });
+test('star totals count 5.1 and 5.2 among 28 scored levels, max 84', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 84 });
+  assert.deepEqual(starTotals(progressOf(['pipelines', 'order-matters']), LIVE), { earned: 6, max: 84 });
 });
 
 // ---- level fields and lights --------------------------------------------------------
