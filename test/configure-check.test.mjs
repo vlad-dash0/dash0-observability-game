@@ -261,3 +261,15 @@ test('referenceProblems: a given that already passes is a problem (nothing to fi
 test('referenceProblems: a given that does not parse still counts as failing', () => {
   assert.deepEqual(referenceProblems(SDK, 'file_format: "1.0"', 'a: [1'), []);
 });
+
+test('pipelineStages: stages in schema order with string items and their indexes; malformed or missing give empty stages', async () => {
+  const { pipelineStages, pipelineComponents } = await import('../lib/configure/check.mjs');
+  const { COLLECTOR_SCHEMA } = await import('../lib/configure/collector.mjs');
+  const text = 'service:\n  pipelines:\n    traces:\n      receivers: [a, 3, b]\n      exporters: x\n    metrics: 5\n';
+  const r = checkConfig(text, COLLECTOR_SCHEMA);
+  const flat = (name) => pipelineStages(r, COLLECTOR_SCHEMA, name).map((s) => `${s.key}=${s.items.map(([i, v]) => `${i}:${v}`).join(',')}`).join(' ');
+  assert.equal(flat('traces'), 'receivers=0:a,2:b processors= exporters=');
+  assert.equal(flat('metrics'), 'receivers= processors= exporters=');
+  assert.equal(flat('logs'), 'receivers= processors= exporters=');
+  assert.equal([...pipelineComponents(r, COLLECTOR_SCHEMA, 'traces')].join(), 'a,b');
+});
