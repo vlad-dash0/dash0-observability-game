@@ -62,12 +62,14 @@ test('the top level must be a mapping', () => {
   assert.equal(root('true').message, 'the top level must be a mapping, got a boolean');
   assert.equal(root('null').message, 'the top level must be a mapping, got null');
   assert.equal(root('').message, 'the top level must be a mapping, got an empty document');
+  assert.equal(root('  \n\t\n').message, 'the top level must be a mapping, got an empty document');
+  assert.equal(root('---').message, 'the top level must be a mapping, got null');
   assert.equal(root('# only a comment\n').message, 'the top level must be a mapping, got an empty document');
 });
 
 test('safe load: only the core schema, no custom or language-specific tags', () => {
   assert.deepEqual(fail('a: !!js/function x'), {
-    kind: 'parse', path: '', message: 'unknown tag !<tag:yaml.org,2002:js/function>', line: 1, column: 19,
+    kind: 'parse', path: '', message: 'unknown scalar tag !<tag:yaml.org,2002:js/function>', line: 1, column: 4,
   });
   assert.equal(fail('a: !!binary x').kind, 'parse');
   // Core schema: a timestamp stays text and `<<` is an ordinary key.

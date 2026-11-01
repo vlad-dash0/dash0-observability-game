@@ -17,7 +17,7 @@ ES modules, no build step), local-first progress, serverless `api/` later.
 - `index.html`, `main.mjs` (the only file that touches Alpine), `styles/`.
 - `lib/` pure modules, `levels/` one file per level + `levels/index.mjs` registry,
   `cards/deck.mjs`, `hub/` map data (arriving in F2-F6).
-- `vendor/` self-hosted Alpine 3.14.1 and js-yaml 4.3.2 (an ES module, imported by `lib/configure/`), pinned by `vendor/SHA256SUMS`.
+- `vendor/` self-hosted Alpine 3.14.1 and js-yaml 5.5.0 (an ES module, imported by `lib/configure/`), pinned by `vendor/SHA256SUMS`.
 - `test/` (`*.test.mjs`; `test/helpers/dom.mjs` is the linkedom DOM + click helpers).
 - `tools/serve.mjs` dev server; `.github/workflows/ci.yml`.
 

@@ -215,7 +215,7 @@ test('referenceProblems: names each way the reference fails its own checker', ()
     'reference: file_format: must be one of "1.0", "1.1"',
     'reference: zzz: unknown key "zzz"',
   ]);
-  assert.deepEqual(referenceProblems(SDK, 'a: [1'), ['reference: line 2, column 1: unexpected end of the stream within a flow collection']);
+  assert.deepEqual(referenceProblems(SDK, 'a: [1'), ['reference: line 1, column 6: unexpected end of the stream within a flow collection']);
 });
 
 test('referenceProblems: a given that already passes is a problem (nothing to fix)', () => {

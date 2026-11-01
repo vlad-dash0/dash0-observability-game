@@ -12,7 +12,7 @@ import { headersFor, ignoreMatcher } from '../tools/serve.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const VENDOR = join(ROOT, 'vendor');
 const ALPINE = 'alpine-3.14.1.min.js';
-const JS_YAML = 'js-yaml-4.3.2.mjs';
+const JS_YAML = 'js-yaml-5.5.0.mjs';
 
 // docs/FOUNDATION.md §7, verbatim.
 const CSP =

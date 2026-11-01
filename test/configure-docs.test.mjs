@@ -28,7 +28,7 @@ const SCHEMA = {
 const EXAMPLES = [
   ['the file is longer than 32768 characters', `a: ${'x'.repeat(MAX_CHARS)}`, SCHEMA],
   ['bad indentation of a mapping entry', 'a: b: c', SCHEMA],
-  ['unknown tag !<tag:yaml.org,2002:js/function>', 'a: !!js/function x', SCHEMA],
+  ['unknown scalar tag !<tag:yaml.org,2002:js/function>', 'a: !!js/function x', SCHEMA],
   ['expected a single document in the stream, but found more', 'a: 1\n---\nb: 2', SCHEMA],
   ['duplicate key', 'a: 1\na: 2', SCHEMA],
   ['the top level must be a mapping, got a list', '- 1', SCHEMA],
@@ -55,9 +55,9 @@ test('every message example in §4.8 is in the doc and is what the checker emits
 });
 
 test('§4.8 and the code agree on the vendored parser, the size cap and the default key message', () => {
-  assert.ok(section.includes('vendor/js-yaml-4.3.2.mjs'));
+  assert.ok(section.includes('vendor/js-yaml-5.5.0.mjs'));
   assert.ok(section.includes('`MAX_CHARS` = 32768'));
-  assert.match(read('lib/configure/parse.mjs'), /from '\.\.\/\.\.\/vendor\/js-yaml-4\.3\.2\.mjs'/);
+  assert.match(read('lib/configure/parse.mjs'), /from '\.\.\/\.\.\/vendor\/js-yaml-5\.5\.0\.mjs'/);
   const defaulted = { root: { type: 'mapping', additional: { type: 'any' }, keyPattern: '^[a-z]+$' } };
   assert.equal(checkConfig('A: 1', defaulted).errors[0].message, 'invalid key "A": expected a key matching ^[a-z]+$');
   assert.ok(section.includes('a key matching <keyPattern>'));

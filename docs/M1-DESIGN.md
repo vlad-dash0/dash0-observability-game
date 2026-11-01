@@ -240,7 +240,7 @@ SUPPORTED → [{title, items: string[], note}]   // functions, aggregations, uni
 - **A11y and focus:** feedback is `role=status aria-live=polite tabindex=-1`; with `labelledBy` the widget is a labelled group. Focus: the textarea on mount; a Run that does not finish leaves focus where it is (the live region announces it, so the player keeps typing); `onComplete()`'s return after the pass. No timers (I2).
 
 ### 4.8 Configure it core (M2, #3, part 1)
-Core `lib/configure/` (`parse`, `paths`, `schema`, `check`, `collector`). Pure, DOM-free, no timers (I2), no randomness. The view and the `configure` step type are part 2; `configure` stays RESERVED in `lib/play.mjs` until then. YAML is read by the vendored js-yaml 4.3.2 (MIT, `vendor/js-yaml-4.3.2.mjs`, pinned in `vendor/SHA256SUMS`), imported by a relative path so `node --test` and the browser load the same file; it is loaded only in `parse.mjs`, with its CORE schema (YAML 1.2 core: no timestamps, binary, `<<` merge or language tags).
+Core `lib/configure/` (`parse`, `paths`, `schema`, `check`, `collector`). Pure, DOM-free, no timers (I2), no randomness. The view and the `configure` step type are part 2; `configure` stays RESERVED in `lib/play.mjs` until then. YAML is read by the vendored js-yaml 5.5.0 (MIT, `vendor/js-yaml-5.5.0.mjs`, pinned in `vendor/SHA256SUMS`), imported by a relative path so `node --test` and the browser load the same file; it is loaded only in `parse.mjs`, with its CORE schema (YAML 1.2 core: no timestamps, binary, `<<` merge or language tags).
 ```
 parseYaml(text) → {ok:true, doc} | {ok:false, error}      // doc is a plain mapping; throws TypeError if text is not a string
 checkConfig(text, schema) → {ok, errors: Error[], doc: mapping|null, verdict: Verdict|null}   // throws on a malformed schema
@@ -256,7 +256,7 @@ Verdict = {flowing, pipelines: [{name, flowing, reasons: Error[]}], inactive: [{
 | kind | message | extra |
 |---|---|---|
 | `too-large` | `the file is longer than 32768 characters` | line, column null |
-| `parse` | js-yaml's own reason, verbatim (e.g. `bad indentation of a mapping entry`, `unknown tag !<tag:yaml.org,2002:js/function>`, `expected a single document in the stream, but found more`) | `line`, `column` of the mark |
+| `parse` | js-yaml's own reason, verbatim (e.g. `bad indentation of a mapping entry`, `unknown scalar tag !<tag:yaml.org,2002:js/function>`, `expected a single document in the stream, but found more`) | `line`, `column` of the mark |
 | `duplicate-key` | `duplicate key` | `line`, `column` of the second key |
 | `root` | `the top level must be a mapping, got a list`; also `... got a string`, `... got a number`, `... got a boolean`, `... got null`, `the top level must be a mapping, got an empty document` (no text, or only comments) | line, column null |
 | `alias` | `aliases (*name) are not supported` | `path` of the reused node, e.g. `use` or `l[1]` |
