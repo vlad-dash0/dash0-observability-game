@@ -316,5 +316,6 @@ test('validateChoiceSpec: null and non-arrays give a problem and never throw', (
 });
 
 test('validateChoiceSpec collects every problem', () => {
-  assert.equal(validateChoiceSpec([null, { key: 'a', why: 1 }]).length, 3);
+  assert.deepEqual(validateChoiceSpec([null, { key: 'a', why: 1 }]), ['choice 0 is not an object', 'choice "a" needs a string why']);
+  assert.deepEqual(validateChoiceSpec([null]), ['choice 0 is not an object']);
 });
