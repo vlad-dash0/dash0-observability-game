@@ -52,6 +52,7 @@ A level file keeps today's metadata (FOUNDATION §2.1), declares `play` instead 
 - `question`: trusted HTML, rendered as `<h3 class="q" id="<widgetId>-q">`. Required for labelled types (choice, sort), optional otherwise.
 - `show`: optional. Trusted authored HTML shown before the question (lists, tables).
 - `code`: optional. Plain text, escaped, rendered in `<pre><code>`. Intended for env files, YAML and PromQL.
+- `qid`: optional plain token, the question heading's id. Default `<widgetId>-q`. Migrated levels set it to keep today's hand-named ids (e.g. `avm-q-sort`).
 
 **Step types:**
 
@@ -77,7 +78,7 @@ A level file keeps today's metadata (FOUNDATION §2.1), declares `play` instead 
 
 ### Worked example: 2.7 `auto-vs-manual`
 
-`SORT`, `WHY` and `FIX` stay byte-identical (`:11-95`). The header comment and Spec lines stay. Imports, `CONTENT` and `run` go.
+`SORT`, `WHY` and `FIX` stay byte-identical (`:11-95`). The header comment, Spec lines and the `CONTENT` export stay (existing tests import it, #71 AC4). Imports used only by `run`, and `run` itself, go.
 
 ```js
 export default {
@@ -90,17 +91,17 @@ export default {
       {
         intro: 'Cart runs with zero-code instrumentation, so it already emits spans. Some of what you want to see in them comes with that, and some only your own code can add.',
         question: 'Pick an item, then say whether it comes automatically or needs your code.',
-        sort: SORT,
+        qid: 'avm-q-sort', sort: SORT,
       },
       {
         intro: 'Now cart\'s traces look wrong: each outgoing <code>fetch</code> call shows two CLIENT spans. The operator injects <code>NODE_OPTIONS=--require @opentelemetry/auto-instrumentations-node/register</code> into the pod, and cart\'s own <code>tracing.js</code> starts a NodeSDK with <code>getNodeAutoInstrumentations()</code>.',
         question: 'Why does each fetch call show two CLIENT spans?',
-        choice: { id: 'avm-why', choices: WHY },
+        qid: 'avm-q-why', choice: { id: 'avm-why', choices: WHY },
       },
       {
         intro: 'Cart still needs spans for <code>applyLoyaltyDiscount()</code> and the coupon, which no agent can add for you.',
         question: 'What is the fix?',
-        choice: { id: 'avm-fix', choices: FIX },
+        qid: 'avm-q-fix', choice: { id: 'avm-fix', choices: FIX },
       },
     ],
     finish: 'You know what zero-code instrumentation covers, and that a second setup can double some spans. Run one and add business spans through the API.',
@@ -119,11 +120,11 @@ play: {
   prefix: 'sat',
   steps: [
     { intro: 'A customer pays. The request passes through storefront and api-gateway, and each service records spans for its part of the work: one span per operation.',
-      question: 'What makes these spans one trace?', choice: { id: 'sat', choices: ONE_TRACE } },
+      question: 'What makes these spans one trace?', qid: 'sat-q-one', choice: { id: 'sat', choices: ONE_TRACE } },
     { intro: 'The spans of trace <code>4bf9…</code> arrived one by one, and the waterfall shows every one as a root. Pick each span and give it its parent, so the request reads top to bottom.',
       question: 'Rebuild the request\'s span tree.', build: TREE },
     { intro: '<code>GET /products</code> on storefront ran while api-gateway handled the checkout, yet it stays a root.',
-      question: 'What is <code>GET /products</code>?', choice: { id: 'sat-e', choices: OTHER } },
+      question: 'What is <code>GET /products</code>?', qid: 'sat-q-other', choice: { id: 'sat-e', choices: OTHER } },
   ],
   finish: 'You can read a trace: its spans share a trace ID, and each one points at its parent.',
 },
@@ -148,7 +149,7 @@ Derived `mechanics`: `['build']`, as pinned (`act-2.test.mjs:46`).
 ```js
 const show = (i) => {
   const step = steps[i], type = typeOf(step), spec = step[type.key], last = i === steps.length - 1;
-  const qid = `${type.idOf(spec)}-q`, e = ctx.escapeHtml;
+  const qid = step.qid ?? `${type.idOf(spec)}-q`, e = ctx.escapeHtml;
   ctx.renderStep(
     `<div class="lesson-intro">${ctx.speech(step.intro)}</div><div class="lesson-stage">` +
       `${step.show ?? ''}${step.code != null ? `<pre><code>${e(step.code)}</code></pre>` : ''}` +
@@ -189,7 +190,7 @@ Each type also has a test driver in `test/helpers/step-drivers.mjs` (§4). Addin
 **Identical behaviour.**
 - The same mount helpers run with the same specs, so penalties, feedback words and focus order are unchanged.
 - ctx and `scoreStars` are untouched. Finish text and cards are the same, and with `prefix` so are the button ids.
-- The only markup differences: build steps' `<h3>` gains an id, and lead-in lists move into `show`.
+- The only markup differences: build steps' `<h3>` gains an id, and lead-in lists move into `show`. Question heading ids are derived (`<widgetId>-q`) unless the step sets `qid`; migrated levels set `qid` to their current ids (2.7: `avm-q-sort`, `avm-q-why`, `avm-q-fix`; 2.1: `sat-q-one`, `sat-q-other`), so their markup is unchanged. No test pins these ids today.
 
 **Invariants.**
 - **PI1:** `lib/play.mjs` never calls `ctx.mistake` or `ctx.hint` (I1).
@@ -267,6 +268,7 @@ Run when the registry is built; all errors are collected into one `RegistryError
 `validatePlay` checks:
 - plain data only;
 - known keys at every level of `play`;
+- `qid`, when present, is a plain token and unique within the level;
 - exactly one type key per step, and it is live, not reserved;
 - `intro` present; `question` present where the type requires it;
 - `code` and `show` are strings;
@@ -320,9 +322,9 @@ There is no hybrid "mostly steps plus one hook". Two clean modes are cheaper to 
 - 1.2: the env checker, until #3 decides whether Configure it absorbs it.
 - the-pager.
 
-In each migration PR:
-- `PIN`, `SLIPS` and `DRIVERS` stay byte-identical. These are the proof that behaviour is identical.
-- Only adapter lines change: `shape()` reads `step.choice`, `level` fields come from `LIVE`, and `CONTENT` imports become `level.play`. The PR body lists them.
+In each migration PR (#71 AC4: existing tests unchanged and green):
+- The level keeps its `CONTENT` export, and steps set `qid` to the current heading ids, so no existing test line changes. `PIN`, `SLIPS` and `DRIVERS` stay byte-identical: they are the proof that behaviour is identical.
+- The only test edits allowed are additions (the `ANSWERS` line). If a migration cannot avoid editing an existing test line, it stops and the PR body names the line and why, for the user to decide.
 
 ## 8. Phased plan (one PR each, never stacked, each mergeable to main)
 
@@ -330,7 +332,7 @@ In each migration PR:
 |---|---|---|---|---|
 | P1 | `validateChoiceSpec` pulled out of `mountChoice`; no "at least 2" rule here, because `choice.test.mjs:260-268` mounts a single choice and expects the "rendered" error | backend | – | `test/choice.test.mjs` adds: valid → `[]`; 0 or 2 rights → `needs exactly one right answer, has N`; duplicate key; non-string why; `null` → a problem, no throw. Existing assertions unchanged. [drop the rights check in the validator → the new test and the existing `mountChoice` test both go red, proving the delegation] |
 | P2 | Platform: `lib/play.mjs`, registry `play` key and option, `liveRegistry`, `test/fixtures/play-level.mjs` (one step of each live type), `test/helpers/step-drivers.mjs`, `test/play.test.mjs`, `test/answers.test.mjs`, derived drivers in `levels-play`, `levels/index.mjs` "TO ADD A LEVEL" comment, FOUNDATION §2.1 and §2.4 | backend (registry, validate) + frontend (runner) | P1 | (a) fixture clean run 3★ with cards = `level.cards` [runner passes `cards: []`]; (b) each slip exactly 2★ [drop `ctx.mistake()` in `mountChoice`]; (c) Next disabled before solve [render Next without `disabled`]; (d) focus walk ends on `#fx-finish` [`onDone` returns undefined]; (e) registry errors: both run and play, no kit, mechanics declared, function in play, two bad steps → 2 errors [return on first]; (f) built `play` is frozen and survives mutation of the source [skip the clone]; (g) derived mechanics `['sort','build','incident']` [count choice]; (h) `code` `<img onerror>` renders escaped [drop `e()`]; (i) `lib/play.mjs` source has no `mistake(` or `hint(` [add one on Next]; (j) the suite ran ≥1 level [drop the fixture]; (k) a second clean run of the same level starts at step 1 with 3★ [module-level step index] |
-| P3 | Migrate 2.7 | frontend | P2 | Add `'auto-vs-manual'` to `ANSWERS` → red (gap: not a play level); migrate; `PIN`, `SLIPS` and `DRIVERS` byte-identical [swap `right` from two-setups to retries → `ANSWERS`, `PIN` and the clean run go red] |
+| P3 | Migrate 2.7 (keeps `CONTENT` and current heading ids via `qid`; no existing test line edited) | frontend | P2 | Add `'auto-vs-manual'` to `ANSWERS` → red (gap: not a play level); migrate; `git diff` of existing test files is empty; `PIN`, `SLIPS` and `DRIVERS` byte-identical [swap `right` from two-setups to retries → `ANSWERS`, `PIN` and the clean run go red] |
 | P4 | Migrate 0.1–0.3, 2.3, 2.5 (optional) | frontend | P3 | as P3, per level |
 | P5 | Migrate 2.1, 2.6 (2.4 optional, last) | frontend | P3 | as P3; build answer key lines |
 | – | #3, #4, #5, #7 | per issue | P2 | a step type plus a driver plus a thin play level; generated suites cover it |
