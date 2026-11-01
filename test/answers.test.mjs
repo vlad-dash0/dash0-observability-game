@@ -117,6 +117,10 @@ const ANSWERS = {
     'incident the-3am-errors: error-patterns,trace-of-error > inventory-reply',
     'choice tae-link: trace-and-resource',
   ],
+  silence: [
+    'incident silence: arrival-by-cluster,collector-pods,collector-log > exporter-renamed',
+    'choice sil-rule: listed-must-be-defined',
+  ],
   'who-is-talking': [
     'incident who-is-talking: alert-resource,deploy-history > name-dropped',
     'choice wit-fix: env-var',
