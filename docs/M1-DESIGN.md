@@ -162,6 +162,25 @@ checkSpot(spec, st) → {state, outcome: right|wrong|repeat|empty|solved, extra,
 - **Solvability (I7):** `validateSpotSpec` guarantees the fault set is a non-empty proper subset of real lines, so the reference path (select the faults, Check) always passes; the generated step driver plays exactly that.
 - **A11y and focus:** feedback is `role=status aria-live=polite tabindex=-1`; with `labelledBy` the widget is a labelled group. Focus: first line on mount, stays on the toggled line, feedback after a Check that does not finish, `onComplete()`'s return after the last. No timers (I2).
 
+### 4.5 Trade-off (M2, #7)
+Core `lib/widgets/trade-off.mjs`, view `lib/widgets/trade-off-view.mjs`; step type `tradeoff`, mechanic `tradeoff`.
+```
+TradeoffSpec = { id, unit, cap, knobs: [{id, label, options: [{id, label, cost, keeps?: [needId]}]}] (1..5 knobs, 2..5 options),
+  needs: [{id, label}] (1..4), answer: {[knobId]: optionId}, whyNot?: {['knobId:optionId']: html}, explain: html }
+validateTradeoffSpec(spec) → string[]   // kebab ids, unique per list, cost >= 0 and cap > 0 with at most 2 decimals,
+                                        // keeps/answer/whyNot name real needs/knobs/options, whyNot never on an answer option
+newTradeoffState(spec) → {picks: {}, tried: [], solved: false}
+pickOption(spec, st, knobId, optionId) → {state, outcome: picked|unknown|solved}
+evaluatePlan(spec, picks) → {complete, total, over, lost}   // total = sum of picked costs; over = total - cap (0 when within); lost = needs no picked option keeps
+checkTradeoff(spec, st) → {state, outcome: right|wrong|repeat|incomplete|solved, total, over, lost}
+```
+- **Cost model (shown, never hidden):** a plan is one option per knob and costs the sum of the picked options' costs, in `unit`. The widget states that rule, the cap and the needs; each option shows its cost and what it keeps; a live line shows `Plan cost: N of CAP unit` and, past the cap, `over the cap by M unit`. Sampling rates, retention periods and label/attribute choices are all just knobs with costs. Numbers are always grouped and rounded to 2 decimals (`formatAmount`).
+- **Pass rule:** `total <= cap` AND every need is in the `keeps` of at least one picked option. Exactly at the cap passes. A cheap plan that drops a need fails.
+- **Interaction:** each knob is a `<fieldset>` with a `<legend>` and one radio per option; nothing is preselected. Picking is free and updates the total in place. `#ID-check` grades the plan; `label`, `whyNot` and `explain` are trusted authored HTML, `unit` and ids are escaped.
+- **Outcomes:** `right` = the plan passes: `Right. This plan costs N of CAP unit and keeps everything you need. <explain>`, radios and Check lock, `onComplete()`. A failing plan is one mistake (I1) in `mountTradeoff` only: `Not quite.` plus `Over the cap by M unit.` and/or `It drops what you need: <labels>.` plus the `whyNot` of each picked option that has one. The right plan is never named. The same failing plan again is free (`Same as last time: ...`); Check with a knob unpicked is free.
+- **Solvability (I7):** `validateTradeoffSpec` enumerates every plan (at most 5^5) and requires: the `answer` passes; some plan within the cap drops a need; some plan keeps every need but is over the cap. So the puzzle is a real trade-off, not a cap alone or a signal alone. The generated step driver plays the `answer`, and slips with one plan of each failing kind.
+- **A11y and focus:** feedback is `role=status aria-live=polite tabindex=-1`; the total is `aria-live=polite`; with `labelledBy` the widget is a labelled group. Focus: first radio on mount, stays on the picked radio, feedback after a Check that does not finish, `onComplete()`'s return after the last. No timers (I2).
+
 ## 5. Phases (one PR each, never stacked, each mergeable to main)
 
 | # | Phase | Owner | Depends | Must not batch |
