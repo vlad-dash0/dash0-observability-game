@@ -168,7 +168,7 @@ export default {
   icon: '\u{1F522}',
   rewardTitle: 'Series counter',
   cards: ['series-are-combinations'],
-  lights: ['recommendations'],
+  lights: ['postgres'],
   scoring: { parMs: null },
   play: {
     prefix: 'cdn',

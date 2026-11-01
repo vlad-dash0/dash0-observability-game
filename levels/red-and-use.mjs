@@ -104,7 +104,7 @@ export default {
   icon: '\u{1F6A6}',
   rewardTitle: 'Golden-signals reader',
   cards: ['red-and-use'],
-  lights: ['redis'],
+  lights: ['checkout'],
   scoring: { parMs: null },
   play: {
     prefix: 'ru',

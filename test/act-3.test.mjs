@@ -80,8 +80,8 @@ const FIELDS = {
   temporality: { no: '3.2', name: 'Temporality', mechanics: ['spot'], cards: ['delta-needs-converting'], lights: ['notifications'] },
   histograms: { no: '3.3', name: 'Histograms', mechanics: ['query'], cards: ['averages-hide-tails'], lights: ['payment-provider'] },
   'promql-basics': { no: '3.4', name: 'PromQL basics', mechanics: ['query'], cards: ['prometheus-names'], lights: ['shipping'] },
-  cardinality: { no: '3.5', name: 'Cardinality', mechanics: ['spot', 'tradeoff'], cards: ['series-are-combinations'], lights: ['recommendations'] },
-  'red-and-use': { no: '3.7', name: 'RED and USE', mechanics: ['query'], cards: ['red-and-use'], lights: ['redis'] },
+  cardinality: { no: '3.5', name: 'Cardinality', mechanics: ['spot', 'tradeoff'], cards: ['series-are-combinations'], lights: ['postgres'] },
+  'red-and-use': { no: '3.7', name: 'RED and USE', mechanics: ['query'], cards: ['red-and-use'], lights: ['checkout'] },
 };
 
 for (const [id, want] of Object.entries(FIELDS)) {
@@ -120,16 +120,16 @@ test('lights: 3.3 lights the payment provider and 3.4 shipping, and each lights 
   assert.deepEqual(lit(['instruments', 'temporality', 'histograms', 'promql-basics']), ['kafka', 'notifications', 'payment-provider', 'shipping']);
 });
 
-test('lights: 3.5 lights Recommendations and 3.7 Redis, each only its own node, and all six levels light six nodes', () => {
+test('lights: 3.5 lights Postgres and 3.7 Checkout (a node 1.2 also lights), each only its own node', () => {
   const lit = (done) => {
     const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
     return NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id).sort();
   };
-  assert.deepEqual(lit(['cardinality']), ['recommendations']);
-  assert.deepEqual(lit(['red-and-use']), ['redis']);
+  assert.deepEqual(lit(['cardinality']), ['postgres']);
+  assert.deepEqual(lit(['red-and-use']), ['checkout']);
   assert.deepEqual(
     lit(['instruments', 'temporality', 'histograms', 'promql-basics', 'cardinality', 'red-and-use']),
-    ['kafka', 'notifications', 'payment-provider', 'recommendations', 'redis', 'shipping'],
+    ['checkout', 'kafka', 'notifications', 'payment-provider', 'postgres', 'shipping'],
   );
 });
 
