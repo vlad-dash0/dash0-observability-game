@@ -2,7 +2,7 @@
 // Collector v0.144.0, #14403 and #14396); `otlp` and `otlphttp` are deprecated aliases that still
 // resolve, said once in level 5.1 and once on the otlp-ports-and-paths card, with the one pinned
 // version v0.164.0. Receivers stay `otlp`; the `otlp` distribution name is unchanged.
-// Asserts strings and booleans only.
+// The scan covers every live level (all acts), its comment lines and the whole deck. Asserts strings and booleans only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -13,7 +13,7 @@ import { COLLECTOR_SCHEMA } from '../lib/configure/collector.mjs';
 
 const LIVE = liveRegistry();
 const ACT_5 = ['pipelines', 'order-matters', 'otlp-endpoints', 'agent-vs-gateway', 'ottl-and-transforms', 'distributions', 'silence'];
-const CARDS = ['otlp-ports-and-paths', 'not-every-component'];
+const ALL_LEVELS = Object.keys(LIVE.levels);
 const plain = (html) => html.replace(/<[^>]+>/g, '');
 const read = (rel) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 const stepWith = (levelId, key) => LIVE.levels[levelId].play.steps.find((s) => s[key] !== undefined)[key];
@@ -47,24 +47,25 @@ test('the otlp-ports-and-paths card says the alias sentence once, and the distri
   assert.equal(/otlp[^.]{0,40}deprecated alias/.test(card('not-every-component').back), false);
 });
 
-test('no Act 5 level or the two cards uses otlp/ or otlphttp as an exporter id, except inside the one alias sentence per place', () => {
+test('no live level (any act), its comments, or any card uses otlp/ or otlphttp as an exporter id, except inside the one alias sentence per place', () => {
   const texts = [];
-  for (const id of ACT_5) texts.push([`level ${id}`, JSON.stringify(LIVE.levels[id]).split(JSON.stringify(LEVEL_SENTENCE).slice(1, -1)).join('')]);
-  for (const id of CARDS) texts.push([`card ${id}`, JSON.stringify(card(id)).split(CARD_SENTENCE).join('')]);
-  for (const id of ACT_5) {
-    const comments = read(`levels/${id}.mjs`).split('\n').filter((l) => l.startsWith('//')).join('\n');
+  for (const id of ALL_LEVELS) texts.push([`level ${id}`, JSON.stringify(LIVE.levels[id]).split(JSON.stringify(LEVEL_SENTENCE).slice(1, -1)).join('')]);
+  for (const c of DECK) texts.push([`card ${c.id}`, JSON.stringify(c).split(CARD_SENTENCE).join('')]);
+  for (const id of ALL_LEVELS) {
+    const comments = read(`levels/${id}.mjs`).split('\n').filter((l) => l.trimStart().startsWith('//')).join('\n');
     texts.push([`comments of ${id}`, comments]);
   }
+  assert.equal(texts.length > 60, true, `scanned ${texts.length} texts`);
   for (const [where, text] of texts) {
     const hit = withoutUrls(text).match(OLD_NAME);
     assert.equal(hit, null, `${where} still uses ${hit && hit[0]}`);
   }
 });
 
-test('every Act 5 config (given and reference) defines its exporters as otlp_grpc or otlp_http, never the old types', () => {
+test('every configure step in every live level (given and reference) defines its exporters as otlp_grpc or otlp_http, never the old types', () => {
   let seen = 0;
-  for (const id of ACT_5) {
-    for (const step of LIVE.levels[id].play.steps) {
+  for (const id of ALL_LEVELS) {
+    for (const step of LIVE.levels[id].play?.steps ?? []) {
       if (step.configure === undefined) continue;
       for (const field of ['given', 'reference']) {
         const exporters = Object.keys(checkConfig(step.configure[field], COLLECTOR_SCHEMA).doc.exporters ?? {});
@@ -75,7 +76,7 @@ test('every Act 5 config (given and reference) defines its exporters as otlp_grp
       }
     }
   }
-  assert.equal(seen > 10, true, `looked at ${seen} exporters`);
+  assert.equal(seen >= 15, true, `looked at ${seen} exporters`);
 });
 
 test('receivers stay otlp, and the otlp distribution keeps its name', () => {

@@ -24,7 +24,7 @@ const ANSWERS = {
   'detectors-and-kubernetes': [
     'choice det-when: at-start',
     'choice det-where: collector',
-    'configure det-config: receivers: otlp: protocols: grpc: processors: k8sattributes: extract: metadata: - k8s.namespace.name - k8s.pod.name - k8s.pod.uid - k8s.deployment.name - k8s.node.name batch: exporters: otlp/dash0: endpoint: ${env:DASH0_ENDPOINT} service: pipelines: traces: receivers: [otlp] processors: [k8sattributes, batch] exporters: [otlp/dash0]',
+    'configure det-config: receivers: otlp: protocols: grpc: processors: k8sattributes: extract: metadata: - k8s.namespace.name - k8s.pod.name - k8s.pod.uid - k8s.deployment.name - k8s.node.name batch: exporters: otlp_grpc/dash0: endpoint: ${env:DASH0_ENDPOINT} service: pipelines: traces: receivers: [otlp] processors: [k8sattributes, batch] exporters: [otlp_grpc/dash0]',
     'choice det-rbac: pods-namespaces',
     'choice det-dash0: operator-adds',
   ],
@@ -108,7 +108,7 @@ const ANSWERS = {
   ],
   'collecting-logs': [
     'choice col-route: otlp-appender',
-    'configure col-config: receivers: otlp: protocols: grpc: filelog/shipping: include: [/var/log/shipping/agent.log] start_at: beginning multiline: line_start_pattern: ^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} operators: - type: regex_parser regex: \'(?s)^(?P<time>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}) (?P<sev>[A-Z]+) (?P<msg>.*)$\' severity: parse_from: attributes.sev processors: batch: exporters: otlp/dash0: endpoint: ${env:DASH0_ENDPOINT} service: pipelines: traces: receivers: [otlp] processors: [batch] exporters: [otlp/dash0] logs: receivers: [filelog/shipping] processors: [batch] exporters: [otlp/dash0]',
+    'configure col-config: receivers: otlp: protocols: grpc: filelog/shipping: include: [/var/log/shipping/agent.log] start_at: beginning multiline: line_start_pattern: ^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} operators: - type: regex_parser regex: \'(?s)^(?P<time>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}) (?P<sev>[A-Z]+) (?P<msg>.*)$\' severity: parse_from: attributes.sev processors: batch: exporters: otlp_grpc/dash0: endpoint: ${env:DASH0_ENDPOINT} service: pipelines: traces: receivers: [otlp] processors: [batch] exporters: [otlp_grpc/dash0] logs: receivers: [filelog/shipping] processors: [batch] exporters: [otlp_grpc/dash0]',
     'choice col-multiline: line-start',
     'choice col-parse: collector-regex',
     'choice col-dash0: log-ai',

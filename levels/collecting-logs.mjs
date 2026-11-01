@@ -37,7 +37,7 @@
 // model component settings. A schema that knew filelog's settings would need per-component-type schemas,
 // keyed by the type part of an id such as `filelog/shipping`, which is a change to the schema format and
 // the checker for one level, so the step grades the wiring (defined, the Collector would start, and
-// `uses` requires the logs pipeline to list `filelog/shipping` and `otlp/dash0`) and the settings
+// `uses` requires the logs pipeline to list `filelog/shipping` and `otlp_grpc/dash0`) and the settings
 // (`multiline`, `operators`) are taught in the Choice steps, as level 1.3 does for k8sattributes.
 
 // Step 1: the route for code the team owns. `why` follows "Right." or "Not quite.".
@@ -73,18 +73,18 @@ const GIVEN = [
   'processors:',
   '  batch:',
   'exporters:',
-  '  otlp/dash0:',
+  '  otlp_grpc/dash0:',
   '    endpoint: ${env:DASH0_ENDPOINT}',
   'service:',
   '  pipelines:',
   '    traces:',
   '      receivers: [otlp]',
   '      processors: [batch]',
-  '      exporters: [otlp/dash0]',
+  '      exporters: [otlp_grpc/dash0]',
   '    logs:',
   '      receivers: [filelog]',
   '      processors: [batch]',
-  '      exporters: [otlp/dash0]',
+  '      exporters: [otlp_grpc/dash0]',
   '',
 ].join('\n');
 
@@ -106,18 +106,18 @@ const REFERENCE = [
   'processors:',
   '  batch:',
   'exporters:',
-  '  otlp/dash0:',
+  '  otlp_grpc/dash0:',
   '    endpoint: ${env:DASH0_ENDPOINT}',
   'service:',
   '  pipelines:',
   '    traces:',
   '      receivers: [otlp]',
   '      processors: [batch]',
-  '      exporters: [otlp/dash0]',
+  '      exporters: [otlp_grpc/dash0]',
   '    logs:',
   '      receivers: [filelog/shipping]',
   '      processors: [batch]',
-  '      exporters: [otlp/dash0]',
+  '      exporters: [otlp_grpc/dash0]',
   '',
 ].join('\n');
 
@@ -126,7 +126,7 @@ const CONFIG = {
   schema: 'collector',
   given: GIVEN,
   reference: REFERENCE,
-  uses: { logs: ['filelog/shipping', 'otlp/dash0'] },
+  uses: { logs: ['filelog/shipping', 'otlp_grpc/dash0'] },
   hint: 'The logs pipeline lists a receiver called <code>filelog</code>. Compare it, letter for letter, with the id defined under <code>receivers</code>.',
   explain:
     'A receiver reads nothing until a pipeline lists it, and a pipeline can only list what is defined, spelled the same: ' +

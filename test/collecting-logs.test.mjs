@@ -117,10 +117,10 @@ test('config: the given does not start (the logs pipeline names "filelog", which
 });
 
 test('config: `uses` requires the logs pipeline to list filelog/shipping and the Dash0 exporter', () => {
-  assert.deepEqual(config().uses, { logs: ['filelog/shipping', 'otlp/dash0'] });
+  assert.deepEqual(config().uses, { logs: ['filelog/shipping', 'otlp_grpc/dash0'] });
   const logs = docOf(config().reference).service.pipelines.logs;
   assert.deepEqual(logs.receivers, ['filelog/shipping']);
-  assert.deepEqual(logs.exporters, ['otlp/dash0']);
+  assert.deepEqual(logs.exporters, ['otlp_grpc/dash0']);
   assert.deepEqual(docOf(config().reference).service.pipelines.traces.receivers, ['otlp'], 'traces keeps the OTLP receiver');
 });
 
@@ -136,11 +136,11 @@ const cases = () => {
     // Remove the logs pipeline altogether.
     'delete the logs pipeline': ref.replace(/ {4}logs:\n(?: {6}.*\n)+/, ''),
     // The filelog receiver moves to the traces pipeline and logs reads OTLP.
-    'wrong pipeline: filelog in traces, otlp in logs': swap('      receivers: [otlp]\n      processors: [batch]\n      exporters: [otlp/dash0]\n    logs:\n      receivers: [filelog/shipping]', '      receivers: [otlp, filelog/shipping]\n      processors: [batch]\n      exporters: [otlp/dash0]\n    logs:\n      receivers: [otlp]'),
+    'wrong pipeline: filelog in traces, otlp in logs': swap('      receivers: [otlp]\n      processors: [batch]\n      exporters: [otlp_grpc/dash0]\n    logs:\n      receivers: [filelog/shipping]', '      receivers: [otlp, filelog/shipping]\n      processors: [batch]\n      exporters: [otlp_grpc/dash0]\n    logs:\n      receivers: [otlp]'),
     // Rename the definition to match the pipeline's spelling: valid, but not the receiver the task names.
     'rename the receiver to filelog': swap('  filelog/shipping:', '  filelog:').replace('receivers: [filelog/shipping]', 'receivers: [filelog]'),
     // A different exporter: the logs never reach Dash0.
-    'export logs to debug': swap('  otlp/dash0:\n', '  debug:\n  otlp/dash0:\n').replace(/(logs:\n(?: {6}.*\n)*? {6}exporters: )\[otlp\/dash0\]/, '$1[debug]'),
+    'export logs to debug': swap('  otlp_grpc/dash0:\n', '  debug:\n  otlp_grpc/dash0:\n').replace(/(logs:\n(?: {6}.*\n)*? {6}exporters: )\[otlp_grpc\/dash0\]/, '$1[debug]'),
   };
 };
 
