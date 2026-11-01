@@ -239,6 +239,61 @@ SUPPORTED → [{title, items: string[], note}]   // functions, aggregations, uni
 - **Solvability (I7):** `validateQuerySpec` guarantees the reference gives data and `given` is not already a pass. The generated step driver types the reference and Runs; its slip is `(reference) + 1`, valid, with the reference's series and wrong values, costing exactly one mistake. The equivalent-query proof is in `test/query-it-view.test.mjs`.
 - **A11y and focus:** feedback is `role=status aria-live=polite tabindex=-1`; with `labelledBy` the widget is a labelled group. Focus: the textarea on mount; a Run that does not finish leaves focus where it is (the live region announces it, so the player keeps typing); `onComplete()`'s return after the pass. No timers (I2).
 
+### 4.8 Configure it core (M2, #3, part 1)
+Core `lib/configure/` (`parse`, `paths`, `schema`, `check`, `collector`). Pure, DOM-free, no timers (I2), no randomness. The view and the `configure` step type are part 2; `configure` stays RESERVED in `lib/play.mjs` until then. YAML is read by the vendored js-yaml 4.3.2 (MIT, `vendor/js-yaml-4.3.2.mjs`, pinned in `vendor/SHA256SUMS`), imported by a relative path so `node --test` and the browser load the same file; it is loaded only in `parse.mjs`, with its CORE schema (YAML 1.2 core: no timestamps, binary, `<<` merge or language tags).
+```
+parseYaml(text) → {ok:true, doc} | {ok:false, error}      // doc is a plain mapping; throws TypeError if text is not a string
+checkConfig(text, schema) → {ok, errors: Error[], doc: mapping|null, verdict: Verdict|null}   // throws on a malformed schema
+describeError(error) → string                              referenceProblems(schema, reference, given?) → string[]
+validateSchema(schema) → string[]                          COLLECTOR_SCHEMA, MAX_CHARS, joinPath, resolvePattern
+Error = {kind, path, message, ...detail}                   // path = key path of the offending key; '' for file-level errors
+Verdict = {flowing, pipelines: [{name, flowing, reasons: Error[]}], inactive: [{section, id}]}
+```
+**Input is untrusted.** Safe load only. Text over `MAX_CHARS` = 32768 characters is refused unparsed. js-yaml's own nesting limit (100) turns absurd nesting into a `parse` error. An alias (`*name`) of a mapping or list is refused (`alias`, `path` = the second place it is used), found by walking each collection once, so an alias bomb is refused without being expanded; an alias of a scalar copies a value and is accepted. A `__proto__` key is an ordinary key. Schema and path lookups follow own properties only.
+
+**File-level errors** (`parseYaml`, and so the only error of `checkConfig`; `doc` and `verdict` are then null). `line` and `column` are 1-based, or null when js-yaml gives no position:
+
+| kind | message | extra |
+|---|---|---|
+| `too-large` | `the file is longer than 32768 characters` | line, column null |
+| `parse` | js-yaml's own reason, verbatim (e.g. `bad indentation of a mapping entry`, `unknown tag !<tag:yaml.org,2002:js/function>`, `expected a single document in the stream, but found more`) | `line`, `column` of the mark |
+| `duplicate-key` | `duplicate key` | `line`, `column` of the second key |
+| `root` | `the top level must be a mapping, got a list`; also `... got a string`, `... got a number`, `... got a boolean`, `... got null`, `the top level must be a mapping, got an empty document` (no text, or only comments) | line, column null |
+| `alias` | `aliases (*name) are not supported` | `path` of the reused node, e.g. `use` or `l[1]` |
+
+**Schema format** (plain data; `validateSchema` lists authoring mistakes and `checkConfig` throws `invalid schema: ...` on any, so a typo cannot pass everything):
+```
+{ root: Node,
+  refs?: [{at: pattern, in: [path]}],                       // each string at `at` must be a key of a mapping at one of `in`
+  pipelines?: {at: path, stages: [{key, in: [path]}]} }     // `at` is a mapping of pipelines; each pipeline's list `key` is a ref into `in`
+Node = {type: 'mapping', keys?: {k: Node}, required?: [k], additional?: Node, keyPattern?: regex source, keyExpect?: text,
+        nullable?: true, min?: n}                           // keys not in `keys` use `additional`, else are unknown; null is allowed only if nullable
+     | {type: 'list', items: Node, min?: n}
+     | {type: 'string'|'number'|'integer'|'boolean', enum?: [value]}
+     | {type: 'any'}
+```
+Paths are dotted keys with `[i]` for list items; a key that is not letters, digits, `_`, `-` or `/` is quoted (`resource["a.b c"]`). A pattern is the same with `*` (every key of a mapping) and a final `[]` (every item of a list): `service.pipelines.*.receivers[]`.
+
+**Schema errors** (`checkConfig`), in order: the walk of the document (for a mapping: `min`, then `required`, then each key in the order written), then every ref in schema order (`refs`, then the pipeline stages), each in document order. Each key is reported once: a wrong type is not also checked for enum, and a `bad-key` value is not checked as well.
+
+| kind | path | message | extra |
+|---|---|---|---|
+| `wrong-type` | the value | `expected a mapping, got a list`, `expected an integer, got a string` (`a mapping`, `a list`, `a string`, `a number`, `an integer`, `a boolean`; got also `null`) | `expected`, `got` (`mapping list string number integer boolean null`) |
+| `bad-value` | the value | `must be one of "1.0", "1.1"` | `allowed` |
+| `missing-key` | the missing key | `missing required key "exporters"` | |
+| `unknown-key` | the key | `unknown key "log_levl"` | `allowed` (sorted) |
+| `bad-key` | the key | `invalid key "Bad": expected <keyExpect>` (default `a key matching <keyPattern>`) | |
+| `too-few` | the list or mapping | `needs at least 1 item` / `needs at least 2 items`, `needs at least 1 entry` / `needs at least 2 entries` | `min` |
+| `unknown-ref` | the item, e.g. `service.pipelines.traces.exporters[1]` | `"otlp/typo" is not defined under exporters or connectors` (`a`, `a or b`, `a, b or c`) | `ref`, `in` |
+
+A non-string ref item is the schema's `wrong-type`, not a second error.
+
+**Verdict** (only with `schema.pipelines`; null after a file-level error). One entry per key of the pipelines mapping, in document order. A pipeline's `reasons` are the errors whose path is at or under it (`service.pipelines.traces`, `...traces.exporters[1]`, a missing `exporters`, a pipeline that is not a mapping, an invalid pipeline name), and its `flowing` is "no reasons": its own wiring. The top-level `flowing` is also false when the config has any error anywhere (a Collector refuses to start then) or has no pipeline. `inactive` lists components defined in a stage's `in` sections that no pipeline names (a Collector ignores them silently): a note for the view, not a stall. `ok` is "no errors"; a config is *passing* when `ok` and (no verdict or `verdict.flowing`).
+
+**`COLLECTOR_SCHEMA`** ([config docs](https://opentelemetry.io/docs/collector/configuration/)): a deliberate subset. Top-level keys `receivers processors exporters connectors extensions` (a mapping of component ids to a settings mapping or nothing; settings are not checked; an id is `type` or `type/name`, `^[A-Za-z0-9_]+(/\S+)?$`) and `service` (required, with `pipelines` required, `extensions` a list of ids and `telemetry` any mapping). Pipelines are named `traces`, `metrics` or `logs`, optionally `/name`; each needs `receivers` and `exporters` (at least one item each) and may have `processors`. References: receivers must be defined under `receivers` or `connectors`, processors under `processors`, exporters under `exporters` or `connectors`, `service.extensions` under `extensions`. Not modelled: a connector used on only one side, component settings, the `profiles` signal.
+
+**Authoring check (I7):** `referenceProblems(schema, reference, given?)` returns `[]` or messages: `reference: <describeError>` for every error of the reference (`describeError` is `path: message`, or `line L, column C: message` for a positioned file-level error, or the bare message), `reference: no pipeline flows` for a reference that has no error and no flowing pipeline, and `given: already passes the checker, so there is nothing to fix`. A given that does not parse counts as failing. Part 2's generated suites call it for every `configure` step.
+
 ## 5. Phases (one PR each, never stacked, each mergeable to main)
 
 | # | Phase | Owner | Depends | Must not batch |
