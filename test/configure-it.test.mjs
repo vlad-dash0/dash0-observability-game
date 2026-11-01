@@ -131,3 +131,88 @@ test('the checker is called with the text and the spec schema', () => {
   runConfigure(spec(), newConfigureState(), REF, { check });
   assert.deepEqual(seen, [[REF, true]]);
 });
+
+// `uses` (#97): components a pipeline must list.
+const USES_REF = `receivers:
+  otlp:
+processors:
+  batch:
+exporters:
+  otlp/dash0:
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/dash0]
+`;
+// Valid and flowing, but the traces pipeline no longer lists batch.
+const NO_BATCH = USES_REF.replace('      processors: [batch]\n', '').replace('processors:\n  batch:\n', '');
+const USES_GIVEN = USES_REF.replace('[otlp/dash0]', '[otlp/dash0x]');
+const usesSpec = (extra = {}) => spec({ given: USES_GIVEN, reference: USES_REF, uses: { traces: ['batch'] }, ...extra });
+
+test('a spec with uses is valid; uses on its own also names the pipelines that must flow', () => {
+  assert.deepEqual(validateConfigureSpec(usesSpec()), []);
+  assert.deepEqual(validateConfigureSpec(usesSpec({ target: undefined })), []);
+  assert.deepEqual(validateConfigureSpec(usesSpec({ uses: { traces: ['otlp', 'batch', 'otlp/dash0'] } })), []);
+});
+
+test('uses is checked at load: its shape, the reference (I7), and that given does not already pass', () => {
+  const cases = [
+    [{ uses: [] }, 'uses must be a mapping of pipeline names to non-empty lists of component ids'],
+    [{ uses: {} }, 'uses must be a mapping of pipeline names to non-empty lists of component ids'],
+    [{ uses: 'batch' }, 'uses must be a mapping of pipeline names to non-empty lists of component ids'],
+    [{ uses: { traces: [] } }, 'uses "traces" must be a non-empty list of component ids'],
+    [{ uses: { traces: 'batch' } }, 'uses "traces" must be a non-empty list of component ids'],
+    [{ uses: { traces: [3] } }, 'uses "traces" must be a non-empty list of component ids'],
+    [{ uses: { traces: [' '] } }, 'uses "traces" must be a non-empty list of component ids'],
+    [{ uses: { traces: ['batch', 'batch'] } }, 'uses "traces" names "batch" twice'],
+    [{ uses: { traces: ['memory_limiter'] } }, 'uses "traces": the reference does not list "memory_limiter"'],
+    [{ uses: { metrics: ['batch'] } }, 'uses "metrics": the reference has no flowing pipeline with that name'],
+    [{ given: NO_BATCH }, 'given: already passes the checker, so there is nothing to fix'],
+  ];
+  for (const [edit, want] of cases) {
+    const got = validateConfigureSpec(usesSpec(edit));
+    assert.ok(got.includes(want), `${want}\n  got: ${JSON.stringify(got)}`);
+  }
+});
+
+test('a config that flows but leaves a required component out is wrong (reason uses) with the pipeline, not the ids', () => {
+  const r = runConfigure(usesSpec(), newConfigureState(), NO_BATCH);
+  assert.equal(r.outcome, 'wrong');
+  assert.equal(r.reason, 'uses');
+  assert.deepEqual(r.unmet, ['traces']);
+  assert.deepEqual(r.state.tried, [normalizeConfig(NO_BATCH)]);
+  assert.equal(JSON.stringify(r.unmet).includes('batch'), false);
+});
+
+test('any stage counts, and the ids match exactly', () => {
+  const exporter = usesSpec({ uses: { traces: ['otlp/dash0'] } });
+  assert.equal(runConfigure(exporter, newConfigureState(), USES_REF).outcome, 'right');
+  const receiver = usesSpec({ uses: { traces: ['otlp'] } });
+  assert.equal(runConfigure(receiver, newConfigureState(), USES_REF).outcome, 'right');
+  const wrongId = usesSpec({ uses: { traces: ['batch'] } });
+  const renamed = USES_REF.replaceAll('batch', 'batch/2');
+  assert.equal(runConfigure(wrongId, newConfigureState(), renamed).reason, 'uses');
+});
+
+test('every listed component is needed, and the reference passes', () => {
+  const both = usesSpec({ uses: { traces: ['batch', 'otlp'] } });
+  assert.equal(runConfigure(both, newConfigureState(), USES_REF).outcome, 'right');
+  const half = USES_REF.replace('receivers: [otlp]', 'receivers: [otlp2]').replace('  otlp:\n', '  otlp2:\n');
+  assert.equal(runConfigure(both, newConfigureState(), half).reason, 'uses');
+});
+
+test('a failing uses config again is a free repeat; a pipeline named only in uses must flow (reason target)', () => {
+  let r = runConfigure(usesSpec(), newConfigureState(), NO_BATCH);
+  r = runConfigure(usesSpec(), r.state, `${NO_BATCH}\n\n`);
+  assert.equal(r.outcome, 'repeat');
+  const metricsOnly = USES_REF.replace('traces:', 'metrics:');
+  const t = runConfigure(usesSpec({ target: undefined }), newConfigureState(), metricsOnly);
+  assert.equal(t.reason, 'target');
+  assert.deepEqual(t.unmet, ['traces']);
+});
+
+test('a config with schema errors stays invalid, before uses is considered', () => {
+  assert.equal(runConfigure(usesSpec(), newConfigureState(), USES_GIVEN).reason, 'invalid');
+});

@@ -312,3 +312,42 @@ test('mountConfigure throws a TypeError naming the spec for a bad spec, no onCom
   assert.throws(() => mountConfigure(ctx, fixture(), {}), /configure "cf": onComplete must be a function/);
   assert.throws(() => mountConfigure(ctx, { ...fixture(), id: 'other' }, { onComplete() {} }), /configure "other": not rendered/);
 });
+
+// `uses` (#97): the fixed message, the charge, and no leak of the missing ids.
+const usesFixture = (extra = {}) => fixture({ uses: { traces: ['batch'] }, ...extra });
+const NO_BATCH = REF.replace('      processors: [batch]\n', '').replace('processors:\n  batch:\n', '');
+
+test('a config that flows but drops a required component costs one mistake, with a fixed message that never names it', () => {
+  const { counts, mount } = setup(usesFixture());
+  mount();
+  check(NO_BATCH);
+  assert.equal(feedback(), 'The traces pipeline runs, but it does not do what the task asks yet.');
+  assert.equal(counts.mistakes, 1);
+  assert.equal(counts.done, 0);
+  assert.equal((feedback() + panel() + q('#cf-input').value).includes('batch'), false);
+  assert.equal(stateOf('traces'), 'Flowing');
+});
+
+test('the uses message joins several pipelines in plain words, and a repeat is free', () => {
+  const two = { traces: ['batch'], metrics: ['batch'] };
+  const ref = `${REF}    metrics:\n      receivers: [otlp]\n      processors: [batch]\n      exporters: [otlp/dash0]\n`;
+  const given = ref.replaceAll('[otlp/dash0]', '[otlp/dash0x]');
+  const bare = ref.replaceAll('      processors: [batch]\n', '').replace('processors:\n  batch:\n', '');
+  const { counts, mount } = setup(fixture({ given, reference: ref, uses: two }));
+  mount();
+  check(bare);
+  assert.equal(feedback(), 'The traces and metrics pipelines run, but they do not do what the task asks yet.');
+  check(bare);
+  assert.equal(feedback(), 'Same as last time: that config still does not pass.');
+  assert.equal(counts.mistakes, 1);
+});
+
+test('the reference passes a uses step after a uses slip, and the slip costs nothing more', () => {
+  const { counts, mount } = setup(usesFixture());
+  mount();
+  check(NO_BATCH);
+  check(REF);
+  assert.ok(feedback().startsWith('Right. '), feedback());
+  assert.equal(counts.mistakes, 1);
+  assert.equal(counts.done, 1);
+});
