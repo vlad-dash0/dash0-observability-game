@@ -109,6 +109,8 @@ test('renderSort: one plain-text instruction line, not a live region, describes 
     assert.equal(q('#signals-hint').className, 'sort-hint', `${when}: class`);
     assert.equal(q('#signals-hint').hasAttribute('role'), false, `${when}: no role`);
     assert.equal(q('#signals-hint').hasAttribute('aria-live'), false, `${when}: not live`);
+    assert.equal(q('.sort-pool').getAttribute('role'), 'group', `${when}: the pool is a group`);
+    assert.equal(q('.sort-pool').getAttribute('aria-label'), 'Items to sort', `${when}: the group is named`);
     assert.equal(q('.sort-pool').getAttribute('aria-describedby'), 'signals-hint', `${when}: pool described by the hint`);
   };
   check('rendered');
