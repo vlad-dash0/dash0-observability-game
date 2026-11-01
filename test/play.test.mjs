@@ -9,7 +9,7 @@ import { recordFocus } from './helpers/focus.mjs';
 import { STEP_DRIVERS, stepsOf } from './helpers/step-drivers.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
 import { validateChoiceSpec } from '../lib/widgets/choice.mjs';
-import { runPlay, STEP_TYPES, validatePlay } from '../lib/play.mjs';
+import { RESERVED, runPlay, STEP_TYPES, validatePlay } from '../lib/play.mjs';
 import { buildRegistry, RegistryError, validateRegistry } from '../lib/registry.mjs';
 import { liveRegistry } from '../app.mjs';
 import { playFixture, FIXTURE_CARD } from './fixtures/play-level.mjs';
@@ -164,20 +164,20 @@ test('lib/play.mjs never charges a penalty itself (PI1)', () => {
 // ---- registry: the play key ----------------------------------------------------
 
 test('a play level derives its mechanics in order of first appearance', () => {
-  assert.deepEqual([...FX.mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query']);
-  assert.equal(validatePlay(playFixture().play).mechanics.join(), 'sort,build,incident,spot,tradeoff,query');
+  assert.deepEqual([...FX.mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query', 'configure']);
+  assert.equal(validatePlay(playFixture().play).mechanics.join(), 'sort,build,incident,spot,tradeoff,query,configure');
 });
 
 test('a declared mechanics list that equals the derived one is accepted', () => {
-  const lv = { ...playFixture(), mechanics: ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query'] };
-  assert.deepEqual([...build(lv).levels[ID].mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query']);
+  const lv = { ...playFixture(), mechanics: ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query', 'configure'] };
+  assert.deepEqual([...build(lv).levels[ID].mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query', 'configure']);
 });
 
 test('registry errors for run and play together, no kit, differing mechanics, a function', () => {
   assert.deepEqual(errorsOf({ ...playFixture(), run() {} }), [`${AT}: declares both run and play; use one`]);
   assert.deepEqual(errorsOf(playFixture(), { play: undefined }), [`${AT}: play needs the step kit (buildRegistry option "play")`]);
   assert.deepEqual(errorsOf({ ...playFixture(), mechanics: ['build'] }), [
-    `${AT}: declares mechanics ["build"] but its steps give ["sort","build","incident","spot","tradeoff","query"]; fix or remove mechanics`,
+    `${AT}: declares mechanics ["build"] but its steps give ["sort","build","incident","spot","tradeoff","query","configure"]; fix or remove mechanics`,
   ]);
   const lv = playFixture();
   lv.play.steps[0].choice.choices[0].why = () => 'x';
@@ -190,7 +190,7 @@ test('two bad steps are two errors, not one', () => {
   const lv = playFixture();
   lv.play.steps = [{ intro: 'x' }, { intro: 'y', choice: lv.play.steps[0].choice, sort: lv.play.steps[1].sort }];
   assert.deepEqual(errorsOf(lv), [
-    `${AT}: step 1 has no step type (one of choice, sort, build, incident, spot, tradeoff, query)`,
+    `${AT}: step 1 has no step type (one of choice, sort, build, incident, spot, tradeoff, query, configure)`,
     `${AT}: step 2 has two step types ("choice", "sort")`,
   ]);
   assert.throws(() => build(lv), RegistryError);
@@ -215,7 +215,7 @@ test('a run level keeps play null', () => {
 
 test('the live registry passes the kit, so it builds play levels', () => {
   const reg = liveRegistry(act([playFixture()]), [FIXTURE_CARD]);
-  assert.deepEqual([...reg.levels[ID].mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query']);
+  assert.deepEqual([...reg.levels[ID].mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query', 'configure']);
 });
 
 // ---- validatePlay: the author-facing messages (§5) ------------------------------
@@ -230,7 +230,7 @@ function problems(edit) {
 test('validatePlay names each problem as the design says', () => {
   const cases = [
     [(p) => { p.steps[1].inrto = 'x'; }, 'step 2: unknown key "inrto" (did you mean "intro"?)'],
-    [(p) => { p.steps[2] = { intro: 'x', configure: {} }; }, 'step 3: step type "configure" is reserved for Configure it (#3) and not available yet'],
+    [(p) => { p.steps[2] = { intro: 'x', configure: {} }; }, 'step 3 (configure "?"): unknown schema undefined (one of collector)'],
     [(p) => { p.steps[0].choice.choices[1].right = false; }, 'step 1 (choice "fx-pick"): needs exactly one right answer, has 0'],
     [(p) => { p.steps[1].sort.items[0].bucket = 'automatic'; }, 'step 2 (sort "fx-sort"): item "server": unknown bucket "automatic"'],
     [(p) => { p.steps[2].build.answer = {}; }, 'step 3 (build "fx-tree"): the given state already passes Check, so there is nothing to do'],
@@ -272,6 +272,32 @@ test('validatePlay names each query step problem, with the step and widget id', 
 
 test('a query step may carry a given starting query', () => {
   assert.deepEqual(problems((p) => { p.steps[6].query.given = 'http_server_requests_total'; }), []);
+});
+
+test('validatePlay names each configure step problem, with the step and widget id', () => {
+  const cases = [
+    [(p) => { p.steps[7].configure.referense = 'x'; }, 'step 8 (configure "fx-config"): unknown key "referense" on spec (did you mean "reference"?)'],
+    [(p) => { p.steps[7].configure.schema = 'nope'; }, 'step 8 (configure "fx-config"): unknown schema "nope" (one of collector)'],
+    [(p) => { p.steps[7].configure.reference = p.steps[7].configure.given; }, 'step 8 (configure "fx-config"): reference: service.pipelines.traces.exporters[0]: "otlp/dash0x" is not defined under exporters or connectors'],
+    [(p) => { p.steps[7].configure.given = p.steps[7].configure.reference; }, 'step 8 (configure "fx-config"): given: already passes the checker, so there is nothing to fix'],
+    [(p) => { p.steps[7].configure.target = ['metrics']; }, 'step 8 (configure "fx-config"): target "metrics": the reference has no flowing pipeline with that name'],
+    [(p) => { delete p.steps[7].question; }, 'step 8 (configure "fx-config"): needs a question'],
+    [(p) => { p.steps[7].configure.id = 'fx-pick'; }, 'step 8: widget id "fx-pick" is already used by step 1'],
+  ];
+  for (const [edit, want] of cases) {
+    const got = problems(edit);
+    assert.ok(got.includes(want), `${want}\n  got: ${JSON.stringify(got)}`);
+  }
+});
+
+test('a configure step may leave out the target and the hint', () => {
+  assert.deepEqual(problems((p) => { delete p.steps[7].configure.target; delete p.steps[7].configure.hint; }), []);
+});
+
+test('no step type is reserved any more: configure is live', () => {
+  assert.deepEqual(Object.keys(RESERVED), []);
+  assert.equal(typeof STEP_TYPES.configure.mount, 'function');
+  assert.equal(STEP_TYPES.configure.mechanic, 'configure');
 });
 
 test('a build whose answer fails checkBuild names the issue', () => {

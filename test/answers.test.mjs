@@ -35,6 +35,7 @@ const ANSWERS = {
     'spot fx-spot: user',
     'tradeoff fx-budget: sampling=tail attrs=tier',
     'query fx-query: checkout-http@3000 sum by (service) (rate(http_server_requests_total[5m]))',
+    'configure fx-config: receivers: otlp: exporters: otlp/dash0: service: pipelines: traces: receivers: [otlp] exporters: [otlp/dash0]',
   ],
 };
 

@@ -62,7 +62,7 @@ A level file keeps today's metadata (FOUNDATION §2.1) and declares `play` inste
 | `sort` | SortSpec (M1-DESIGN §4.1) | sort | live |
 | `build` | BuildSpec (§4.2) | build | live |
 | `incident` | Scenario (§4.3) | incident | live |
-| `configure` | reserved for #3, e.g. `{id, given, lang, checker: '<name>', target, hint?}` | configure | reserved |
+| `configure` | ConfigureSpec (§4.9 of M1-DESIGN): `{id, schema: '<name>', given: '<yaml>', reference: '<yaml>', target?: [pipeline], hint?, explain}`, checked by the checker core (§4.8) | configure | live |
 | `query` | QuerySpec (§4.7 of M1-DESIGN): `{id, dataset: '<name>', at, reference: '<query>', given?, hint?, explain}`, graded by comparing result series | query | live |
 | `spot` | SpotSpec (§4.4 of M1-DESIGN) | spot | live |
 | `tradeoff` | TradeoffSpec (§4.5 of M1-DESIGN) | tradeoff | live |
@@ -197,6 +197,7 @@ The live adapters are thin wrappers:
 - **spot:** `renderSpot(spec, newSpotState(spec), …)`, `mountSpot`, `validateSpotSpec`.
 - **tradeoff:** `renderTradeoff(spec, newTradeoffState(spec), …)`, `mountTradeoff`, `validateTradeoffSpec`.
 - **query:** `renderQuery(spec, newQueryState(spec), …)`, `mountQuery`, `validateQuerySpec`. The driver types into the field: a click may be `{type: selector, text}` (`test/helpers/dom.mjs`).
+- **configure:** `renderConfigure(spec, newConfigureState(), …)`, `mountConfigure`, `validateConfigureSpec` (which runs `referenceProblems`, I7: the reference passes its own checker, `given` does not, and every `target` pipeline flows in the reference). The driver types the reference and Checks; its slip is the reference plus an unknown top-level key (parses, fails the checker), named `check` so the generated suite also proves a repeated Check is free.
 
 Each type also has a test driver in `test/helpers/step-drivers.mjs` (§4). Adding a widget means: core and view (M1-DESIGN §4 pattern), plus one `STEP_TYPES` entry, plus one step driver, plus one thin level.
 
@@ -282,7 +283,7 @@ Run when the registry is built; all errors are collected into one `RegistryError
 - plain data only;
 - known keys at every level of `play`;
 - `qid`, when present, is a plain token and unique within the level;
-- exactly one type key per step, and it is live, not reserved;
+- exactly one type key per step, and it is live, not reserved (`RESERVED` in `lib/play.mjs` is empty now that `configure` is live; the check stays for the next type named before it is built);
 - `intro` present; `question` present where the type requires it;
 - `code` and `show` are strings;
 - widget ids unique within the level;
@@ -298,8 +299,9 @@ The registry adds: run and play are mutually exclusive, play requires the kit, a
 - `declares mechanics ["build"] but its steps give ["sort"]; fix or remove mechanics`
 - `play must be plain data: steps[1].choice.choices[0].why is a function; write run(ctx) for custom behaviour`
 - `step 2: unknown key "inrto" (did you mean "intro"?)`
-- `step 2 has no step type (one of choice, sort, build, incident, spot, tradeoff, query)` / `step 2 has two step types ("choice", "sort")`
-- `step 3: step type "configure" is reserved for Configure it (#3) and not available yet`
+- `step 2 has no step type (one of choice, sort, build, incident, spot, tradeoff, query, configure)` / `step 2 has two step types ("choice", "sort")`
+- `step 3: step type "<key>" is reserved for <widget> and not available yet` (no type is reserved now)
+- `step 8 (configure "fx-config"): given: already passes the checker, so there is nothing to fix`
 - `step 2 (choice "avm-why"): needs exactly one right answer, has 0`
 - `step 1 (sort "avm-sort"): item "redis": unknown bucket "automatic"`
 - `step 2 (build "sat-tree"): the given state already passes Check, so there is nothing to do`
