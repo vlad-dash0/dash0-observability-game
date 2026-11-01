@@ -12,7 +12,7 @@ const KIND = [
   {
     key: 'fixed',
     label: 'Explicit: you give a list of boundaries once and the histogram adapts them as the data changes',
-    why: 'An explicit bucket histogram keeps the boundaries you gave it (or the SDK default). Values outside them pile up in the first or last bucket, which is why picking them well matters.',
+    why: 'An explicit bucket histogram keeps the boundaries you gave it (or the default or advisory ones the SDK falls back on). Values outside them pile up in the first or last bucket, which is why picking them well matters.',
   },
   {
     key: 'exponential',
@@ -38,7 +38,7 @@ const BUCKETS = [
     key: 'top-bucket',
     label: 'Only that they take at least 2.5 seconds: the buckets stop before the tail does',
     right: true,
-    why: 'The p99 falls inside the +Inf bucket, and for a quantile there Prometheus returns the upper bound of the second highest bucket, here 2.5. The real p99 is higher, and these buckets cannot say by how much. Add boundaries above your slowest requests, or use an exponential histogram. The OpenTelemetry SDK default boundaries run from 0 to 10000, so every duration under 5 seconds falls into one bucket, (0, 5], and the histogram tells you almost nothing.',
+    why: 'The p99 falls inside the +Inf bucket, and for a quantile there Prometheus returns the upper bound of the second highest bucket, here 2.5. The real p99 is higher, and these buckets cannot say by how much. Add boundaries above your slowest requests, or use an exponential histogram. The OpenTelemetry SDK default boundaries run from 0 to 10000, which suits large values, so a duration metric in seconds with no better boundaries puts everything under 5 seconds into one bucket, (0, 5]. For http.server.request.duration, the semantic conventions advise boundaries in seconds from 0.005 to 10, which the SDK uses; for your own duration metrics, set the boundaries yourself.',
   },
   {
     key: 'trust-average',
@@ -110,7 +110,8 @@ export default {
       },
       {
         intro:
-          'The p99 reads exactly 2.5. The buckets of this histogram are 0.05, 0.1, 0.25, 0.5, 1 and 2.5 seconds, then +Inf.',
+          'The p99 reads exactly 2.5. The buckets of this histogram are 0.05, 0.1, 0.25, 0.5, 1 and 2.5 seconds, then +Inf. ' +
+          'These service buckets stop at 2.5 seconds, narrower than the semantic conventions advise for HTTP durations.',
         question: 'What does a p99 of exactly 2.5 seconds tell you?',
         qid: 'hist-q-buckets',
         choice: { id: 'hist-buckets', choices: BUCKETS },

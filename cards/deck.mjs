@@ -190,8 +190,9 @@ export const DECK = [
       'A histogram counts observations into buckets and keeps a count and a sum, so sum over count is the mean, and a few ' +
       'very slow requests barely move it. A percentile needs the buckets: histogram_quantile estimates it from the rate of ' +
       'the _bucket series, summed by le, and the estimate is only as good as the bucket boundaries. A quantile that falls ' +
-      'in the +Inf bucket is reported as the highest finite bound, and the SDK default boundaries (0 to 10000) suit large ' +
-      'numbers, not durations in seconds. An explicit bucket histogram uses boundaries you choose. An exponential histogram ' +
+      'in the +Inf bucket is reported as the highest finite bound. The SDK default boundaries (0 to 10000) suit large ' +
+      'values, not durations in seconds, but for http.server.request.duration the semantic conventions advise boundaries ' +
+      'from 0.005 to 10 seconds, which the SDK uses; set your own for other durations. An explicit bucket histogram uses boundaries you choose. An exponential histogram ' +
       'derives them from a scale, so one histogram covers a wide range with small relative error, but not every backend ' +
       'accepts it: the Prometheus text formats drop it or convert it to fixed buckets.',
     specUrl: 'https://opentelemetry.io/docs/specs/otel/metrics/data-model/#exponentialhistogram',

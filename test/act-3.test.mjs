@@ -158,8 +158,9 @@ const CARDS = {
       'A histogram counts observations into buckets and keeps a count and a sum, so sum over count is the mean, and a few ' +
       'very slow requests barely move it. A percentile needs the buckets: histogram_quantile estimates it from the rate of ' +
       'the _bucket series, summed by le, and the estimate is only as good as the bucket boundaries. A quantile that falls ' +
-      'in the +Inf bucket is reported as the highest finite bound, and the SDK default boundaries (0 to 10000) suit large ' +
-      'numbers, not durations in seconds. An explicit bucket histogram uses boundaries you choose. An exponential histogram ' +
+      'in the +Inf bucket is reported as the highest finite bound. The SDK default boundaries (0 to 10000) suit large ' +
+      'values, not durations in seconds, but for http.server.request.duration the semantic conventions advise boundaries ' +
+      'from 0.005 to 10 seconds, which the SDK uses; set your own for other durations. An explicit bucket histogram uses boundaries you choose. An exponential histogram ' +
       'derives them from a scale, so one histogram covers a wide range with small relative error, but not every backend ' +
       'accepts it: the Prometheus text formats drop it or convert it to fixed buckets.',
     specUrl: 'https://opentelemetry.io/docs/specs/otel/metrics/data-model/#exponentialhistogram',
@@ -344,6 +345,17 @@ test('histograms: the buckets step grades the nuance: a p99 on the top bound is 
   const wrong = choiceOf('histograms', 'hist-buckets').filter((c) => !c.right);
   assert.deepEqual(wrong.map((c) => c.key).sort(), ['exact-p99', 'trust-average']);
   assert.equal(/diluted|sum divided by a count/.test(wrong.find((c) => c.key === 'trust-average').why), true, 'why the average hid it');
+});
+
+test('histograms: the boundary teaching names the semconv advisory for http.server.request.duration, not just the bare SDK default', () => {
+  const why = plain(rightOf('histograms', 'hist-buckets').why);
+  for (const w of ['http.server.request.duration', 'semantic conventions', '0.005 to 10', 'which the SDK uses', 'set the boundaries yourself']) {
+    assert.equal(why.includes(w), true, w);
+  }
+  const back = DECK.find((c) => c.id === 'averages-hide-tails').back;
+  assert.equal(back.includes('http.server.request.duration') && back.includes('0.005 to 10'), true, 'the card says it too');
+  const intro = plain(LIVE.levels.histograms.play.steps[3].intro);
+  assert.equal(/stop at 2\.5 seconds/.test(intro) && /narrower than the semantic conventions/.test(intro), true, 'this level\'s buckets are narrower than the advisory');
 });
 
 test('histograms: explicit vs exponential is graded: scale and relative error, not exactness, and backend support varies', () => {
