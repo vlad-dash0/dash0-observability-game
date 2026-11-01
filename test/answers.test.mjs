@@ -148,6 +148,11 @@ const ANSWERS = {
     'sort dist-sort: k8sattributes=contrib-k8s batch=all-three awss3-exporter=contrib-only memory-limiter=all-three redaction=contrib-k8s acme-scrubber=none tail-sampling=contrib-k8s otlp-exporter=all-three awsxray-exporter=contrib-only',
     'choice dist-build: ocb',
   ],
+  'what-costs-money': [
+    'choice wcm-host: fewer-hosts',
+    'tradeoff wcm-gb: traces=tail logs=trimmed',
+    'tradeoff wcm-signal: interval=s60 records=per-request spans=tail',
+  ],
   'play-fixture': [
     'choice fx-pick: trace',
     'sort fx-sort: server=auto loyalty=manual',

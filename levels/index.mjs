@@ -53,6 +53,7 @@ import the3amErrors from './the-3am-errors.mjs';
 import theBill from './the-bill.mjs';
 import thePager from './the-pager.mjs';
 import theSignals from './the-signals.mjs';
+import whatCostsMoney from './what-costs-money.mjs';
 import whoIsTalking from './who-is-talking.mjs';
 import whyOpentelemetry from './why-opentelemetry.mjs';
 
@@ -110,7 +111,7 @@ export const ACTS = [
     no: 6,
     name: 'Sampling and cost',
     sub: 'You can\'t keep everything',
-    levels: [headSampling, tailSampling],
+    levels: [headSampling, tailSampling, whatCostsMoney],
     boss: null,
   },
 ];

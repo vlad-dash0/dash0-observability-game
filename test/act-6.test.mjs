@@ -39,14 +39,14 @@ const stepKinds = (levelId) => LIVE.levels[levelId].play.steps.map((st) => ['cho
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-6 "Sampling and cost" holds 6.1 and 6.2 after Act 5, with no boss yet', () => {
+test('act-6 "Sampling and cost" holds 6.1 to 6.3 after Act 5, with no boss yet', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-6');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 6, name: 'Sampling and cost', sub: 'You can\'t keep everything', levelIds: ['head-sampling', 'tail-sampling'], bossId: null },
+    { no: 6, name: 'Sampling and cost', sub: 'You can\'t keep everything', levelIds: ['head-sampling', 'tail-sampling', 'what-costs-money'], bossId: null },
   );
   assert.deepEqual(LIVE.acts.map((a) => a.id).slice(-2), ['act-5', 'act-6']);
-  assert.deepEqual(LIVE.order.slice(-3), ['silence', 'head-sampling', 'tail-sampling']);
+  assert.deepEqual(LIVE.order.slice(-4), ['silence', 'head-sampling', 'tail-sampling', 'what-costs-money']);
 });
 
 test('act-6 unlocks like the acts before it: every earlier act complete (Act 5 and its boss included), or entered', () => {

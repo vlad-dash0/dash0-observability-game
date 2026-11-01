@@ -46,7 +46,7 @@ test('act-5 "The Collector" holds 5.1 to 5.6 after Act 4, and the boss "Silence"
     { no: 5, name: 'The Collector', sub: 'The plumbing', levelIds: ['pipelines', 'order-matters', 'otlp-endpoints', 'agent-vs-gateway', 'ottl-and-transforms', 'distributions'], bossId: 'silence' },
   );
   assert.deepEqual(LIVE.acts.map((a) => a.id).slice(0, 6), ['act-0', 'act-1', 'act-2', 'act-3', 'act-4', 'act-5'], 'act-5 follows act-4');
-  assert.deepEqual(LIVE.order.slice(-9, -2), ['pipelines', 'order-matters', 'otlp-endpoints', 'agent-vs-gateway', 'ottl-and-transforms', 'distributions', 'silence']);
+  assert.deepEqual(LIVE.order.slice(-10, -3), ['pipelines', 'order-matters', 'otlp-endpoints', 'agent-vs-gateway', 'ottl-and-transforms', 'distributions', 'silence']);
 });
 
 test('act-5 unlocks like the acts before it: every earlier act complete (Act 4 included), or entered', () => {

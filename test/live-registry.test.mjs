@@ -51,6 +51,7 @@ const EXPECTED_ORDER = [
   'silence',
   'head-sampling',
   'tail-sampling',
+  'what-costs-money',
 ];
 
 test('the live registry builds against the real deck and map nodes', () => {
@@ -115,7 +116,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
       no: 6,
       name: 'Sampling and cost',
       sub: 'You can\'t keep everything',
-      levelIds: ['head-sampling', 'tail-sampling'],
+      levelIds: ['head-sampling', 'tail-sampling', 'what-costs-money'],
       bossId: null,
     },
   ]);
