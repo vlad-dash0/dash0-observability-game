@@ -142,6 +142,26 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .query-table th, .query-table td { text-align: left; padding: 3px 12px 3px 0; overflow-wrap: anywhere; }
 .query-num { font-variant-numeric: tabular-nums; text-align: right; }
 
+/* ---------- Configure it (lib/widgets/configure-it-view.mjs) ---------- */
+/* The pipeline view says Flowing or Stalled in words (never colour alone); the border adds a
+   second cue: solid for flowing, dashed and thicker for stalled. Static, so nothing to reduce
+   for prefers-reduced-motion. Text on surface and muted text on surface only, so
+   test/theme.test.mjs's contrast checks cover it in both themes. */
+.configure-label { display: block; font-weight: 600; margin: 0 0 4px; }
+.configure-input { display: block; box-sizing: border-box; width: 100%; font-family: var(--font-mono); font-size: 14px; padding: 8px 10px; margin: 0 0 8px; border: 1.5px solid var(--color-border); border-radius: var(--radius-sm); }
+.configure-pipelines { margin: 10px 0; }
+.configure-note, .configure-more, .configure-inactive { color: var(--color-text-muted); font-size: 13.5px; margin: 4px 0; }
+.configure-overall { font-weight: 600; margin: 0 0 8px; }
+.configure-list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.configure-pipeline { background: var(--color-surface); color: var(--color-text); border-radius: var(--radius-sm); padding: 8px 13px; overflow-wrap: anywhere; }
+.configure-pipeline[data-state="flowing"] { border: 1.5px solid var(--color-success); }
+.configure-pipeline[data-state="stalled"] { border: 3px dashed var(--color-error); padding: 6.5px 11.5px; }
+.configure-pipeline p { margin: 0 0 4px; }
+.configure-state { font-weight: 700; margin-left: 8px; }
+.configure-stage code { font-size: 13.5px; }
+.configure-reasons, .configure-errors { margin: 4px 0 0 20px; padding: 0; overflow-wrap: anywhere; }
+.configure-kind { font-family: var(--font-mono); font-size: 12.5px; color: var(--color-text-muted); }
+
 /* ---------- Sort it (lib/widgets/sort-it-view.mjs) ---------- */
 /* Labels may hold long <code> names: items, bucket buttons and placed items wrap anywhere
    (as does .feedback above, which quotes them), so no Sort it label overflows at 320px.

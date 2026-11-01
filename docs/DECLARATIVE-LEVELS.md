@@ -30,7 +30,7 @@ Evidence:
 | 2.2 span-kinds | "Map edges" line, rewritten inside `onComplete` from `serviceEdges` | `span-kinds.mjs:77-80`, `:107`, `:114-121` | stays `run(ctx)` |
 | 2.4 context-propagation | hop and root lists built from data with `escapeHtml`; `CONTENT.steps[0].hops/roots` pinned | `context-propagation.mjs:125-144`; `act-2.test.mjs:480-488` | can migrate with `show` (those two tests become string checks); optional, last |
 | 2.6 events-and-links | an authored list of three short stories | `events-and-links.mjs:133`, `:140` | fits, via `show` |
-| 1.2 naming-your-service | env editor, Check and hint written inline, with its own `lastFailed` (M1-DESIGN §2); choice id `nys` used twice | `naming-your-service.mjs:145-189`, `:107`, `:201` | stays `run(ctx)` until a configure step exists |
+| 1.2 naming-your-service | env editor, Check and hint written inline, with its own `lastFailed` (M1-DESIGN §2); choice id `nys` used twice | `naming-your-service.mjs:145-189`, `:107`, `:201` | stays `run(ctx)` by decision on #3: a configure step exists now, but 1.2 is an env editor, not YAML |
 | the-pager | not a widget: looks, a plain-text budget, Escalate | `the-pager.mjs:57-98` | stays `run(ctx)` |
 | checkout-is-slow | a plain Scenario plus 17 lines of standard wiring | `checkout-is-slow.mjs:40-136`, `:157-173` | fits: one `incident` step; optional |
 
@@ -62,7 +62,7 @@ A level file keeps today's metadata (FOUNDATION §2.1) and declares `play` inste
 | `sort` | SortSpec (M1-DESIGN §4.1) | sort | live |
 | `build` | BuildSpec (§4.2) | build | live |
 | `incident` | Scenario (§4.3) | incident | live |
-| `configure` | reserved for #3, e.g. `{id, given, lang, checker: '<name>', target, hint?}` | configure | reserved |
+| `configure` | ConfigureSpec (§4.9 of M1-DESIGN): `{id, schema: '<name>', given: '<yaml>', reference: '<yaml>', target?: [pipeline], hint?, explain}`, checked by the checker core (§4.8) | configure | live |
 | `query` | QuerySpec (§4.7 of M1-DESIGN): `{id, dataset: '<name>', at, reference: '<query>', given?, hint?, explain}`, graded by comparing result series | query | live |
 | `spot` | SpotSpec (§4.4 of M1-DESIGN) | spot | live |
 | `tradeoff` | TradeoffSpec (§4.5 of M1-DESIGN) | tradeoff | live |
@@ -197,6 +197,7 @@ The live adapters are thin wrappers:
 - **spot:** `renderSpot(spec, newSpotState(spec), …)`, `mountSpot`, `validateSpotSpec`.
 - **tradeoff:** `renderTradeoff(spec, newTradeoffState(spec), …)`, `mountTradeoff`, `validateTradeoffSpec`.
 - **query:** `renderQuery(spec, newQueryState(spec), …)`, `mountQuery`, `validateQuerySpec`. The driver types into the field: a click may be `{type: selector, text}` (`test/helpers/dom.mjs`).
+- **configure:** `renderConfigure(spec, newConfigureState(), …)`, `mountConfigure`, `validateConfigureSpec` (which runs `referenceProblems`, I7: the reference passes its own checker, `given` does not, and every `target` pipeline flows in the reference). The driver types the reference and Checks; its slip is the reference plus an unknown top-level key (parses, fails the checker), named `check` so the generated suite also proves a repeated Check is free.
 
 Each type also has a test driver in `test/helpers/step-drivers.mjs` (§4). Adding a widget means: core and view (M1-DESIGN §4 pattern), plus one `STEP_TYPES` entry, plus one step driver, plus one thin level.
 
@@ -282,7 +283,7 @@ Run when the registry is built; all errors are collected into one `RegistryError
 - plain data only;
 - known keys at every level of `play`;
 - `qid`, when present, is a plain token and unique within the level;
-- exactly one type key per step, and it is live, not reserved;
+- exactly one type key per step, and it is live, not reserved (`RESERVED` in `lib/play.mjs` is empty now that `configure` is live; the check stays for the next type named before it is built);
 - `intro` present; `question` present where the type requires it;
 - `code` and `show` are strings;
 - widget ids unique within the level;
@@ -298,8 +299,9 @@ The registry adds: run and play are mutually exclusive, play requires the kit, a
 - `declares mechanics ["build"] but its steps give ["sort"]; fix or remove mechanics`
 - `play must be plain data: steps[1].choice.choices[0].why is a function; write run(ctx) for custom behaviour`
 - `step 2: unknown key "inrto" (did you mean "intro"?)`
-- `step 2 has no step type (one of choice, sort, build, incident, spot, tradeoff, query)` / `step 2 has two step types ("choice", "sort")`
-- `step 3: step type "configure" is reserved for Configure it (#3) and not available yet`
+- `step 2 has no step type (one of choice, sort, build, incident, spot, tradeoff, query, configure)` / `step 2 has two step types ("choice", "sort")`
+- `step 3: step type "<key>" is reserved for <widget> and not available yet` (no type is reserved now)
+- `step 8 (configure "fx-config"): given: already passes the checker, so there is nothing to fix`
 - `step 2 (choice "avm-why"): needs exactly one right answer, has 0`
 - `step 1 (sort "avm-sort"): item "redis": unknown bucket "automatic"`
 - `step 2 (build "sat-tree"): the given state already passes Check, so there is nothing to do`
@@ -332,7 +334,7 @@ There is no hybrid "mostly steps plus one hook". Two clean modes are cheaper to 
 
 **Stay hand-written:**
 - 2.2: the edges hook.
-- 1.2: the env checker, until #3 decides whether Configure it absorbs it.
+- 1.2: the env checker, by decision on #3 (the `configure` step exists, but 1.2 is an env editor, not YAML).
 - the-pager.
 
 In each migration PR (#71 AC4: existing tests unchanged and green):
@@ -361,4 +363,4 @@ In each migration PR (#71 AC4: existing tests unchanged and green):
 
 1. How much existing content to migrate in M2? [P3 (2.7) only. P4 if it stays mechanical. Build levels and bosses later or never.]
 2. For new acts, should the design doc keep full answer tables plus a per-act `PIN` test, or should the level file be the source of truth plus the 1-line-per-step `ANSWERS` key? [Level file plus `ANSWERS`. The design doc keeps concept, nuance, cards and spec URLs, and card fronts stay pinned.]
-3. 1.2's env checker: make it a step type now, or let #3 Configure it decide? [Let #3 decide. 1.2 stays hand-written.]
+3. 1.2's env checker: make it a step type now, or let #3 Configure it decide? [Decided on #3: 1.2 stays hand-written. The `configure` step exists, but 1.2 is an env editor, not YAML.]

@@ -138,7 +138,22 @@ const query = {
   answerKey: (s) => `query ${s.id}: ${s.dataset}@${s.at} ${s.reference}`,
 };
 
-export const STEP_DRIVERS = { choice, sort, build, incident, spot, tradeoff, query };
+const configure = {
+  solve: (s) => [{ type: `#${s.id}-input`, text: s.reference }, `#${s.id}-check`],
+  // The reference plus an unknown top-level key: it parses, so the checker (not the parser) fails it.
+  // Named 'check' so the generated suite also proves a repeated Check on the same text is free.
+  slips: (s) => [
+    {
+      name: 'check',
+      clicks: [{ type: `#${s.id}-input`, text: `${s.reference}\nzz-unknown: 1\n` }, `#${s.id}-check`],
+      says: /^Not quite\. The Collector would not accept this config: 1 problem\./,
+    },
+  ],
+  first: (s) => `#${s.id}-input`,
+  answerKey: (s) => `configure ${s.id}: ${s.reference.replace(/\s+/g, ' ').trim()}`,
+};
+
+export const STEP_DRIVERS = { choice, sort, build, incident, spot, tradeoff, query, configure };
 
 /** A play level's steps as `{step, key, spec, type, driver}` in order. */
 export function stepsOf(level) {
