@@ -573,6 +573,8 @@ test('V7 the reverse view: a span shows its attributes read-only and the records
   assert.equal(qa('[data-show-log]')[0].textContent, '70 ms · INFO · Charge submitted');
   click('[data-show-log="l-worker"]');
   assert.equal(q('[data-log="l-worker"]').getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(qa('[data-span]').map((b) => b.getAttribute('aria-pressed')), ['false', 'false', 'false', 'false'], 'choosing a record clears the span selection');
+  assert.equal(q('[data-build-panel] [data-panel-title]').dataset.panelTitle, 'log', 'the span panel is closed');
   assert.equal(q(`[data-attach="${S3}"]`).getAttribute('aria-pressed'), 'true');
   assert.deepEqual(lines('wf-cursor'), ['82.14 82.14 0 24']);
   click(`[data-span="${S1}"]`);

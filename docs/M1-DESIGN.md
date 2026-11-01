@@ -152,7 +152,9 @@ validateBuildSpec applies the log answer before the I7 check, so the rule codes 
 timeAxis(spans, times = []) → {min, range, pct(ms)}; waterfall(spans, {times}) uses it (same output with no times)
 ```
 `play.mjs` accepts `logs` and `explain` on a build step, and logs mode in levels (phase B
-removed the "not available in levels yet" guard).
+removed the "not available in levels yet" guard). `explain` is shown only in logs mode, so
+`validateBuildSpec` refuses it elsewhere (`explain: only shown in logs mode`) rather than
+letting an author's text vanish.
 
 Logs mode view (#113 phase B), same `renderBuild` / `mountBuild`, span mode unchanged:
 - **Board.** The read-only waterfall (one row per span, widened by the record times through

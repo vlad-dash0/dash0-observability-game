@@ -594,3 +594,10 @@ test('A13 id pairing: both or neither, on the board, in the span\'s trace, never
   ok.logs[1].spanId = S2;
   assert.deepEqual(validateBuildSpec(ok), []);
 });
+
+test('explain is refused outside logs mode, because span mode never shows it', () => {
+  assert.deepEqual(validateBuildSpec({ ...b1Spec(), explain: 'Because.' }), ['explain: only shown in logs mode']);
+  assert.deepEqual(validateBuildSpec({ ...b1Spec(), explain: ' ' }), ['explain: not non-empty text', 'explain: only shown in logs mode']);
+  assert.deepEqual(validateBuildSpec(b1Spec()), []);
+  assert.deepEqual(validateBuildSpec({ ...logsSpec(), explain: 'Because.' }), []);
+});
