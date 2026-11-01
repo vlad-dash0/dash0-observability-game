@@ -16,11 +16,13 @@ import { createLevelContext } from '../lib/level-context.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { answer, budgetLeft, canAnswer, newIncident, openView, validateScenario } from '../lib/widgets/incident.mjs';
 import { liveRegistry } from '../app.mjs';
+import { expectedStarMax } from './helpers/stars.mjs';
 import { nodeStates } from '../lib/map.mjs';
 import { levelState } from '../lib/unlock.mjs';
 import { EDGES, NODES } from '../hub/map-data.mjs';
 
 const LIVE = liveRegistry();
+const MAX_STARS = expectedStarMax(LIVE);
 const ID = 'the-3am-errors';
 const BOSS = LIVE.levels[ID];
 const S = BOSS.play.steps[0].incident;
@@ -88,11 +90,11 @@ test('the-3am-errors: lights Orders (shared with 2.4), and the boss waits for th
   assert.equal(levelState(ID, all, LIVE), 'open');
 });
 
-test('the-3am-errors: star totals count the boss (30 scored levels, max 90), and a 3-star boss is 3 of them', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 90 });
+test('the-3am-errors: star totals count the boss (the derived scored-level max), and a 3-star boss is 3 of them', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: MAX_STARS });
   const p = emptyProgress();
   p.levels[ID] = { stars: 3, at: null };
-  assert.deepEqual(starTotals(p, LIVE), { earned: 3, max: 90 });
+  assert.deepEqual(starTotals(p, LIVE), { earned: 3, max: MAX_STARS });
 });
 
 test('the-3am-errors: no em dash in the level file', () => {

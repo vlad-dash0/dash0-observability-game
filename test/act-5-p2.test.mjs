@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { DECK } from '../cards/deck.mjs';
 import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
+import { expectedStarMax } from './helpers/stars.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { nodeStates } from '../lib/map.mjs';
 import { levelState } from '../lib/unlock.mjs';
@@ -18,6 +19,7 @@ import { COLLECTOR_SCHEMA } from '../lib/configure/collector.mjs';
 import { newConfigureState, runConfigure } from '../lib/widgets/configure-it.mjs';
 
 const LIVE = liveRegistry();
+const MAX_STARS = expectedStarMax(LIVE);
 const read = (rel) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 const plain = (html) => html.replace(/<[^>]+>/g, '');
 
@@ -56,9 +58,9 @@ for (const [id, want] of Object.entries(FIELDS)) {
   });
 }
 
-test('star totals: 30 scored levels, max 90, and the two new levels add 6', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 90 });
-  assert.deepEqual(starTotals(progressOf(['otlp-endpoints', 'agent-vs-gateway']), LIVE), { earned: 6, max: 90 });
+test('star totals: the derived scored-level max, and the two new levels add 6', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: MAX_STARS });
+  assert.deepEqual(starTotals(progressOf(['otlp-endpoints', 'agent-vs-gateway']), LIVE), { earned: 6, max: MAX_STARS });
 });
 
 test('5.3 and 5.4 open in any order once Act 5 is entered; they stay locked on a fresh save', () => {
