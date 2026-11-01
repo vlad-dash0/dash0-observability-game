@@ -452,12 +452,24 @@ test('A7 attachLog and applyLogs derive the trace from the span, never store it'
   assert.equal(attachLog(LSPEC, st, 'l-other', null), 'detached');
   const detached = applyLogs(LSPEC, st).find((l) => l.id === 'l-other');
   assert.deepEqual([detached.spanId, detached.traceId], [null, null], 'both ids or neither');
-  assert.equal(attachLog(LSPEC, st, 'ghost', S1), 'unknown');
-  assert.equal(attachLog(LSPEC, st, 'l-boot', NONE), 'unknown');
-  assert.equal(attachLog(LSPEC, st, 'l-boot', 'none'), 'unknown');
-  assert.equal(attachLog(LSPEC, st, 'l-boot', undefined), 'unknown');
-  assert.equal(attachLog(LSPEC, st, 'constructor', S1), 'unknown');
-  assert.equal(Object.values(st.logs).every((v) => v === null), true, 'refusals change nothing');
+  // Refusals run against attached records, so one that cleared or moved a record would show.
+  assert.equal(attachLog(LSPEC, st, 'l-other', S4), 'attached');
+  assert.equal(attachLog(LSPEC, st, 'l-charge', S3), 'attached');
+  const before = gradedKey(LSPEC, st);
+  const refusals = [
+    ['l-other', NONE],
+    ['l-other', 'none'],
+    ['l-other', undefined],
+    ['l-other', 7],
+    ['ghost', S1],
+    ['constructor', S1],
+    [undefined, S1],
+  ];
+  for (const [id, span] of refusals) {
+    assert.equal(attachLog(LSPEC, st, id, span), 'unknown', `${id} ${span}`);
+    assert.deepEqual(st.logs, { 'l-boot': null, 'l-cart': null, 'l-other': S4, 'l-charge': S3, 'l-worker': null }, `${id} ${span} changes nothing`);
+    assert.equal(gradedKey(LSPEC, st), before, `${id} ${span}: the graded key is unchanged`);
+  }
   assert.equal(LSPEC.logs[2].spanId, null, 'the frozen spec is never written');
   const out = applyLogs(LSPEC, st);
   out[0].attributes['thread.name'] = 'x';
