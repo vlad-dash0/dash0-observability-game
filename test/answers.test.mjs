@@ -23,6 +23,7 @@ const ANSWERS = {
     'incident checkout-slow: traces,db-metrics > slow-query',
     'spot fx-spot: user',
     'tradeoff fx-budget: sampling=tail attrs=tier',
+    'query fx-query: checkout-http@3000 sum by (service) (rate(http_server_requests_total[5m]))',
   ],
 };
 

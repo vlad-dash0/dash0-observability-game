@@ -164,20 +164,20 @@ test('lib/play.mjs never charges a penalty itself (PI1)', () => {
 // ---- registry: the play key ----------------------------------------------------
 
 test('a play level derives its mechanics in order of first appearance', () => {
-  assert.deepEqual([...FX.mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff']);
-  assert.equal(validatePlay(playFixture().play).mechanics.join(), 'sort,build,incident,spot,tradeoff');
+  assert.deepEqual([...FX.mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query']);
+  assert.equal(validatePlay(playFixture().play).mechanics.join(), 'sort,build,incident,spot,tradeoff,query');
 });
 
 test('a declared mechanics list that equals the derived one is accepted', () => {
-  const lv = { ...playFixture(), mechanics: ['sort', 'build', 'incident', 'spot', 'tradeoff'] };
-  assert.deepEqual([...build(lv).levels[ID].mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff']);
+  const lv = { ...playFixture(), mechanics: ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query'] };
+  assert.deepEqual([...build(lv).levels[ID].mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query']);
 });
 
 test('registry errors for run and play together, no kit, differing mechanics, a function', () => {
   assert.deepEqual(errorsOf({ ...playFixture(), run() {} }), [`${AT}: declares both run and play; use one`]);
   assert.deepEqual(errorsOf(playFixture(), { play: undefined }), [`${AT}: play needs the step kit (buildRegistry option "play")`]);
   assert.deepEqual(errorsOf({ ...playFixture(), mechanics: ['build'] }), [
-    `${AT}: declares mechanics ["build"] but its steps give ["sort","build","incident","spot","tradeoff"]; fix or remove mechanics`,
+    `${AT}: declares mechanics ["build"] but its steps give ["sort","build","incident","spot","tradeoff","query"]; fix or remove mechanics`,
   ]);
   const lv = playFixture();
   lv.play.steps[0].choice.choices[0].why = () => 'x';
@@ -190,7 +190,7 @@ test('two bad steps are two errors, not one', () => {
   const lv = playFixture();
   lv.play.steps = [{ intro: 'x' }, { intro: 'y', choice: lv.play.steps[0].choice, sort: lv.play.steps[1].sort }];
   assert.deepEqual(errorsOf(lv), [
-    `${AT}: step 1 has no step type (one of choice, sort, build, incident, spot, tradeoff)`,
+    `${AT}: step 1 has no step type (one of choice, sort, build, incident, spot, tradeoff, query)`,
     `${AT}: step 2 has two step types ("choice", "sort")`,
   ]);
   assert.throws(() => build(lv), RegistryError);
@@ -215,7 +215,7 @@ test('a run level keeps play null', () => {
 
 test('the live registry passes the kit, so it builds play levels', () => {
   const reg = liveRegistry(act([playFixture()]), [FIXTURE_CARD]);
-  assert.deepEqual([...reg.levels[ID].mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff']);
+  assert.deepEqual([...reg.levels[ID].mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query']);
 });
 
 // ---- validatePlay: the author-facing messages (§5) ------------------------------
@@ -253,6 +253,25 @@ test('validatePlay names each problem as the design says', () => {
     const got = problems(edit);
     assert.ok(got.includes(want), `${want}\n  got: ${JSON.stringify(got)}`);
   }
+});
+
+test('validatePlay names each query step problem, with the step and widget id', () => {
+  const cases = [
+    [(p) => { p.steps[6].query.referense = 'x'; }, 'step 7 (query "fx-query"): unknown key "referense" on spec (did you mean "reference"?)'],
+    [(p) => { p.steps[6].query.dataset = 'nope'; }, 'step 7 (query "fx-query"): unknown dataset "nope" (one of checkout-http)'],
+    [(p) => { p.steps[6].query.reference = 'sum(('; }, 'step 7 (query "fx-query"): reference does not give data: {"kind":"syntax"'],
+    [(p) => { p.steps[6].query.given = 'sum without (route, status) (rate(http_server_requests_total[5m]))'; }, 'step 7 (query "fx-query"): given already passes, so there is nothing to do'],
+    [(p) => { delete p.steps[6].question; }, 'step 7 (query "fx-query"): needs a question'],
+    [(p) => { p.steps[6].query.id = 'fx-pick'; }, 'step 7: widget id "fx-pick" is already used by step 1'],
+  ];
+  for (const [edit, want] of cases) {
+    const got = problems(edit);
+    assert.ok(got.some((e) => e.startsWith(want)), `${want}\n  got: ${JSON.stringify(got)}`);
+  }
+});
+
+test('a query step may carry a given starting query', () => {
+  assert.deepEqual(problems((p) => { p.steps[6].query.given = 'http_server_requests_total'; }), []);
 });
 
 test('a build whose answer fails checkBuild names the issue', () => {
