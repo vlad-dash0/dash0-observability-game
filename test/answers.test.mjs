@@ -90,6 +90,18 @@ const ANSWERS = {
     'choice order-why: refuse-early',
     'choice order-batch: late',
   ],
+  'otlp-endpoints': [
+    'choice otlp-port: http-port',
+    'choice otlp-signal: as-is',
+    'configure otlp-config: extensions: headers_setter: headers: - action: insert key: Authorization value: "Bearer ${env:DASH0_TOKEN}" receivers: otlp: protocols: grpc: endpoint: 0.0.0.0:4317 http: endpoint: 0.0.0.0:4318 processors: batch: exporters: debug: otlp/dash0: endpoint: ${env:DASH0_ENDPOINT} auth: authenticator: headers_setter service: extensions: [headers_setter] pipelines: traces: receivers: [otlp] processors: [batch] exporters: [debug, otlp/dash0] metrics: receivers: [otlp] processors: [batch] exporters: [otlp/dash0]',
+    'choice otlp-token: header',
+  ],
+  'agent-vs-gateway': [
+    'choice agw-pattern: gateway',
+    'choice agw-why: same-instance',
+    'configure agw-config: receivers: otlp: protocols: grpc: endpoint: 0.0.0.0:4317 processors: memory_limiter: check_interval: 1s limit_mib: 400 batch: exporters: otlp/gateway: endpoint: gateway-collector:4317 load_balancing: routing_key: traceID protocol: otlp: tls: insecure: true resolver: dns: hostname: gateway-collector-headless service: pipelines: traces: receivers: [otlp] processors: [memory_limiter, batch] exporters: [load_balancing] metrics: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp/gateway]',
+    'choice agw-key: trace-id',
+  ],
   'play-fixture': [
     'choice fx-pick: trace',
     'sort fx-sort: server=auto loyalty=manual',

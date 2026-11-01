@@ -18,6 +18,7 @@
 //      DRIVERS['<id>'] (happy and sloppy runs) in test/levels-play.test.mjs.
 //
 // Act: { id, no, name, sub, levels: [level, ...], boss: level | null }.
+import agentVsGateway from './agent-vs-gateway.mjs';
 import autoVsManual from './auto-vs-manual.mjs';
 import baggage from './baggage.mjs';
 import cardinality from './cardinality.mjs';
@@ -31,6 +32,7 @@ import instruments from './instruments.mjs';
 import monitoringVsObservability from './monitoring-vs-observability.mjs';
 import namingYourService from './naming-your-service.mjs';
 import orderMatters from './order-matters.mjs';
+import otlpEndpoints from './otlp-endpoints.mjs';
 import pipelines from './pipelines.mjs';
 import promqlBasics from './promql-basics.mjs';
 import resources from './resources.mjs';
@@ -90,7 +92,7 @@ export const ACTS = [
     no: 5,
     name: 'The Collector',
     sub: 'The plumbing',
-    levels: [pipelines, orderMatters],
+    levels: [pipelines, orderMatters, otlpEndpoints, agentVsGateway],
     boss: null,
   },
 ];
