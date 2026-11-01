@@ -129,7 +129,7 @@ const SCENARIO = {
       id: 'replicas',
       label: 'The database needs more replicas',
       right: false,
-      why: 'The database is idle. More replicas would not shorten 40 queries that run one after another.',
+      why: 'The database is not saturated (30% CPU, replica lag near 0). More replicas would not shorten 40 queries that run one after another.',
     },
   ],
   answerAfterViews: 1,
