@@ -39,14 +39,14 @@ const rightOf = (levelId, widgetId) => choiceOf(levelId, widgetId).find((c) => c
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-5 "The Collector" holds 5.1 to 5.6 after Act 4, with no boss (its boss waits on decision #16)', () => {
+test('act-5 "The Collector" holds 5.1 to 5.6 after Act 4, and the boss "Silence"', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-5');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 5, name: 'The Collector', sub: 'The plumbing', levelIds: ['pipelines', 'order-matters', 'otlp-endpoints', 'agent-vs-gateway', 'ottl-and-transforms', 'distributions'], bossId: null },
+    { no: 5, name: 'The Collector', sub: 'The plumbing', levelIds: ['pipelines', 'order-matters', 'otlp-endpoints', 'agent-vs-gateway', 'ottl-and-transforms', 'distributions'], bossId: 'silence' },
   );
   assert.deepEqual(LIVE.acts.map((a) => a.id), ['act-0', 'act-1', 'act-2', 'act-3', 'act-4', 'act-5'], 'act-5 is the last act');
-  assert.deepEqual(LIVE.order.slice(-6), ['pipelines', 'order-matters', 'otlp-endpoints', 'agent-vs-gateway', 'ottl-and-transforms', 'distributions']);
+  assert.deepEqual(LIVE.order.slice(-7), ['pipelines', 'order-matters', 'otlp-endpoints', 'agent-vs-gateway', 'ottl-and-transforms', 'distributions', 'silence']);
 });
 
 test('act-5 unlocks like the acts before it: every earlier act complete (Act 4 included), or entered', () => {

@@ -41,6 +41,7 @@ import pipelines from './pipelines.mjs';
 import promqlBasics from './promql-basics.mjs';
 import resources from './resources.mjs';
 import redAndUse from './red-and-use.mjs';
+import silence from './silence.mjs';
 import spanKinds from './span-kinds.mjs';
 import spansAndTraces from './spans-and-traces.mjs';
 import statusAndErrors from './status-and-errors.mjs';
@@ -100,6 +101,6 @@ export const ACTS = [
     name: 'The Collector',
     sub: 'The plumbing',
     levels: [pipelines, orderMatters, otlpEndpoints, agentVsGateway, ottlAndTransforms, distributions],
-    boss: null,
+    boss: silence,
   },
 ];
