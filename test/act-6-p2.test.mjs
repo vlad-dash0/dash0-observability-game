@@ -103,8 +103,8 @@ test('6.3 per signal: costs and cap are the numbers the copy relies on', () => {
   const cost = (k, o) => spec.knobs.find((x) => x.id === k).options.find((x) => x.id === o).cost;
   assert.deepEqual([spec.unit, spec.cap], ['cost units per day', 40]);
   assert.deepEqual(
-    [cost('interval', 's10'), cost('interval', 's60'), cost('interval', 'm5'), cost('records', 'per-line'), cost('records', 'per-request'), cost('records', 'none'), cost('spans', 'all'), cost('spans', 'tail'), cost('spans', 'head')],
-    [30, 5, 1, 40, 10, 0, 50, 12, 1],
+    [cost('interval', 's10'), cost('interval', 's60'), cost('interval', 'm5'), cost('records', 'per-line'), cost('records', 'per-line-trimmed'), cost('records', 'per-request'), cost('records', 'none'), cost('spans', 'all'), cost('spans', 'tail'), cost('spans', 'head')],
+    [30, 5, 1, 40, 40, 10, 0, 50, 12, 1],
   );
   assert.equal(cost('interval', 's10') / cost('interval', 's60'), 6, 'ten seconds is six times as many points as sixty');
 });
@@ -118,6 +118,8 @@ test('6.3 per signal: exactly one plan passes (27 of 40) and each shortcut fails
   assert.deepEqual([fast.total, fast.over, fast.lost.length], [52, 12, 0], 'ten-second metrics break the cap');
   const lines = evaluatePlan(spec, { interval: 's60', records: 'per-line', spans: 'tail' });
   assert.deepEqual([lines.total, lines.over, lines.lost.length], [57, 17, 0], 'a record per line breaks the cap, though the bytes are the same');
+  const smaller = evaluatePlan(spec, { interval: 's60', records: 'per-line-trimmed', spans: 'tail' });
+  assert.deepEqual([smaller.total, smaller.over, smaller.lost.length], [57, 17, 0], 'cutting the bodies does not move a per-signal bill');
   const slow = evaluatePlan(spec, { interval: 'm5', records: 'per-request', spans: 'tail' });
   assert.deepEqual([slow.over, slow.lost], [0, ['fast-alerts']], 'five-minute metrics miss the alert');
   const none = evaluatePlan(spec, { interval: 's60', records: 'none', spans: 'tail' });
@@ -131,9 +133,29 @@ test('6.3 per signal: exactly one plan passes (27 of 40) and each shortcut fails
 test('6.3: the same lever flips between the two models (bodies cost under per GB, record count costs under per signal)', () => {
   const g = gb();
   const s = signal();
-  assert.equal(g.knobs.find((k) => k.id === 'logs').options.some((o) => /bod/.test(plain(o.label))), true, 'per GB prices the bodies');
-  assert.equal(s.knobs.find((k) => k.id === 'records').options.some((o) => /One record for each/.test(plain(o.label))), true, 'per signal prices the records');
-  assert.equal(/save[s]? what trimming bodies would not|does not/.test(plain(s.explain)), true);
+  const gbLog = (id) => g.knobs.find((k) => k.id === 'logs').options.find((o) => o.id === id);
+  const sigRec = (id) => s.knobs.find((k) => k.id === 'records').options.find((o) => o.id === id);
+  assert.equal(gbLog('trimmed').cost < gbLog('full').cost, true, 'per GB: cutting the bodies costs less');
+  assert.equal(plain(gbLog('trimmed').label), 'Every log line, with the bodies cut out');
+  assert.equal(sigRec('per-line-trimmed').cost, sigRec('per-line').cost, 'per signal: cutting the bodies costs the same');
+  assert.equal(plain(sigRec('per-line-trimmed').label), 'One record for each log line, with the bodies cut out');
+  assert.equal(sigRec('per-request').cost < sigRec('per-line').cost, true, 'per signal: fewer records cost less');
+  assert.equal(
+    plain(s.explain).includes('That reverses the last step: cutting the bodies saves nothing here, because every line is still one record, and packing a request\'s lines into one record does.'),
+    true,
+  );
+  assert.equal(plain(g.explain).includes('takes them from 80 to 30 GB with every line kept, where halving the number of lines would only take them from 80 to 40'), true);
+  assert.equal(plain(s.explain).includes('into one record does. A metric makes'), true, 'the sentences are separated by a space');
+  assert.equal(gbLog('full').cost, 80);
+  assert.equal(gbLog('trimmed').cost, 30);
+  assert.equal(plain(s.whyNot['records:per-line-trimmed']), 'Smaller records, same count: the meter counts records, so the bill did not move.');
+});
+
+test('6.3 per GB: the meter is GB sent, and retention is the separate multiplier', () => {
+  assert.equal(plain(steps[1].intro).includes('per GB sent'), true);
+  assert.equal(plain(steps[1].intro).includes('100 GB sent a day'), true);
+  assert.equal(/\bstored\b/.test(plain(steps[1].intro)), false, 'the step does not call the meter stored');
+  assert.equal(plain(gb().explain).includes('what you store is the daily volume times the days you keep it'), true);
 });
 
 test('6.3 per signal: the explain teaches the Dash0 tie-in from the cost-control docs, with no price', () => {
