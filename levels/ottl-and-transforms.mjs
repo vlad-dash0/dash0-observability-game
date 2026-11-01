@@ -5,6 +5,7 @@
 // Spec: docs/OUTLINE.md §4 Act 5.
 // Spec: https://opentelemetry.io/docs/collector/transforming-telemetry/ , https://opentelemetry.io/docs/collector/components/processor/
 // Docs (GitHub READMEs, not an allowed Spec host): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/transformprocessor/README.md , https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/attributesprocessor/README.md , https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/redactionprocessor/README.md , https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/pkg/ottl/README.md , https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/pkg/ottl/ottlfuncs/README.md
+// Docs (filter processor, the Collector-side drop checked in step 4): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/filterprocessor/README.md
 // Dash0 docs (not an allowed Spec host): https://www.dash0.com/docs/dash0/cost-control/spam-filters
 //
 // What is graded. The configure step grades the wiring through COLLECTOR_SCHEMA (docs/M1-DESIGN.md
@@ -167,6 +168,11 @@ const BACKEND = [
     why: 'The transform processor changes the data before it leaves the cluster. A Dash0 spam filter is the backend-side drop: it drops whole spans, logs or data points that match, at ingestion, so it cannot remove one attribute. The data has already left the cluster by then, a drop cannot be recovered, and filtered telemetry still carries the ingest charge. In the Collector, dropping whole telemetry is the filter processor\'s job, which drops what matches before anything is sent.',
   },
   {
+    key: 'filter-processor',
+    label: 'Add the filter processor to the Collector: it removes <code>user.email</code> from the spans and keeps the spans',
+    why: 'The filter processor is the Collector-side drop: it drops whole spans, logs or data points that match its conditions, before anything is sent. It does not edit one attribute, so the spans would be lost with the email. Changing an attribute is the transform processor\'s job.',
+  },
+  {
     key: 'spam-drop-all',
     label: 'Add a spam filter for those spans: they are dropped, so nothing about the customer is kept, and dropped data costs nothing',
     why: 'The spans have already reached Dash0, and filtered telemetry still passes through ingest and carries the ingest charge: a spam filter reduces what is stored, not what you send. It also drops the whole span, not only the email.',
@@ -199,7 +205,7 @@ export default {
       {
         intro:
           'Now the part legal cares about. Checkout puts the customer\'s email on every span as <code>user.email</code>, and it must not ' +
-          'leave the cluster. Four colleagues proposed statements for the span context of the transform processor, and some of them do not ' +
+          'leave the cluster. Eight statements were proposed for the span context of the transform processor, and some of them do not ' +
           'remove it.',
         question: 'Spot the statements that would leave the email on the exported span.',
         qid: 'ottl-q-spot',

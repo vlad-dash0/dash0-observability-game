@@ -77,7 +77,7 @@ const SORT = {
       why: 'A vendor exporter: only the contrib distribution ships it.',
       whyNot: {
         'all-three': 'The core distribution has a short exporter list (otlp, debug, file and a few more), and this is not on it.',
-        'contrib-k8s': 'The k8s distribution allows only OTLP exporters (plus nop, debug and file), so a vendor exporter is not in it.',
+        'contrib-k8s': 'The k8s distribution ships a short list of exporters (otlp, otlphttp, otelarrow, load_balancing, nop, debug and file), so a vendor exporter is not in it.',
         none: 'The contrib distribution ships it, so it is not a custom build.',
       },
     },
@@ -143,7 +143,7 @@ const SORT = {
       why: 'A vendor exporter: only the contrib distribution ships it.',
       whyNot: {
         'all-three': 'The core distribution has a short exporter list (otlp, debug, file and a few more), and this is not on it.',
-        'contrib-k8s': 'The k8s distribution allows only OTLP exporters (plus nop, debug and file), so a vendor exporter is not in it.',
+        'contrib-k8s': 'The k8s distribution ships a short list of exporters (otlp, otlphttp, otelarrow, load_balancing, nop, debug and file), so a vendor exporter is not in it.',
         none: 'The contrib distribution ships it, so it is not a custom build.',
       },
     },

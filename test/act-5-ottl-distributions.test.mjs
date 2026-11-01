@@ -32,6 +32,7 @@ const rightOf = (levelId, widgetId) => choiceOf(levelId, widgetId).find((c) => c
 const keysOf = (levelId, widgetId) => choiceOf(levelId, widgetId).map((c) => c.key).sort();
 
 const OTTL = 'ottl-and-transforms';
+const OTTL_SRC = readFileSync(new URL('../levels/ottl-and-transforms.mjs', import.meta.url), 'utf8');
 const DIST = 'distributions';
 
 // ---- levels, lights, totals ---------------------------------------------------------
@@ -271,12 +272,21 @@ test('ottl config: the statements and where the processor sits in the list are n
 
 // ---- 5.5 step 4: backend-side drop --------------------------------------------------
 
+test('ottl spot: the intro count matches the eight statements the widget shows', () => {
+  const intro = plain(LIVE.levels[OTTL].play.steps.find((st) => st.spot && st.spot.id === 'ottl-spot').intro);
+  assert.equal(intro.includes('Eight statements'), true, 'the intro says eight');
+  assert.equal(SPOT().lines.length, 8);
+});
+
 test('ottl backend: redact in the pipeline; a spam filter drops whole points at ingestion, cannot edit one attribute, is final and still charged', () => {
   const right = rightOf(OTTL, 'ottl-backend');
   assert.equal(right.key, 'pipeline');
   const text = plain(right.label + right.why);
   for (const w of ['pipeline', 'spam filter', 'whole', 'one attribute', 'ingest', 'cannot be recovered', 'charge']) assert.equal(text.includes(w), true, w);
-  assert.deepEqual(keysOf(OTTL, 'ottl-backend'), ['pipeline', 'spam-drop-all', 'spam-strip']);
+  assert.deepEqual(keysOf(OTTL, 'ottl-backend'), ['filter-processor', 'pipeline', 'spam-drop-all', 'spam-strip']);
+  const filt = plain(choiceOf(OTTL, 'ottl-backend').find((c) => c.key === 'filter-processor').why);
+  for (const w of ['filter processor', 'whole', 'drop', 'transform processor']) assert.equal(filt.includes(w), true, `filter option says "${w}"`);
+  assert.equal(OTTL_SRC.includes('filterprocessor/README.md'), true, 'the filter processor README is cited on a Docs line');
   const strip = plain(choiceOf(OTTL, 'ottl-backend').find((c) => c.key === 'spam-strip').why);
   assert.equal(/does not strip|cannot/.test(strip), true);
   const free = plain(choiceOf(OTTL, 'ottl-backend').find((c) => c.key === 'spam-drop-all').why);
@@ -345,7 +355,11 @@ test('distributions sort: k8sattributes is in contrib and k8s, not core; batch, 
   const k8s = plain(by('k8sattributes').why);
   for (const w of ['contrib', 'k8s', 'not core']) assert.equal(k8s.includes(w), true, w);
   for (const id of ['batch', 'memory-limiter', 'otlp-exporter']) assert.equal(/core/.test(plain(by(id).why)), true, id);
-  assert.equal(/Kubernetes|OTLP/.test(plain(by('awss3-exporter').whyNot['contrib-k8s'])), true, 'the k8s distribution only has OTLP exporters (plus nop, debug, file)');
+  for (const id of ['awss3-exporter', 'awsxray-exporter']) {
+    const w = plain(by(id).whyNot['contrib-k8s']);
+    assert.equal(/only OTLP|allows only/.test(w), false, `${id}: the k8s list is not only OTLP`);
+    for (const e of ['otlp', 'otlphttp', 'otelarrow', 'load_balancing', 'nop', 'debug', 'file']) assert.equal(w.includes(e), true, `${id} names ${e}`);
+  }
   assert.equal(/ocb|OCB|build/.test(plain(by('acme-scrubber').why)), true, 'a component nobody ships is built with OCB');
 });
 
