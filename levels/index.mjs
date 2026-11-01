@@ -20,6 +20,7 @@
 // Act: { id, no, name, sub, levels: [level, ...], boss: level | null }.
 import autoVsManual from './auto-vs-manual.mjs';
 import baggage from './baggage.mjs';
+import cardinality from './cardinality.mjs';
 import checkoutIsSlow from './checkout-is-slow.mjs';
 import contextPropagation from './context-propagation.mjs';
 import detectorsAndKubernetes from './detectors-and-kubernetes.mjs';
@@ -30,6 +31,7 @@ import monitoringVsObservability from './monitoring-vs-observability.mjs';
 import namingYourService from './naming-your-service.mjs';
 import promqlBasics from './promql-basics.mjs';
 import resources from './resources.mjs';
+import redAndUse from './red-and-use.mjs';
 import spanKinds from './span-kinds.mjs';
 import spansAndTraces from './spans-and-traces.mjs';
 import statusAndErrors from './status-and-errors.mjs';
@@ -68,7 +70,7 @@ export const ACTS = [
     no: 3,
     name: 'Metrics',
     sub: 'How much, how often',
-    levels: [instruments, temporality, histograms, promqlBasics],
+    levels: [instruments, temporality, histograms, promqlBasics, cardinality, redAndUse],
     boss: null,
   },
 ];

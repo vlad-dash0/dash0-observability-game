@@ -53,6 +53,21 @@ const ANSWERS = {
     'query pql-increase: checkout-http@2700 sum(increase(http_server_requests_total{route="/pay"}[10m]))',
     'choice pql-dash0: both-names',
   ],
+  cardinality: [
+    'choice cdn-combos: product',
+    'spot cdn-spot: url-path,user-id,request-id',
+    'tradeoff cdn-budget: requests=route-status served=tier customer=span-attribute',
+    'choice cdn-dash0: fix-source',
+  ],
+  'red-and-use': [
+    'choice ru-methods: red-services-use-resources',
+    'choice ru-saturation: saturation',
+    'choice ru-connector: spanmetrics',
+    'query ru-rate: checkout-spanmetrics@3600 sum by (service_name) (rate(traces_span_metrics_calls_total{span_kind="SPAN_KIND_SERVER"}[5m]))',
+    'query ru-errors: checkout-spanmetrics@3600 sum by (service_name) (rate(traces_span_metrics_calls_total{span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR"}[5m])) / sum by (service_name) (rate(traces_span_metrics_calls_total{span_kind="SPAN_KIND_SERVER"}[5m]))',
+    'query ru-duration: checkout-spanmetrics@3600 histogram_quantile(0.95, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER"}[5m])))',
+    'choice ru-dash0: derived',
+  ],
   'play-fixture': [
     'choice fx-pick: trace',
     'sort fx-sort: server=auto loyalty=manual',

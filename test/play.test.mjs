@@ -258,7 +258,7 @@ test('validatePlay names each problem as the design says', () => {
 test('validatePlay names each query step problem, with the step and widget id', () => {
   const cases = [
     [(p) => { p.steps[6].query.referense = 'x'; }, 'step 7 (query "fx-query"): unknown key "referense" on spec (did you mean "reference"?)'],
-    [(p) => { p.steps[6].query.dataset = 'nope'; }, 'step 7 (query "fx-query"): unknown dataset "nope" (one of checkout-http)'],
+    [(p) => { p.steps[6].query.dataset = 'nope'; }, 'step 7 (query "fx-query"): unknown dataset "nope" (one of checkout-http, checkout-spanmetrics)'],
     [(p) => { p.steps[6].query.reference = 'sum(('; }, 'step 7 (query "fx-query"): reference does not give data: {"kind":"syntax"'],
     [(p) => { p.steps[6].query.given = 'sum without (route, status) (rate(http_server_requests_total[5m]))'; }, 'step 7 (query "fx-query"): given already passes, so there is nothing to do'],
     [(p) => { delete p.steps[6].question; }, 'step 7 (query "fx-query"): needs a question'],

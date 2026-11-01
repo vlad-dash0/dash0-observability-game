@@ -1,4 +1,4 @@
-// Act 3 levels 3.1 Instruments, 3.2 Temporality, 3.3 Histograms and 3.4 PromQL basics beyond the generated play-through
+// Act 3 levels 3.1 Instruments, 3.2 Temporality, 3.3 Histograms, 3.4 PromQL basics, 3.5 Cardinality and 3.7 RED and USE beyond the generated play-through
 // (test/play.test.mjs, test/answers.test.mjs, test/levels-play.test.mjs): the act's place in the
 // registry, unlock and map; level fields and lights; card fronts and backs; the facts the copy
 // states (docs/OUTLINE.md §4 Act 3), each checked from the level's own data. Asserts strings,
@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { DECK } from '../cards/deck.mjs';
 import { getDataset } from '../lib/promql/datasets.mjs';
 import { evaluate } from '../lib/promql/eval.mjs';
+import { allPlans, evaluatePlan } from '../lib/widgets/trade-off.mjs';
 import { gradeQuery } from '../lib/promql/grade.mjs';
 import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
@@ -36,13 +37,13 @@ const rightOf = (levelId, widgetId) => choiceOf(levelId, widgetId).find((c) => c
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-3 "Metrics" holds 3.1 to 3.4, after Act 2, with no boss yet', () => {
+test('act-3 "Metrics" holds 3.1 to 3.5 and 3.7, after Act 2, with no boss yet', () => {
   const index = LIVE.acts.findIndex((a) => a.id === 'act-3');
   assert.equal(index, 3, 'act-3 follows act-0, act-1 and act-2');
   const act = LIVE.acts[index];
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 3, name: 'Metrics', sub: 'How much, how often', levelIds: ['instruments', 'temporality', 'histograms', 'promql-basics'], bossId: null },
+    { no: 3, name: 'Metrics', sub: 'How much, how often', levelIds: ['instruments', 'temporality', 'histograms', 'promql-basics', 'cardinality', 'red-and-use'], bossId: null },
   );
 });
 
@@ -63,7 +64,7 @@ test('act-3 unlocks like act-2 did: every earlier act complete, or entered', () 
 });
 
 test('act-3 levels are scored with no par time, and belong to act-3', () => {
-  for (const id of ['instruments', 'temporality', 'histograms', 'promql-basics']) {
+  for (const id of ['instruments', 'temporality', 'histograms', 'promql-basics', 'cardinality', 'red-and-use']) {
     const level = LIVE.levels[id];
     assert.equal(level.actId, 'act-3', id);
     assert.equal(level.kind, 'level', id);
@@ -79,6 +80,8 @@ const FIELDS = {
   temporality: { no: '3.2', name: 'Temporality', mechanics: ['spot'], cards: ['delta-needs-converting'], lights: ['notifications'] },
   histograms: { no: '3.3', name: 'Histograms', mechanics: ['query'], cards: ['averages-hide-tails'], lights: ['payment-provider'] },
   'promql-basics': { no: '3.4', name: 'PromQL basics', mechanics: ['query'], cards: ['prometheus-names'], lights: ['shipping'] },
+  cardinality: { no: '3.5', name: 'Cardinality', mechanics: ['spot', 'tradeoff'], cards: ['series-are-combinations'], lights: ['postgres'] },
+  'red-and-use': { no: '3.7', name: 'RED and USE', mechanics: ['query'], cards: ['red-and-use'], lights: ['checkout'] },
 };
 
 for (const [id, want] of Object.entries(FIELDS)) {
@@ -115,6 +118,19 @@ test('lights: 3.3 lights the payment provider and 3.4 shipping, and each lights 
   assert.deepEqual(lit(['histograms']), ['payment-provider']);
   assert.deepEqual(lit(['promql-basics']), ['shipping']);
   assert.deepEqual(lit(['instruments', 'temporality', 'histograms', 'promql-basics']), ['kafka', 'notifications', 'payment-provider', 'shipping']);
+});
+
+test('lights: 3.5 lights Postgres and 3.7 Checkout (a node 1.2 also lights), each only its own node', () => {
+  const lit = (done) => {
+    const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
+    return NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id).sort();
+  };
+  assert.deepEqual(lit(['cardinality']), ['postgres']);
+  assert.deepEqual(lit(['red-and-use']), ['checkout']);
+  assert.deepEqual(
+    lit(['instruments', 'temporality', 'histograms', 'promql-basics', 'cardinality', 'red-and-use']),
+    ['checkout', 'kafka', 'notifications', 'payment-provider', 'postgres', 'shipping'],
+  );
 });
 
 // ---- cards --------------------------------------------------------------------------
@@ -180,6 +196,39 @@ const CARDS = {
     dash0Angle:
       'Dash0 exposes each metric under both names, and the otel_metric_name label selects the original one. It also ' +
       'derives metrics from logs and spans, which you query with the same PromQL.',
+  },
+  'series-are-combinations': {
+    front:
+      'A metric has one series per attribute combination: keep user ids and raw URLs off metrics, and use http.route.',
+    back:
+      'Every unique combination of attribute values is its own time series, so the worst case is the product of the ' +
+      'number of values of each attribute: 5 methods, 14 routes and 9 status codes make at most 630 series, and adding ' +
+      'user.id with 31,402 values makes it 19,783,260. Series cost memory, storage and query time, and the Prometheus ' +
+      'guidance is not to use labels for unbounded values such as user IDs. http.route is the low-cardinality choice: ' +
+      'a route template with placeholders for the dynamic segments. An SDK that implements the specification\'s ' +
+      'cardinality limit (2,000 per metric by default) folds the combinations it had not seen yet into one overflow ' +
+      'point. Keep per-user detail on spans and logs.',
+    specUrl: 'https://opentelemetry.io/docs/specs/otel/metrics/sdk/#cardinality-limits',
+    dash0Angle:
+      'Dash0\'s Metric Explorer tree map sizes each metric by its cardinality, so you can see what drives volume. A ' +
+      'spam filter drops matching data points at ingestion, but fixing the source is the cheaper answer.',
+  },
+  'red-and-use': {
+    front:
+      'RED (rate, errors, duration) reads a service\'s requests; USE (utilisation, saturation, errors) reads a resource.',
+    back:
+      'RED is Tom Wilkie\'s checklist for each request-driven service: Rate, the requests per second; Errors, the share ' +
+      'of them that fail; Duration, how long they take, as a distribution. USE is Brendan Gregg\'s checklist for each ' +
+      'resource, such as a CPU or a disk: Utilisation, how busy it is; Saturation, how much work waits for it, often a ' +
+      'queue; Errors, the count of error events. A burst can saturate a resource while its average utilisation looks ' +
+      'low. When a service sends traces but no metrics, the Collector\'s spanmetrics connector (contrib) turns the spans ' +
+      'into a calls counter and a duration histogram: rate is the calls, errors are the calls with an error status, and ' +
+      'the metric names and the duration unit depend on the version, so check yours. Count a service\'s own requests ' +
+      'from its SERVER spans, and keep span names low-cardinality, because every distinct name is a series.',
+    specUrl: 'https://opentelemetry.io/docs/collector/components/connector/',
+    dash0Angle:
+      'Dash0 derives RED from the spans it receives (dash0.spans.red) for its Service Catalog and Service Map, so you ' +
+      'do not run a connector for them.',
   },
 };
 
@@ -480,4 +529,271 @@ test('the Act 3 level files cite the metrics spec pages their facts come from', 
     const src = read(`levels/${f}.mjs`);
     assert.equal(/\bthe spec says\b/i.test(src), false, f);
   }
+});
+
+// ---- 3.5 Cardinality ------------------------------------------------------------------
+
+// How many values each attribute takes, written out here a second time (the level computes every
+// number it shows from its own table; this one is the independent check).
+const COUNTS = { method: 5, route: 14, status: 9, tier: 3, user: 31402, path: 48211 };
+const prod = (...ks) => ks.reduce((a, k) => a * COUNTS[k], 1);
+const grouped = (n) => n.toLocaleString('en-US');
+const budget = () => stepOf('cardinality', 'tradeoff', 'cdn-budget');
+const spotOf = () => stepOf('cardinality', 'spot', 'cdn-spot');
+const cdnKeys = () => LIVE.levels.cardinality.play.steps.map((st) => ['choice', 'spot', 'tradeoff'].find((k) => st[k]));
+
+test('cardinality: the steps are choice, spot, tradeoff, choice', () => {
+  assert.deepEqual(cdnKeys(), ['choice', 'spot', 'tradeoff', 'choice']);
+});
+
+test('cardinality: series are every label combination, so the bound is the product, and a sum is the wrong answer', () => {
+  const right = rightOf('cardinality', 'cdn-combos');
+  assert.equal(right.key, 'product');
+  assert.equal(plain(right.label), `5 × 14 × 9 = ${prod('method', 'route', 'status')}`);
+  assert.equal(prod('method', 'route', 'status'), 630);
+  const sum = choiceOf('cardinality', 'cdn-combos').find((c) => c.key === 'sum');
+  assert.equal(plain(sum.label).startsWith(`5 + 14 + 9 = ${5 + 14 + 9}`), true, plain(sum.label));
+  assert.equal(plain(right.why).includes(`${grouped(prod('method', 'route', 'status', 'user'))}`), true, 'the user.id multiplication is stated, and exact');
+  assert.equal(prod('method', 'route', 'status', 'user'), 19783260);
+  assert.equal(/most|upper|worst/.test(plain(right.why)), true, 'the product is a bound, not a count');
+  const intro = plain(LIVE.levels.cardinality.play.steps[0].intro);
+  for (const w of ['5 values', '14 routes', '9 codes']) assert.equal(intro.includes(w), true, w);
+});
+
+test('cardinality: the spotted attributes are exactly the unbounded ones; the bounded ones say why they are fine', () => {
+  const spec = spotOf();
+  assert.deepEqual([...spec.faults].sort(), ['request-id', 'url-path', 'user-id']);
+  const text = (id) => spec.lines.find((l) => l.id === id).text;
+  assert.equal(/url_path="\/recommendations\/\d+"/.test(text('url-path')), true, 'a raw URL with an id in it');
+  assert.equal(text('route').includes('http_route="/recommendations/{id}"'), true, 'the template, not the URL');
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['method', 'route', 'status', 'tier']);
+  assert.equal(/low-cardinality/.test(plain(spec.whyNot.route)) && /placeholder/.test(plain(spec.whyNot.route)), true);
+  assert.equal(/_OTHER/.test(plain(spec.whyNot.method)), true);
+  assert.equal(/not what they look like/.test(plain(spec.whyNot.status)), true, 'a number-looking attribute is not the problem');
+  assert.equal(/3 tiers/.test(plain(spec.whyNot.tier)), true);
+});
+
+test('cardinality: the spot step teaches the nuance: http.route, the Prometheus guidance and the SDK overflow', () => {
+  const t = plain(spotOf().explain);
+  for (const w of ['http.route', '/recommendations/{id}', 'unbounded values such as user IDs', '2,000 per metric', 'otel.metric.overflow']) assert.equal(t.includes(w), true, w);
+});
+
+test('cardinality: every budget cost is the product of the values of the attributes kept, and the labels show that arithmetic', () => {
+  const spec = budget();
+  const cost = (knob, option) => spec.knobs.find((k) => k.id === knob).options.find((o) => o.id === option).cost;
+  const label = (knob, option) => plain(spec.knobs.find((k) => k.id === knob).options.find((o) => o.id === option).label);
+  assert.equal(cost('requests', 'none'), 1, 'a counter with no attributes is one series');
+  assert.equal(cost('requests', 'route-status'), 14 * 9);
+  assert.equal(cost('requests', 'path-status'), 48211 * 9);
+  assert.equal(cost('served', 'none'), 1);
+  assert.equal(cost('served', 'tier'), 3);
+  assert.equal(cost('served', 'user'), 31402);
+  assert.equal(cost('customer', 'span-attribute'), 0, 'a span attribute is not a metric series');
+  assert.equal(label('requests', 'route-status').endsWith('14 × 9 = 126'), true, label('requests', 'route-status'));
+  assert.equal(label('requests', 'path-status').endsWith('48,211 × 9 = 433,899'), true, label('requests', 'path-status'));
+  assert.equal(label('served', 'user').endsWith(': 31,402'), true);
+  assert.equal(433899, prod('path', 'status'), 'the arithmetic shown is the arithmetic');
+  assert.equal(spec.cap, 500);
+  assert.equal(spec.unit, 'series');
+});
+
+test('cardinality: the budget is a real trade-off with one right plan: 129 of 500 series, keeping all three needs', () => {
+  const spec = budget();
+  const plans = allPlans(spec).map((picks) => ({ picks, ...evaluatePlan(spec, picks) }));
+  const passing = plans.filter((p) => p.over === 0 && p.lost.length === 0);
+  assert.deepEqual(passing.map((p) => p.picks), [{ requests: 'route-status', served: 'tier', customer: 'span-attribute' }], 'exactly one plan passes');
+  assert.equal(passing[0].total, 126 + 3 + 0);
+  assert.equal(passing[0].total, 129);
+  const cheap = evaluatePlan(spec, { requests: 'none', served: 'none', customer: 'nothing' });
+  assert.deepEqual([cheap.total, cheap.over, cheap.lost.length], [2, 0, 3], 'the cheapest plan is far under the cap and drops all three needs');
+  const full = evaluatePlan(spec, { requests: 'path-status', served: 'tier', customer: 'span-attribute' });
+  assert.deepEqual([full.total, full.over, full.lost.length], [433899 + 3, 433899 + 3 - 500, 0], 'a raw URL keeps every need and is over the cap');
+  const user = evaluatePlan(spec, { requests: 'route-status', served: 'user', customer: 'span-attribute' });
+  assert.deepEqual([user.total, user.over > 0, user.lost], [126 + 31402, true, ['served-by-tier']], 'a user id on the metric is over the cap and still has no tier');
+  assert.equal(plans.some((p) => p.over === 0 && p.lost.length > 0), true);
+  assert.equal(plans.some((p) => p.over > 0 && p.lost.length === 0), true);
+});
+
+test('cardinality: the budget explains itself with exact figures and says spans have a cost of their own', () => {
+  const spec = budget();
+  const t = plain(spec.explain);
+  for (const w of ['129 of 500 series', '126 for the route and status counter', '3 for the tier counter', 'route template', 'Spans have their own volume and cost']) assert.equal(t.includes(w), true, w);
+  assert.equal(plain(spec.whyNot['requests:path-status']).includes('433,899 series'), true);
+  assert.equal(plain(spec.whyNot['served:user']).includes('31,402 users'), true);
+  assert.equal(/span/.test(plain(spec.whyNot['served:user'])), true, 'the user id belongs on a span');
+});
+
+test('cardinality: the Dash0 tie-in is graded: fix the source, and a spam filter drops whole points but is not free', () => {
+  const right = rightOf('cardinality', 'cdn-dash0');
+  assert.equal(right.key, 'fix-source');
+  const t = plain(right.label + right.why);
+  for (const w of ['tree map', 'instrumentation layer', 'cannot be recovered', 'ingest charge', 'not what you send', 'Collector filter processor']) assert.equal(t.includes(w), true, w);
+  const wrong = choiceOf('cardinality', 'cdn-dash0').filter((c) => !c.right);
+  assert.deepEqual(wrong.map((c) => c.key).sort(), ['leave', 'spam-attribute', 'spam-free']);
+  assert.equal(/does not strip one attribute/.test(plain(wrong.find((c) => c.key === 'spam-attribute').why)), true);
+  assert.equal(/ingest charge/.test(plain(wrong.find((c) => c.key === 'spam-free').why)), true);
+  assert.equal(/prompt to ask/.test(plain(wrong.find((c) => c.key === 'leave').why)), true);
+  const intro = plain(LIVE.levels.cardinality.play.steps[3].intro);
+  assert.equal(intro.includes('tree map') && intro.includes('spam filters'), true);
+});
+
+// ---- 3.7 RED and USE -------------------------------------------------------------------
+
+const ruQuery = (id) => queryOf('red-and-use', id);
+const SERVER_KIND = 'span_kind="SPAN_KIND_SERVER"';
+const CALLS = 'traces_span_metrics_calls_total';
+const DURATION = 'traces_span_metrics_duration_milliseconds_bucket';
+const byService = (spec, text = spec.reference) => Object.fromEntries(valueOf(spec, text).map(([l, v]) => [l.service_name ?? JSON.stringify(l), v]));
+const near = (a, b) => Math.abs(a - b) < 1e-6;
+
+test('red-and-use: the steps are choice, choice, choice, query, query, query, choice', () => {
+  assert.deepEqual(keysOf('red-and-use'), ['choice', 'choice', 'choice', 'query', 'query', 'query', 'choice']);
+});
+
+test('red-and-use: RED reads a service and USE reads a resource, and the swaps are named as swaps', () => {
+  const right = rightOf('red-and-use', 'ru-methods');
+  assert.equal(right.key, 'red-services-use-resources');
+  const t = plain(right.label);
+  for (const w of ['Rate, Errors, Duration', 'Utilisation, Saturation, Errors', 'CPU or a disk']) assert.equal(t.includes(w), true, w);
+  assert.deepEqual(choiceOf('red-and-use', 'ru-methods').filter((c) => !c.right).map((c) => c.key).sort(), ['red-everything', 'swapped']);
+  assert.equal(/microservices/.test(plain(choiceOf('red-and-use', 'ru-methods').find((c) => c.key === 'red-everything').why)), true);
+});
+
+test('red-and-use: saturation is the queue, not the utilisation, because an average hides bursts', () => {
+  const right = rightOf('red-and-use', 'ru-saturation');
+  assert.equal(right.key, 'saturation');
+  assert.equal(/run-queue length|run queue/.test(plain(right.label + right.why)), true);
+  assert.equal(/average/.test(plain(right.why)), true);
+  const util = choiceOf('red-and-use', 'ru-saturation').find((c) => c.key === 'utilisation');
+  for (const w of ['five-minute average', '100%', 'seconds at a time']) assert.equal(plain(util.why).includes(w), true, w);
+  assert.equal(/five minutes/.test(plain(LIVE.levels['red-and-use'].play.steps[1].intro)), true, 'the intro sets up the same five-minute average');
+});
+
+test('red-and-use: the spanmetrics connector is graded: calls and duration, names, unit, feature gate, and a connector is not a processor', () => {
+  const right = rightOf('red-and-use', 'ru-connector');
+  assert.equal(right.key, 'spanmetrics');
+  const t = plain(right.label + right.why);
+  for (const w of ['traces pipeline', 'metrics pipeline', 'traces.span.metrics.calls', 'traces.span.metrics.duration', 'milliseconds by default', 'connector.spanmetrics.legacyMetricNames', 'span_metrics', 'check what your version emits']) assert.equal(t.includes(w), true, w);
+  const wrong = choiceOf('red-and-use', 'ru-connector').filter((c) => !c.right);
+  assert.deepEqual(wrong.map((c) => c.key).sort(), ['errors-metric', 'processor', 'raw-url']);
+  assert.equal(/STATUS_CODE_ERROR/.test(plain(wrong.find((c) => c.key === 'errors-metric').why)) && /otel\.status_code/.test(plain(wrong.find((c) => c.key === 'errors-metric').why)), true);
+  const raw = plain(wrong.find((c) => c.key === 'raw-url').why);
+  for (const w of ['http.route', 'must not default to the URI path', 'aggregation_cardinality_limit', 'cardinality of 3.5']) assert.equal(raw.includes(w), true, w);
+});
+
+test('red-and-use: the dataset and the queries use the names the connector gives, translated as 3.4 taught', () => {
+  /** The 3.4 translation: dots to underscores, then the unit word if there is one, then _total for a monotonic sum. */
+  const promName = ({ name, unit, monotonicSum }) => {
+    const base = name.replace(/[^a-zA-Z0-9_:]/g, '_');
+    const word = { ms: 'milliseconds' }[unit];
+    const withUnit = word ? `${base}_${word}` : base;
+    return monotonicSum ? `${withUnit}_total` : withUnit;
+  };
+  const names = new Set(getDataset('checkout-spanmetrics').series.map((x) => x.labels.__name__));
+  assert.equal(names.has(promName({ name: 'traces.span.metrics.calls', monotonicSum: true })), true);
+  assert.equal(names.has(`${promName({ name: 'traces.span.metrics.duration', unit: 'ms' })}_bucket`), true);
+  assert.equal(promName({ name: 'traces.span.metrics.calls', monotonicSum: true }), CALLS);
+  const intro = plain(LIVE.levels['red-and-use'].play.steps[3].intro);
+  assert.equal(intro.includes('traces.span.metrics.calls') && intro.includes(CALLS), true);
+  assert.equal(plain(LIVE.levels['red-and-use'].play.steps[5].intro).includes(DURATION), true);
+});
+
+test('red-and-use: every query step reads a registered dataset inside its range, and its reference passes itself', () => {
+  for (const id of ['ru-rate', 'ru-errors', 'ru-duration']) {
+    const spec = ruQuery(id);
+    const data = getDataset(spec.dataset);
+    assert.equal(spec.dataset, 'checkout-spanmetrics', id);
+    assert.equal(spec.at >= data.meta.start && spec.at <= data.meta.end, true, `${id} at ${spec.at}`);
+    assert.equal(grade(spec, spec.reference).ok, true, id);
+  }
+});
+
+test('red-and-use: rate is 12 and 16 requests per second, and equivalent forms pass while counting CLIENT spans does not', () => {
+  const spec = ruQuery('ru-rate');
+  const v = byService(spec);
+  assert.deepEqual(Object.keys(v).sort(), ['cart', 'checkout']);
+  assert.equal(near(v.checkout, 12) && near(v.cart, 16), true, JSON.stringify(v));
+  assert.equal(plain(spec.explain).includes('12 requests per second and cart 16'), true);
+  assert.equal(grade(spec, `sum by (service_name) (rate(${CALLS}{span_kind!="SPAN_KIND_CLIENT"}[5m]))`).ok, true, 'not CLIENT');
+  assert.equal(grade(spec, `sum by (service_name) (rate(${CALLS}{span_kind=~"SPAN_KIND_SERVER"}[10m]))`).ok, true, 'a steady rate over 10m, with a regex');
+  assert.equal(grade(spec, `sum by (service_name) (increase(${CALLS}{${SERVER_KIND}}[5m])) / 300`).ok, true, 'increase over the window');
+  assert.equal(near(byService(spec, `sum by (service_name) (rate(${CALLS}[5m]))`).checkout, 16), true, 'without the span kind checkout reads 16');
+  assert.equal(grade(spec, `sum by (service_name) (rate(${CALLS}[5m]))`).reason, 'wrong-values');
+  assert.equal(grade(spec, `sum(rate(${CALLS}{${SERVER_KIND}}[5m]))`).reason, 'wrong-count', 'no by: one series');
+  assert.equal(grade(spec, `sum by (span_name) (rate(${CALLS}{${SERVER_KIND}}[5m]))`).reason, 'wrong-count');
+  assert.equal(grade(spec, `sum by (service_name) (${CALLS}{${SERVER_KIND}})`).reason, 'wrong-values', 'the raw counter is not a rate');
+});
+
+test('red-and-use: the error ratio is 1 in 12 and 1 in 240; a success is UNSET, so an OK filter matches nothing', () => {
+  const spec = ruQuery('ru-errors');
+  const v = byService(spec);
+  assert.equal(near(v.checkout, 1 / 12) && near(v.cart, 1 / 240), true, JSON.stringify(v));
+  assert.equal(plain(spec.explain).includes('1 request in 12, about 8.3%'), true);
+  assert.equal(plain(spec.explain).includes('1 in 240, about 0.4%'), true);
+  assert.equal(Math.round((1 / 12) * 1000) / 10, 8.3);
+  assert.equal(Math.round((1 / 240) * 1000) / 10, 0.4);
+  const E = `sum by (service_name) (rate(${CALLS}`;
+  const all = `${E}{${SERVER_KIND}}[5m]))`;
+  assert.equal(grade(spec, `${E}{${SERVER_KIND}, status_code!="STATUS_CODE_UNSET"}[5m])) / ${all}`).ok, true, 'not UNSET is the same set here');
+  assert.equal(grade(spec, `${E}{${SERVER_KIND}, status_code=~".*ERROR"}[5m])) / ${all}`).ok, true);
+  assert.equal(grade(spec, `${E}{${SERVER_KIND}, status_code="STATUS_CODE_OK"}[5m])) / ${all}`).reason, 'empty', 'no series says OK');
+  assert.equal(grade(spec, `${E}{${SERVER_KIND}, status_code="STATUS_CODE_ERROR"}[5m])) / ${E}{${SERVER_KIND}, status_code="STATUS_CODE_UNSET"}[5m]))`).reason, 'wrong-values', 'against the unset calls, not all of them');
+  assert.equal(grade(spec, `${E}{${SERVER_KIND}, status_code="STATUS_CODE_ERROR"}[5m]))`).reason, 'wrong-values', 'errors per second, not a ratio');
+  assert.equal(grade(spec, `${E}{status_code="STATUS_CODE_ERROR"}[5m])) / ${E}[5m]))`).reason, 'wrong-values', 'CLIENT spans included');
+});
+
+test('red-and-use: the p95 is 1,500 and 238 milliseconds, the p95 of 3.3 from spans, and the span kind and quantile are graded', () => {
+  const spec = ruQuery('ru-duration');
+  const v = byService(spec);
+  assert.equal(near(v.checkout, 1500) && near(v.cart, 238), true, JSON.stringify(v));
+  const h3 = valueOf(queryOf('histograms', 'hist-p95'));
+  const seconds = Object.fromEntries(h3.map(([l, x]) => [l.service, x]));
+  assert.equal(near(seconds.checkout * 1000, v.checkout), true, '3.3 found 1.5 seconds for checkout');
+  assert.equal(Math.abs(seconds.cart * 1000 - v.cart) < 1, true, '3.3 found about 0.24 seconds for cart');
+  const B = `rate(${DURATION}{${SERVER_KIND}}[5m])`;
+  assert.equal(grade(spec, `histogram_quantile(0.95, sum by (service_name, le) (rate(${DURATION}{span_kind=~"SPAN_KIND_SERVER"}[10m])))`).ok, true, 'a steady rate over 10m');
+  assert.equal(grade(spec, `histogram_quantile(0.99, sum by (service_name, le) (${B}))`).reason, 'wrong-values', 'p99 is not p95');
+  assert.equal(grade(spec, `histogram_quantile(0.95, sum by (service_name, le) (rate(${DURATION}[5m])))`).reason, 'wrong-values', 'the CLIENT span moves checkout');
+  assert.equal(grade(spec, `histogram_quantile(0.95, sum by (le) (${B}))`).reason, 'wrong-count', 'no service: one series');
+  assert.equal(grade(spec, `histogram_quantile(0.95, sum by (service_name, le) (${B})) / 1000`).reason, 'wrong-values', 'seconds are not milliseconds');
+});
+
+test('red-and-use: the Dash0 tie-in is graded: RED derived from spans, not billed as custom, bounded by operation name', () => {
+  const right = rightOf('red-and-use', 'ru-dash0');
+  assert.equal(right.key, 'derived');
+  const t = plain(right.label + right.why);
+  for (const w of ['dash0.spans.red', 'Service Catalog and Service Map', 'not billed as a custom metric', 'status code ERROR', 'GET /users/{id}', 'cardinality bounded']) assert.equal(t.includes(w), true, w);
+  const wrong = choiceOf('red-and-use', 'ru-dash0').filter((c) => !c.right);
+  assert.deepEqual(wrong.map((c) => c.key).sort(), ['connector-needed', 'service-metrics']);
+  assert.equal(/derivation itself/.test(plain(wrong.find((c) => c.key === 'connector-needed').why)), true);
+  assert.equal(/still gets rate, errors and duration/.test(plain(wrong.find((c) => c.key === 'service-metrics').why)), true);
+});
+
+test('3.5 and 3.7 cite the pages their facts come from, and the sources that are not on the spec hosts are named as sources', () => {
+  const lines = (f) => read(`levels/${f}.mjs`).split('\n');
+  const urls = (f) => lines(f).filter((l) => /^\/\/ Spec: /.test(l)).flatMap((l) => l.match(/https:\/\/[^\s,]+/g) ?? []);
+  const has = (f, prefix) => urls(f).some((u) => u.startsWith(prefix));
+  for (const prefix of [
+    'https://opentelemetry.io/docs/specs/otel/metrics/sdk/#cardinality-limits',
+    'https://opentelemetry.io/docs/specs/otel/metrics/supplementary-guidelines/',
+    'https://opentelemetry.io/docs/specs/semconv/http/http-metrics/',
+    'https://opentelemetry.io/docs/specs/semconv/http/http-spans/',
+    'https://prometheus.io/docs/practices/naming/#labels',
+    'https://prometheus.io/docs/practices/instrumentation/#do-not-overuse-labels',
+  ]) assert.equal(has('cardinality', prefix), true, prefix);
+  for (const prefix of ['https://opentelemetry.io/docs/collector/components/connector/', 'https://opentelemetry.io/docs/specs/semconv/http/http-spans/']) assert.equal(has('red-and-use', prefix), true, prefix);
+  const src = lines('red-and-use').filter((l) => /^\/\/ Source/.test(l)).join('\n');
+  for (const u of ['connector/spanmetricsconnector/README.md', 'https://www.brendangregg.com/usemethod.html', 'the-red-method-how-to-instrument-your-services']) assert.equal(src.includes(u), true, u);
+  const dash0 = (f) => lines(f).filter((l) => /^\/\/ Dash0 docs: /.test(l)).join('\n');
+  assert.equal(dash0('cardinality').includes('identify-high-cardinality-metrics') && dash0('cardinality').includes('cost-control/spam-filters'), true);
+  assert.equal(dash0('red-and-use').includes('monitoring/services/built-in-metrics'), true);
+});
+
+test('cardinality: the budget intro says what a plan costs without calling the span attribute a metric', () => {
+  const steps = LIVE.levels.cardinality.play.steps;
+  const intro = plain(steps[2].intro);
+  assert.equal(intro.includes('A plan costs the sum of the series of its metrics; a span attribute is not a metric series, so it costs 0.'), true, intro);
+  assert.equal(/three metrics/.test(intro + plain(steps[2].question)), false, 'only two of the three knobs are metrics');
+  const knobs = budget().knobs;
+  assert.deepEqual(knobs.map((k) => /<code>(?:http\.server\.requests|recommendations\.served)<\/code>/.test(k.label)), [true, true, false]);
 });

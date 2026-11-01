@@ -21,7 +21,7 @@ const one = (q, t) => {
 const PAY = 'route="/pay"';
 
 test('datasets are registered by name, deterministic and read-only', () => {
-  assert.deepEqual(datasetNames(), ['checkout-http']);
+  assert.deepEqual(datasetNames(), ['checkout-http', 'checkout-spanmetrics']);
   assert.equal(typeof DATASETS['checkout-http'], 'function');
   assert.equal(JSON.stringify(DATASETS['checkout-http']()), JSON.stringify(DATASETS['checkout-http']()));
   assert.equal(getDataset('checkout-http'), getDataset('checkout-http'));
@@ -95,4 +95,100 @@ test('the last 5 minutes show 3 ok req/s on /pay and the average latency matches
   const avg = one(`sum(rate(http_server_request_duration_seconds_sum{${PAY}}[5m])) / sum(rate(http_server_request_duration_seconds_count{${PAY}}[5m]))`, end);
   // per scrape: 0*.03 + 6*.07 + 12*.17 + 12*.4 + 18*.8 + 9*1.8 + 3*4 = 49.86 over 60
   assert.ok(approx(avg, 49.86 / 60, 1e-6), String(avg));
+});
+
+// ---- checkout-spanmetrics: what a spanmetrics connector in the Collector emits for the same traffic ----
+// Hand-computed from the generator's per-scrape table (15s): /pay 60 calls (2 failing, 15 after the
+// deploy), /quote 120, cart /add 90, cart /view 150 (1 failing), and checkout's outbound POST to the
+// payment provider (a CLIENT span) once per /pay.
+
+const S = getDataset('checkout-spanmetrics');
+const sval = (q, t = end) => {
+  const r = evaluate(S, t, q);
+  assert.equal(r.kind, 'vector', q + JSON.stringify(r));
+  return Object.fromEntries(r.series.map((x) => [labelKey(x.labels), x.value]));
+};
+const CALLS = 'traces_span_metrics_calls_total';
+const SERVER = 'span_kind="SPAN_KIND_SERVER"';
+
+test('checkout-spanmetrics: named by the connector, translated like 3.4, sorted, and counters only ever grow', () => {
+  assert.equal(S.meta.scrape, 15);
+  assert.equal(S.meta.end, 3600);
+  const names = [...new Set(S.series.map((x) => x.labels.__name__))].sort();
+  assert.deepEqual(names, [
+    'traces_span_metrics_calls_total',
+    'traces_span_metrics_duration_milliseconds_bucket',
+    'traces_span_metrics_duration_milliseconds_count',
+    'traces_span_metrics_duration_milliseconds_sum',
+  ]);
+  const keys = S.series.map((x) => labelKey(x.labels));
+  assert.deepEqual(keys, [...keys].sort());
+  assert.equal(new Set(keys).size, keys.length);
+  for (const x of S.series) {
+    assert.equal(x.samples.length, 3600 / 15 + 1);
+    assert.equal(x.samples.every((p, i) => i === 0 || p[1] >= x.samples[i - 1][1]), true, 'the connector, not the service, holds the count: a deploy is no reset');
+    assert.deepEqual(Object.keys(x.labels).filter((k) => !['__name__', 'le'].includes(k)).sort(), ['service_name', 'span_kind', 'span_name', 'status_code']);
+  }
+});
+
+test('checkout-spanmetrics: a success is UNSET, and a series exists only for a status the span has had', () => {
+  const statuses = (name) => [...new Set(S.series.filter((x) => x.labels.__name__ === CALLS && x.labels.span_name === name).map((x) => x.labels.status_code))].sort();
+  assert.deepEqual(statuses('POST /pay'), ['STATUS_CODE_ERROR', 'STATUS_CODE_UNSET']);
+  assert.deepEqual(statuses('GET /quote'), ['STATUS_CODE_UNSET'], 'never failed: no error series, and no STATUS_CODE_OK either');
+  assert.deepEqual(statuses('POST /add'), ['STATUS_CODE_UNSET']);
+  assert.deepEqual(statuses('GET /view'), ['STATUS_CODE_ERROR', 'STATUS_CODE_UNSET']);
+  assert.equal(S.series.some((x) => x.labels.status_code === 'STATUS_CODE_OK'), false);
+});
+
+test('checkout-spanmetrics: the last 5 minutes: server rate 12 and 16 req/s, and the client span adds 4 more to checkout', () => {
+  assert.ok(approx(sval(`sum by (service_name) (rate(${CALLS}{${SERVER}}[5m]))`)['service_name="checkout"'], 12));
+  assert.ok(approx(sval(`sum by (service_name) (rate(${CALLS}{${SERVER}}[5m]))`)['service_name="cart"'], 16));
+  assert.ok(approx(sval(`sum by (service_name) (rate(${CALLS}[5m]))`)['service_name="checkout"'], 16), 'unfiltered: /pay counted twice');
+  assert.ok(approx(sval(`sum(rate(${CALLS}{span_kind="SPAN_KIND_CLIENT"}[5m]))`)[''], 4));
+});
+
+test('checkout-spanmetrics: errors per second are 1 on checkout and 1/15 on cart, so the ratios are 1/12 and 1/240', () => {
+  const err = `sum by (service_name) (rate(${CALLS}{${SERVER}, status_code="STATUS_CODE_ERROR"}[5m]))`;
+  const all = `sum by (service_name) (rate(${CALLS}{${SERVER}}[5m]))`;
+  const e = sval(err);
+  assert.ok(approx(e['service_name="checkout"'], 1));
+  assert.ok(approx(e['service_name="cart"'], 1 / 15));
+  const ratio = sval(`${err} / ${all}`);
+  assert.ok(approx(ratio['service_name="checkout"'], 1 / 12));
+  assert.ok(approx(ratio['service_name="cart"'], 1 / 240));
+  assert.ok(approx(sval(`${err} / ${all}`, 2100)['service_name="checkout"'], 2 / 15 / 12), 'before the deploy: 2 of 180 per scrape');
+});
+
+test('checkout-spanmetrics: histogram count, +Inf bucket and calls agree per span and status, and the p95 per service is the one 3.3 found, in milliseconds', () => {
+  const by = (name, span, status) => S.series.filter((x) => x.labels.__name__ === name && x.labels.span_name === span && x.labels.span_kind === 'SPAN_KIND_SERVER' && x.labels.status_code === status);
+  for (const [span, status] of [['POST /pay', 'STATUS_CODE_ERROR'], ['POST /pay', 'STATUS_CODE_UNSET'], ['GET /view', 'STATUS_CODE_ERROR'], ['GET /quote', 'STATUS_CODE_UNSET']]) {
+    const [calls] = by(CALLS, span, status);
+    const [count] = by('traces_span_metrics_duration_milliseconds_count', span, status);
+    const inf = by('traces_span_metrics_duration_milliseconds_bucket', span, status).find((x) => x.labels.le === '+Inf');
+    assert.deepEqual(count.samples, calls.samples, `${span} ${status}`);
+    assert.deepEqual(inf.samples, calls.samples, `${span} ${status} +Inf`);
+  }
+  const p95 = sval(`histogram_quantile(0.95, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{${SERVER}}[5m])))`);
+  // checkout: per scrape [60,46,27,17,18,9,3] of 180, rank 171 in (1000, 2500]: 1000 + 1500 * 3/9; cart: [135,70,25,10] of 240, rank 228 in (100, 250]: 100 + 150 * 23/25
+  assert.ok(approx(p95['service_name="checkout"'], 1500, 1e-6));
+  assert.ok(approx(p95['service_name="cart"'], 238, 1e-6));
+  const unfiltered = sval(`histogram_quantile(0.95, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket[5m])))`);
+  assert.equal(Math.abs(unfiltered['service_name="checkout"'] - 1500) > 1, true, 'the client span moves checkout\'s p95');
+});
+
+const sone = (q, t = end) => {
+  const v = Object.values(sval(q, t));
+  assert.equal(v.length, 1, q);
+  return v[0];
+};
+
+test('checkout-spanmetrics: failing requests are the slowest ones: /pay errors after the deploy land 3, 9 and 3 per scrape in (500,1000], (1000,2500] and +Inf', () => {
+  const failed = (le) => sone(`sum(rate(traces_span_metrics_duration_milliseconds_bucket{span_name="POST /pay", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR", le="${le}"}[5m]))`, end);
+  assert.ok(approx(failed('500'), 0), 'none under 500ms');
+  assert.ok(approx(failed('1000'), 3 / 15));
+  assert.ok(approx(failed('2500'), 12 / 15));
+  assert.ok(approx(failed('+Inf'), 15 / 15));
+  const ok = (le) => sone(`sum(rate(traces_span_metrics_duration_milliseconds_bucket{span_name="POST /pay", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_UNSET", le="${le}"}[5m]))`, end);
+  assert.ok(approx(ok('+Inf'), 45 / 15), 'the other 45 of 60 per scrape succeeded');
+  assert.ok(approx(ok('2500'), 45 / 15), 'and none of them is above 2.5s');
 });
