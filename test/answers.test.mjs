@@ -79,7 +79,7 @@ const ANSWERS = {
     'choice sl-bridge: keep-logger',
   ],
   correlation: [
-    'spot cor-spot: checkout-startup,payments-worker,notifications-email',
+    'build cor-build: startup=none cart=00f067aa0ba902b7 other-order=b7ad6b7169203331 provider-slow=3ee05e5bb0f1ae0c retry-worker=none email=none',
     'choice cor-why: no-active-span',
     'choice cor-fix: run-in-span',
     'choice cor-dash0: resource-mode',

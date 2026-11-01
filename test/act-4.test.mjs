@@ -1,9 +1,9 @@
 // Act 4 levels 4.1 Structured logs and 4.2 Correlation beyond the generated play-through
 // (test/play.test.mjs, test/answers.test.mjs, test/levels-play.test.mjs): the act's place in the
 // registry, unlock and map; level fields and lights; card fronts and backs; the facts the copy
-// states (docs/OUTLINE.md §4 Act 4), each checked from the level's own data. Level 4.2 uses Spot
-// it and Choice, not Build it (issue #91 design note), so a log record stays a record. Asserts
-// strings, numbers and booleans only.
+// states (docs/OUTLINE.md §4 Act 4), each checked from the level's own data. Level 4.2 attaches
+// log records to spans with Build it in logs mode (issue #114), then Choice; a log record stays a
+// standalone record that carries ids. Asserts strings, numbers and booleans only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -14,7 +14,7 @@ import { expectedStarMax } from './helpers/stars.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { nodeStates } from '../lib/map.mjs';
 import { isActUnlocked, levelState, lockReason } from '../lib/unlock.mjs';
-import { checkSpot, newSpotState, toggleLine } from '../lib/widgets/spot-it.mjs';
+import { attachLog, checkBuild, newBuildState, validateBuildSpec } from '../lib/widgets/build-it.mjs';
 
 const LIVE = liveRegistry();
 const MAX_STARS = expectedStarMax(LIVE);
@@ -104,7 +104,7 @@ test('star totals count all four Act 4 entries against the derived scored-level 
 
 const FIELDS = {
   'structured-logs': { no: '4.1', name: 'Structured logs', mechanics: ['sort'], cards: ['severity-number-not-text'], lights: ['payments'] },
-  correlation: { no: '4.2', name: 'Correlation', mechanics: ['spot'], cards: ['logs-need-an-active-span'], lights: ['checkout'] },
+  correlation: { no: '4.2', name: 'Correlation', mechanics: ['build'], cards: ['logs-need-an-active-span'], lights: ['checkout'] },
 };
 
 for (const [id, want] of Object.entries(FIELDS)) {
@@ -253,54 +253,116 @@ test('structured logs: the Logs Bridge API is for appender authors; the answer i
 
 // ---- 4.2 Correlation ----------------------------------------------------------------
 
-const spot = () => stepOf('correlation', 'spot', 'cor-spot');
-const idsOnLine = (l) => {
-  const m = /trace_id=(\S*)\s+span_id=(\S*)/.exec(l.text);
-  return { trace: m[1], span: m[2] };
+const build = () => stepOf('correlation', 'build', 'cor-build');
+const BUILD_ANSWER = {
+  startup: null,
+  cart: '00f067aa0ba902b7',
+  'other-order': 'b7ad6b7169203331',
+  'provider-slow': '3ee05e5bb0f1ae0c',
+  'retry-worker': null,
+  email: null,
 };
-const linked = (l) => {
-  const { trace, span } = idsOnLine(l);
-  return /^[0-9a-f]{32}$/.test(trace) && !/^0+$/.test(trace) && /^[0-9a-f]{16}$/.test(span) && !/^0+$/.test(span);
+const SPAN = { checkout: 'b1a2c3d4e5f60718', cart: '00f067aa0ba902b7', charge: '3ee05e5bb0f1ae0c', other: 'b7ad6b7169203331' };
+// A fresh state with the reference answer applied, then `changes` on top, graded by the real grader.
+const graded = (changes = {}) => {
+  const spec = build();
+  const st = newBuildState(spec);
+  for (const [id, at] of Object.entries({ ...spec.answer, ...changes })) attachLog(spec, st, id, at);
+  return checkBuild(spec, st);
+};
+const codes = (r) => r.issues.map((i) => `${i.logId}:${i.code}`);
+// What the data says: a record belongs to the deepest span of its own service that covers its time and
+// whose order.id and thread.name, where both carry one, agree; none if there is no such span.
+const oracle = (spec, l) => {
+  const depth = (s) => (s.parentId === null ? 0 : 1 + depth(spec.spans.find((p) => p.spanId === s.parentId)));
+  const fits = spec.spans.filter(
+    (s) =>
+      s.service === l.service &&
+      l.timeMs >= s.startMs &&
+      l.timeMs <= s.endMs &&
+      ['order.id', 'thread.name'].every((k) => !(k in s.attributes && k in l.attributes) || s.attributes[k] === l.attributes[k]),
+  );
+  fits.sort((a, b) => depth(b) - depth(a));
+  return fits.length ? fits[0].spanId : null;
 };
 
-test('correlation: the spotted lines are exactly the records with no valid trace link (blank or all-zero ids)', () => {
-  assert.equal(spot().target, 'config');
-  assert.deepEqual(spot().lines.filter((l) => !linked(l)).map((l) => l.id), spot().faults);
-  const kinds = spot().faults.map((id) => {
-    const { trace } = idsOnLine(spot().lines.find((l) => l.id === id));
-    return trace === '' ? 'blank' : /^0+$/.test(trace) ? 'zero' : 'other';
-  });
-  assert.deepEqual(kinds.sort(), ['blank', 'blank', 'zero'], 'two blank records and one all-zero record');
+test('correlation: the first step is a logs-mode Build it of six records of order 8841 and its neighbour, then the three choices', () => {
+  const steps = LIVE.levels.correlation.play.steps;
+  assert.deepEqual(
+    steps.map((s) => (s.build ? `build ${s.build.id}` : `choice ${s.choice.id}`)),
+    ['build cor-build', 'choice cor-why', 'choice cor-fix', 'choice cor-dash0'],
+  );
+  assert.deepEqual(build().edit, ['logs']);
+  assert.deepEqual(build().logs.map((l) => l.id), Object.keys(BUILD_ANSWER));
+  assert.deepEqual(build().answer, BUILD_ANSWER);
+  assert.equal(typeof build().explain, 'string');
+  assert.equal(build().logs.every((l) => l.traceId === null && l.spanId === null), true, 'every record starts without span context');
+  assert.equal(build().spans.every((s) => s.parentId === null || build().spans.some((p) => p.spanId === s.parentId)), true);
+  assert.deepEqual([...LIVE.levels.correlation.mechanics], ['build']);
 });
 
-test('correlation: a trace id written in the message text does not link a record, and linked records say which trace and span they are in', () => {
-  const worker = spot().lines.find((l) => l.id === 'payments-worker');
-  assert.equal(/trace_id=\s+span_id=\s/.test(worker.text), true, 'the fields are blank');
-  assert.equal(/[0-9a-f]{32}/.test(worker.text.replace(/trace_id=\S*/, '')), true, 'but the message mentions a trace id');
-  for (const l of spot().lines.filter(linked)) {
-    assert.equal(typeof spot().whyNot[l.id], 'string', `${l.id} says why it is linked`);
+test('correlation: every record\'s answer follows from its own data (service, time, order.id, thread.name), deepest span first', () => {
+  for (const l of build().logs) assert.equal(oracle(build(), l), build().answer[l.id], l.id);
+});
+
+test('correlation: exactly three records stay unlinked, from three services, and each carries a clue in its own data', () => {
+  const spec = build();
+  const unlinked = spec.logs.filter((l) => spec.answer[l.id] === null);
+  assert.deepEqual(unlinked.map((l) => l.id), ['startup', 'retry-worker', 'email']);
+  assert.equal(new Set(unlinked.map((l) => l.service)).size >= 2, true);
+  const covering = (l) => spec.spans.filter((s) => s.service === l.service && l.timeMs >= s.startMs && l.timeMs <= s.endMs);
+  assert.deepEqual(covering(unlinked[0]).map((s) => s.name), [], 'startup runs before any request: no span covers it');
+  assert.deepEqual(covering(unlinked[2]).map((s) => s.name), [], 'no notifications span is on the board');
+  const w = unlinked[1];
+  assert.equal(covering(w).length, 1, 'the worker record falls inside a span of its own service');
+  assert.equal(covering(w)[0].attributes['thread.name'] === w.attributes['thread.name'], false, 'but another thread wrote it');
+  assert.equal(spec.logs.length - unlinked.length, 3);
+});
+
+test('correlation: the retry-worker record stays UNLINKED in the reference answer; linking it to the span it overlaps is graded wrong', () => {
+  const spec = build();
+  assert.equal(spec.answer['retry-worker'], null);
+  assert.deepEqual(graded().issues, [], 'the reference answer passes');
+  assert.deepEqual(codes(graded({ 'retry-worker': SPAN.charge })), ['retry-worker:log-no-active-span']);
+  assert.equal(graded({ 'retry-worker': SPAN.charge }).ok, false);
+  // The rule-only I7 validator cannot see this: with the trap record linked in the answer, the spec still validates.
+  assert.deepEqual(validateBuildSpec({ ...spec, answer: { ...spec.answer, 'retry-worker': SPAN.charge } }), []);
+});
+
+test('correlation: shortcuts fail the real grader: link all by service and time, link to the outer span, link the neighbour order, link a span of another service', () => {
+  const spec = build();
+  const byTime = {};
+  for (const l of spec.logs) byTime[l.id] = spec.spans.find((s) => s.service === l.service && l.timeMs >= s.startMs && l.timeMs <= s.endMs)?.spanId ?? null;
+  assert.deepEqual(codes(graded(byTime)), ['cart:log-wrong-span', 'other-order:log-wrong-trace', 'retry-worker:log-no-active-span']);
+  assert.deepEqual(codes(graded({ cart: SPAN.checkout })), ['cart:log-wrong-span'], 'the outer span is not the one the call ran in');
+  assert.deepEqual(codes(graded({ cart: SPAN.other })), ['cart:log-wrong-trace'], 'the neighbour order has the same service and time');
+  assert.deepEqual(codes(graded({ 'other-order': SPAN.checkout })), ['other-order:log-wrong-trace']);
+  assert.deepEqual(codes(graded({ email: SPAN.charge })), ['email:log-other-service']);
+  assert.deepEqual(codes(graded({ startup: SPAN.checkout })), ['startup:log-outside-span']);
+  assert.equal(graded(Object.fromEntries(spec.logs.map((l) => [l.id, null]))).ok, false, 'leaving every record unlinked fails');
+});
+
+test('correlation: the records of the two orders are told apart by order.id, and the nested span is the one the call was started in', () => {
+  const spec = build();
+  const at = (id) => spec.spans.find((s) => s.spanId === spec.answer[id]);
+  const rec = (id) => spec.logs.find((l) => l.id === id);
+  const root = (s) => (s.parentId === null ? s : root(spec.spans.find((p) => p.spanId === s.parentId)));
+  for (const id of ['cart', 'other-order']) {
+    assert.equal(root(at(id)).attributes['order.id'], rec(id).attributes['order.id'], `${id} is in the trace of its own order`);
+    const decoys = spec.spans.filter((s) => s.service === rec(id).service && s.traceId !== at(id).traceId && rec(id).timeMs >= s.startMs && rec(id).timeMs <= s.endMs);
+    assert.equal(decoys.length >= 1, true, `${id} has a same-service span of the other order covering its time`);
+    assert.equal(decoys.every((s) => s.attributes['order.id'] !== rec(id).attributes['order.id']), true);
   }
-  for (const id of spot().faults) assert.equal(Object.hasOwn(spot().whyNot, id), false, `${id} is a fault`);
+  assert.equal(at('cart').name, 'validate cart');
+  assert.equal(at('cart').parentId, SPAN.checkout, 'nested inside the request span, same service, same trace');
+  assert.equal(/current span/.test(LIVE.levels.correlation.play.steps[0].intro), true, 'the copy says the span was started as the current one');
+  assert.equal(/innermost span that was current/.test(LIVE.levels.correlation.play.steps[0].intro), true, 'innermost holds only for spans made current');
+  const fixIntro = LIVE.levels.correlation.play.steps[2].intro;
+  assert.equal(/Its record is one of the unlinked ones\./.test(fixIntro) && !/blank ones/.test(fixIntro), true, 'one worker record, not all the unlinked ones');
+  const inMessage = choiceOf('correlation', 'cor-fix').find((c) => c.key === 'in-message').why;
+  assert.equal(/record shows/.test(inMessage), false, 'no pointer at evidence the player never sees');
 });
 
-test('correlation: lines are plain text of one service each, fictional Kettle & Co, and share trace ids across services', () => {
-  const services = new Set(spot().lines.map((l) => l.text.split(/\s+/)[2]));
-  assert.equal(services.size >= 5, true, 'several services log');
-  const trace = (id) => idsOnLine(spot().lines.find((l) => l.id === id)).trace;
-  assert.equal(trace('checkout-cart'), trace('payments-retry'), 'one request, two services, one trace id');
-});
-
-test('correlation: Spot it grades the selection: exactly the three unlinked records pass, a linked record costs a mistake', () => {
-  const grade = (ids) => {
-    let st = newSpotState(spot());
-    for (const id of ids) st = toggleLine(spot(), st, id).state;
-    return checkSpot(spot(), st).outcome;
-  };
-  assert.equal(grade(spot().faults), 'right');
-  assert.equal(grade([...spot().faults, 'orders-stored']), 'wrong');
-  assert.equal(grade(spot().faults.slice(1)), 'wrong', 'missing one is wrong');
-  assert.equal(grade([]), 'empty');
-});
 
 test('correlation: why the ids are missing is graded: no active span or an unbridged logger, not a deleted id', () => {
   const right = rightOf('correlation', 'cor-why');
@@ -332,10 +394,13 @@ test('correlation: the Dash0 tie-in is bounded to what the docs say: default tra
   assert.deepEqual(wrong.map((c) => c.key).sort(), ['by-text', 'by-time']);
 });
 
-test('correlation uses no Build it: the level has no build step and no span rows for log records', () => {
+test('correlation uses Build it for its log records: one build step, in logs mode, and no span row for a record', () => {
   const steps = LIVE.levels.correlation.play.steps;
-  assert.equal(steps.some((s) => Object.hasOwn(s, 'build')), false);
-  assert.deepEqual([...LIVE.levels.correlation.mechanics], ['spot']);
+  assert.equal(steps.filter((s) => Object.hasOwn(s, 'build')).length, 1);
+  assert.equal(steps.some((s) => Object.hasOwn(s, 'spot')), false, 'the Spot it step is replaced by the Build it step');
+  const spec = build();
+  assert.equal(spec.logs.some((l) => spec.spans.some((s) => s.spanId === l.id)), false, 'a record is never a span');
+  assert.equal(spec.logs.some((l) => Object.hasOwn(l, 'parentId')), false, 'and never a child');
 });
 
 // ---- both levels --------------------------------------------------------------------
