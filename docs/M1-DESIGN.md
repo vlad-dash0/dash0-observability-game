@@ -93,6 +93,10 @@ View `lib/widgets/sort-it-view.mjs`: `renderSort(spec, state, {selected, escapeH
 labelledBy?})` (item buttons `data-item` + `aria-pressed`; bucket buttons `data-bucket`,
 disabled when tried for the selected item or nothing selected; `[data-bucket-list]` of placed
 items; `#ID-feedback`; `labelledBy`, a plain-token heading id, makes the widget a labelled group).
+Above the board every Sort it step shows one plain-text instruction, `<p class="sort-hint"
+id="ID-hint">` ("Drag each item into the right bucket, or pick an item and then a bucket."),
+the same on every step, not a live region; the item pool (`.sort-pool`) carries
+`aria-describedby="ID-hint"`.
 `mountSort(ctx, spec, {onComplete})`: tap-to-place (item then bucket; keyboard-native); drag is
 an enhancement calling the same path. Only `'wrong'` costs a mistake. Feedback: `Right. <label>
 goes in <bucket>. <why>` / `Not quite. <label> is not <bucket>. <whyNot?>` (doesn't reveal the
