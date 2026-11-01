@@ -266,6 +266,20 @@ export const DECK = [
       'spam filter drops matching data points at ingestion, but fixing the source is the cheaper answer.',
   },
   {
+    id: 'exemplars-need-sampled-spans',
+    front: 'An exemplar links one metric measurement to its trace, but only if it was recorded inside a sampled span.',
+    back:
+      'An exemplar is a recorded measurement that keeps its value, its time, the attributes the metric point does not ' +
+      'keep, and, for a synchronous instrument, the trace_id and span_id of the span that was active when it was recorded. ' +
+      'The SDK picks exemplars as measurements are recorded: a filter decides which measurements are eligible and a ' +
+      'reservoir decides which are kept. The default filter in the specification is TraceBased, which only makes ' +
+      'measurements recorded in the context of a sampled span eligible, so a measurement made outside any span, or ' +
+      'inside a span that was sampled out, cannot become one. OTEL_METRICS_EXEMPLAR_FILTER sets the filter to ' +
+      'always_on, always_off or trace_based.',
+    specUrl: 'https://opentelemetry.io/docs/specs/otel/metrics/sdk/#exemplarfilter',
+    dash0Angle: null,
+  },
+  {
     id: 'red-and-use',
     front:
       'RED (rate, errors, duration) reads a service\'s requests; USE (utilisation, saturation, errors) reads a resource.',

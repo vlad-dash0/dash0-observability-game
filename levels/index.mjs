@@ -29,6 +29,7 @@ import correlation from './correlation.mjs';
 import detectorsAndKubernetes from './detectors-and-kubernetes.mjs';
 import distributions from './distributions.mjs';
 import eventsAndLinks from './events-and-links.mjs';
+import exemplars from './exemplars.mjs';
 import histograms from './histograms.mjs';
 import instruments from './instruments.mjs';
 import monitoringVsObservability from './monitoring-vs-observability.mjs';
@@ -80,7 +81,7 @@ export const ACTS = [
     no: 3,
     name: 'Metrics',
     sub: 'How much, how often',
-    levels: [instruments, temporality, histograms, promqlBasics, cardinality, redAndUse],
+    levels: [instruments, temporality, histograms, promqlBasics, cardinality, exemplars, redAndUse],
     boss: null,
   },
   {
