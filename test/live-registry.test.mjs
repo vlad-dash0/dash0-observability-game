@@ -7,6 +7,7 @@ import { ACTS } from '../levels/index.mjs';
 import { DECK } from '../cards/deck.mjs';
 import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
+import { runPlay, validatePlay } from '../lib/play.mjs';
 
 const nodeIds = NODES.map((n) => n.id);
 
@@ -29,7 +30,7 @@ const EXPECTED_ORDER = [
 ];
 
 test('the live registry builds against the real deck and map nodes', () => {
-  const reg = buildRegistry(ACTS, { deck: DECK, nodeIds });
+  const reg = buildRegistry(ACTS, { deck: DECK, nodeIds, play: { validatePlay, runPlay } });
   assert.deepEqual(reg.order, EXPECTED_ORDER);
   assert.deepEqual(liveRegistry().order, EXPECTED_ORDER, 'app.mjs builds the same registry');
 });

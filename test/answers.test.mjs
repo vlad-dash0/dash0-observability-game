@@ -11,6 +11,11 @@ import { liveRegistry } from '../app.mjs';
 import { playFixture, FIXTURE_CARD } from './fixtures/play-level.mjs';
 
 const ANSWERS = {
+  'auto-vs-manual': [
+    'sort avm-sort: server=auto loyalty=manual redis=auto coupon=manual client=auto item-count=manual',
+    'choice avm-why: two-setups',
+    'choice avm-fix: keep-one',
+  ],
   'play-fixture': [
     'choice fx-pick: trace',
     'sort fx-sort: server=auto loyalty=manual',
