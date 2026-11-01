@@ -3,8 +3,9 @@
 // button or a level that never finishes, before it ships. Spec: docs/FOUNDATION.md
 // §6 F3 levels-play.
 //
-// TO ADD A LEVEL: add DRIVERS['<id>'] below with a happy run and a sloppy run. The
-// "every level has a driver" test fails until the driver exists.
+// TO ADD A LEVEL: for a run(ctx) level add DRIVERS['<id>'] below with a happy run and a
+// sloppy run; the "every run-level has a driver" test fails until it exists. A declarative
+// (play) level needs none: it is driven by drivers derived from its spec (derivedDriver below).
 //   play()   clicks through with q / qa and the click / clickUntil below
 //   expect   { stars, cards } that run must earn
 //   sloppy   { play(), expect } a run with mistakes or hints that earns fewer stars
@@ -17,8 +18,11 @@ import assert from 'node:assert/strict';
 import { makeDom, q, qa, click as domClick } from './helpers/dom.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
+import { runPlay, validatePlay } from '../lib/play.mjs';
 import { liveRegistry } from '../app.mjs';
+import { stepsOf } from './helpers/step-drivers.mjs';
 import fixtureLevel, { FIXTURE_CARD } from './fixtures/fixture-level.mjs';
+import { playFixture } from './fixtures/play-level.mjs';
 import * as V from './fixtures/variant-levels.mjs';
 
 const NOW = 1767225600000;
@@ -514,8 +518,9 @@ function checkLevel(level, driver) {
   assert.ok(sloppy < happy, `sloppy run (${sloppy}) must score fewer stars than happy (${happy})`);
 }
 
-test('every registered level has a driver and every driver is registered', () => {
-  assert.deepEqual(driverGaps(LIVE.order, DRIVERS), { missing: [], extra: [] });
+test('every registered run-level has a driver and every driver is registered', () => {
+  const gaps = driverGaps(LIVE.order, DRIVERS);
+  assert.deepEqual({ ...gaps, missing: gaps.missing.filter((id) => !LIVE.levels[id].play) }, { missing: [], extra: [] });
 });
 
 test('driverGaps catches a missing driver and a driver without a level', () => {
@@ -524,8 +529,42 @@ test('driverGaps catches a missing driver and a driver without a level', () => {
 });
 
 for (const id of LIVE.order) {
+  if (!DRIVERS[id] && LIVE.levels[id].play) continue; // played with a derived driver below
   test(`level "${id}" plays through (happy and sloppy)`, () => {
     checkLevel(LIVE.levels[id], DRIVERS[id]);
+  });
+}
+
+/**
+ * A driver for a play level, derived from its steps (test/helpers/step-drivers.mjs): the happy
+ * run solves every step; the sloppy run makes the first slip it can find, then solves.
+ */
+function derivedDriver(level) {
+  const steps = stepsOf(level);
+  const advance = (i) => `#${level.play.prefix ?? level.id}-${i === steps.length - 1 ? 'finish' : 'next'}`;
+  const run = (slipAt = -1) => () =>
+    steps.forEach(({ driver, spec }, i) => {
+      if (i === slipAt) for (const sel of driver.slips(spec)[0].clicks) click(sel);
+      for (const sel of driver.solve(spec)) click(sel);
+      click(advance(i));
+    });
+  const expect = (stars) => ({ stars: level.scored ? stars : 0, cards: [...level.cards] });
+  const slipAt = steps.findIndex(({ driver, spec }) => driver.slips(spec).length > 0);
+  return { play: run(), expect: expect(3), sloppy: { play: run(slipAt), expect: expect(2) } };
+}
+
+const PLAY_LEVELS = [
+  ...Object.values(LIVE.levels).filter((l) => l.play && !DRIVERS[l.id]),
+  ...Object.values(
+    buildRegistry([{ id: 'play-act', no: 0, levels: [playFixture()], boss: null }], {
+      deck: [FIXTURE_CARD], nodeIds: [], play: { validatePlay, runPlay },
+    }).levels,
+  ),
+];
+
+for (const level of PLAY_LEVELS) {
+  test(`play level "${level.id}" plays through (derived driver, happy and sloppy)`, () => {
+    checkLevel(level, derivedDriver(level));
   });
 }
 

@@ -14,6 +14,7 @@ import { shuffle as kitShuffle } from './lib/lesson-kit.mjs';
 import { createLevelContext } from './lib/level-context.mjs';
 import { nodeStates, renderMap } from './lib/map.mjs';
 import { cardTotals, mergeProgress, recordCompletion, registryIds, starTotals } from './lib/progress.mjs';
+import { runPlay, validatePlay } from './lib/play.mjs';
 import { buildRegistry } from './lib/registry.mjs';
 import { loadProgress, saveProgress, STORAGE_KEY } from './lib/storage.mjs';
 import { readTheme, writeTheme } from './lib/theme.mjs';
@@ -24,7 +25,7 @@ import { levelState, lockReason } from './lib/unlock.mjs';
  * `acts` / `deck` default to the real ones; tests pass fixtures through the same checks.
  */
 export function liveRegistry(acts = ACTS, deck = DECK) {
-  return buildRegistry(acts, { deck, nodeIds: NODES.map((n) => n.id) });
+  return buildRegistry(acts, { deck, nodeIds: NODES.map((n) => n.id), play: { validatePlay, runPlay } });
 }
 
 // Player-facing text for every non-null game.notice (§4 Absence).
