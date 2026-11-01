@@ -130,9 +130,8 @@ const CARDS = {
       'parent. For a span with a parent it follows the parent\'s sampled flag, which travels in the W3C traceparent header: by ' +
       'default a sampled parent means sampled and an unsampled parent means dropped. A child that ignores the flag, such as one ' +
       'set to always_on, exports spans of traces whose root was dropped, and the backend shows traces with holes. ' +
-      'TraceIdRatioBased ignores the parent\'s flag by design and decides again from the trace ID. Its exact algorithm was ' +
-      'never specified and SDKs or versions may disagree, so the spec recommends it only for root spans, in combination with ' +
-      'ParentBased. If you set nothing, the default sampler is parentbased_always_on. Head sampling never sees the whole trace, ' +
+      'TraceIdRatioBased ignores the parent\'s flag by design, so the spec recommends it only for root spans, in combination ' +
+      'with ParentBased. If you set nothing, the default sampler is parentbased_always_on. Head sampling never sees the whole trace, ' +
       'so it cannot promise to keep the errors: that is what tail sampling is for.',
     specUrl: 'https://opentelemetry.io/docs/specs/otel/trace/sdk/#parentbased',
     dash0Angle: null,
@@ -158,6 +157,9 @@ test('6.1 and 6.2 cards: front, back, spec URL and Dash0 angle are pinned; front
     assert.deepEqual(DECK.find((c) => c.id === id), { id, ...want });
     assert.equal(want.front.length <= 140, true, `${id} front is ${want.front.length} characters`);
   }
+  const back = DECK.find((c) => c.id === 'parent-based-sampling').back;
+  assert.equal(/never specified|disagree|inconsistent/.test(back), false, 'the card teaches ParentBased, not a one-sided SDK-disagreement claim');
+  assert.equal(back.includes('ignores the parent\'s flag by design') && back.includes('only for root spans'), true);
   assert.equal(DECK.some((c) => c.id === 'tail-sampling-needs-one-collector'), true, 'the existing sampling card stays');
 });
 

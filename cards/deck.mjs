@@ -451,9 +451,8 @@ export const DECK = [
       'parent. For a span with a parent it follows the parent\'s sampled flag, which travels in the W3C traceparent header: by ' +
       'default a sampled parent means sampled and an unsampled parent means dropped. A child that ignores the flag, such as one ' +
       'set to always_on, exports spans of traces whose root was dropped, and the backend shows traces with holes. ' +
-      'TraceIdRatioBased ignores the parent\'s flag by design and decides again from the trace ID. Its exact algorithm was ' +
-      'never specified and SDKs or versions may disagree, so the spec recommends it only for root spans, in combination with ' +
-      'ParentBased. If you set nothing, the default sampler is parentbased_always_on. Head sampling never sees the whole trace, ' +
+      'TraceIdRatioBased ignores the parent\'s flag by design, so the spec recommends it only for root spans, in combination ' +
+      'with ParentBased. If you set nothing, the default sampler is parentbased_always_on. Head sampling never sees the whole trace, ' +
       'so it cannot promise to keep the errors: that is what tail sampling is for.',
     specUrl: 'https://opentelemetry.io/docs/specs/otel/trace/sdk/#parentbased',
     dash0Angle: null,

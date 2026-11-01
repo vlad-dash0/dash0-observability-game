@@ -8,10 +8,11 @@
 // Facts used (each read on the page above): OTEL_TRACES_SAMPLER defaults to parentbased_always_on; parentbased_traceidratio is
 // ParentBased(root=TraceIdRatioBased) and OTEL_TRACES_SAMPLER_ARG is its ratio, a number in [0..1]. ParentBased calls its root
 // sampler only for a span with no parent; with a parent it uses the parent's sampled flag (defaults: sampled gives AlwaysOn, not
-// sampled gives AlwaysOff). TraceIdRatioBased MUST ignore the parent's sampled flag and its decision MUST be a deterministic hash
-// of the trace ID, but the spec's own warning says the exact algorithm was never specified, the sampler is not defined to be
-// compatible with any other SDK, and different SDKs or versions may give inconsistent results for the same input, so it is
-// recommended only for root spans in combination with ParentBased. The spec also marks TraceIdRatioBased as deprecated in favour of
+// sampled gives AlwaysOff). TraceIdRatioBased MUST ignore the parent's sampled flag. Both halves of what the spec says about its
+// decision: the Stable text says it MUST be a deterministic hash of the trace ID, so a given trace ID is sampled or not
+// independent of language and time; a Development warning says the exact algorithm was never specified and different SDKs or
+// versions may differ. The spec recommends it only for root spans, in combination with ParentBased; this level does not
+// teach the disagreement and makes no claim either way. The spec also marks TraceIdRatioBased as deprecated in favour of
 // the ProbabilitySampler (Development), which this level does not teach. The sampled flag travels in the W3C traceparent header.
 // Head sampling decides without looking at the whole trace, so it cannot ensure that traces with an error are kept (the sampling concepts page).
 //
