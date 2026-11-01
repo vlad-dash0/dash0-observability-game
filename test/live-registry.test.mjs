@@ -12,7 +12,7 @@ import { runPlay, validatePlay } from '../lib/play.mjs';
 const nodeIds = NODES.map((n) => n.id);
 
 // Extended on purpose with each level PR (docs/M1-DESIGN.md §5): Act 0 (P3) plays before Act 1;
-// its boss, the pager (P4), comes after its levels; Act 2 (P6: 2.1, 2.2) plays after Act 1; its boss, checkout-is-slow (P11), comes last; Act 3 (M3 P1: 3.1, 3.2) plays after Act 2.
+// its boss, the pager (P4), comes after its levels; Act 2 (P6: 2.1, 2.2) plays after Act 1; its boss, checkout-is-slow (P11), comes last; Act 3 (M3 P1: 3.1, 3.2; M3 P2: 3.3, 3.4) plays after Act 2.
 const EXPECTED_ORDER = [
   'monitoring-vs-observability',
   'the-signals',
@@ -29,6 +29,8 @@ const EXPECTED_ORDER = [
   'checkout-is-slow',
   'instruments',
   'temporality',
+  'histograms',
+  'promql-basics',
 ];
 
 test('the live registry builds against the real deck and map nodes', () => {
@@ -69,7 +71,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
       no: 3,
       name: 'Metrics',
       sub: 'How much, how often',
-      levelIds: ['instruments', 'temporality'],
+      levelIds: ['instruments', 'temporality', 'histograms', 'promql-basics'],
       bossId: null,
     },
   ]);

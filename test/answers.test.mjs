@@ -27,6 +27,20 @@ const ANSWERS = {
     'choice temp-restart: reset',
     'choice temp-dash0: both',
   ],
+  histograms: [
+    'choice hist-kind: exponential',
+    'query hist-avg: checkout-http@3600 sum(rate(http_server_request_duration_seconds_sum{route="/pay"}[5m])) / sum(rate(http_server_request_duration_seconds_count{route="/pay"}[5m]))',
+    'query hist-p99: checkout-http@3600 histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{route="/pay"}[5m])))',
+    'choice hist-buckets: top-bucket',
+    'query hist-p95: checkout-http@3600 histogram_quantile(0.95, sum by (service, le) (rate(http_server_request_duration_seconds_bucket[5m])))',
+  ],
+  'promql-basics': [
+    'choice pql-unit: seconds-bucket',
+    'choice pql-total: total',
+    'query pql-rate: checkout-http@3600 sum by (route) (rate(http_server_requests_total{service="checkout", status="500"}[5m]))',
+    'query pql-increase: checkout-http@2700 sum(increase(http_server_requests_total{route="/pay"}[10m]))',
+    'choice pql-dash0: both-names',
+  ],
   'play-fixture': [
     'choice fx-pick: trace',
     'sort fx-sort: server=auto loyalty=manual',

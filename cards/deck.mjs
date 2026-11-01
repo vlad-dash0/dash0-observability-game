@@ -182,4 +182,38 @@ export const DECK = [
       'Dash0 accepts both temporalities and you query metrics with PromQL, so the conversion is for Prometheus-style ' +
       'backends, not for Dash0.',
   },
+  {
+    id: 'averages-hide-tails',
+    front:
+      'An average hides the slow tail: read p95 and p99 from histogram buckets, and make sure the buckets reach your slowest requests.',
+    back:
+      'A histogram counts observations into buckets and keeps a count and a sum, so sum over count is the mean, and a few ' +
+      'very slow requests barely move it. A percentile needs the buckets: histogram_quantile estimates it from the rate of ' +
+      'the _bucket series, summed by le, and the estimate is only as good as the bucket boundaries. A quantile that falls ' +
+      'in the +Inf bucket is reported as the highest finite bound. The SDK default boundaries (0 to 10000) suit large ' +
+      'values, not durations in seconds, but for http.server.request.duration the semantic conventions advise boundaries ' +
+      'from 0.005 to 10 seconds, which the SDK uses; set your own for other durations. An explicit bucket histogram uses boundaries you choose. An exponential histogram ' +
+      'derives them from a scale, so one histogram covers a wide range with small relative error, but not every backend ' +
+      'accepts it: the Prometheus text formats drop it or convert it to fixed buckets.',
+    specUrl: 'https://opentelemetry.io/docs/specs/otel/metrics/data-model/#exponentialhistogram',
+    dash0Angle:
+      'Dash0 speaks PromQL, so histogram_quantile over the rate of the _bucket series gives you the percentile, ' +
+      'as it would in Prometheus.',
+  },
+  {
+    id: 'prometheus-names',
+    front:
+      'OpenTelemetry names change for PromQL: dots become underscores, a unit word is added, and monotonic sums get _total.',
+    back:
+      'With the classic translation, http.server.request.duration with the unit s is queried as ' +
+      'http_server_request_duration_seconds, and its histogram series are _bucket, _sum and _count. A monotonic sum such as ' +
+      'http.server.requests becomes a counter, http_server_requests_total, and a unit in braces such as {request} is dropped. ' +
+      'Use rate() for a per-second figure and increase() for growth over a window; both adjust for counter resets. ' +
+      'Prometheus can also keep UTF-8 names, and a backend may be configured to skip the suffixes, so check what yours does.',
+    specUrl:
+      'https://opentelemetry.io/docs/specs/otel/compatibility/prometheus_and_openmetrics/#otlp-metric-points-to-prometheus',
+    dash0Angle:
+      'Dash0 exposes each metric under both names, and the otel_metric_name label selects the original one. It also ' +
+      'derives metrics from logs and spans, which you query with the same PromQL.',
+  },
 ];

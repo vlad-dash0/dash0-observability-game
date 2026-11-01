@@ -23,9 +23,11 @@ import baggage from './baggage.mjs';
 import checkoutIsSlow from './checkout-is-slow.mjs';
 import contextPropagation from './context-propagation.mjs';
 import eventsAndLinks from './events-and-links.mjs';
+import histograms from './histograms.mjs';
 import instruments from './instruments.mjs';
 import monitoringVsObservability from './monitoring-vs-observability.mjs';
 import namingYourService from './naming-your-service.mjs';
+import promqlBasics from './promql-basics.mjs';
 import spanKinds from './span-kinds.mjs';
 import spansAndTraces from './spans-and-traces.mjs';
 import statusAndErrors from './status-and-errors.mjs';
@@ -64,7 +66,7 @@ export const ACTS = [
     no: 3,
     name: 'Metrics',
     sub: 'How much, how often',
-    levels: [instruments, temporality],
+    levels: [instruments, temporality, histograms, promqlBasics],
     boss: null,
   },
 ];
