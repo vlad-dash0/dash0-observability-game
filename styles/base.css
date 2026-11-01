@@ -243,6 +243,23 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .build-issues { margin: 8px 0 0 18px; }
 .build-issues li { max-width: 100%; overflow-wrap: anywhere; }
 
+/* Build it, logs mode. A record is a debug-style line in the stream under the waterfall. The
+   tick (an attached record, on its span row) and the dashed cursor (the selected record's
+   time) are SVG lines: positions are attributes, and non-scaling-stroke keeps their width
+   under preserveAspectRatio="none". The pressed record gets a thicker text-coloured border,
+   not colour alone. Colours are existing tokens, so both themes follow. */
+.build-logs { list-style: none; display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; }
+.build-log {
+  width: 100%; text-align: left; border: 1.5px solid var(--color-border); background: var(--color-surface);
+  color: var(--color-text); border-radius: var(--radius-sm); padding: 8px 11.5px; font-family: var(--font-mono);
+  font-size: 13px; font-weight: 500; cursor: pointer; max-width: 100%; overflow-wrap: anywhere;
+}
+.build-log:hover { border-color: var(--color-accent); }
+.build-log[aria-pressed="true"] { border: 3px solid var(--color-text); background: var(--color-surface-2); padding: 6.5px 10px; }
+.build-attrs { list-style: none; margin: 8px 0 0; padding: 0; font-family: var(--font-mono); font-size: 13px; overflow-wrap: anywhere; }
+.wf-log { stroke: var(--color-text); stroke-width: 3px; vector-effect: non-scaling-stroke; }
+.wf-cursor { stroke: var(--color-accent); stroke-width: 1.5px; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+
 /* ---------- Config editor (level 1.2) ---------- */
 .env-label { display: block; font-weight: 700; font-size: 14px; margin-bottom: 6px; }
 .env-editor {

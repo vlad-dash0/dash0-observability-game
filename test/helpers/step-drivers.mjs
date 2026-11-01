@@ -8,6 +8,7 @@
 //   answerKey(spec) -> string   the spec's answer as one line, for test/answers.test.mjs
 // Adding a step type to lib/play.mjs means adding its driver here (test/play.test.mjs checks).
 import { STEP_TYPES } from '../../lib/play.mjs';
+import { isLogMode } from '../../lib/widgets/build-it.mjs';
 import { waterfall } from '../../lib/widgets/trace.mjs';
 import { allPlans, evaluatePlan } from '../../lib/widgets/trade-off.mjs';
 
@@ -36,7 +37,33 @@ const sort = {
 
 const FIELDS = [['parentId', 'parent', 'parent'], ['kind', 'kind', 'kind'], ['status', 'status', 'status']];
 
-const build = {
+// Logs mode: every record is set explicitly (select it, then its span or "No span context"),
+// so no step depends on the given state.
+const attachClicks = (id, spanId) => [`[data-log="${id}"]`, `[data-attach="${spanId ?? 'none'}"]`];
+
+const buildLogs = {
+  solve: (s) => [...s.logs.flatMap((l) => attachClicks(l.id, s.answer[l.id])), `#${s.id}-check`],
+  slips(s) {
+    // `orphan`: every record right except the first one that has a span, which is left without
+    // span context. Later clicks of solve() overwrite every record, so the slip leaves no trace.
+    const first = s.logs.find((l) => s.answer[l.id] !== null);
+    return [
+      { name: 'check', clicks: [`#${s.id}-check`], says: /^Not yet:/ },
+      ...(first === undefined
+        ? []
+        : [{
+            name: 'orphan',
+            clicks: [...s.logs.flatMap((l) => attachClicks(l.id, l === first ? null : s.answer[l.id])), `#${s.id}-check`],
+            says: /^Not yet: 1 problem\./,
+          }]),
+      ...(s.hint === undefined ? [] : [{ name: 'hint', clicks: [`#${s.id}-hint`], says: /\S/, at: `#${s.id}-hint-text` }]),
+    ];
+  },
+  first: (s) => `log:${s.logs[0].id}`,
+  answerKey: (s) => `build ${s.id}: ${s.logs.map((l) => `${l.id}=${s.answer[l.id] ?? 'none'}`).join(' ')}`,
+};
+
+const buildSpans = {
   solve(s) {
     const span = (id) => `[data-span="${id}"]`;
     const set = (id, attr, value) => [span(id), `[data-${attr}="${value}"]`];
@@ -69,6 +96,13 @@ const build = {
         ...(own(w, 'links') ? [`${id}.links=${[...w.links].sort().join('+') || 'none'}`] : []),
       ])
       .join(' ')}`,
+};
+
+const build = {
+  solve: (s) => (isLogMode(s) ? buildLogs : buildSpans).solve(s),
+  slips: (s) => (isLogMode(s) ? buildLogs : buildSpans).slips(s),
+  first: (s) => (isLogMode(s) ? buildLogs : buildSpans).first(s),
+  answerKey: (s) => (isLogMode(s) ? buildLogs : buildSpans).answerKey(s),
 };
 
 const clues = (s) => s.views.filter((v) => v.kind === 'clue').slice(0, s.answerAfterViews).map((v) => v.id);

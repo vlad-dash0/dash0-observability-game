@@ -145,6 +145,7 @@ const ANSWERS = {
     'tradeoff fx-budget: sampling=tail attrs=tier',
     'query fx-query: checkout-http@3000 sum by (service) (rate(http_server_requests_total[5m]))',
     'configure fx-config: receivers: otlp: processors: batch: exporters: otlp/dash0: service: pipelines: traces: receivers: [otlp] processors: [batch] exporters: [otlp/dash0]',
+    'build fx-logs: l-boot=none l-cart=aaaaaaaaaaaaaaa2 l-other=ccccccccccccccc4 l-charge=ddddddddddddddd3 l-worker=none',
   ],
 };
 

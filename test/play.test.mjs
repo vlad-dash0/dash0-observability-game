@@ -373,12 +373,14 @@ test('validatePlay names a configure step uses problem, and a step may leave use
   assert.deepEqual(problems((p) => { delete p.steps[7].configure.uses; }), []);
 });
 
-// logs mode (#113, phase A): the core exists, the view does not
+// logs mode (#113): the core (phase A) and the view (phase B) exist; the fixture's step 9 is a logs step
 
-test('P1 a logs-mode build step is refused in levels until the view exists', () => {
+test('P1 a logs-mode build step is accepted in levels; mixing it with span fields is still refused', () => {
   const got = problems((p) => { p.steps.push({ intro: 'Attach the logs.', build: logsSpec() }); });
-  assert.deepEqual(got, ['step 9 (build "l1"): edit: logs is not available in levels yet']);
-  assert.deepEqual(problems((p) => { p.steps.push({ intro: 'Attach the logs.', build: { ...logsSpec(), edit: ['logs', 'parent'] } }); }).filter((e) => e.includes('not available in levels yet')).length, 1);
+  assert.deepEqual(got, []);
+  const mixed = problems((p) => { p.steps.push({ intro: 'Attach the logs.', build: { ...logsSpec(), edit: ['logs', 'parent'] } }); });
+  assert.equal(mixed.filter((e) => e.includes('logs is its own mode')).length, 1);
+  assert.equal(mixed.some((e) => e.includes('not available in levels yet')), false);
 });
 
 test('P2 logs-mode keys are checked: a typo on the spec or a record is named', () => {
@@ -390,7 +392,7 @@ test('P2 logs-mode keys are checked: a typo on the spec or a record is named', (
   ];
   for (const [edit, tail] of cases) {
     const got = problems((p) => { const b = logsSpec(); edit(b); p.steps.push({ intro: 'x', build: b }); });
-    const want = `step 9 (build "l1"): ${tail}`;
+    const want = `step 10 (build "l1"): ${tail}`;
     assert.ok(got.includes(want), `${want}\n  got: ${JSON.stringify(got)}`);
   }
 });
