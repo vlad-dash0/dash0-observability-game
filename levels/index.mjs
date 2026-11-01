@@ -30,6 +30,7 @@ import detectorsAndKubernetes from './detectors-and-kubernetes.mjs';
 import distributions from './distributions.mjs';
 import eventsAndLinks from './events-and-links.mjs';
 import exemplars from './exemplars.mjs';
+import headSampling from './head-sampling.mjs';
 import histograms from './histograms.mjs';
 import instruments from './instruments.mjs';
 import monitoringVsObservability from './monitoring-vs-observability.mjs';
@@ -46,6 +47,7 @@ import spanKinds from './span-kinds.mjs';
 import spansAndTraces from './spans-and-traces.mjs';
 import statusAndErrors from './status-and-errors.mjs';
 import structuredLogs from './structured-logs.mjs';
+import tailSampling from './tail-sampling.mjs';
 import temporality from './temporality.mjs';
 import the3amErrors from './the-3am-errors.mjs';
 import theBill from './the-bill.mjs';
@@ -102,5 +104,13 @@ export const ACTS = [
     sub: 'The plumbing',
     levels: [pipelines, orderMatters, otlpEndpoints, agentVsGateway, ottlAndTransforms, distributions],
     boss: silence,
+  },
+  {
+    id: 'act-6',
+    no: 6,
+    name: 'Sampling and cost',
+    sub: 'You can\'t keep everything',
+    levels: [headSampling, tailSampling],
+    boss: null,
   },
 ];

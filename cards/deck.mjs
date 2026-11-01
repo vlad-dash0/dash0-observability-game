@@ -441,4 +441,36 @@ export const DECK = [
     specUrl: 'https://opentelemetry.io/docs/collector/distributions/',
     dash0Angle: null,
   },
+  {
+    id: 'parent-based-sampling',
+    front:
+      'Head sampling decides once, at the root. Child services must follow the parent\'s sampled flag, or traces come out with holes.',
+    back:
+      'Head sampling decides before the trace is complete, at its root span: OTEL_TRACES_SAMPLER=parentbased_traceidratio with ' +
+      'OTEL_TRACES_SAMPLER_ARG=0.1 keeps about one trace in ten. ParentBased uses its root sampler only for a span with no ' +
+      'parent. For a span with a parent it follows the parent\'s sampled flag, which travels in the W3C traceparent header: by ' +
+      'default a sampled parent means sampled and an unsampled parent means dropped. A child that ignores the flag, such as one ' +
+      'set to always_on, exports spans of traces whose root was dropped, and the backend shows traces with holes. ' +
+      'TraceIdRatioBased ignores the parent\'s flag by design and decides again from the trace ID. Its exact algorithm was ' +
+      'never specified and SDKs or versions may disagree, so the spec recommends it only for root spans, in combination with ' +
+      'ParentBased. If you set nothing, the default sampler is parentbased_always_on. Head sampling never sees the whole trace, ' +
+      'so it cannot promise to keep the errors: that is what tail sampling is for.',
+    specUrl: 'https://opentelemetry.io/docs/specs/otel/trace/sdk/#parentbased',
+    dash0Angle: null,
+  },
+  {
+    id: 'spanmetrics-before-sampling',
+    front:
+      'Compute span metrics before sampling: a connector fed from a tail_sampling pipeline counts only the traces that were kept.',
+    back:
+      'The span_metrics connector counts the spans it receives, for each set of dimensions, into calls and duration metrics. ' +
+      'A connector is an exporter at the end of one pipeline and a receiver at the start of another, so it receives what leaves ' +
+      'the processors of the traces pipeline that lists it. List it in a pipeline that has tail_sampling and it sees only the ' +
+      'kept traces: the request rate comes out too low, and when the policies keep every error the error ratio comes out too ' +
+      'high. Give the connector a traces pipeline of its own with no sampling processor, and let the sampled pipeline feed the ' +
+      'backend. A receiver can be listed in more than one pipeline, so both pipelines can read the same one. The component was ' +
+      'renamed from spanmetrics to span_metrics, and the old name still works but is deprecated.',
+    specUrl: 'https://opentelemetry.io/docs/collector/configuration/#connectors',
+    dash0Angle: null,
+  },
 ];

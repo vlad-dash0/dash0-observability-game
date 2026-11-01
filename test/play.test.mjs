@@ -133,7 +133,7 @@ for (const level of LEVELS) {
     assert.equal(playAll(level).calls[0].result.stars, stars(level));
     const second = start(level);
     assert.equal(second.focus.names()[0], steps[0].driver.first(steps[0].spec));
-    assert.equal(qa('[data-finish]').length, 0, 'starts on a step that is not the last');
+    assert.equal(qa('[data-finish]').length, steps.length === 1 ? 1 : 0, steps.length === 1 ? 'a one-step level starts on its last step' : 'starts on a step that is not the last');
     assert.equal(playAll(level, () => {}, second).calls[0].result.stars, stars(level));
     ran += 1;
   });
