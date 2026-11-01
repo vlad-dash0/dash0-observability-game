@@ -127,7 +127,7 @@ const ANSWERS = {
   ],
   'tail-sampling': [
     'tradeoff ts-budget: policies=errors-slow-baseline wait=wait-30s',
-    'spot ts-spot: traces,traces-checkout',
+    'spot ts-spot: traces',
   ],
   'who-is-talking': [
     'incident who-is-talking: alert-resource,deploy-history > name-dropped',

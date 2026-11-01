@@ -343,21 +343,16 @@ const spotRun = (ids) => {
   return { outcome: r.outcome, extra: r.extra, missing: r.missing };
 };
 
-test('spot: the lines are valid, six pipelines, and exactly the two that feed span_metrics after tail_sampling are the faults', () => {
+test('spot: the lines are valid, five of them, and exactly one, the traces pipeline that feeds span_metrics after tail_sampling, is the fault', () => {
   const spec = spot();
   assert.deepEqual(validateSpotSpec(spec), []);
   assert.equal(spec.target, 'config');
-  assert.equal(spec.lines.length, 6);
-  const text = (id) => spec.lines.find((l) => l.id === id).text;
+  assert.deepEqual(spec.lines.map((l) => l.id), ['traces', 'metrics-spans', 'logs', 'connector-def', 'sampler-def']);
   const rule = (l) => /processors: \[[^\]]*tail_sampling[^\]]*\]/.test(l.text) && /exporters: \[[^\]]*span_metrics[^\]]*\]/.test(l.text);
-  assert.deepEqual(spec.lines.filter(rule).map((l) => l.id).sort(), [...spec.faults].sort(), 'the faults are exactly the lines that match the rule');
-  assert.deepEqual([...spec.faults].sort(), ['traces', 'traces-checkout']);
-  assert.equal(text('traces-metrics').includes('processors: [memory_limiter] exporters: [span_metrics/all]'), true, 'the connector fed with nothing in between');
-  assert.equal(text('metrics-spans').startsWith('metrics/spans: receivers: [span_metrics/web, span_metrics/checkout, span_metrics/audit, span_metrics/all]'), true, 'the receiving end of every connector');
-  // A connector that is the exporter of several pipelines counts all of them together, so each traces pipeline names its own.
-  const connectors = spec.lines.flatMap((l) => (/^traces/.test(l.text) ? l.text.match(/span_metrics\/[a-z]+/g) ?? [] : []));
-  assert.deepEqual(connectors.sort(), ['span_metrics/all', 'span_metrics/audit', 'span_metrics/checkout', 'span_metrics/web']);
-  assert.equal(new Set(connectors).size, connectors.length, 'no connector is fed by two pipelines');
+  assert.deepEqual(spec.lines.filter(rule).map((l) => l.id), ['traces'], 'the one line that matches the rule');
+  assert.deepEqual([...spec.faults], ['traces']);
+  assert.equal(spec.lines[0].text, 'traces: receivers: [otlp] processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0, span_metrics]');
+  assert.equal(spec.lines.find((l) => l.id === 'metrics-spans').text, 'metrics/spans: receivers: [span_metrics] processors: [batch] exporters: [otlp_grpc/dash0]');
   assert.equal(spec.lines.every((l) => !l.text.includes('spanmetrics')), true, 'the current component name, span_metrics');
 });
 
@@ -366,7 +361,7 @@ test('spot: the lines are valid, six pipelines, and exactly the two that feed sp
 // is defined (the real checkConfig), and every connector is the exporter of a traces pipeline AND the receiver of a metrics
 // pipeline (checkConfig does not model that pairing, the Collector refuses to start without it, so it is checked here).
 const assembled = (lines) => {
-  const pipelines = lines.map((text) => {
+  const pipelines = lines.filter((text) => /^(traces|metrics|logs)(\/[a-z]+)?: /.test(text)).map((text) => {
     const [, name, body] = text.match(/^([a-z/]+): (.*)$/);
     const fields = Object.fromEntries([...body.matchAll(/(receivers|processors|exporters): \[([^\]]*)\]/g)].map((m) => [m[1], m[2].split(',').map((s) => s.trim())]));
     return { name, receivers: fields.receivers ?? ['otlp'], processors: fields.processors ?? [], exporters: fields.exporters };
@@ -396,44 +391,69 @@ const connectorProblems = ({ pipelines }) => {
   return problems;
 };
 
-test('spot: all six lines together are one config the Collector accepts: every component defined, every connector exported by a traces pipeline and received by a metrics one', () => {
-  const cfg = assembled(spot().lines.map((l) => l.text));
+// The single writer rule (the spanmetrics README): two span_metrics connectors that write the same metric names and dimensions
+// conflict, so the config has exactly one span_metrics instance, in the lines and in the fix the explain describes.
+const instances = (cfg) => [...new Set(cfg.pipelines.flatMap((p) => [...p.exporters, ...p.receivers]).filter((id) => id.startsWith('span_metrics')))];
+const accepted = (cfg) => {
   const result = checkConfig(cfg.yaml, COLLECTOR_SCHEMA);
   assert.deepEqual(result.errors.map((e) => `${e.kind} ${e.path}`), []);
   assert.equal(result.verdict.flowing, true);
   assert.deepEqual(result.verdict.inactive, [], 'nothing defined is left unused');
   assert.deepEqual(connectorProblems(cfg), []);
-  assert.deepEqual(cfg.pipelines.map((p) => p.name).sort(), ['metrics/spans', 'traces', 'traces/audit', 'traces/checkout', 'traces/metrics', 'traces/sampled']);
+  assert.deepEqual(instances(cfg), ['span_metrics'], 'exactly one span_metrics instance: a single writer');
+};
+// The fix the explain describes: span_metrics gets its own traces pipeline with no sampling, and tail_sampling stays on the pipeline to the backend.
+const FIXED = [
+  'traces/metrics: receivers: [otlp] processors: [memory_limiter] exporters: [span_metrics]',
+  'traces: receivers: [otlp] processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0]',
+];
+
+test('spot: the lines together are one config the Collector accepts: every component defined, the connector exported by a traces pipeline and received by a metrics one, one writer', () => {
+  const cfg = assembled(spot().lines.map((l) => l.text));
+  accepted(cfg);
+  assert.deepEqual(cfg.pipelines.map((p) => p.name).sort(), ['logs', 'metrics/spans', 'traces']);
 });
 
-test('spot: the config check has teeth: a connector nobody receives, or received but never exported, is refused', () => {
+test('spot: the fix the explain describes is also one valid, single-writer config, and has no sampling before the connector', () => {
+  const spec = spot();
+  const lines = [...FIXED, ...spec.lines.filter((l) => l.id !== 'traces').map((l) => l.text)];
+  const cfg = assembled(lines);
+  accepted(cfg);
+  const feeding = cfg.pipelines.filter((p) => p.exporters.includes('span_metrics'));
+  assert.deepEqual(feeding.map((p) => [p.name, p.processors.includes('tail_sampling')]), [['traces/metrics', false]]);
+  assert.equal(plain(spec.explain).includes('traces/metrics'), true, 'the explain names the pipeline of the fix');
+});
+
+test('spot: the config check has teeth: a second span_metrics instance, a connector nobody receives, or one received but never exported, is refused', () => {
   const lines = spot().lines.map((l) => l.text);
-  const noReceiver = lines.map((l) => l.replace('span_metrics/checkout, ', ''));
-  assert.deepEqual(connectorProblems(assembled(noReceiver)), ['span_metrics/checkout is an exporter of traces/checkout but no pipeline receives it']);
-  const noExporter = lines.map((l) => l.replace(', span_metrics/audit]', ']'));
-  assert.deepEqual(connectorProblems(assembled(noExporter)), ['span_metrics/audit is received but never an exporter']);
+  const second = lines.map((l) => l.replace('otlp_grpc/dash0, span_metrics]', 'otlp_grpc/dash0, span_metrics, span_metrics/2]'));
+  assert.deepEqual(instances(assembled(second)), ['span_metrics', 'span_metrics/2']);
+  assert.deepEqual(connectorProblems(assembled(second)), ['span_metrics/2 is an exporter of traces but no pipeline receives it']);
+  const noReceiver = lines.map((l) => l.replace('receivers: [span_metrics]', 'receivers: [otlp]'));
+  assert.deepEqual(connectorProblems(assembled(noReceiver)), ['span_metrics is an exporter of traces but no pipeline receives it']);
+  const noExporter = lines.map((l) => l.replace(', span_metrics]', ']'));
+  assert.deepEqual(connectorProblems(assembled(noExporter)), ['span_metrics is received but never an exporter']);
 });
 
-test('spot: the real grader accepts exactly the two faults; one, all, the decoys or a mix fail', () => {
-  assert.deepEqual(spotRun(['traces', 'traces-checkout']), { outcome: 'right', extra: [], missing: [] });
-  assert.deepEqual(spotRun(['traces-checkout', 'traces']), { outcome: 'right', extra: [], missing: [] }, 'order is irrelevant');
-  assert.deepEqual(spotRun(['traces']), { outcome: 'wrong', extra: [], missing: ['traces-checkout'] });
-  assert.deepEqual(spotRun(['traces-checkout']), { outcome: 'wrong', extra: [], missing: ['traces'] });
+test('spot: the real grader accepts exactly the traces line; any decoy, or all lines, fail', () => {
+  assert.deepEqual(spotRun(['traces']), { outcome: 'right', extra: [], missing: [] });
   assert.deepEqual(spotRun(spot().lines.map((l) => l.id)).outcome, 'wrong');
-  assert.deepEqual(spotRun(['traces-sampled']), { outcome: 'wrong', extra: ['traces-sampled'], missing: ['traces', 'traces-checkout'] }, 'tail_sampling alone is not the fault');
-  assert.deepEqual(spotRun(['traces-metrics']).extra, ['traces-metrics'], 'the connector alone is not the fault');
-  assert.deepEqual(spotRun(['traces', 'traces-checkout', 'traces-audit']), { outcome: 'wrong', extra: ['traces-audit'], missing: [] });
-  assert.deepEqual(spotRun(['traces', 'traces-checkout', 'metrics-spans']).extra, ['metrics-spans']);
+  assert.deepEqual(spotRun(['sampler-def']), { outcome: 'wrong', extra: ['sampler-def'], missing: ['traces'] }, 'tail_sampling alone is not the fault');
+  assert.deepEqual(spotRun(['connector-def']).extra, ['connector-def'], 'the connector alone is not the fault');
+  assert.deepEqual(spotRun(['metrics-spans']), { outcome: 'wrong', extra: ['metrics-spans'], missing: ['traces'] });
+  assert.deepEqual(spotRun(['logs']).extra, ['logs']);
+  assert.deepEqual(spotRun(['traces', 'metrics-spans']), { outcome: 'wrong', extra: ['metrics-spans'], missing: [] });
   assert.equal(spotRun([]).outcome, 'empty');
 });
 
-test('spot: every decoy says why it is fine, and the faults are never explained as fine', () => {
+test('spot: every decoy says why it is fine, and the fault is never explained as fine', () => {
   const spec = spot();
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['metrics-spans', 'traces-audit', 'traces-metrics', 'traces-sampled']);
-  assert.equal(/every span/.test(plain(spec.whyNot['traces-metrics'])), true);
-  assert.equal(/no connector|nothing to count/.test(plain(spec.whyNot['traces-sampled'])), true);
-  assert.equal(/no sampling/.test(plain(spec.whyNot['traces-audit'])), true);
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['connector-def', 'logs', 'metrics-spans', 'sampler-def']);
   assert.equal(/receiv/.test(plain(spec.whyNot['metrics-spans'])), true);
+  assert.equal(/singular|the connector/.test(plain(spec.whyNot['metrics-spans'])) && !/four/.test(plain(spec.whyNot['metrics-spans'])), true, 'one connector again');
+  assert.equal(/connector is not in it/.test(plain(spec.whyNot.logs)), true);
+  assert.equal(/definition|only defines/.test(plain(spec.whyNot['connector-def'])), true);
+  assert.equal(/definition|only defines/.test(plain(spec.whyNot['sampler-def'])), true);
 });
 
 test('spot: the explain teaches the nuance with the recomputed figures: 39 of 400 requests a second, 8 errors of 39 is 21%, not 2%', () => {
@@ -441,7 +461,8 @@ test('spot: the explain teaches the nuance with the recomputed figures: 39 of 40
   assert.equal(KEPT_ERRORS / TRACES, 0.02);
   const t = plain(spot().explain);
   for (const w of ['39', '400', '21%', '2%', 'exporter', 'end of', 'before', 'its own', 'span_metrics', 'spanmetrics', 'deprecated']) assert.equal(t.includes(w), true, w);
-  for (const w of ['counts the spans of all of them together', 'own connector', 'a pipeline whose connector sees only']) assert.equal(t.includes(w), true, w);
+  for (const w of ['39 of 400', '8 of 39', 'traces/metrics', 'no sampling processor', 'one span_metrics']) assert.equal(t.includes(w), true, w);
+  assert.equal(/four|all of them together|own connector/.test(t), false, 'one connector, no namespaces');
   const intro = plain(LIVE.levels['tail-sampling'].play.steps[1].intro);
   for (const w of ['span_metrics', 'tail_sampling']) assert.equal(intro.includes(w), true, w);
 });
