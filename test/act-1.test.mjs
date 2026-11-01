@@ -14,6 +14,7 @@ import { nodeStates } from '../lib/map.mjs';
 import { isActUnlocked, levelState, lockReason } from '../lib/unlock.mjs';
 import { checkConfig } from '../lib/configure/check.mjs';
 import { COLLECTOR_SCHEMA } from '../lib/configure/collector.mjs';
+import { newConfigureState, runConfigure } from '../lib/widgets/configure-it.mjs';
 
 const LIVE = liveRegistry();
 const read = (rel) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
@@ -241,7 +242,7 @@ test('detectors config: the given does not start (the pipeline names a processor
   assert.equal(ref.ok, true);
   assert.equal(ref.verdict.flowing, true);
   assert.deepEqual(ref.verdict.pipelines.map((p) => `${p.name}=${p.flowing}`), ['traces=true']);
-  assert.deepEqual(spec.target, ['traces']);
+  assert.equal(Object.hasOwn(spec, 'target'), false, '`uses` names the traces pipeline, so it is also the target');
 });
 
 test('detectors config: the reference lists k8sattributes in the traces pipeline, before batch, and defines it', () => {
@@ -252,16 +253,24 @@ test('detectors config: the reference lists k8sattributes in the traces pipeline
   assert.deepEqual(checkConfig(config().given, COLLECTOR_SCHEMA).doc.processors, { batch: null }, 'the given only defines batch');
 });
 
-test('detectors config: defined but not listed still starts, and the checker reports it as unused', () => {
-  const unlisted = config().reference.replace('processors: [k8sattributes, batch]', 'processors: [batch]');
-  const r = checkConfig(unlisted, COLLECTOR_SCHEMA);
-  assert.equal(r.ok, true, 'the Collector starts');
-  assert.deepEqual(r.verdict.inactive, [{ section: 'processors', id: 'k8sattributes' }]);
+test('detectors config: deleting k8sattributes from the traces pipeline is wrong and costs one mistake; the reference is right', () => {
+  const spec = config();
+  assert.deepEqual(spec.uses, { traces: ['k8sattributes'] });
+  const unlisted = spec.reference.replace('processors: [k8sattributes, batch]', 'processors: [batch]');
+  assert.equal(checkConfig(unlisted, COLLECTOR_SCHEMA).ok, true, 'the Collector would start, so only `uses` can refuse it');
+  const wrong = runConfigure(spec, newConfigureState(), unlisted);
+  assert.deepEqual({ outcome: wrong.outcome, reason: wrong.reason, unmet: wrong.unmet }, { outcome: 'wrong', reason: 'uses', unmet: ['traces'] });
+  const same = runConfigure(spec, wrong.state, unlisted);
+  assert.equal(same.outcome, 'repeat', 'the same text again is free');
+  assert.equal(runConfigure(spec, wrong.state, spec.reference).outcome, 'right');
+  // Removing the reference's definition as well still does not pass: the given's error is the other way in.
+  const dropped = spec.reference.replace(/  k8sattributes:[\s\S]*?(?=  batch:)/, '');
+  assert.equal(runConfigure(spec, newConfigureState(), dropped).reason, 'invalid');
 });
 
 test('detectors config: the copy says what is graded (wiring) and what is not (settings)', () => {
   const text = plain(config().explain);
-  for (const w of ['defined', 'listed', 'extract.metadata', 'IP address', 'checks the wiring, not the settings']) {
+  for (const w of ['defined', 'listed', 'extract.metadata', 'IP address', 'checks the wiring, not the settings', 'Removing it']) {
     assert.equal(text.includes(w), true, w);
   }
 });

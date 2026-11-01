@@ -9,8 +9,9 @@
 // Dash0 docs (not an allowed Spec host): https://www.dash0.com/docs/dash0/monitoring/kubernetes/dash0-operator/auto-instrumentation
 //
 // The configure step grades the config through COLLECTOR_SCHEMA (docs/M1-DESIGN.md §4.8), which
-// does not model component settings, so the step grades the wiring (defined, named in the traces
-// pipeline, the Collector would start) and the settings are taught in the choice steps.
+// does not model component settings, so the step grades the wiring (defined, the Collector would
+// start, and `uses` requires the traces pipeline to list k8sattributes) and the settings are taught
+// in the choice steps. `uses` implies the traces pipeline must flow, so there is no `target`.
 
 // Step 1: when detectors run. `why` follows "Right." or "Not quite.".
 const WHEN = [
@@ -105,11 +106,12 @@ const CONFIG = {
   schema: 'collector',
   given: GIVEN,
   reference: REFERENCE,
-  target: ['traces'],
+  uses: { traces: ['k8sattributes'] },
   hint: 'The traces pipeline already names <code>k8sattributes</code>. Look under <code>processors</code>: the Collector can only run what is defined there.',
   explain:
     'A processor takes effect only when it is both defined under <code>processors</code> and listed in a pipeline. ' +
     'Defined but not listed, it does nothing and the Collector starts without it; listed but not defined, the Collector refuses to start. ' +
+    'Removing it from the pipeline would start the Collector too, but then the traces carry no pod metadata, so the task needs it listed. ' +
     'The settings are what make it useful: <code>extract.metadata</code> picks the attributes it adds, and by default the ' +
     'processor matches telemetry to a pod by the IP address of the incoming connection. This game checks the wiring, not the settings.',
 };
