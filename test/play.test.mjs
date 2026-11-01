@@ -359,3 +359,15 @@ test('an unknown key in a widget spec is named, with a hint when close', () => {
     assert.ok(got.includes(want), `${want}\n  got: ${JSON.stringify(got)}`);
   }
 });
+
+test('validatePlay names a configure step uses problem, and a step may leave uses out', () => {
+  const cases = [
+    [(p) => { p.steps[7].configure.uses = { traces: ['memory_limiter'] }; }, 'step 8 (configure "fx-config"): uses "traces": the reference does not list "memory_limiter"'],
+    [(p) => { p.steps[7].configure.uses = { traces: [] }; }, 'step 8 (configure "fx-config"): uses "traces" must be a non-empty list of component ids'],
+  ];
+  for (const [edit, want] of cases) {
+    const got = problems(edit);
+    assert.ok(got.includes(want), `${want}\n  got: ${JSON.stringify(got)}`);
+  }
+  assert.deepEqual(problems((p) => { delete p.steps[7].configure.uses; }), []);
+});

@@ -62,3 +62,12 @@ test('§4.8 and the code agree on the vendored parser, the size cap and the defa
   assert.equal(checkConfig('A: 1', defaulted).errors[0].message, 'invalid key "A": expected a key matching ^[a-z]+$');
   assert.ok(section.includes('a key matching <keyPattern>'));
 });
+
+test('the uses messages in M1-DESIGN §4.9 and DECLARATIVE-LEVELS are the ones the game says', () => {
+  const s49 = design.slice(design.indexOf('### 4.9 '), design.indexOf('## 5. Phases'));
+  const levels = read('docs/DECLARATIVE-LEVELS.md');
+  const one = 'The traces pipeline runs, but it does not do what the task asks yet.';
+  const many = 'The traces and metrics pipelines run, but they do not do what the task asks yet.';
+  assert.ok(s49.includes(one) && s49.includes(many) && levels.includes(one));
+  assert.ok(s49.includes('uses?: {pipeline name: [component id]}') && levels.includes('uses?: {pipeline: [component id]}'));
+});

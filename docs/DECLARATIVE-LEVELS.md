@@ -62,7 +62,7 @@ A level file keeps today's metadata (FOUNDATION §2.1) and declares `play` inste
 | `sort` | SortSpec (M1-DESIGN §4.1) | sort | live |
 | `build` | BuildSpec (§4.2) | build | live |
 | `incident` | Scenario (§4.3) | incident | live |
-| `configure` | ConfigureSpec (§4.9 of M1-DESIGN): `{id, schema: '<name>', given: '<yaml>', reference: '<yaml>', target?: [pipeline], hint?, explain}`, checked by the checker core (§4.8) | configure | live |
+| `configure` | ConfigureSpec (§4.9 of M1-DESIGN): `{id, schema: '<name>', given: '<yaml>', reference: '<yaml>', target?: [pipeline], uses?: {pipeline: [component id]}, hint?, explain}`, checked by the checker core (§4.8) | configure | live |
 | `query` | QuerySpec (§4.7 of M1-DESIGN): `{id, dataset: '<name>', at, reference: '<query>', given?, hint?, explain}`, graded by comparing result series | query | live |
 | `spot` | SpotSpec (§4.4 of M1-DESIGN) | spot | live |
 | `tradeoff` | TradeoffSpec (§4.5 of M1-DESIGN) | tradeoff | live |
@@ -197,7 +197,7 @@ The live adapters are thin wrappers:
 - **spot:** `renderSpot(spec, newSpotState(spec), …)`, `mountSpot`, `validateSpotSpec`.
 - **tradeoff:** `renderTradeoff(spec, newTradeoffState(spec), …)`, `mountTradeoff`, `validateTradeoffSpec`.
 - **query:** `renderQuery(spec, newQueryState(spec), …)`, `mountQuery`, `validateQuerySpec`. The driver types into the field: a click may be `{type: selector, text}` (`test/helpers/dom.mjs`).
-- **configure:** `renderConfigure(spec, newConfigureState(), …)`, `mountConfigure`, `validateConfigureSpec` (which runs `referenceProblems`, I7: the reference passes its own checker, `given` does not, and every `target` pipeline flows in the reference). The driver types the reference and Checks; its slip is the reference plus an unknown top-level key (parses, fails the checker), named `check` so the generated suite also proves a repeated Check is free.
+- **configure:** `renderConfigure(spec, newConfigureState(), …)`, `mountConfigure`, `validateConfigureSpec` (which runs `referenceProblems`, I7: the reference passes its own checker, `given` does not, every `target` pipeline flows in the reference, and the reference lists every `uses` component, so a step can require that e.g. `k8sattributes` is really in the traces pipeline; a config that flows but drops one is one mistake with the fixed message `The traces pipeline runs, but it does not do what the task asks yet.`, which names the pipeline, never the component). The driver types the reference and Checks; its slip is the reference plus an unknown top-level key (parses, fails the checker), named `check` so the generated suite also proves a repeated Check is free.
 
 Each type also has a test driver in `test/helpers/step-drivers.mjs` (§4). Adding a widget means: core and view (M1-DESIGN §4 pattern), plus one `STEP_TYPES` entry, plus one step driver, plus one thin level.
 
