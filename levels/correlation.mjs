@@ -1,9 +1,9 @@
-// Level 4.2: Correlation. The player spots, among eight log lines, the records with no trace link
-// (blank ids or an all-zero id), says why they have none (the log call ran outside an active span,
-// or through a logger that is not bridged), says how to get a worker's records linked (run the call
-// inside a span), and says what Dash0 shows for an unlinked record. There is no Build it step: a log
-// record is a standalone record that carries a trace_id and a span_id, not a child of a span
-// (issue #91 design note), so the level uses Spot it with `target: 'config'` and Choice.
+// Level 4.2: Correlation. The player attaches six log records to the spans they were written in (Build it
+// in logs mode: a record is a standalone record that carries a trace_id and a span_id, never a child span),
+// then says why three have no link (the log call ran outside an active span, or through a logger that is
+// not bridged), how to get a worker's records linked (run the call inside a span), and what Dash0 shows
+// for an unlinked record. The Spot it step of #91 is replaced by the Build it step, which grades the same
+// nuance on more evidence; the three Choice steps are kept.
 // Spec: docs/OUTLINE.md §4 Act 4.
 // Spec: https://opentelemetry.io/docs/specs/otel/logs/data-model/ , https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-traceid , https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-spanid , https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-traceflags
 // Spec: https://opentelemetry.io/docs/specs/otel/logs/api/ , https://opentelemetry.io/docs/specs/otel/logs/ , https://opentelemetry.io/docs/concepts/signals/logs/
@@ -21,58 +21,51 @@
 // trace, and can list by Resource (within 30 minutes of the span), which suits logs outside the trace
 // such as background jobs. Nothing below says Dash0 matches an unlinked record any other way.
 
-// Step 1. Each line is what a debug view prints for one record: time, level, service, the record's
-// trace_id and span_id fields, then the message. Eight records from Kettle & Co, none real. Three
-// have no trace link: blank ids (startup code, a retry worker) and all-zero ids. One blank record
-// mentions a trace id in its message; the fields are what link a record, not the text. `whyNot` is
-// shown for a picked line that is linked.
-const SPOT = {
-  id: 'cor-spot',
-  target: 'config',
-  lines: [
-    { id: 'checkout-startup', text: '09:00:02 INFO checkout trace_id= span_id= Listening on port 8080' },
-    {
-      id: 'checkout-cart',
-      text: '09:14:07 INFO checkout trace_id=4bf92f3577b34da6a3ce929d0e0e4736 span_id=00f067aa0ba902b7 Cart validated for order 8841',
-    },
-    {
-      id: 'payments-retry',
-      text: '09:14:08 WARN payments trace_id=4bf92f3577b34da6a3ce929d0e0e4736 span_id=3ee05e5bb0f1ae0c Provider slow, retrying charge',
-    },
-    {
-      id: 'payments-worker',
-      text: '09:14:12 ERROR payments trace_id= span_id= Retry worker gave up on charge (trace 4bf92f3577b34da6a3ce929d0e0e4736)',
-    },
-    {
-      id: 'orders-stored',
-      text: '09:14:13 INFO orders trace_id=0af7651916cd43dd8448eb211c80319c span_id=b7ad6b7169203331 Order 8841 stored',
-    },
-    {
-      id: 'notifications-email',
-      text: '09:14:14 ERROR notifications trace_id=00000000000000000000000000000000 span_id=0000000000000000 Email not sent for order 8841',
-    },
-    {
-      id: 'cart-emptied',
-      text: '09:14:15 INFO cart trace_id=5b8efff798038103d269b633813fc60c span_id=eee19b7ec3c1b174 Cart emptied',
-    },
-    {
-      id: 'inventory-reserve',
-      text: '09:14:16 DEBUG inventory trace_id=0af7651916cd43dd8448eb211c80319c span_id=a3ce929d0be4d2c1 Reserved 2 items',
-    },
+// Step 1: Build it in logs mode. Four spans (two orders at checkout, one charge at payments) and six
+// records from Kettle & Co, none real. The player attaches each record to the span it was written in, or
+// to none: the record's trace_id and span_id then fill in from that span. Three records get a span: the
+// cart check (the innermost span, started as the current span), the neighbour order's record (same service
+// and time as order 8841's spans, told apart by order.id) and the slow-provider warning. Three stay
+// unlinked: startup (before any request), the retry worker (inside the charge span's window and service,
+// but another thread wrote it, so no span was current) and the email (no notifications span on the board).
+// Records are standalone: never a span row, never a child.
+const T1 = '4bf92f3577b34da6a3ce929d0e0e4736';
+const T2 = '0af7651916cd43dd8448eb211c80319c';
+const CHECKOUT = 'b1a2c3d4e5f60718';
+const CART = '00f067aa0ba902b7';
+const CHARGE = '3ee05e5bb0f1ae0c';
+const OTHER = 'b7ad6b7169203331';
+
+const span = (spanId, traceId, parentId, name, service, kind, startMs, endMs, attributes = {}) => ({
+  spanId, traceId, parentId, name, service, kind, startMs, endMs, status: 'UNSET', attributes, events: [], links: [],
+});
+const log = (id, timeMs, severity, service, body, attributes) => ({ id, timeMs, severity, service, body, traceId: null, spanId: null, attributes });
+
+const BUILD = {
+  id: 'cor-build',
+  edit: ['logs'],
+  spans: [
+    span(CHECKOUT, T1, null, 'POST /checkout', 'checkout', 'SERVER', 0, 120, { 'order.id': '8841' }),
+    span(CART, T1, CHECKOUT, 'validate cart', 'checkout', 'INTERNAL', 20, 40),
+    span(CHARGE, T1, CHECKOUT, 'POST /charge', 'payments', 'SERVER', 50, 110, { 'thread.name': 'http-exec-1' }),
+    span(OTHER, T2, null, 'POST /checkout', 'checkout', 'SERVER', 30, 100, { 'order.id': '8842' }),
   ],
-  faults: ['checkout-startup', 'payments-worker', 'notifications-email'],
-  whyNot: {
-    'checkout-cart': 'Both fields hold real ids: this record links to span 00f067aa0ba902b7 of trace 4bf92f35.... Its level and message do not matter.',
-    'payments-retry': 'It carries the same trace_id as the checkout record, so the two services\' records belong to one request, and its own span_id says which span of payments it was written in.',
-    'orders-stored': 'Real ids in both fields: a linked record.',
-    'cart-emptied': 'Both ids are set and valid. It belongs to a different trace, but it does belong to one.',
-    'inventory-reserve': 'Real ids in both fields, whatever the level: even a DEBUG record carries them when it is written inside a span.',
-  },
+  logs: [
+    log('startup', -120, 'INFO', 'checkout', 'Listening on port 8080', { 'thread.name': 'main' }),
+    log('cart', 30, 'DEBUG', 'checkout', 'Cart validated', { 'order.id': '8841' }),
+    log('other-order', 60, 'INFO', 'checkout', 'Order accepted', { 'order.id': '8842' }),
+    log('provider-slow', 70, 'WARN', 'payments', 'Provider slow, retrying charge', { 'thread.name': 'http-exec-1' }),
+    log('retry-worker', 95, 'ERROR', 'payments', 'Retry worker gave up on charge', { 'thread.name': 'retry-worker-2' }),
+    log('email', 130, 'ERROR', 'notifications', 'Email not sent for order 8841', { 'thread.name': 'mail-pool-1' }),
+  ],
+  answer: { startup: null, cart: CART, 'other-order': OTHER, 'provider-slow': CHARGE, 'retry-worker': null, email: null },
+  hint: 'A record belongs to a span only if that span was the current one when the log call ran: look at the record\'s service, its time and its attributes, and at the span\'s.',
   explain:
-    'Three records have no trace link. Two have blank ids: the log call ran outside any span, in startup code and in a retry ' +
-    'worker. The email record has all-zero ids, which W3C Trace Context treats as invalid, and some formats print zeros when ' +
-    'there is no valid span context. The worker\'s message mentions a trace id, but only the <code>trace_id</code> and ' +
-    '<code>span_id</code> fields link a record. The other five are linked, at any level.',
+    'Three records get a span. The cart check was written inside <code>validate cart</code>, the innermost span of order 8841, ' +
+    'started as the current span. The neighbour order\'s record shares checkout and the time with order 8841\'s spans; its ' +
+    '<code>order.id</code> says which trace it is in. The provider warning ran on the charge request\'s thread. Three stay ' +
+    'unlinked: startup ran before any request, the email has no span on the board, and the retry worker\'s record falls inside ' +
+    'the charge span\'s window but a different thread wrote it, so no span was current.',
 };
 
 // Step 2: why the ids are missing. `why` follows "Right." or "Not quite.".
@@ -151,14 +144,13 @@ export default {
       {
         intro:
           'From a log, an engineer wants to jump to its trace. That works when the record carries a ' +
-          '<code>trace_id</code> and a <code>span_id</code>. A debug view prints each record\'s two fields, ' +
-          'blank when the record has none. Kettle &amp; Co logged this while order 8841 was paid.',
-        question: 'Spot the records with no trace link.',
-        qid: 'cor-q-spot',
-        spot: SPOT,
+          '<code>trace_id</code> and a <code>span_id</code>, and a log call gets them only from the span that is the ' +
+          'current span when it runs. Kettle &amp; Co logged these six records while order 8841 was paid, with order 8842 ' +
+          'in flight at checkout. Attach each record to the span it was written in, or to none.',
+        build: BUILD,
       },
       {
-        intro: 'Checkout is instrumented and runs a bridged logger. Yet the three records have no link.',
+        intro: 'Checkout is instrumented and runs a bridged logger. Yet three records have no link.',
         question: 'Why do they have no trace link?',
         qid: 'cor-q-why',
         choice: { id: 'cor-why', choices: WHY },
