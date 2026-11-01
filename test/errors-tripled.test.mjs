@@ -15,6 +15,8 @@ import { createLevelContext } from '../lib/level-context.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { answer, budgetLeft, canAnswer, newIncident, openView, validateScenario } from '../lib/widgets/incident.mjs';
 import { liveRegistry } from '../app.mjs';
+import { checkConfig } from '../lib/configure/check.mjs';
+import { COLLECTOR_SCHEMA } from '../lib/configure/collector.mjs';
 import { expectedStarMax } from './helpers/stars.mjs';
 import { nodeStates } from '../lib/map.mjs';
 import { levelState } from '../lib/unlock.mjs';
@@ -206,7 +208,8 @@ test('every percentage and every rate in the story comes from the one table', ()
   // 38% is the neutral Collector-health view's own memory figure; every other percentage is the table's.
   assert.deepEqual([...pcts].sort(), [`${f1(RATIO_AFTER)}%`, `${f1(RATIO_BEFORE)}%`, '30%', `${DROP}%`, '70%', '38%'].sort());
   const nums = new Set((all.match(/\b\d{1,3}(,\d{3})*\b/g) ?? []).filter((x) => Number(x.replace(',', '')) >= 100 && !/^(0|2026)/.test(x)));
-  for (const x of nums) assert.equal(['1,000', '328', '288', '960', '100'].includes(x), true, `unexplained figure ${x}`);
+  // 400 is limit_mib of the memory_limiter in the config shown (a config value, not a story figure).
+  for (const x of nums) assert.equal(['1,000', '328', '288', '960', '100', '400'].includes(x), true, `unexplained figure ${x}`);
 });
 
 test('the closing Choice grades the nuance: a ratio counted after a sampler that keeps every error is biased; uniform sampling would not be', () => {
@@ -222,6 +225,99 @@ test('the closing Choice grades the nuance: a ratio counted after a sampler that
   const under = plain(CHOICE.find((c) => c.key === 'errors-undercounted').why);
   assert.equal(under.includes('status_code') && under.includes(String(ERRORS)), true);
   assert.equal(CHOICE.length, 3);
+});
+
+// ---- the config on the screen is one config the Collector accepts ----------------------
+
+// The collector-diff view shows the whole gateway config, with + and - lines for the change. Both states are rebuilt from it: the
+// config after (drop the - lines) and the config before (drop the + lines), each checked by the real checkConfig, then the
+// connector rules checkConfig does not model: every connector is exported by a traces pipeline and received by a metrics
+// pipeline, and there is exactly one span_metrics instance, fed by exactly one pipeline (the spanmetrics README's Single Writer
+// Principle), so no unsampled pipeline feeds the same connector.
+const rawLines = () => {
+  const pre = /<pre><code>([\s\S]*)<\/code><\/pre>/.exec(view('collector-diff').html)[1];
+  return pre.split('\n');
+};
+const stateOf = (keep, drop) => rawLines().filter((l) => !l.startsWith(drop)).map((l) => (l.startsWith(keep) ? ` ${l.slice(1)}` : l)).map((l) => l.slice(1)).join('\n');
+const AFTER = stateOf('+', '-');
+const BEFORE_CFG = stateOf('-', '+');
+const pipelinesOf = (doc) => Object.entries(doc.service.pipelines).map(([name, p]) => ({ name, ...p }));
+const connectorProblems = (doc) => {
+  const problems = [];
+  const ps = pipelinesOf(doc);
+  for (const id of Object.keys(doc.connectors ?? {})) {
+    const out = ps.filter((p) => p.exporters.includes(id));
+    const into = ps.filter((p) => p.receivers.includes(id));
+    if (out.length === 0) problems.push(`${id} is never exported`);
+    if (into.length === 0) problems.push(`${id} is never received`);
+    for (const p of out) if (!p.name.startsWith('traces')) problems.push(`${id} exported by ${p.name}`);
+    for (const p of into) if (!p.name.startsWith('metrics')) problems.push(`${id} received by ${p.name}`);
+  }
+  return problems;
+};
+const spanMetrics = (doc) => Object.keys(doc.connectors ?? {}).filter((id) => id.startsWith('span_metrics'));
+const accepted = (yaml) => {
+  const r = checkConfig(yaml, COLLECTOR_SCHEMA);
+  assert.deepEqual(r.errors.map((e) => `${e.kind} ${e.path}`), []);
+  assert.equal(r.verdict.flowing, true);
+  assert.deepEqual(r.verdict.inactive, [], 'nothing defined is left unused');
+  assert.deepEqual(connectorProblems(r.doc), []);
+  assert.deepEqual(spanMetrics(r.doc), ['span_metrics'], 'exactly one span_metrics instance');
+  const feeding = pipelinesOf(r.doc).filter((p) => p.exporters.includes('span_metrics')).map((p) => `${p.name}:${p.processors.includes('tail_sampling')}`);
+  return { doc: r.doc, feeding };
+};
+
+test('the config shown is one config the Collector accepts, after and before the change, with one span_metrics instance fed by one pipeline', () => {
+  const after = accepted(AFTER);
+  assert.deepEqual(after.feeding, ['traces:true'], 'after: the one pipeline that feeds the connector samples first');
+  assert.deepEqual(Object.keys(after.doc.service.pipelines).sort(), ['metrics/spans', 'traces']);
+  const before = accepted(BEFORE_CFG);
+  assert.deepEqual(before.feeding, ['traces:false'], 'before: the same pipeline had no sampling');
+  assert.equal('tail_sampling' in before.doc.processors, false);
+});
+
+test('the config check has teeth: a second connector instance, an unreceived connector, an undefined policy processor or an unused one is refused', () => {
+  const second = AFTER.replace('exporters: [otlp_grpc/dash0, span_metrics]', 'exporters: [otlp_grpc/dash0, span_metrics, span_metrics/2]').replace('    span_metrics:', '    span_metrics:\n    span_metrics/2:');
+  const r2 = checkConfig(second, COLLECTOR_SCHEMA);
+  assert.deepEqual(spanMetrics(r2.doc), ['span_metrics', 'span_metrics/2']);
+  assert.deepEqual(connectorProblems(r2.doc), ['span_metrics/2 is never received']);
+  const unreceived = checkConfig(AFTER.replace('receivers: [span_metrics]', 'receivers: [otlp]'), COLLECTOR_SCHEMA);
+  assert.deepEqual(connectorProblems(unreceived.doc), ['span_metrics is never received']);
+  const undefinedProc = checkConfig(AFTER.replace('    tail_sampling:\n', '    tail_sampling_x:\n'), COLLECTOR_SCHEMA);
+  assert.deepEqual(undefinedProc.errors.map((e) => e.kind), ['unknown-ref'], 'an id the pipeline lists but nothing defines');
+  const unused = checkConfig(AFTER.replace('processors: [memory_limiter, tail_sampling, batch]', 'processors: [memory_limiter, batch]'), COLLECTOR_SCHEMA);
+  assert.deepEqual(unused.verdict.inactive.map((x) => x.id), ['tail_sampling']);
+});
+
+test('the policies shown, run over 1,000 requests of which 40 fail, keep exactly 40 + 288 = 328, the figure every text states', () => {
+  const { doc } = accepted(AFTER);
+  const policies = doc.processors.tail_sampling.policies;
+  assert.deepEqual(policies.map((p) => p.type), ['status_code', 'probabilistic'], 'two policies: a trace is kept when any of them samples it');
+  assert.deepEqual(policies[0].status_code.status_codes, ['ERROR']);
+  const pct = policies[1].probabilistic.sampling_percentage;
+  assert.equal(pct, KEEP_REST * 100);
+  let kept = 0;
+  let keptErrors = 0;
+  let keptHealthy = 0;
+  let healthySeen = 0;
+  for (let i = 0; i < REQUESTS; i += 1) {
+    const isError = i < ERRORS;
+    const voted = policies.map((p) => {
+      if (p.type === 'status_code') return isError && p.status_code.status_codes.includes('ERROR');
+      const share = Math.floor(((healthySeen + 1) * pct) / 100) > Math.floor((healthySeen * pct) / 100);
+      return !isError && share;
+    });
+    if (!isError) healthySeen += 1;
+    if (voted.some(Boolean)) {
+      kept += 1;
+      if (isError) keptErrors += 1;
+      else keptHealthy += 1;
+    }
+  }
+  assert.deepEqual({ kept, keptErrors, keptHealthy }, { kept: KEPT, keptErrors: ERRORS, keptHealthy: 288 });
+  assert.equal(f1((keptErrors / kept) * 100), f1(RATIO_AFTER));
+  assert.equal(f1((ERRORS / REQUESTS) * 100), f1(RATIO_BEFORE));
+  assert.equal(REQUESTS - kept, 672, 'requests the connector never sees: 67% of 1,000');
 });
 
 // ---- sources -------------------------------------------------------------------------

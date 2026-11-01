@@ -9,7 +9,7 @@
 // a sampler that keeps every error does not; compute span metrics before sampling).
 // Spec: docs/OUTLINE.md §4 Act 6.
 // Spec: https://opentelemetry.io/docs/concepts/sampling/#tail-sampling , https://opentelemetry.io/docs/collector/configuration/#connectors
-// Docs (GitHub READMEs, not an allowed Spec host): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md , https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/connector/spanmetricsconnector/README.md
+// Docs (GitHub READMEs, not an allowed Spec host): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md , https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/connector/spanmetricsconnector/README.md , https://github.com/open-telemetry/opentelemetry-collector/blob/main/connector/README.md
 // Dash0 tie-in: n/a. No Dash0 docs page was checked for this scenario, and nothing below names a Dash0 feature.
 //
 // Facts used (each read on the pages above): tail sampling decides on all or most of the spans of a trace, and one thing it can
@@ -20,7 +20,9 @@
 // (configuration page), so span_metrics receives what leaves the processors of the traces pipeline that lists it. The connector
 // counts the spans it receives into `traces.span.metrics.calls`, with `status.code` as a dimension, and error counts are the
 // calls with an Error status code (connector README). The component was renamed from spanmetrics to span_metrics (same README).
-// The config shown has exactly one pipeline that lists span_metrics, so no other pipeline feeds the same connector unsampled.
+// The config shown is the whole gateway config (the + and - lines are the change), and a test assembles and checks it: every component
+// defined, nothing unused, span_metrics exported by one traces pipeline and received by one metrics pipeline, and exactly one span_metrics
+// instance (the spanmetrics README's Single Writer Principle), so no other pipeline feeds the same connector unsampled.
 //
 // Invented for the game: all the figures (one table below: 1,000 requests a second, 40 of them failed, a policy that keeps every
 // error and 30% of the rest), the times, the services, the deploy and the provider incident. The table is arranged so the title is
@@ -86,11 +88,22 @@ const SCENARIO = {
       kind: 'clue',
       html:
         '<p>Gateway Collector config, applied at 02:04:</p>' +
-        '<pre><code>+  processors:\n' +
+        '<pre><code>   receivers:\n' +
+        '     otlp:\n' +
+        '       protocols:\n' +
+        '         grpc:\n' +
+        '   processors:\n' +
+        '     memory_limiter: {check_interval: 1s, limit_mib: 400, spike_limit_mib: 100}\n' +
+        '     batch:\n' +
         '+    tail_sampling:\n' +
         '+      policies:\n' +
         '+        - {name: errors, type: status_code, status_code: {status_codes: [ERROR]}}\n' +
         `+        - {name: rest, type: probabilistic, probabilistic: {sampling_percentage: ${KEEP_PCT}}}\n` +
+        '   exporters:\n' +
+        '     otlp_grpc/dash0:\n' +
+        '       endpoint: ${env:DASH0_ENDPOINT}\n' +
+        '   connectors:\n' +
+        '     span_metrics:\n' +
         '   service:\n' +
         '     pipelines:\n' +
         '       traces:\n' +
