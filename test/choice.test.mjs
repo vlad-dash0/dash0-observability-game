@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { makeDom, q, qa, click } from './helpers/dom.mjs';
 import { recordFocus } from './helpers/focus.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
-import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
+import { choiceHtml, mountChoice, validateChoiceSpec } from '../lib/widgets/choice.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
 import nys from '../levels/naming-your-service.mjs';
 
@@ -290,4 +290,32 @@ test('mountChoice refuses choices that are not an array, naming the question', (
 test('mountChoice refuses a null choice, naming the question', () => {
   const { ctx, onRight } = setup();
   assert.throws(() => mountChoice(ctx, [...CHOICES, null], { id: 'q1', onRight }), { name: 'TypeError', message: /^choice "q1": choice 4 is not an object/ });
+});
+
+test('validateChoiceSpec: a valid spec has no problems', () => {
+  assert.deepEqual(validateChoiceSpec(CHOICES), []);
+});
+
+test('validateChoiceSpec: zero or two right answers is a problem', () => {
+  for (const [n, choices] of [
+    [0, CHOICES.map((c) => ({ ...c, right: false }))],
+    [2, CHOICES.map((c) => (c.key === 'a' ? { ...c, right: true } : c))],
+  ]) {
+    assert.deepEqual(validateChoiceSpec(choices), [`needs exactly one right answer, has ${n}`]);
+  }
+});
+
+test('validateChoiceSpec: a duplicate key and a non-string why are problems', () => {
+  assert.deepEqual(validateChoiceSpec(CHOICES.map((c) => (c.key === 'c' ? { ...c, key: 'a' } : c))), ['choice keys must be unique']);
+  assert.deepEqual(validateChoiceSpec(CHOICES.map((c) => (c.key === 'c' ? { ...c, why: 3 } : c))), ['choice "c" needs a string why']);
+});
+
+test('validateChoiceSpec: null and non-arrays give a problem and never throw', () => {
+  assert.deepEqual(validateChoiceSpec(null), ['choices must be an array']);
+  assert.deepEqual(validateChoiceSpec([...CHOICES, null]), ['choice 4 is not an object']);
+});
+
+test('validateChoiceSpec collects every problem', () => {
+  assert.deepEqual(validateChoiceSpec([null, { key: 'a', why: 1 }]), ['choice 0 is not an object', 'choice "a" needs a string why']);
+  assert.deepEqual(validateChoiceSpec([null]), ['choice 0 is not an object']);
 });
