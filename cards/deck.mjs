@@ -149,5 +149,37 @@ export const DECK = [
       'spans and attributes with the API.',
     specUrl: 'https://opentelemetry.io/docs/zero-code/js/',
     dash0Angle: null,
+  },  {
+    id: 'gauge-not-count',
+    front:
+      'A Gauge is a reading, not a count: report a running total with one and the backend gets samples, not a sum it can take a rate of.',
+    back:
+      'Pick the instrument by what the number means. A Counter only goes up. An UpDownCounter goes up and down, and its ' +
+      'values add up across sources, like active requests or queue length. A Gauge is a current value that makes no ' +
+      'sense to sum, like a temperature. A Histogram records many values where the spread matters, like durations. ' +
+      'Synchronous instruments are called where the event happens; asynchronous (observable) ones take a callback the ' +
+      'SDK runs at each collection. A gauge point is only a sampled value, with no aggregation semantic. A monotonic ' +
+      'Sum also carries a start time, which is what lets a backend compute a rate that notices restarts, so a running ' +
+      'total belongs in a Counter.',
+    specUrl: 'https://opentelemetry.io/docs/specs/otel/metrics/api/#instrument',
+    dash0Angle: null,
+  },
+  {
+    id: 'delta-needs-converting',
+    front:
+      'Prometheus-style backends need cumulative sums: convert delta series first, and expect a restart to reset a cumulative counter.',
+    back:
+      'Temporality says whether a point holds the total since the process started (cumulative) or only the change since ' +
+      'the last report (delta). SDKs default to cumulative. Prometheus is the textbook cumulative system, and ' +
+      "OpenTelemetry's data model notes that the time series model it targets has no delta counters. So a delta sum has " +
+      'to be turned into a cumulative one before it reaches such a backend, and an exporter either converts a delta ' +
+      "histogram or drops it. The Collector's deltatocumulative processor does the conversion, but it is stateful: it " +
+      'keeps every series in memory, so all the points of one series must reach the same instance. A cumulative counter ' +
+      'lives in the process, so a restart starts it again from zero with a new start time, which a backend that reads ' +
+      'start times treats as a reset, not as a drop.',
+    specUrl: 'https://opentelemetry.io/docs/specs/otel/metrics/data-model/#temporality',
+    dash0Angle:
+      'Dash0 accepts both temporalities and you query metrics with PromQL, so the conversion is for Prometheus-style ' +
+      'backends, not for Dash0.',
   },
 ];

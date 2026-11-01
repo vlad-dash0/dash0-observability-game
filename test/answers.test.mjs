@@ -16,6 +16,17 @@ const ANSWERS = {
     'choice avm-why: two-setups',
     'choice avm-fix: keep-one',
   ],
+  instruments: [
+    'sort instr-sort: orders-placed=counter warehouse-temp=gauge queue-length=up-down-counter checkout-duration=histogram payment-declines=counter cache-hit-ratio=gauge active-requests=up-down-counter response-bytes=histogram',
+    'choice instr-async: async-updown',
+    'choice instr-gauge: sampled-not-sum',
+  ],
+  temporality: [
+    'spot temp-spot: emails-sent,checkout-duration,payments-declined',
+    'choice temp-convert: deltatocumulative',
+    'choice temp-restart: reset',
+    'choice temp-dash0: both',
+  ],
   'play-fixture': [
     'choice fx-pick: trace',
     'sort fx-sort: server=auto loyalty=manual',
