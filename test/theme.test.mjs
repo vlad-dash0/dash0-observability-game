@@ -359,3 +359,17 @@ test('readTheme / writeTheme: storage round trip, and safe when storage fails', 
   assert.equal(writeTheme(() => ({ setItem: boom }), 'light'), false);
   assert.equal(writeTheme(boom, 'light'), false);
 });
+
+test('map: the telemetry ring is dotted, with a visible gap between round-capped dots', () => {
+  const rule = rules(stripComments(read('styles/hub.css'))).find((r) => r.selector.includes('kind-telemetry'));
+  assert.ok(rule, 'a .kind-telemetry rule');
+  const num = (prop) => rule.body.match(new RegExp(`${prop}:\\s*([\\d.]+)`));
+  const width = Number(num('stroke-width')[1]);
+  const [dash, gap] = rule.body.match(/stroke-dasharray:\s*([\d.]+)\s+([\d.]+)/).slice(1).map(Number);
+  assert.match(rule.body, /stroke-linecap:\s*round/);
+  // A round cap adds width/2 at each end of a dash, so the visible gap is gap - width.
+  assert.ok(gap - width >= 0.4, `visible gap ${(gap - width).toFixed(2)} (gap ${gap}, width ${width})`);
+  // On the real node radius (2.6, lib/map.mjs) a ring of 10 to 14 dots reads as dotted.
+  const dots = (2 * Math.PI * 2.6) / (dash + gap);
+  assert.ok(dots >= 10 && dots <= 14, `${dots.toFixed(1)} dots per ring`);
+});
