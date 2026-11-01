@@ -459,8 +459,8 @@ buttons (`data-ask`); clicking one reveals a made-up answer (service.name, a met
 with service.version, a span attribute, a trace; `CONTENT.telemetry` in
 `levels/the-pager.mjs` cites the OpenTelemetry specs). Finish `#pager-finish` "Finish"
 (`data-finish`) is enabled after all four are asked. Each part has its own status regions
-(part 1: budget and feedback; part 2: answers), never both at once. Reward: "You could not
-answer one question. Time to instrument."
+(part 1: budget and feedback; part 2: answers), never both at once. Reward: "Blind, you
+could not answer one question. With telemetry, all four took seconds. Time to instrument."
 
 ### Act 2
 **2.1 `spans-and-traces`**: build; cards `['no-trace-object']`. Step 1 choice "What makes these

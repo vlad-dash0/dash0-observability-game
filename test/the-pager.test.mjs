@@ -22,7 +22,7 @@ const MAX_STARS = expectedStarMax(LIVE);
 // ---- content pin: docs/M1-DESIGN.md §6 Boss the-pager ------------------------------
 
 const ALERT = 'PAGE: checkout p95 > 2 s (firing)';
-const REWARD = 'You could not answer one question. Time to instrument.';
+const REWARD = 'Blind, you could not answer one question. With telemetry, all four took seconds. Time to instrument.';
 // The four looks in play order: key, label (§6), and the reason it reveals.
 const LOOKS = [
   ['service', 'Which service?', 'No data. No service sends telemetry yet, so nothing says which one is slow.'],

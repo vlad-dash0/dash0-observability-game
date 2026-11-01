@@ -7,7 +7,7 @@
 
 const ALERT = 'PAGE: checkout p95 > 2 s (firing)';
 const BUDGET = { startPct: 100, stepPct: 25 };
-const REWARD = 'You could not answer one question. Time to instrument.';
+const REWARD = 'Blind, you could not answer one question. With telemetry, all four took seconds. Time to instrument.';
 const INTRO =
   'Your pager goes off. Try the four questions below: you will find you cannot answer them, because nothing sends telemetry yet. Each try burns error budget. When you give up, press Escalate.';
 const LIT_INTRO =
