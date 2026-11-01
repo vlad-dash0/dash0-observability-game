@@ -121,6 +121,18 @@ test('hypotheses enable after answerAfterViews; wrong costs one, then is disable
   assert.equal(counts.done, 0);
 });
 
+test('neutral and herring opens do not enable the hypotheses; clue opens do', () => {
+  const { counts } = setup();
+  click('[data-view="status-page"]');
+  click('[data-view="deploys"]');
+  assert.equal(counts.mistakes, 1, 'only the herring costs');
+  assert.equal(hypDisabled().join(), 'true,true,true');
+  click('[data-view="traces"]');
+  assert.equal(hypDisabled().join(), 'true,true,true');
+  click('[data-view="db-metrics"]');
+  assert.equal(hypDisabled().join(), 'false,false,false');
+});
+
 test('the right hypothesis explains, closes the board and hands focus to onComplete', () => {
   const { counts, focus } = setup();
   click('[data-view="traces"]');

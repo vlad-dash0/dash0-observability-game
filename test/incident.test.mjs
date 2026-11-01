@@ -81,14 +81,29 @@ test('exhaustedNow is true exactly once, on the open that reaches 0', () => {
   assert.equal(openView(s, c.state, 'b').exhaustedNow, false);
 });
 
-test('canAnswer waits for answerAfterViews views and ends when solved', () => {
+test('canAnswer waits for answerAfterViews clue views and ends when solved', () => {
   const s = S();
   assert.equal(canAnswer(s, newIncident(s)), false);
   assert.equal(canAnswer(s, open(s, newIncident(s), 'traces')), false);
   assert.equal(canAnswer(s, open(s, newIncident(s), 'traces', 'traces')), false);
-  const ready = open(s, newIncident(s), 'traces', 'status-page');
+  const ready = open(s, newIncident(s), 'traces', 'db-metrics');
   assert.equal(canAnswer(s, ready), true);
   assert.equal(canAnswer(s, answer(s, ready, 'slow-query').state), false);
+});
+
+test('canAnswer counts only clue views: neutral and herring opens, however many, never unlock', () => {
+  const s = S();
+  const filler = open(s, newIncident(s), 'status-page', 'deploys');
+  assert.equal(filler.opened.length, s.answerAfterViews);
+  assert.equal(canAnswer(s, filler), false);
+  assert.equal(answer(s, filler, 'slow-query').outcome, 'locked');
+  const oneClue = open(s, filler, 'traces');
+  assert.equal(canAnswer(s, oneClue), false);
+  assert.equal(answer(s, oneClue, 'slow-query').outcome, 'locked');
+  assert.equal(canAnswer(s, open(s, oneClue, 'traces', 'status-page')), false);
+  const ready = open(s, oneClue, 'db-metrics');
+  assert.equal(canAnswer(s, ready), true);
+  assert.equal(answer(s, ready, 'slow-query').outcome, 'right');
 });
 
 test('answer outcomes: locked, unknown, wrong, repeat, right, closed', () => {

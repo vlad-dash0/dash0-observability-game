@@ -254,6 +254,17 @@ test('the-bill: it takes two looks to unlock the answers (answerAfterViews 2): o
   assert.equal(locked(), 'false,false,false,false');
 });
 
+test('the-bill: neutral and herring views never unlock the answers; only clue views do', () => {
+  start();
+  for (const id of ['request-rate', 'export-interval', 'collector-health']) open(id);
+  for (const id of ['biggest-metric', 'new-service']) open(id);
+  assert.equal(locked(), 'true,true,true,true', 'every neutral and herring view is open and the answers are still locked');
+  open('volume-by-metric');
+  assert.equal(locked(), 'true,true,true,true', 'one clue is still not enough');
+  open('label-breakdown');
+  assert.equal(locked(), 'false,false,false,false');
+});
+
 // ---- reference path (I7) -------------------------------------------------------------
 
 test('the-bill: the reference path (volume, labels, deploy, then user-id-label) solves with 40% of the budget left and no penalty', () => {
@@ -306,8 +317,9 @@ test('the-bill: the second herring is a second mistake; a wrong answer on top is
   open('biggest-metric');
   open('new-service');
   assert.equal(slips.mistakes, 2);
+  for (const id of ['volume-by-metric', 'label-breakdown']) open(id);
   guess('traffic-growth');
-  assert.equal(slips.mistakes, 3, 'the two herrings count as the two looks that unlock the answers');
+  assert.equal(slips.mistakes, 3, 'the herrings do not unlock; the two clues do');
   guess('user-id-label');
   finish();
   assert.equal(slips.mistakes, 3);
