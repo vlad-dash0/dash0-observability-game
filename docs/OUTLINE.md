@@ -226,10 +226,15 @@ pricing wording.
 
 ## 8. Proposed milestones
 
-1. **M0, skeleton**: hub map, registry, lesson kit, progress, test harness; one
+Decided 2026-10-31: platform before content, so later acts are mostly content.
+
+1. **M0, skeleton** (done): hub map, registry, lesson kit, progress, test harness; one
    level end to end (1.2 Naming your service).
-2. **M1, vertical slice**: Act 0 + Act 2 + the Act 2 boss; ask the guide; play-test
-   with a few people inside Dash0.
-3. **M2, core curriculum**: Acts 1, 3, 4, 5.
-4. **M3, the rest + dogfooding**: Acts 6 to 8; game instrumented into Dash0; final
-   boss.
+2. **M1, vertical slice** (done): Act 0 + Act 2 + the Act 2 boss. Ask the guide moved
+   out of M1 and has not shipped (separate track below).
+3. **M2, platform**: declarative levels (#71, designed first), Configure it (#3), Query
+   it (#4), Spot it (#5), Trade-off (#7), each proven by one thin level.
+4. **M3, content**: Acts 1, 3, 4, 5.
+5. **M4, content**: Acts 6 to 8; game instrumented into Dash0 (dogfooding); final boss.
+
+Separate tracks: Ask the guide (#17) and Act 9.
