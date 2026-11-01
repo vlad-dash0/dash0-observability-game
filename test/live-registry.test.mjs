@@ -12,7 +12,7 @@ import { runPlay, validatePlay } from '../lib/play.mjs';
 const nodeIds = NODES.map((n) => n.id);
 
 // Extended on purpose with each level PR (docs/M1-DESIGN.md §5): Act 0 (P3) plays before Act 1;
-// its boss, the pager (P4), comes after its levels; Act 2 (P6: 2.1, 2.2) plays after Act 1; its boss, checkout-is-slow (P11), comes last; Act 3 (M3 P1: 3.1, 3.2; M3 P2: 3.3, 3.4; M3 P3: 3.5, 3.7) plays after Act 2; Act 1 (M3 P4: 1.1 before 1.2, 1.3 after it); Act 4 (M3 P5: 4.1, 4.2) plays after Act 3.
+// its boss, the pager (P4), comes after its levels; Act 2 (P6: 2.1, 2.2) plays after Act 1; its boss, checkout-is-slow (P11), comes last; Act 3 (M3 P1: 3.1, 3.2; M3 P2: 3.3, 3.4; M3 P3: 3.5, 3.7) plays after Act 2; Act 1 (M3 P4: 1.1 before 1.2, 1.3 after it); Act 4 (M3 P5: 4.1, 4.2) plays after Act 3; Act 5 (M3 P7: 5.1, 5.2) plays after Act 4.
 const EXPECTED_ORDER = [
   'monitoring-vs-observability',
   'the-signals',
@@ -37,6 +37,8 @@ const EXPECTED_ORDER = [
   'red-and-use',
   'structured-logs',
   'correlation',
+  'pipelines',
+  'order-matters',
 ];
 
 test('the live registry builds against the real deck and map nodes', () => {
@@ -45,7 +47,7 @@ test('the live registry builds against the real deck and map nodes', () => {
   assert.deepEqual(liveRegistry().order, EXPECTED_ORDER, 'app.mjs builds the same registry');
 });
 
-test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "Traces", Act 3 "Metrics", then Act 4 "Logs"', () => {
+test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "Traces", Act 3 "Metrics", Act 4 "Logs", then Act 5 "The Collector"', () => {
   const acts = liveRegistry().acts.map((a) => ({ id: a.id, no: a.no, name: a.name, sub: a.sub, levelIds: [...a.levelIds], bossId: a.bossId }));
   assert.deepEqual(acts, [
     {
@@ -86,6 +88,14 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
       name: 'Logs',
       sub: 'What did it say?',
       levelIds: ['structured-logs', 'correlation'],
+      bossId: null,
+    },
+    {
+      id: 'act-5',
+      no: 5,
+      name: 'The Collector',
+      sub: 'The plumbing',
+      levelIds: ['pipelines', 'order-matters'],
       bossId: null,
     },
   ]);

@@ -85,9 +85,9 @@ test('existing players: a saved 1.2 and Act 0 stay valid; Act 2 waits for 1.1 an
   assert.equal(levelState('spans-and-traces', entered, LIVE), 'done');
 });
 
-test('star totals count both new levels: 22 scored levels, max 66', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 66 });
-  assert.deepEqual(starTotals(progressOf(['resources', 'detectors-and-kubernetes']), LIVE), { earned: 6, max: 66 });
+test('star totals count both new levels: 24 scored levels, max 72', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 72 });
+  assert.deepEqual(starTotals(progressOf(['resources', 'detectors-and-kubernetes']), LIVE), { earned: 6, max: 72 });
 });
 
 // ---- level fields and lights --------------------------------------------------------

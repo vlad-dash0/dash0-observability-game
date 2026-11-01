@@ -312,4 +312,34 @@ export const DECK = [
       'logs of the same trace by default and can switch to the same resource, which finds logs outside the trace, such as ' +
       'background jobs.',
   },
+  {
+    id: 'configured-not-enabled',
+    front:
+      'Configuring a Collector component does not enable it: list it in a pipeline (extensions under service.extensions) or it does nothing.',
+    back:
+      'A Collector config has five kinds of component. Receivers take data in, processors change it, exporters send it out, ' +
+      'connectors join two pipelines (an exporter at the end of one and a receiver at the start of another), and extensions ' +
+      'add abilities that are not part of the data path, such as a health check. Defining one under its section only ' +
+      'configures it. Receivers, processors and exporters are enabled by listing them in a pipeline under service.pipelines, ' +
+      'a connector by listing it in both pipelines it joins, and an extension under service.extensions. A component that is ' +
+      'defined but not listed is not enabled, so a memory_limiter nobody listed protects nothing; one that is listed but not ' +
+      'defined keeps the Collector from starting.',
+    specUrl: 'https://opentelemetry.io/docs/collector/configuration/#service',
+    dash0Angle: null,
+  },
+  {
+    id: 'memory-limiter-first',
+    front:
+      'Processor order is processing order, per pipeline: memory_limiter first, drops and context readers before batch, batch late.',
+    back:
+      'The processors in a pipeline run in the order they are listed, and every pipeline has its own list, so the same ' +
+      'processors can be right in one pipeline and wrong in another. memory_limiter goes first: when memory runs high it ' +
+      'refuses data by returning an error to the component before it, so receivers can retry and slow their senders before ' +
+      'later processors pile up more. batch goes late, after the processors that drop, filter or change data, so it does not ' +
+      'batch what is discarded afterwards. A processor that reads the request context, such as k8sattributes, must run before ' +
+      "batch, because batching clears that context. The processor docs also say to prefer an exporter's own batching where " +
+      'it has one.',
+    specUrl: 'https://opentelemetry.io/docs/collector/configuration/#processors',
+    dash0Angle: null,
+  },
 ];
