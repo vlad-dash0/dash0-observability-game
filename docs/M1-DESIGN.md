@@ -197,7 +197,13 @@ answer(s, st, id) → right|wrong|repeat|locked|unknown|closed
 ```
 View: alert, `<meter min=0 max=100 value=…>` + `Error budget: N% left (M min in).`, view
 buttons `Label (N min)`, opened panels with `tabindex="-1"` headings, hypothesis buttons
-disabled until `canAnswer` (enough clues opened). Mistakes: first open of a herring, a wrong hypothesis (repeat free),
+disabled until `canAnswer` (enough clues opened). While not `canAnswer` and not solved, a plain-text line
+`<p class="incident-locked-hint" id="<id>-locked-hint">Look for more evidence before naming the cause.</p>`
+sits above the hypotheses; it is derived from the same `canAnswer` result (no second statement of the unlock rule),
+is the same text every time (never names the clue views or counts what remains), and is absent when unlocked,
+when solved, and when a hypothesis is merely disabled because it was answered wrong. The hypotheses sit in
+`role=group aria-label="Hypotheses"` with `aria-describedby` pointing at that line (only while it exists). It is
+not a live region: `#<id>-feedback` stays the only one. Mistakes: first open of a herring, a wrong hypothesis (repeat free),
 `exhaustedNow` exactly once.
 
 ### 4.4 Spot it (M2, #5)
