@@ -111,6 +111,12 @@ test('a pipeline name must be a signal, optionally with /name', () => {
   assert.equal(check(GOOD.replace('    traces:', '    traces/eu:')).ok, true);
 });
 
+test('an unknown key with an odd name inside a pipeline stalls that pipeline, by quoted path', () => {
+  const r = check(GOOD.replace('      processors: [batch]', '      processors: [batch]\n      "odd key": 1'));
+  assert.deepEqual(r.errors.map((e) => [e.kind, e.path]), [['unknown-key', 'service.pipelines.traces["odd key"]']]);
+  assert.deepEqual(r.verdict.pipelines, [{ name: 'traces', flowing: false, reasons: r.errors }]);
+});
+
 test('a pipeline that is not a mapping is stalled', () => {
   const r = check('receivers: {otlp: }\nexporters: {debug: }\nservice:\n  pipelines:\n    traces: [otlp]');
   assert.deepEqual(r.errors.map((e) => [e.path, e.message]), [['service.pipelines.traces', 'expected a mapping, got a list']]);

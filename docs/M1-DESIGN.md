@@ -258,10 +258,10 @@ Verdict = {flowing, pipelines: [{name, flowing, reasons: Error[]}], inactive: [{
 | `too-large` | `the file is longer than 32768 characters` | line, column null |
 | `parse` | js-yaml's own reason, verbatim (e.g. `bad indentation of a mapping entry`, `unknown scalar tag !<tag:yaml.org,2002:js/function>`, `expected a single document in the stream, but found more`) | `line`, `column` of the mark |
 | `duplicate-key` | `duplicate key` | `line`, `column` of the second key |
-| `root` | `the top level must be a mapping, got a list`; also `... got a string`, `... got a number`, `... got a boolean`, `... got null`, `the top level must be a mapping, got an empty document` (no text, or only comments) | line, column null |
+| `root` | `the top level must be a mapping, got a list`; also `... got a string`, `... got a number`, `... got a boolean`, `... got null`, `the top level must be a mapping, got an empty document` (no text, or only comments; LF, CRLF and lone CR line endings all count) | line, column null |
 | `alias` | `aliases (*name) are not supported` | `path` of the reused node, e.g. `use` or `l[1]` |
 
-**Schema format** (plain data; `validateSchema` lists authoring mistakes and `checkConfig` throws `invalid schema: ...` on any, so a typo cannot pass everything):
+**Schema format** (plain data; `validateSchema` lists authoring mistakes and `checkConfig` throws `invalid schema: ...` on any, so a typo cannot pass everything. It checks node types and properties; that `at`, `in` entries, `key`, `keyPattern`, `keyExpect` and `required` entries are strings (messages like `refs[0]: at must be a string`, `pipelines.stages[0]: key must be a string`, `pipelines.stages[0]: in entries must be strings`, `root: keyPattern must be a string`); that a stage `key` is one plain key (`pipelines.stages[0]: key "r.s" must be a single plain key`); and that no object has an unknown property, e.g. `schema: unknown property "refz"`):
 ```
 { root: Node,
   refs?: [{at: pattern, in: [path]}],                       // each string at `at` must be a key of a mapping at one of `in`

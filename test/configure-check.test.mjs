@@ -158,6 +158,41 @@ test('validateSchema lists authoring mistakes with their location', () => {
     ['pipelines.stages[0]: in must be a non-empty list of paths']);
 });
 
+test('validateSchema requires string fields where a path or pattern is expected', () => {
+  const base = { root: { type: 'any' } };
+  const v = (extra) => validateSchema({ ...base, ...extra });
+  assert.deepEqual(v({ refs: [{ in: ['x'] }] }), ['refs[0]: at must be a string']);
+  assert.deepEqual(v({ refs: [{ at: 5, in: ['x'] }] }), ['refs[0]: at must be a string']);
+  assert.deepEqual(v({ refs: [{ at: 'a', in: [7] }] }), ['refs[0]: in entries must be strings']);
+  assert.deepEqual(v({ refs: {} }), ['refs: must be a list']);
+  assert.deepEqual(v({ refs: [null] }), ['refs[0]: a ref must be an object']);
+  assert.deepEqual(v({ refs: [{ at: 'a', in: ['x'], aat: 'b' }] }), ['refs[0]: unknown property "aat"']);
+  assert.deepEqual(v({ pipelines: { stages: [{ key: 'r', in: ['x'] }] } }), ['pipelines: at must be a string']);
+  assert.deepEqual(v({ pipelines: { at: ['a'], stages: [{ key: 'r', in: ['x'] }] } }), ['pipelines: at must be a string']);
+  assert.deepEqual(v({ pipelines: { at: 'a', stages: [{ ky: 'r', in: ['x'] }] } }),
+    ['pipelines.stages[0]: unknown property "ky"', 'pipelines.stages[0]: key must be a string']);
+  assert.deepEqual(v({ pipelines: { at: 'a', stages: [{ key: 'r.s', in: ['x'] }] } }),
+    ['pipelines.stages[0]: key "r.s" must be a single plain key']);
+  assert.deepEqual(v({ pipelines: { at: 'a', stages: [{ key: '*', in: ['x'] }] } }),
+    ['pipelines.stages[0]: key "*" must be a single plain key']);
+  assert.deepEqual(v({ pipelines: { at: 'a', stages: [{ key: 'r[]', in: ['x'] }] } }),
+    ['pipelines.stages[0]: key "r[]" must be a single plain key']);
+  assert.deepEqual(v({ pipelines: { at: 'a', stages: [{ key: 'r', in: [null] }] } }),
+    ['pipelines.stages[0]: in entries must be strings']);
+  assert.deepEqual(v({ pipelines: { at: 'a', stages: [7] } }), ['pipelines.stages[0]: a stage must be an object']);
+  assert.deepEqual(v({ pipelines: 'x' }), ['pipelines: must be an object']);
+  assert.deepEqual(v({ pipelines: { at: 'a', stages: [{ key: 'r', in: ['x'] }] }, refz: [] }), ['schema: unknown property "refz"']);
+  assert.deepEqual(v({ pipelines: { at: 'a', stages: [{ key: 'r', in: ['x'] }] } }), []);
+});
+
+test('validateSchema requires string or list-of-string node fields', () => {
+  const m = (props) => validateSchema({ root: { type: 'mapping', ...props } });
+  assert.deepEqual(m({ keyPattern: 5 }), ['root: keyPattern must be a string']);
+  assert.deepEqual(m({ keyPattern: '^a$', keyExpect: 5 }), ['root: keyExpect must be a string']);
+  assert.deepEqual(m({ keys: { a: { type: 'any' } }, required: 'a' }), ['root: required must be a list of strings']);
+  assert.deepEqual(m({ keys: { a: { type: 'any' } }, required: [1] }), ['root: required must be a list of strings']);
+});
+
 // ---- cross-references ---------------------------------------------------------------
 
 const WIRE = {

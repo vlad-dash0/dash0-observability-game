@@ -64,7 +64,15 @@ test('the top level must be a mapping', () => {
   assert.equal(root('').message, 'the top level must be a mapping, got an empty document');
   assert.equal(root('  \n\t\n').message, 'the top level must be a mapping, got an empty document');
   assert.equal(root('---').message, 'the top level must be a mapping, got null');
+  for (const nothing of ['# c\r\n', '# c\r', '\r\n\r\n', '  \r# c\r\n  \r\n', '#\u2028c']) {
+    assert.equal(root(nothing).message, 'the top level must be a mapping, got an empty document', JSON.stringify(nothing));
+  }
   assert.equal(root('# only a comment\n').message, 'the top level must be a mapping, got an empty document');
+});
+
+test('CRLF and lone-CR line endings parse like LF', () => {
+  assert.deepEqual(parseYaml('a: 1\r\nb:\r\n  - x\r\n').doc, { a: 1, b: ['x'] });
+  assert.deepEqual(fail('a: 1\r\na: 2').kind, 'duplicate-key');
 });
 
 test('safe load: only the core schema, no custom or language-specific tags', () => {
