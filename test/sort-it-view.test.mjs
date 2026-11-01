@@ -98,6 +98,43 @@ test('renderSort: one draggable, unpressed button per item, one disabled button 
   assert.equal(q('.sort').hasAttribute('role'), false, 'no labelledBy, no group');
 });
 
+const HINT = 'Drag each item into the right bucket, or pick an item and then a bucket.';
+
+test('renderSort: one plain-text instruction line, not a live region, describes the item list, before and during play', () => {
+  const { dom, mount } = setup();
+  const check = (when) => {
+    assert.equal(qa('#signals-hint').length, 1, `${when}: one hint`);
+    assert.equal(q('#signals-hint').textContent, HINT, `${when}: text`);
+    assert.equal(q('#signals-hint').innerHTML, HINT, `${when}: plain text, no markup`);
+    assert.equal(q('#signals-hint').className, 'sort-hint', `${when}: class`);
+    assert.equal(q('#signals-hint').hasAttribute('role'), false, `${when}: no role`);
+    assert.equal(q('#signals-hint').hasAttribute('aria-live'), false, `${when}: not live`);
+    assert.equal(q('.sort-pool').getAttribute('role'), 'group', `${when}: the pool is a group`);
+    assert.equal(q('.sort-pool').getAttribute('aria-label'), 'Items to sort', `${when}: the group is named`);
+    assert.equal(q('.sort-pool').getAttribute('aria-describedby'), 'signals-hint', `${when}: pool described by the hint`);
+  };
+  check('rendered');
+  mount();
+  check('mounted');
+  click(q('[data-item="i1"]'));
+  check('item selected');
+  click(q('[data-bucket="log"]'));
+  check('after a wrong try');
+  click(q('[data-item="i1"]'));
+  click(q('[data-bucket="metric"]'));
+  check('after a right placement');
+  assert.equal(dom.body.querySelectorAll('[data-sort] > .sort-hint').length, 1, 'the hint sits outside the redrawn board');
+});
+
+test('renderSort: the hint id follows the spec id and is escaped', () => {
+  makeDom();
+  const spec = fixture();
+  const html = renderSort({ ...spec, id: 'a"b' }, newSortState(spec), { selected: null, escapeHtml });
+  globalThis.document.body.innerHTML = html;
+  assert.equal(q('.sort-hint').id, 'a"b-hint');
+  assert.equal(q('.sort-pool').getAttribute('aria-describedby'), 'a"b-hint');
+});
+
 test('renderSort: the selected item is pressed and only its untried buckets are enabled; placed items move to their list', () => {
   const spec = fixture();
   let { state } = place(spec, newSortState(spec), 'i1', 'metric');

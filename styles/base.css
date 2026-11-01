@@ -167,6 +167,7 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
    (as does .feedback above, which quotes them), so no Sort it label overflows at 320px.
    .choice and .speech are not covered. Only existing text/background pairs (text on surface and surface-2, muted text on
    surface), so test/theme.test.mjs's contrast checks cover them in both themes. */
+.sort-hint { color: var(--color-text-muted); font-size: 13.5px; margin: 0 0 8px; }
 .sort-pool { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; min-height: 8px; }
 .sort-item {
   border: 1.5px solid var(--color-border); background: var(--color-surface); color: var(--color-text);
