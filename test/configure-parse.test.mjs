@@ -71,6 +71,9 @@ test('the top level must be a mapping', () => {
 });
 
 test('CRLF and lone-CR line endings parse like LF', () => {
+  for (const text of ['# c\rreceivers: {}\r', '# c\r\nreceivers: {}\r\n', '  # c\n\rreceivers: {}', '# c\nreceivers: {}']) {
+    assert.deepEqual(parseYaml(text).doc, { receivers: {} }, JSON.stringify(text));
+  }
   assert.deepEqual(parseYaml('a: 1\r\nb:\r\n  - x\r\n').doc, { a: 1, b: ['x'] });
   assert.deepEqual(fail('a: 1\r\na: 2').kind, 'duplicate-key');
 });
