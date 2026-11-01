@@ -2,7 +2,7 @@
 // Spec: docs/M1-DESIGN.md §4.2, §7 P5. Asserts strings, numbers and booleans only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { serviceEdges, waterfall } from '../lib/widgets/trace.mjs';
+import { serviceEdges, timeAxis, waterfall } from '../lib/widgets/trace.mjs';
 import { A, B, C, D, E, OTHER_TRACE, TRACE, b1Spans } from './fixtures/build-b1.mjs';
 
 function deepFreeze(v) {
@@ -139,4 +139,25 @@ test('serviceEdges: no edge without a CLIENT→SERVER or PRODUCER→CONSUMER pai
     sp('c', { trace: T2, service: 'api', kind: 'SERVER', parent: '1' }), // parent in another trace
   ];
   assert.deepEqual(serviceEdges(spans), []);
+});
+
+// timeAxis (#113)
+
+test('T1 timeAxis: with no times it is the spans\' own range; times widen it; waterfall follows', () => {
+  const spans = b1Spans();
+  const plain = timeAxis(spans);
+  assert.deepEqual([plain.min, plain.range, plain.pct(0), plain.pct(40), plain.pct(100)], [0, 100, 0, 40, 100]);
+  assert.deepEqual(waterfall(spans, {}), waterfall(spans), 'no times: identical output');
+  assert.deepEqual(waterfall(spans, { times: [] }), waterfall(spans));
+  const wide = timeAxis(spans, [-40, 140]);
+  assert.deepEqual([wide.min, wide.range], [-40, 180]);
+  assert.equal(wide.pct(-40), 0);
+  assert.equal(wide.pct(140), 100);
+  assert.equal(wide.pct(50), 50);
+  const rows = waterfall(spans, { times: [-100] }).rows;
+  assert.deepEqual([rows[0].x, rows[0].width], [50, 50], 'bars shift and shrink on the widened axis');
+  assert.equal(rows.length, spans.length, 'times add no rows');
+  const flat = timeAxis([sp('a', { start: 5, end: 5 })]);
+  assert.deepEqual([flat.range, flat.pct(5)], [0, 0], 'a zero range puts everything at 0');
+  assert.deepEqual([timeAxis([]).range, timeAxis([], [3, 9]).min, timeAxis([], [3, 9]).range], [0, 3, 6]);
 });

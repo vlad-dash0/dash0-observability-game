@@ -114,7 +114,7 @@ serviceEdges(spans) → sorted unique [{from, to, via}]: CLIENT→child SERVER i
 ```
 Core `lib/widgets/build-it.mjs`:
 ```
-BuildSpec = { id, spans, edit: ⊆ ['parent','kind','status','links'], answer: {[spanId]: {...}}, hint? }
+BuildSpec = { id, spans, edit: ⊆ ['parent','kind','status','links'] | ['logs'], answer: {[spanId]: {...}}, hint? }
 validateBuildSpec(spec) → string[]   // hex, unique ids, endMs>=startMs, answer acyclic & passes checkBuild
 newBuildState(spec); setParent → 'set'|'self'|'cycle'|'unknown'; setKind/setStatus → 'set'|'invalid'|'unknown'
 toggleLink → 'linked'|'unlinked'|'self'|'unknown'
@@ -128,6 +128,31 @@ Parent: …`); a panel for the selected span with only editable controls (`data-
 `data-kind`, `data-status`, `data-link` + `aria-pressed`); `#ID-check`, optional `#ID-hint`
 (`ctx.hint()` once). A new failing Check costs a mistake; an identical recheck is free
 (`Same as last time: N problems.`); a refused cycle/self is free ("would make a loop").
+
+**Logs mode (#113, phase A: core only, the view is pending).** `edit: ['logs']` is its own
+mode (exactly that list; a mix with span fields is refused), with the same step type and
+mechanic (`build`). Spans are read-only and not graded; a log record is a standalone
+record that carries `trace_id` / `span_id` (OTel logs data model), never a child span, so
+it gets no `parentId` and no waterfall row.
+```
+BuildSpec += logs: 1..12 LogRecord in non-decreasing timeMs (spec order = display and grading order), explain?
+LogRecord = { id (kebab, unique, not a span id), timeMs (finite, same clock as spans), severity (TRACE|DEBUG|INFO|WARN|ERROR|FATAL),
+  service, body, traceId: 32 lc hex|null, spanId: 16 lc hex|null (both or neither; a set spanId is a span on
+  the board and traceId is that span's trace; all-zero ids refused), attributes? {string|finite number|boolean} }
+answer = {[logId]: spanId | null}   // every record once; null = no span context; 'none' is refused
+BuildState += logs: {[logId]: spanId|null}   // the trace is never stored
+isLogMode(spec); attachLog(spec, st, logId, spanId|null) → 'attached'|'detached'|'unknown'
+applyLogs(spec, st) → records with traceId/spanId derived from the span (the one place)
+recordsBySpan(spec, st) → {[spanId]: record[]} (every span a key, [] for none)
+gradedState: span entries carry spanId only, then {logId, spanId} per record; gradedKey serializes it
+checkBuild → issues {code, logId, message}; one per record, first that applies:
+  log-other-service, log-outside-span (inclusive window), log-no-active-span, log-wrong-trace,
+  log-wrong-span, log-not-attached
+validateBuildSpec applies the log answer before the I7 check, so the rule codes grade the reference answer
+timeAxis(spans, times = []) → {min, range, pct(ms)}; waterfall(spans, {times}) uses it (same output with no times)
+```
+`play.mjs` accepts `logs` and `explain` on a build step but refuses logs mode in levels
+(`edit: logs is not available in levels yet`) until the view lands in phase B.
 
 ### 4.3 Incident engine (P10, M1b)
 Core `lib/widgets/incident.mjs`:

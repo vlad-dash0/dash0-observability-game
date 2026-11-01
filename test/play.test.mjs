@@ -13,6 +13,7 @@ import { RESERVED, runPlay, STEP_TYPES, validatePlay } from '../lib/play.mjs';
 import { buildRegistry, RegistryError, validateRegistry } from '../lib/registry.mjs';
 import { liveRegistry } from '../app.mjs';
 import { playFixture, FIXTURE_CARD } from './fixtures/play-level.mjs';
+import { logsSpec } from './fixtures/build-logs.mjs';
 
 const NOW = 1767225600000;
 const KIT = { validatePlay, runPlay };
@@ -370,4 +371,26 @@ test('validatePlay names a configure step uses problem, and a step may leave use
     assert.ok(got.includes(want), `${want}\n  got: ${JSON.stringify(got)}`);
   }
   assert.deepEqual(problems((p) => { delete p.steps[7].configure.uses; }), []);
+});
+
+// logs mode (#113, phase A): the core exists, the view does not
+
+test('P1 a logs-mode build step is refused in levels until the view exists', () => {
+  const got = problems((p) => { p.steps.push({ intro: 'Attach the logs.', build: logsSpec() }); });
+  assert.deepEqual(got, ['step 9 (build "l1"): edit: logs is not available in levels yet']);
+  assert.deepEqual(problems((p) => { p.steps.push({ intro: 'Attach the logs.', build: { ...logsSpec(), edit: ['logs', 'parent'] } }); }).filter((e) => e.includes('not available in levels yet')).length, 1);
+});
+
+test('P2 logs-mode keys are checked: a typo on the spec or a record is named', () => {
+  const cases = [
+    [(b) => { b.explan = 'x'; }, 'unknown key "explan" on spec (did you mean "explain"?)'],
+    [(b) => { b.logz = []; }, 'unknown key "logz" on spec (did you mean "logs"?)'],
+    [(b) => { b.logs[0].bdy = 'x'; }, 'unknown key "bdy" on log 0 (did you mean "body"?)'],
+    [(b) => { b.logs[1].timeM = 1; }, 'unknown key "timeM" on log 1 (did you mean "timeMs"?)'],
+  ];
+  for (const [edit, tail] of cases) {
+    const got = problems((p) => { const b = logsSpec(); edit(b); p.steps.push({ intro: 'x', build: b }); });
+    const want = `step 9 (build "l1"): ${tail}`;
+    assert.ok(got.includes(want), `${want}\n  got: ${JSON.stringify(got)}`);
+  }
 });
