@@ -63,14 +63,14 @@ const GIVEN = [
   'processors:',
   '  batch:',
   'exporters:',
-  '  otlp/dash0:',
+  '  otlp_grpc/dash0:',
   '    endpoint: ${env:DASH0_ENDPOINT}',
   'service:',
   '  pipelines:',
   '    traces:',
   '      receivers: [otlp]',
   '      processors: [k8sattributes, batch]',
-  '      exporters: [otlp/dash0]',
+  '      exporters: [otlp_grpc/dash0]',
   '',
 ].join('\n');
 
@@ -90,14 +90,14 @@ const REFERENCE = [
   '        - k8s.node.name',
   '  batch:',
   'exporters:',
-  '  otlp/dash0:',
+  '  otlp_grpc/dash0:',
   '    endpoint: ${env:DASH0_ENDPOINT}',
   'service:',
   '  pipelines:',
   '    traces:',
   '      receivers: [otlp]',
   '      processors: [k8sattributes, batch]',
-  '      exporters: [otlp/dash0]',
+  '      exporters: [otlp_grpc/dash0]',
   '',
 ].join('\n');
 
