@@ -143,7 +143,7 @@ export default {
   icon: '\u{1F50C}',
   rewardTitle: 'Endpoint tuner',
   cards: ['otlp-ports-and-paths'],
-  lights: [],
+  lights: ['collector'],
   scoring: { parMs: null },
   play: {
     prefix: 'otlp',

@@ -38,8 +38,8 @@ const textOf = (c) => plain(c.label + c.why);
 // ---- level fields, scoring and lights -----------------------------------------------
 
 const FIELDS = {
-  'otlp-endpoints': { no: '5.3', name: 'OTLP endpoints', mechanics: ['configure'], cards: ['otlp-ports-and-paths'], lights: [] },
-  'agent-vs-gateway': { no: '5.4', name: 'Agent vs gateway', mechanics: ['configure'], cards: ['tail-sampling-needs-one-collector'], lights: [] },
+  'otlp-endpoints': { no: '5.3', name: 'OTLP endpoints', mechanics: ['configure'], cards: ['otlp-ports-and-paths'], lights: ['collector'] },
+  'agent-vs-gateway': { no: '5.4', name: 'Agent vs gateway', mechanics: ['configure'], cards: ['tail-sampling-needs-one-collector'], lights: ['collector'] },
 };
 
 for (const [id, want] of Object.entries(FIELDS)) {
@@ -69,10 +69,12 @@ test('5.3 and 5.4 open in any order once Act 5 is entered; they stay locked on a
   assert.equal(levelState('otlp-endpoints', progressOf(['agent-vs-gateway']), LIVE), 'open');
 });
 
-test('lights: the map has no Collector node, so 5.3 and 5.4 light nothing, like 5.1 and 5.2', () => {
-  const s = nodeStates(LIVE, progressOf(['otlp-endpoints', 'agent-vs-gateway']), NODES, EDGES);
-  assert.equal(NODES.filter((n) => s.nodes[n.id].lit).length, 0);
-  assert.equal(s.edges.filter((e) => e.lit).length, 0);
+test('lights: 5.3 and 5.4 each light the Collector node and nothing else; no edge lights', () => {
+  for (const done of [['otlp-endpoints'], ['agent-vs-gateway'], ['otlp-endpoints', 'agent-vs-gateway']]) {
+    const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
+    assert.deepEqual(NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id), ['collector'], done.join());
+    assert.equal(s.edges.filter((e) => e.lit).length, 0, done.join());
+  }
 });
 
 // ---- cards --------------------------------------------------------------------------

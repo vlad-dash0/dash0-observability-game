@@ -79,6 +79,7 @@
 .system-map .node.kind-datastore circle { stroke-width: 0.9; }
 .system-map .node.kind-queue circle { stroke-dasharray: 0.8 0.5; }
 .system-map .node.kind-external circle { stroke-dasharray: 0.4 0.6; fill: transparent; }
+.system-map .node.kind-telemetry circle { stroke: var(--color-text-muted); stroke-width: 0.7; stroke-dasharray: 0.01 1.35; stroke-linecap: round; }
 .system-map .node.lit circle { fill: var(--color-map-node-lit); stroke: var(--color-map-node-lit); }
 .system-map .node text {
   fill: var(--color-text-muted); font-size: 2.3px; font-family: var(--font-sans);

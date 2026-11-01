@@ -178,7 +178,7 @@ export default {
   icon: '\u{1F4E6}',
   rewardTitle: 'Distro whisperer',
   cards: ['not-every-component'],
-  lights: [],
+  lights: ['collector'],
   scoring: { parMs: null },
   play: {
     prefix: 'dist',

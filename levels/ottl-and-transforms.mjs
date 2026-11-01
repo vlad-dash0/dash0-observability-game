@@ -187,7 +187,7 @@ export default {
   icon: '\u{1F9FD}',
   rewardTitle: 'Data scrubber',
   cards: ['redact-in-the-pipeline'],
-  lights: [],
+  lights: ['collector'],
   scoring: { parMs: null },
   play: {
     prefix: 'ottl',

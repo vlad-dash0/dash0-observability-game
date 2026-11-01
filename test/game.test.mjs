@@ -397,7 +397,7 @@ test('acts list every level and boss in order; the empty registry says levels ar
   assert.deepEqual(empty.acts, []);
   assert.equal(empty.hasLevels, false);
   assert.deepEqual(empty.stars, { earned: 0, max: 0 });
-  assert.equal(Object.keys(empty.mapState().nodes).length, 15, 'the map still shows');
+  assert.equal(Object.keys(empty.mapState().nodes).length, 16, 'the map still shows');
   assert.ok(empty.mapSvg().includes('data-node="storefront"'));
 });
 
@@ -416,10 +416,10 @@ test('level labels and classes cover every state', () => {
 
 test('the map text alternative names the lit components', () => {
   const { game } = setup();
-  assert.equal(game.mapLabel(), 'System map: 0 of 15 components lit.');
+  assert.equal(game.mapLabel(), 'System map: 0 of 16 components lit.');
   game.openLevel('x');
   ctxs.x.finish({ text: 'x is finished now' });
-  assert.equal(game.mapLabel(), 'System map: 2 of 15 components lit: Checkout, Payments.');
+  assert.equal(game.mapLabel(), 'System map: 2 of 16 components lit: Checkout, Payments.');
 });
 
 test('the theme toggle flips, applies and stores the theme', () => {
