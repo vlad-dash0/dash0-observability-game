@@ -223,3 +223,18 @@ test('mounting throws a TypeError naming the spec for a bad spec, no onComplete,
   c.dom.body.innerHTML = '';
   assert.throws(() => c.mount(), { name: 'TypeError', message: /not rendered/ });
 });
+
+test('the unit is escaped in feedback: over-cap verdict and Right message (I3)', () => {
+  const spec = fixture();
+  spec.unit = '<img src=x onerror=1>';
+  const a = setup(spec);
+  a.mount();
+  plan('tail', 'user');
+  check();
+  assert.equal(qa('img').length, 0);
+  assert.equal(q('#bill-feedback').innerHTML.includes('Over the cap by 5 &lt;img src=x onerror=1&gt;.'), true);
+  plan('tail', 'tier');
+  check();
+  assert.equal(qa('img').length, 0);
+  assert.equal(q('#bill-feedback').innerHTML.includes('costs 11 of 12 &lt;img src=x onerror=1&gt; and keeps'), true);
+});
