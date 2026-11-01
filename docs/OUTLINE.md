@@ -132,7 +132,7 @@ Each level lists **concept** / **OTel nuance** / **Dash0 tie-in** / **mechanic**
 | --- | --- | --- | --- | --- |
 | 6.1 Head sampling | Decide at the root; `parentbased_traceidratio` | Child services must respect the parent's decision or traces break | n/a | Trade-off |
 | 6.2 Tail sampling | Keep errors and slow traces, sample the rest | Memory and decision-wait cost; sampled RED metrics need span metrics computed before sampling | n/a | Trade-off + Spot it |
-| 6.3 What costs money | Volume, cardinality, retention | Per-GB vs per-host vs per-signal pricing changes what you optimise | Dash0 prices per signal (spans, log records, metric data points), with cost visible per service | Trade-off |
+| 6.3 What costs money | Volume, cardinality, retention | Per-GB vs per-host vs per-signal pricing changes what you optimise | Dash0 prices per signal (spans, log records, metric data points), with telemetry volume visible per service | Trade-off |
 
 ### Act 7: Alerting and SLOs ("Wake me only when it matters")
 
