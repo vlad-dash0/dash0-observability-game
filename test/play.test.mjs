@@ -164,20 +164,20 @@ test('lib/play.mjs never charges a penalty itself (PI1)', () => {
 // ---- registry: the play key ----------------------------------------------------
 
 test('a play level derives its mechanics in order of first appearance', () => {
-  assert.deepEqual([...FX.mechanics], ['sort', 'build', 'incident']);
-  assert.equal(validatePlay(playFixture().play).mechanics.join(), 'sort,build,incident');
+  assert.deepEqual([...FX.mechanics], ['sort', 'build', 'incident', 'spot']);
+  assert.equal(validatePlay(playFixture().play).mechanics.join(), 'sort,build,incident,spot');
 });
 
 test('a declared mechanics list that equals the derived one is accepted', () => {
-  const lv = { ...playFixture(), mechanics: ['sort', 'build', 'incident'] };
-  assert.deepEqual([...build(lv).levels[ID].mechanics], ['sort', 'build', 'incident']);
+  const lv = { ...playFixture(), mechanics: ['sort', 'build', 'incident', 'spot'] };
+  assert.deepEqual([...build(lv).levels[ID].mechanics], ['sort', 'build', 'incident', 'spot']);
 });
 
 test('registry errors for run and play together, no kit, differing mechanics, a function', () => {
   assert.deepEqual(errorsOf({ ...playFixture(), run() {} }), [`${AT}: declares both run and play; use one`]);
   assert.deepEqual(errorsOf(playFixture(), { play: undefined }), [`${AT}: play needs the step kit (buildRegistry option "play")`]);
   assert.deepEqual(errorsOf({ ...playFixture(), mechanics: ['build'] }), [
-    `${AT}: declares mechanics ["build"] but its steps give ["sort","build","incident"]; fix or remove mechanics`,
+    `${AT}: declares mechanics ["build"] but its steps give ["sort","build","incident","spot"]; fix or remove mechanics`,
   ]);
   const lv = playFixture();
   lv.play.steps[0].choice.choices[0].why = () => 'x';
@@ -190,7 +190,7 @@ test('two bad steps are two errors, not one', () => {
   const lv = playFixture();
   lv.play.steps = [{ intro: 'x' }, { intro: 'y', choice: lv.play.steps[0].choice, sort: lv.play.steps[1].sort }];
   assert.deepEqual(errorsOf(lv), [
-    `${AT}: step 1 has no step type (one of choice, sort, build, incident)`,
+    `${AT}: step 1 has no step type (one of choice, sort, build, incident, spot)`,
     `${AT}: step 2 has two step types ("choice", "sort")`,
   ]);
   assert.throws(() => build(lv), RegistryError);
@@ -215,7 +215,7 @@ test('a run level keeps play null', () => {
 
 test('the live registry passes the kit, so it builds play levels', () => {
   const reg = liveRegistry(act([playFixture()]), [FIXTURE_CARD]);
-  assert.deepEqual([...reg.levels[ID].mechanics], ['sort', 'build', 'incident']);
+  assert.deepEqual([...reg.levels[ID].mechanics], ['sort', 'build', 'incident', 'spot']);
 });
 
 // ---- validatePlay: the author-facing messages (§5) ------------------------------

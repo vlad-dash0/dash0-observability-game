@@ -21,6 +21,7 @@ const ANSWERS = {
     'sort fx-sort: server=auto loyalty=manual',
     'build fx-tree: aaaaaaaaaaaaaaa2.parent=aaaaaaaaaaaaaaa1',
     'incident checkout-slow: traces,db-metrics > slow-query',
+    'spot fx-spot: user',
   ],
 };
 

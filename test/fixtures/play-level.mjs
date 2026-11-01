@@ -63,6 +63,22 @@ export function playFixture() {
           code: '<img src=x onerror=alert(1)>',
           incident: incidentScenario(),
         },
+        {
+          intro: 'One attribute on this span will blow up your bill.',
+          question: 'Spot the attribute that has unbounded values.',
+          spot: {
+            id: 'fx-spot',
+            target: 'span',
+            lines: [
+              { id: 'route', text: 'http.route=/pay' },
+              { id: 'user', text: 'user.id=8841' },
+              { id: 'status', text: 'http.status_code=200' },
+            ],
+            faults: ['user'],
+            whyNot: { route: 'A route comes from a small fixed set.' },
+            explain: 'A user id has a new value for every user.',
+          },
+        },
       ],
       finish: 'You played every live step type.',
     },
