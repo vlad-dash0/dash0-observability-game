@@ -5,13 +5,20 @@ signals, OpenTelemetry and the details that trip people up, and how Dash0 ties i
 together. You join a small company as its new on-call engineer and level up by
 instrumenting, querying and debugging a system that gets more complex as you go.
 
-Status: **M0 foundation**: the app shell, CI and static checks are in; the hub, level
-platform and first level are being built (design: [docs/FOUNDATION.md](docs/FOUNDATION.md)).
+Status: **M0 and M1 are done** (the M1 vertical slice). Playable today: Act 0
+(Orientation) and its boss; Act 2 (Traces), levels 2.1 to 2.7, and its boss "Checkout
+is slow"; plus 1.2 Naming your service from M0. Level widgets: Choice, Sort it, Build it
+(trace waterfall), env-config, the incident engine and triage. The level list is in
+[docs/OUTLINE.md](docs/OUTLINE.md) §4; the registry is `levels/index.mjs`. **Ask the
+guide has not shipped**: it was in the original M1 scope and is now a separate track.
+Next is the platform milestone (OUTLINE §8). Foundation design:
+[docs/FOUNDATION.md](docs/FOUNDATION.md); M1 design: [docs/M1-DESIGN.md](docs/M1-DESIGN.md).
 
 - [docs/OUTLINE.md](docs/OUTLINE.md): game structure, curriculum (acts and levels), OTel
   nuances, how Dash0 fits in, and open questions
 - [docs/GLOSSARY.md](docs/GLOSSARY.md): the glossary the game teaches and links to
 - [docs/FOUNDATION.md](docs/FOUNDATION.md): M0 design (contracts, invariants, test spec)
+- [docs/M1-DESIGN.md](docs/M1-DESIGN.md): M1 design (Act 0 and Act 2 content, widgets)
 
 ## Run and test
 
