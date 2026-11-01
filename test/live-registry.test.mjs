@@ -34,6 +34,7 @@ const EXPECTED_ORDER = [
   'histograms',
   'promql-basics',
   'cardinality',
+  'exemplars',
   'red-and-use',
   'structured-logs',
   'correlation',
@@ -85,7 +86,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
       no: 3,
       name: 'Metrics',
       sub: 'How much, how often',
-      levelIds: ['instruments', 'temporality', 'histograms', 'promql-basics', 'cardinality', 'red-and-use'],
+      levelIds: ['instruments', 'temporality', 'histograms', 'promql-basics', 'cardinality', 'exemplars', 'red-and-use'],
       bossId: null,
     },
     {

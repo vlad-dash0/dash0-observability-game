@@ -1,4 +1,4 @@
-// Act 3 levels 3.1 Instruments, 3.2 Temporality, 3.3 Histograms, 3.4 PromQL basics, 3.5 Cardinality and 3.7 RED and USE beyond the generated play-through
+// Act 3 levels 3.1 Instruments, 3.2 Temporality, 3.3 Histograms, 3.4 PromQL basics, 3.5 Cardinality, 3.6 Exemplars and 3.7 RED and USE beyond the generated play-through
 // (test/play.test.mjs, test/answers.test.mjs, test/levels-play.test.mjs): the act's place in the
 // registry, unlock and map; level fields and lights; card fronts and backs; the facts the copy
 // states (docs/OUTLINE.md §4 Act 3), each checked from the level's own data. Asserts strings,
@@ -11,6 +11,7 @@ import { getDataset } from '../lib/promql/datasets.mjs';
 import { evaluate } from '../lib/promql/eval.mjs';
 import { allPlans, evaluatePlan } from '../lib/widgets/trade-off.mjs';
 import { gradeQuery } from '../lib/promql/grade.mjs';
+import { checkSpot, newSpotState, toggleLine } from '../lib/widgets/spot-it.mjs';
 import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
@@ -37,13 +38,13 @@ const rightOf = (levelId, widgetId) => choiceOf(levelId, widgetId).find((c) => c
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-3 "Metrics" holds 3.1 to 3.5 and 3.7, after Act 2, with no boss yet', () => {
+test('act-3 "Metrics" holds 3.1 to 3.7, after Act 2, with no boss yet', () => {
   const index = LIVE.acts.findIndex((a) => a.id === 'act-3');
   assert.equal(index, 3, 'act-3 follows act-0, act-1 and act-2');
   const act = LIVE.acts[index];
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 3, name: 'Metrics', sub: 'How much, how often', levelIds: ['instruments', 'temporality', 'histograms', 'promql-basics', 'cardinality', 'red-and-use'], bossId: null },
+    { no: 3, name: 'Metrics', sub: 'How much, how often', levelIds: ['instruments', 'temporality', 'histograms', 'promql-basics', 'cardinality', 'exemplars', 'red-and-use'], bossId: null },
   );
 });
 
@@ -81,6 +82,7 @@ const FIELDS = {
   histograms: { no: '3.3', name: 'Histograms', mechanics: ['query'], cards: ['averages-hide-tails'], lights: ['payment-provider'] },
   'promql-basics': { no: '3.4', name: 'PromQL basics', mechanics: ['query'], cards: ['prometheus-names'], lights: ['shipping'] },
   cardinality: { no: '3.5', name: 'Cardinality', mechanics: ['spot', 'tradeoff'], cards: ['series-are-combinations'], lights: ['postgres'] },
+  exemplars: { no: '3.6', name: 'Exemplars', mechanics: ['spot'], cards: ['exemplars-need-sampled-spans'], lights: ['payments'] },
   'red-and-use': { no: '3.7', name: 'RED and USE', mechanics: ['query'], cards: ['red-and-use'], lights: ['checkout'] },
 };
 
@@ -212,6 +214,19 @@ const CARDS = {
     dash0Angle:
       'Dash0\'s Metric Explorer tree map sizes each metric by its cardinality, so you can see what drives volume. A ' +
       'spam filter drops matching data points at ingestion, but fixing the source is the cheaper answer.',
+  },
+  'exemplars-need-sampled-spans': {
+    front: 'An exemplar links one metric measurement to its trace, but only if it was recorded inside a sampled span.',
+    back:
+      'An exemplar is a recorded measurement that keeps its value, its time, the attributes the metric point does not ' +
+      'keep, and, for a synchronous instrument, the trace_id and span_id of the span that was active when it was recorded. ' +
+      'The SDK picks exemplars as measurements are recorded: a filter decides which measurements are eligible and a ' +
+      'reservoir decides which are kept. The default filter in the specification is TraceBased, which only makes ' +
+      'measurements recorded in the context of a sampled span eligible, so a measurement made outside any span, or ' +
+      'inside a span that was sampled out, cannot become one. OTEL_METRICS_EXEMPLAR_FILTER sets the filter to ' +
+      'always_on, always_off or trace_based.',
+    specUrl: 'https://opentelemetry.io/docs/specs/otel/metrics/sdk/#exemplarfilter',
+    dash0Angle: null,
   },
   'red-and-use': {
     front:
@@ -796,4 +811,111 @@ test('cardinality: the budget intro says what a plan costs without calling the s
   assert.equal(/three metrics/.test(intro + plain(steps[2].question)), false, 'only two of the three knobs are metrics');
   const knobs = budget().knobs;
   assert.deepEqual(knobs.map((k) => /<code>(?:http\.server\.requests|recommendations\.served)<\/code>/.test(k.label)), [true, true, false]);
+});
+
+// ---- 3.6 Exemplars -----------------------------------------------------------------------
+
+const exmSpot = () => stepOf('exemplars', 'spot', 'exm-spot');
+const exmKeys = () => LIVE.levels.exemplars.play.steps.map((st) => ['choice', 'spot', 'tradeoff'].find((k) => st[k]));
+/** What an exemplar looks like in the debug view, written here a second time from the level's own text. */
+const EXEMPLAR = /exemplar: value=\d+\.\d+s trace_id=[0-9a-f]{32} span_id=[0-9a-f]{16}$/;
+const spotGrade = (spec, ids) => {
+  let state = newSpotState(spec);
+  for (const id of ids) state = toggleLine(spec, state, id).state;
+  const r = checkSpot(spec, state);
+  return { outcome: r.outcome, extra: r.extra, missing: r.missing };
+};
+
+test('lights: 3.6 lights Payments and only that node; the card and the level are in the act-3 scoring rules', () => {
+  const lit = (done) => {
+    const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
+    return NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id).sort();
+  };
+  assert.deepEqual(lit(['exemplars']), ['payments']);
+  const level = LIVE.levels.exemplars;
+  assert.deepEqual([level.actId, level.kind, level.scored, level.scoring.parMs], ['act-3', 'level', true, null]);
+  assert.equal(LIVE.acts.find((a) => a.id === 'act-3').levelIds.indexOf('exemplars'), LIVE.acts.find((a) => a.id === 'act-3').levelIds.indexOf('cardinality') + 1, 'after 3.5');
+  assert.equal(LIVE.acts.find((a) => a.id === 'act-3').levelIds.indexOf('red-and-use'), LIVE.acts.find((a) => a.id === 'act-3').levelIds.indexOf('exemplars') + 1, 'before 3.7');
+});
+
+test('exemplars: the steps are spot, then choice, and the spot step modifies no widget (config target)', () => {
+  assert.deepEqual(exmKeys(), ['spot', 'choice']);
+  assert.equal(exmSpot().target, 'config');
+});
+
+test('exemplars: the faults are exactly the points whose text carries an exemplar, and the level has no Dash0 step', () => {
+  const spec = exmSpot();
+  const withExemplar = spec.lines.filter((l) => EXEMPLAR.test(l.text)).map((l) => l.id);
+  assert.deepEqual([...spec.faults].sort(), withExemplar.sort());
+  assert.deepEqual([...spec.faults].sort(), ['pay-0914-15', 'pay-0914-30', 'pay-0915-00']);
+  assert.equal(spec.lines.length, 8);
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), spec.lines.map((l) => l.id).filter((id) => !spec.faults.includes(id)).sort(), 'every non-fault has its own whyNot');
+  assert.equal(LIVE.levels.exemplars.play.steps.length, 2, 'the Dash0 tie-in is n/a: no exemplar page in the Dash0 docs');
+});
+
+test('exemplars: puzzle shortcuts fail the real grader: all, none, every line that mentions a trace id, the spike', () => {
+  const spec = exmSpot();
+  const ids = spec.lines.map((l) => l.id);
+  assert.equal(spotGrade(spec, ids).outcome, 'wrong', 'every point');
+  assert.deepEqual(spotGrade(spec, ids).missing, [], 'selecting all misses nothing but picks the others');
+  assert.equal(spotGrade(spec, ids).extra.length, 5, 'and five points that carry no exemplar');
+  assert.equal(spotGrade(spec, []).outcome, 'empty', 'no point');
+  const mentionsTrace = spec.lines.filter((l) => /trace_id/.test(l.text)).map((l) => l.id);
+  assert.equal(mentionsTrace.length, 4, 'three exemplars and the trace_id label');
+  assert.equal(spotGrade(spec, mentionsTrace).outcome, 'wrong', 'a trace id in a label is not an exemplar');
+  const sums = spec.lines.map((l) => [l.id, Number(/sum=(\d+\.\d)s/.exec(l.text)?.[1] ?? 0)]);
+  const spike = sums.filter(([, v]) => v > 30).map(([id]) => id);
+  assert.deepEqual(spike.length, 3, 'three high points');
+  assert.equal(spotGrade(spec, spike).outcome, 'wrong', 'the spike alone is not the answer: a spike does not bring an exemplar');
+  assert.equal(spotGrade(spec, ['pay-0914-15']).outcome, 'wrong', 'a partial pick');
+  assert.equal(spotGrade(spec, [...spec.faults]).outcome, 'right');
+});
+
+test('exemplars: one exemplar is on a point that is not on the spike, and one spike point has none', () => {
+  const spec = exmSpot();
+  const sum = (id) => Number(/sum=(\d+\.\d)s/.exec(spec.lines.find((l) => l.id === id).text)[1]);
+  assert.equal(sum('pay-0914-15') < 10, true, 'an exemplar on an ordinary point');
+  assert.equal(sum('pay-0914-45') > 30 && !spec.faults.includes('pay-0914-45'), true, 'a spike point without one');
+});
+
+test('exemplars: the trace_id label and the scheduled job are named for what they are', () => {
+  const spec = exmSpot();
+  const t = (id) => plain(spec.whyNot[id]);
+  assert.equal(/label/.test(t('pay-label')) && /series/.test(t('pay-label')) && /own field|beside the point/.test(t('pay-label')), true);
+  assert.equal(/scheduler|job/.test(plain(spec.lines.find((l) => l.id === 'refund-batch').text + t('refund-batch'))), true);
+  const e = plain(spec.explain);
+  for (const w of ['trace_id', 'span_id', 'one measurement']) assert.equal(e.includes(w), true, w);
+});
+
+test('exemplars: the nuance is graded: only measurements recorded in a sampled span can become exemplars', () => {
+  const right = rightOf('exemplars', 'exm-why');
+  assert.equal(right.key, 'unsampled-or-no-span');
+  const t = plain(right.label + right.why);
+  for (const w of ['outside any span', 'not sampled', 'TraceBased', 'sampled span', 'OTEL_METRICS_EXEMPLAR_FILTER', 'always_on', 'always_off', 'reservoir']) assert.equal(t.includes(w), true, w);
+  const wrong = choiceOf('exemplars', 'exm-why').filter((c) => !c.right);
+  assert.deepEqual(wrong.map((c) => c.key).sort(), ['backend-dropped', 'errors-only']);
+  assert.equal(/AlwaysOn, AlwaysOff and TraceBased/.test(plain(wrong.find((c) => c.key === 'errors-only').why)), true);
+  assert.equal(/SDK/.test(plain(wrong.find((c) => c.key === 'backend-dropped').why)) && /reservoir/.test(plain(wrong.find((c) => c.key === 'backend-dropped').why)), true);
+  for (const c of choiceOf('exemplars', 'exm-why')) assert.equal(typeof c.why, 'string', c.key);
+});
+
+test('exemplars: every Spot it and Choice intro states the setting: head sampling and a spike on the payments histogram', () => {
+  const steps = LIVE.levels.exemplars.play.steps;
+  assert.equal(plain(steps[0].intro).includes('payments.charge.duration'), true);
+  assert.equal(/sampl/.test(plain(steps[0].intro)), true, 'the intro says traces are sampled');
+  assert.equal(plain(steps[1].question).startsWith('Why'), true);
+});
+
+test('exemplars: cites the OpenTelemetry pages its facts come from, says the Dash0 tie-in is n/a, and has no em dash', () => {
+  const src = read('levels/exemplars.mjs');
+  const urls = src.split('\n').filter((l) => /^\/\/ Spec: /.test(l)).flatMap((l) => l.match(/https:\/\/[^\s,]+/g) ?? []);
+  for (const prefix of [
+    'https://opentelemetry.io/docs/specs/otel/metrics/data-model/#exemplars',
+    'https://opentelemetry.io/docs/specs/otel/metrics/sdk/#exemplar',
+    'https://opentelemetry.io/docs/specs/otel/metrics/sdk/#exemplarfilter',
+    'https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/#exemplar',
+  ]) assert.equal(urls.includes(prefix), true, prefix);
+  assert.equal(/Dash0 tie-in: n\/a/.test(src), true);
+  assert.equal(src.includes('—'), false);
+  assert.equal(read('cards/deck.mjs').includes('—'), false);
 });

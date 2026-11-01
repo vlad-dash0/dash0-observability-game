@@ -59,6 +59,10 @@ const ANSWERS = {
     'tradeoff cdn-budget: requests=route-status served=tier customer=span-attribute',
     'choice cdn-dash0: fix-source',
   ],
+  exemplars: [
+    'spot exm-spot: pay-0914-15,pay-0914-30,pay-0915-00',
+    'choice exm-why: unsampled-or-no-span',
+  ],
   'red-and-use': [
     'choice ru-methods: red-services-use-resources',
     'choice ru-saturation: saturation',
