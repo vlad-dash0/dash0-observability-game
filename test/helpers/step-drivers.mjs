@@ -8,6 +8,7 @@
 // Adding a step type to lib/play.mjs means adding its driver here (test/play.test.mjs checks).
 import { STEP_TYPES } from '../../lib/play.mjs';
 import { waterfall } from '../../lib/widgets/trace.mjs';
+import { allPlans, evaluatePlan } from '../../lib/widgets/trade-off.mjs';
 
 const own = (o, k) => Object.hasOwn(o, k);
 const NOT_QUITE = /^Not quite\./;
@@ -105,7 +106,24 @@ const spot = {
   answerKey: (s) => `spot ${s.id}: ${s.lines.map((l) => l.id).filter((id) => s.faults.includes(id)).join(',')}`,
 };
 
-export const STEP_DRIVERS = { choice, sort, build, incident, spot };
+const tradeoffPick = (picks) => Object.entries(picks).map(([knob, option]) => `[data-knob="${knob}"][data-option="${option}"]`);
+
+const tradeoff = {
+  solve: (s) => [...tradeoffPick(s.answer), `#${s.id}-check`],
+  slips(s) {
+    // validateTradeoffSpec guarantees both exist: a plan that keeps every need but is over the
+    // cap, and one within the cap that drops a need. Picks stay set; solve() overwrites them all.
+    const evaluated = allPlans(s).map((picks) => ({ picks, ...evaluatePlan(s, picks) }));
+    const over = evaluated.find((p) => p.over > 0 && p.lost.length === 0);
+    const lost = evaluated.find((p) => p.over === 0 && p.lost.length > 0);
+    const slip = (name, p, says) => ({ name, clicks: [...tradeoffPick(p.picks), `#${s.id}-check`], says });
+    return [slip('over the cap', over, /^Not quite\. Over the cap by/), slip('drops a need', lost, /^Not quite\. It is within the cap but drops/)];
+  },
+  first: (s) => `knob:${s.knobs[0].id}`,
+  answerKey: (s) => `tradeoff ${s.id}: ${s.knobs.map((k) => `${k.id}=${s.answer[k.id]}`).join(' ')}`,
+};
+
+export const STEP_DRIVERS = { choice, sort, build, incident, spot, tradeoff };
 
 /** A play level's steps as `{step, key, spec, type, driver}` in order. */
 export function stepsOf(level) {

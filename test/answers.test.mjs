@@ -22,6 +22,7 @@ const ANSWERS = {
     'build fx-tree: aaaaaaaaaaaaaaa2.parent=aaaaaaaaaaaaaaa1',
     'incident checkout-slow: traces,db-metrics > slow-query',
     'spot fx-spot: user',
+    'tradeoff fx-budget: sampling=tail attrs=tier',
   ],
 };
 

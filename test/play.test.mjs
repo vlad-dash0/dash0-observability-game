@@ -164,20 +164,20 @@ test('lib/play.mjs never charges a penalty itself (PI1)', () => {
 // ---- registry: the play key ----------------------------------------------------
 
 test('a play level derives its mechanics in order of first appearance', () => {
-  assert.deepEqual([...FX.mechanics], ['sort', 'build', 'incident', 'spot']);
-  assert.equal(validatePlay(playFixture().play).mechanics.join(), 'sort,build,incident,spot');
+  assert.deepEqual([...FX.mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff']);
+  assert.equal(validatePlay(playFixture().play).mechanics.join(), 'sort,build,incident,spot,tradeoff');
 });
 
 test('a declared mechanics list that equals the derived one is accepted', () => {
-  const lv = { ...playFixture(), mechanics: ['sort', 'build', 'incident', 'spot'] };
-  assert.deepEqual([...build(lv).levels[ID].mechanics], ['sort', 'build', 'incident', 'spot']);
+  const lv = { ...playFixture(), mechanics: ['sort', 'build', 'incident', 'spot', 'tradeoff'] };
+  assert.deepEqual([...build(lv).levels[ID].mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff']);
 });
 
 test('registry errors for run and play together, no kit, differing mechanics, a function', () => {
   assert.deepEqual(errorsOf({ ...playFixture(), run() {} }), [`${AT}: declares both run and play; use one`]);
   assert.deepEqual(errorsOf(playFixture(), { play: undefined }), [`${AT}: play needs the step kit (buildRegistry option "play")`]);
   assert.deepEqual(errorsOf({ ...playFixture(), mechanics: ['build'] }), [
-    `${AT}: declares mechanics ["build"] but its steps give ["sort","build","incident","spot"]; fix or remove mechanics`,
+    `${AT}: declares mechanics ["build"] but its steps give ["sort","build","incident","spot","tradeoff"]; fix or remove mechanics`,
   ]);
   const lv = playFixture();
   lv.play.steps[0].choice.choices[0].why = () => 'x';
@@ -190,7 +190,7 @@ test('two bad steps are two errors, not one', () => {
   const lv = playFixture();
   lv.play.steps = [{ intro: 'x' }, { intro: 'y', choice: lv.play.steps[0].choice, sort: lv.play.steps[1].sort }];
   assert.deepEqual(errorsOf(lv), [
-    `${AT}: step 1 has no step type (one of choice, sort, build, incident, spot)`,
+    `${AT}: step 1 has no step type (one of choice, sort, build, incident, spot, tradeoff)`,
     `${AT}: step 2 has two step types ("choice", "sort")`,
   ]);
   assert.throws(() => build(lv), RegistryError);
@@ -215,7 +215,7 @@ test('a run level keeps play null', () => {
 
 test('the live registry passes the kit, so it builds play levels', () => {
   const reg = liveRegistry(act([playFixture()]), [FIXTURE_CARD]);
-  assert.deepEqual([...reg.levels[ID].mechanics], ['sort', 'build', 'incident', 'spot']);
+  assert.deepEqual([...reg.levels[ID].mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff']);
 });
 
 // ---- validatePlay: the author-facing messages (§5) ------------------------------
@@ -243,6 +243,11 @@ test('validatePlay names each problem as the design says', () => {
     [(p) => { p.steps[0].qid = p.steps[1].qid = 'same'; }, 'step 2: heading id "same" is already used by step 1'],
     [(p) => { p.steps = []; }, 'play.steps must be a non-empty array'],
     [(p) => { p.stpes = []; }, 'unknown key "stpes" on play (did you mean "steps"?)'],
+    [(p) => { p.steps[5].tradeoff.knobs[0].options[0].cst = 3; }, 'step 6 (tradeoff "fx-budget"): unknown key "cst" on option "head" of knob "sampling" (did you mean "cost"?)'],
+    [(p) => { p.steps[5].tradeoff.knobz = []; }, 'step 6 (tradeoff "fx-budget"): unknown key "knobz" on spec (did you mean "knobs"?)'],
+    [(p) => { p.steps[5].tradeoff.cap = 100; }, 'step 6 (tradeoff "fx-budget"): trade-off: every plan that keeps every need fits the cap, so the cap never bites'],
+    [(p) => { p.steps[5].tradeoff.answer.attrs = 'user'; }, 'step 6 (tradeoff "fx-budget"): answer: the reference plan is over the cap by 5'],
+    [(p) => { delete p.steps[5].question; }, 'step 6 (tradeoff "fx-budget"): needs a question'],
   ];
   for (const [edit, want] of cases) {
     const got = problems(edit);
