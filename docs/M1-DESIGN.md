@@ -181,6 +181,45 @@ checkTradeoff(spec, st) → {state, outcome: right|wrong|repeat|incomplete|solve
 - **Solvability (I7):** `validateTradeoffSpec` enumerates every plan (at most 5^5) and requires: the `answer` passes; some plan within the cap drops a need; some plan keeps every need but is over the cap. So the puzzle is a real trade-off, not a cap alone or a signal alone. The generated step driver plays the `answer`, and slips with one plan of each failing kind.
 - **A11y and focus:** feedback is `role=status aria-live=polite tabindex=-1`; the total is `aria-live=polite`; with `labelledBy` the widget is a labelled group. Focus: first radio on mount, stays on the picked radio, feedback after a Check that does not finish, `onComplete()`'s return after the last. No timers (I2).
 
+### 4.6 Query it core (M2, #4, part 1)
+Core `lib/promql/` (`lex`, `parse`, `math`, `eval`, `grade`, `datasets`). Pure, DOM-free, no timers (I2), no randomness. The view and the `query` step type are part 2; nothing here is wired into a level yet.
+```
+evaluate(dataset, time, query) → {kind:'vector', series:[{labels, value}]}   // sorted by label set
+                               | {kind:'scalar', value}
+                               | {kind:'syntax', message, at}               // at = character offset
+                               | {kind:'unsupported', what}
+                               | {kind:'error', message}                    // runtime: many-to-one matching, duplicate label sets
+gradeQuery(dataset|name, time, query, referenceQuery) → {ok:true, result} | {ok:false, reason, result, ...detail}
+parse(text) → {kind:'ok', ast} | the failure results above        getDataset(name), datasetNames(), DATASETS
+Dataset = {id, title, meta, series: [{labels: {__name__, ...}, samples: [[t, v]]}]}   // seconds, ascending
+```
+**Supported subset** (anything else is `unsupported`, never a wrong verdict; a syntax error is only for text that is not PromQL):
+
+| Feature | Supported | Notes |
+|---|---|---|
+| Selectors | `name`, `name{l="v", l!="v", l=~"re", l!~"re"}`, `{__name__="n", ...}` | at least one matcher must not match `""`; an absent label equals `""`; regexes fully anchored |
+| Range vectors | `sel[5m]`, `[1h30m]`, units `ms s m h d w y` | only as the argument of `rate`/`increase` |
+| Functions | `rate`, `increase`, `histogram_quantile(φ, v)` | `φ` is any scalar expression |
+| Aggregation | `sum avg min max count`, `by (…)`, `without (…)`, clause before or after the argument | no clause = one group |
+| Arithmetic | `+ - * /`, unary `-`, parentheses, number literals (`1e3`, `Inf`, `NaN`) | precedence `* /` over `+ -`, left-associative |
+| Comparison filters | `== != < > <= >=` between vector and scalar, scalar and vector, vector and vector | keeps the vector's sample; no `bool` |
+| Vector matching | one-to-one on identical label sets (ignoring `__name__`), `on(…)`, `ignoring(…)` | many-to-one is a runtime `error` |
+
+**Unsupported (reported as such):** `offset`, `@`, subqueries (`[5m:1m]`), `bool`, `and`/`or`/`unless`/`atan2`, `^`, `%`, `group_left`/`group_right`, string literals, a bare range vector as the result, aggregations `topk bottomk quantile stddev stdvar count_values group limitk limit_ratio`, and every other Prometheus function (`irate`, `delta`, `*_over_time`, `label_replace`, `abs`, `clamp*`, `time`, `vector`, ...: the full list is `KNOWN_FUNCS` in `parse.mjs`). A name that is not a Prometheus function is a `syntax` error ("unknown function"). Type errors (`rate(x)`, `sum(x[5m])`, `1 > 2`) are `syntax` errors, as in Prometheus.
+
+**Semantics (Prometheus 3.x; docs: [basics](https://prometheus.io/docs/prometheus/latest/querying/basics/), [operators](https://prometheus.io/docs/prometheus/latest/querying/operators/), [functions](https://prometheus.io/docs/prometheus/latest/querying/functions/)):**
+- *Instant selector:* the newest sample in `(t - 300s, t]` (default 5m lookback delta; left-open, as in 3.x). No staleness markers.
+- *Range window* of `[R]` at `t` is `(t - R, t]`, left-open (3.x; 2.x was closed).
+- *`rate`/`increase`* port `extrapolatedRate`: both treat the series as a counter; a sample below its predecessor is a reset and adds the predecessor. `delta = last - first (+ resets)`. With `sampled = lastT - firstT` and `avg = sampled / (n - 1)`: start gap `toStart = firstT - (t - R)`, then clamped to `sampled * first / delta` (the counter was never negative) when `delta > 0 && first >= 0`; end gap `toEnd = t - lastT`. A gap `>= 1.1 * avg` extrapolates by `avg / 2`, a smaller gap by the whole gap; the start gap is reduced to `avg / 2` first and only then clamped (the 3.x order, `promql/functions.go` `extrapolatedRate` at v3.0.0; 2.x clamped first). `increase = delta * (sampled + startExt + endExt) / sampled`; `rate` divides that by `R` (the selector range). Fewer than 2 samples in the window: the series is absent, not 0. So `increase(x[R]) / R` equals `rate(x[R])`. Both drop `__name__`.
+- *`histogram_quantile`* ports `bucketQuantile` for classic buckets: series are grouped by every label except `le` and `__name__`; a series with no parsable `le` is ignored; buckets are sorted, equal bounds summed, counts made monotonic (raised to the predecessor). `rank = φ * total`; the first finite bucket with `count >= rank` is interpolated linearly from its lower bound (0 for the first bucket, unless its bound is `<= 0`, which answers that bound); a rank above every finite bucket (inside +Inf) answers the highest finite bound. No `+Inf` bucket, fewer than 2 buckets or zero observations: NaN (a result, not absence); `φ < 0` is `-Inf`, `φ > 1` is `+Inf`.
+- *Aggregation* drops `__name__`; `by` keeps only the listed labels, `without` drops them. `min`/`max` ignore NaN unless all inputs are NaN. An aggregate over no series is empty (not 0).
+- *Binary operators:* arithmetic drops `__name__`, comparison filters keep it. A vector with no partner is dropped; with `on(…)` the result carries only those labels. Duplicate label sets in a result are an `error`, as in Prometheus. `x / 0` is `±Inf`, `0 / 0` is NaN, kept as samples.
+- **Deviations (deliberate, smallest-thing):** `avg` is `sum / count` (Prometheus uses an incremental mean, differences are below the grading tolerance); histogram monotonic fix is a plain running max (newer Prometheus also ignores tiny float-noise deltas); string escapes follow Go (`\\ \" \' \n \t \r \a \b \f \v \xNN \uNNNN \UNNNNNNNN \NNN`; `\'` only in single quotes, `\"` only in double; backticks take none) and any other escape is a `syntax` error, so a regex digit class is `"\\d+"`; `=~` uses JavaScript regular expressions anchored with `^(?:…)$` (Prometheus uses RE2: lookaheads and backreferences work here and would not there); no native histograms, no staleness markers, no `-query.lookback-delta` override, no `@`/`offset`; hex literals and quoted UTF-8 label names are not lexed.
+
+**Grading:** `gradeQuery` evaluates the reference query (a text) and the learner's query on the same dataset at the same `time` and compares the RESULT series, never the query text, so any equivalent formulation passes. Both results are sorted by label set. Order of checks, first hit wins: `syntax` (+`message`, `at`), `unsupported` (+`what`), `error` (+`message`) → `empty` (vector with no series) → `wrong-count` → `wrong-labels` (same count, different label sets; a scalar answer to a vector question, or the reverse, also lands here; `__name__` is part of the label set) → `wrong-values` (a value outside tolerance) → `{ok:true}`. Scalar vs scalar compares by value. Tolerance: `|a-b| <= 1e-9 + 1e-6 * max(|a|,|b|)`; NaN equals NaN, infinities equal themselves. `result` (the learner's evaluation) rides along so the view can show it; it is never a hint at the reference. A reference that gives no data (or fails) is an authoring bug and throws, so the I7 check is: every level's reference query grades `ok` against itself on its dataset.
+
+**Datasets:** `DATASETS = {name: generator}` in `datasets.mjs`, read through `getDataset(name)` (built once, deep-frozen, throws on an unknown name). A level names a dataset (and an eval time) and never inlines series. `checkout-http`: scrape every 15s for t = 0..3600; `http_server_requests_total{service,route,status}`, `http_server_request_duration_seconds_{bucket{le},sum,count}{service,route}` for checkout `/pay` `/quote` and cart `/add` `/view`. At `meta.deployAt` = 2400 the checkout counters reset (pods restart, so `rate` must cope) and `/pay` gets slower (p99 0.9s → 2.5s) and failing (1/30 → 1/4 of requests); other routes do not change. `meta.end` = 3600 is the natural eval time. The generator's per-scrape table is the single source for every figure in `test/promql-datasets.test.mjs`.
+
 ## 5. Phases (one PR each, never stacked, each mergeable to main)
 
 | # | Phase | Owner | Depends | Must not batch |
