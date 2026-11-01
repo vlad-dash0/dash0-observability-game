@@ -78,7 +78,17 @@ A level file keeps today's metadata (FOUNDATION §2.1) and declares `play` inste
 
 ### Worked example: 2.7 `auto-vs-manual`
 
-`SORT`, `WHY` and `FIX` stay byte-identical (`:11-95`). The header comment, Spec lines and the `CONTENT` export stay (existing tests import it, #71 AC4). Imports used only by `run`, and `run` itself, go.
+`SORT`, `WHY` and `FIX` stay byte-identical (`:11-95`). The header comment and Spec lines stay. `CONTENT` stays exported (existing tests import it, #71 AC4) but is **derived from `play`**, so every question and answer has one home and the pin reads exactly what the player sees. Imports used only by `run`, and `run` itself, go.
+
+```js
+const PLAY = { prefix: 'avm', steps: [ /* as below */ ], finish: '…' };
+// Kept for the existing pins; derived from PLAY, never written by hand.
+export const CONTENT = {
+  steps: PLAY.steps.map((s) => s.choice ? { id: s.choice.id, question: s.question, choices: s.choice.choices } : s.sort ? { sort: s.sort } : { build: s.build }),
+};
+```
+
+The level's default export then uses `play: PLAY`. The derivation must reproduce today's `CONTENT` shape exactly (the P3 empty-diff gate proves it).
 
 ```js
 export default {
@@ -323,7 +333,7 @@ There is no hybrid "mostly steps plus one hook". Two clean modes are cheaper to 
 - the-pager.
 
 In each migration PR (#71 AC4: existing tests unchanged and green):
-- The level keeps its `CONTENT` export and its `mechanics` (checked equal to the derived list), and steps set `qid` to the current heading ids, so no existing test line changes. `PIN`, `SLIPS` and `DRIVERS` stay byte-identical: they are the proof that behaviour is identical.
+- The level keeps its `CONTENT` export (derived from `play`, never a second hand-written copy) and its `mechanics` (checked equal to the derived list), and steps set `qid` to the current heading ids, so no existing test line changes. `PIN`, `SLIPS` and `DRIVERS` stay byte-identical: they are the proof that behaviour is identical.
 - The only test edits allowed are additions (the `ANSWERS` line). If a migration cannot avoid editing an existing test line, it stops and the PR body names the line and why, for the user to decide.
 
 ## 8. Phased plan (one PR each, never stacked, each mergeable to main)
@@ -332,7 +342,7 @@ In each migration PR (#71 AC4: existing tests unchanged and green):
 |---|---|---|---|---|
 | P1 | `validateChoiceSpec` pulled out of `mountChoice`; no "at least 2" rule here, because `choice.test.mjs:260-268` mounts a single choice and expects the "rendered" error | backend | – | `test/choice.test.mjs` adds: valid → `[]`; 0 or 2 rights → `needs exactly one right answer, has N`; duplicate key; non-string why; `null` → a problem, no throw. Existing assertions unchanged. [drop the rights check in the validator → the new test and the existing `mountChoice` test both go red, proving the delegation] |
 | P2 | Platform: `lib/play.mjs`, registry `play` key and option, `liveRegistry`, `test/fixtures/play-level.mjs` (one step of each live type), `test/helpers/step-drivers.mjs`, `test/play.test.mjs`, `test/answers.test.mjs`, derived drivers in `levels-play`, `levels/index.mjs` "TO ADD A LEVEL" comment, FOUNDATION §2.1 and §2.4 | backend (registry, validate) + frontend (runner) | P1 | (a) fixture clean run 3★ with cards = `level.cards` [runner passes `cards: []`]; (b) each slip exactly 2★ [drop `ctx.mistake()` in `mountChoice`]; (c) Next disabled before solve [render Next without `disabled`]; (d) focus walk ends on `#fx-finish` [`onDone` returns undefined]; (e) registry errors: both run and play, no kit, declared mechanics differing from derived (equal is accepted), function in play, two bad steps → 2 errors [return on first]; (f) built `play` is frozen and survives mutation of the source [skip the clone]; (g) derived mechanics `['sort','build','incident']` [count choice]; (h) `code` `<img onerror>` renders escaped [drop `e()`]; (i) `lib/play.mjs` source has no `mistake(` or `hint(` [add one on Next]; (j) the suite ran ≥1 level [drop the fixture]; (k) a second clean run of the same level starts at step 1 with 3★ [module-level step index] |
-| P3 | Migrate 2.7 (keeps `CONTENT` and current heading ids via `qid`; no existing test line edited) | frontend | P2 | Add `'auto-vs-manual'` to `ANSWERS` → red (gap: not a play level); migrate; `git diff` of existing test files is empty; `PIN`, `SLIPS` and `DRIVERS` byte-identical [swap `right` from two-setups to retries → `ANSWERS`, `PIN` and the clean run go red] |
+| P3 | Migrate 2.7 (keeps `CONTENT` and current heading ids via `qid`; no existing test line edited) | frontend | P2 | Add `'auto-vs-manual'` to `ANSWERS` → red (gap: not a play level); migrate; `git diff` of existing test files is empty; `PIN`, `SLIPS` and `DRIVERS` byte-identical [swap `right` from two-setups to retries → `ANSWERS`, `PIN` and the clean run go red; change a question string in `play` → the `PIN` goes red, proving `CONTENT` is derived] |
 | P4 | Migrate 0.1–0.3, 2.3, 2.5 (optional) | frontend | P3 | as P3, per level |
 | P5 | Migrate 2.1, 2.6 (2.4 optional, last) | frontend | P3 | as P3; build answer key lines |
 | – | #3, #4, #5, #7 | per issue | P2 | a step type plus a driver plus a thin play level; generated suites cover it |
