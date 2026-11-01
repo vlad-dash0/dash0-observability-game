@@ -102,8 +102,8 @@ for (const [id, want] of Object.entries(FIELDS)) {
   });
 }
 
-test('steps: 6.1 is one Trade-off step; 6.2 is a Trade-off step and then a Spot it step, and neither has a Configure it step', () => {
-  assert.deepEqual(stepKinds('head-sampling'), ['tradeoff']);
+test('steps: 6.1 is a Trade-off step and a closing Choice step; 6.2 is a Trade-off step and then a Spot it step; no Configure it step', () => {
+  assert.deepEqual(stepKinds('head-sampling'), ['tradeoff', 'choice']);
   assert.deepEqual(stepKinds('tail-sampling'), ['tradeoff', 'spot']);
 });
 
@@ -240,6 +240,23 @@ test('head sampling: the nuance is graded: the wrong options say why a child tha
   assert.equal(label.includes('always_on'), true);
   assert.equal(label.includes('3,360'), true);
   assert.equal(plain(option(spec, 'sampler', 'defaults').label).includes('parentbased_always_on'), true, 'the default sampler is named');
+});
+
+test('head sampling: the closing Choice grades the nuance in words: a child that decides on its own, not the root\'s flag, breaks traces', () => {
+  const choices = stepOf('head-sampling', 'choice', 'hs-why').choices;
+  assert.deepEqual(choices.map((c) => c.key).sort(), ['header-lost', 'own-decision', 'ratio-stacks']);
+  assert.deepEqual(choices.filter((c) => c.right).map((c) => c.key), ['own-decision']);
+  const rightChoice = choices.find((c) => c.right);
+  const right = plain(rightChoice.label + rightChoice.why);
+  for (const w of ['always_on', 'traceidratio', 'sampled flag', 'traceparent', 'ParentBased', 'root', 'holes', 'ignore']) assert.equal(right.includes(w), true, w);
+  assert.equal(/consistent across|same decision in every SDK/.test(right), false, 'no claim that TraceIdRatioBased agrees across SDKs');
+  const lost = plain(choices.find((c) => c.key === 'header-lost').why);
+  for (const w of ['propagat', 'sampler']) assert.equal(lost.includes(w), true, w);
+  const stacks = plain(choices.find((c) => c.key === 'ratio-stacks').why);
+  for (const w of ['never runs', 'again']) assert.equal(stacks.includes(w), true, w);
+  const step = LIVE.levels['head-sampling'].play.steps[1];
+  assert.equal(step.qid, 'hs-q-why');
+  assert.equal(plain(step.intro).includes('always_on'), true);
 });
 
 test('head sampling: the explain states the plan, the env vars, and what head sampling cannot do', () => {

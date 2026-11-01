@@ -114,6 +114,26 @@ const PLAN = {
     'so it keeps 1 in 10 of the failures too. Keeping the errors is the job of tail sampling, next.',
 };
 
+// Step 2: the nuance in words. `why` follows "Right." or "Not quite.".
+const WHY = [
+  {
+    key: 'header-lost',
+    label: 'Setting a sampler on a service stops it propagating <code>traceparent</code>, so the children cannot see the root',
+    why: 'The sampler decides whether a span is recorded and exported, and propagation is separate: the sampled flag still travels in <code>traceparent</code> to the children. The children saw the root\'s decision and did not use it.',
+  },
+  {
+    key: 'own-decision',
+    label: 'A child set to <code>always_on</code> ignores the parent\'s sampled flag and samples its spans anyway, so it keeps spans of traces whose root was dropped',
+    right: true,
+    why: 'Only ParentBased uses the parent\'s decision: for a span with a parent it follows the sampled flag in <code>traceparent</code>, so a trace is kept whole or not at all. <code>always_on</code> ignores the flag and records everything, and so does <code>traceidratio</code>: the spec says TraceIdRatioBased must ignore the parent\'s sampled flag and decide again from the trace ID. Whether two services reach the same answer is not guaranteed, because the spec says its exact algorithm was never specified, which is why it recommends it only for root spans, in combination with ParentBased. Either way the children keep spans of traces whose root was dropped, and those traces have holes.',
+  },
+  {
+    key: 'ratio-stacks',
+    label: 'Each service applies its own ratio on top of the root\'s, so the chances multiply and the children keep too little',
+    why: 'Ratios do not multiply. Under ParentBased the ratio belongs to the root sampler, which never runs for a span that has a parent, so a child follows the flag. A child set to <code>always_on</code> keeps too much, not too little, and a child set to <code>traceidratio</code> decides again from the trace ID rather than stacking a second chance.',
+  },
+];
+
 export default {
   id: 'head-sampling',
   no: '6.1',
@@ -136,6 +156,14 @@ export default {
         question: 'Pick the sampler setup that fits the budget and keeps every kept trace whole.',
         qid: 'hs-q-plan',
         tradeoff: PLAN,
+      },
+      {
+        intro:
+          'A teammate sets <code>OTEL_TRACES_SAMPLER=always_on</code> on checkout and payments "so we never lose a span", and leaves storefront on <code>parentbased_traceidratio</code>. ' +
+          'Now checkout and payments spans turn up in the backend with no storefront span above them.',
+        question: 'Why do the traces have holes?',
+        qid: 'hs-q-why',
+        choice: { id: 'hs-why', choices: WHY },
       },
     ],
     finish:

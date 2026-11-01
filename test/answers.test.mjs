@@ -123,6 +123,7 @@ const ANSWERS = {
   ],
   'head-sampling': [
     'tradeoff hs-plan: sampler=ratio-10pct',
+    'choice hs-why: own-decision',
   ],
   'tail-sampling': [
     'tradeoff ts-budget: policies=errors-slow-baseline wait=wait-30s',
