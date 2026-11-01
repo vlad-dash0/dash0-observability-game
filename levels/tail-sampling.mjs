@@ -132,7 +132,9 @@ const BUDGET = {
 };
 
 // Step 2: the placement. `traces` and `traces/checkout` list tail_sampling and span_metrics together. The others each get one
-// half right, or are the receiving end of the connector.
+// half right, or are the receiving end of the connectors. Together the six lines are one config the Collector accepts (a connector
+// is exported by a traces pipeline and received by a metrics one; the traces pipelines read an `otlp` receiver the lines leave out);
+// test/act-6.test.mjs assembles them and checks that.
 const SPOT = {
   id: 'ts-spot',
   target: 'config',
@@ -142,18 +144,18 @@ const SPOT = {
     { id: 'traces-metrics', text: 'traces/metrics: processors: [memory_limiter] exporters: [span_metrics/all]' },
     { id: 'traces-sampled', text: 'traces/sampled: processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0]' },
     { id: 'traces-audit', text: 'traces/audit: processors: [memory_limiter, batch] exporters: [otlp_grpc/dash0, span_metrics/audit]' },
-    { id: 'metrics-spans', text: 'metrics/spans: receivers: [span_metrics/all] processors: [batch] exporters: [otlp_grpc/dash0]' },
+    { id: 'metrics-spans', text: 'metrics/spans: receivers: [span_metrics/web, span_metrics/checkout, span_metrics/audit, span_metrics/all] processors: [batch] exporters: [otlp_grpc/dash0]' },
   ],
   faults: ['traces', 'traces-checkout'],
   whyNot: {
     'traces-metrics': 'The connector is fed straight from the receiver side of the pipeline, with only the memory limiter in between, so it counts every span. This is the shape to aim for.',
     'traces-sampled': 'It samples, and it has no connector to feed, so nothing is counted from the kept traces. The backend gets the sampled traces from here.',
     'traces-audit': 'It lists the connector, and there is no sampling processor in this pipeline, so the connector counts every span that reaches it.',
-    'metrics-spans': 'This is the receiving end of the connector, a metrics pipeline. What it gets depends on the traces pipeline that lists the connector, and that is where to look.',
+    'metrics-spans': 'This is the receiving end of the four connectors, a metrics pipeline: a connector has to be received somewhere, or the Collector will not start. What each connector gives it depends on the traces pipeline that lists that connector, and that is where to look.',
   },
   explain:
     'A connector is an exporter at the end of one pipeline and a receiver at the start of another, so it receives what comes out of the processors of the traces pipeline that lists it. ' +
-    'Each pipeline here has its own connector, named after it, because a connector that is the exporter of several pipelines counts the spans of all of them together. ' +
+    'Each traces pipeline here has its own connector, named after it, because a connector that is the exporter of several pipelines counts the spans of all of them together, and <code>metrics/spans</code> receives all four, because a connector must be used as both an exporter and a receiver. ' +
     `In <code>traces</code> and <code>traces/checkout</code> the connector gets what <code>tail_sampling</code> kept. For a pipeline whose connector sees only the sampled spans of the ${n(TRACES)} traces a second, ` +
     `the request rate it computes is ${n(KEPT)} a second, not ${n(TRACES)}, and the error ratio is ${n(ERRORS)} of ${n(KEPT)}, ${ERROR_SHARE}%, not the real ${pct(ERROR_RATE)}, because the sampler kept every error and few of the rest. ` +
     'Compute span metrics before sampling: give the connector a traces pipeline with no sampling processor, as <code>traces/metrics</code> does, and let a pipeline like <code>traces/sampled</code> send the sampled traces to the backend. ' +
@@ -186,8 +188,8 @@ export default {
       },
       {
         intro:
-          'The same gateway computes request and error rates from spans with the <code>span_metrics</code> connector, and since the <code>tail_sampling</code> processor went in the dashboards are wrong: the request rate fell to a tenth and the error ratio jumped. ' +
-          'Here are the gateway\'s pipelines, one line each.',
+          'The same gateway computes request and error rates from spans with <code>span_metrics</code> connectors, one for each traces pipeline, and one metrics pipeline sends all four to the dashboards. Since the <code>tail_sampling</code> processor went in, the numbers from two of them are wrong: the request rate fell to a tenth and the error ratio jumped. ' +
+          'Here are the gateway\'s pipelines, one line each. The traces pipelines read the <code>otlp</code> receiver, which the lines leave out.',
         question: 'Spot the pipelines where the connector counts the wrong spans.',
         qid: 'ts-q-spot',
         spot: SPOT,

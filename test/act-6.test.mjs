@@ -16,6 +16,8 @@ import { nodeStates } from '../lib/map.mjs';
 import { isActUnlocked, levelState, lockReason } from '../lib/unlock.mjs';
 import { allPlans, checkTradeoff, evaluatePlan, newTradeoffState, pickOption, validateTradeoffSpec } from '../lib/widgets/trade-off.mjs';
 import { checkSpot, newSpotState, toggleLine, validateSpotSpec } from '../lib/widgets/spot-it.mjs';
+import { checkConfig } from '../lib/configure/check.mjs';
+import { COLLECTOR_SCHEMA } from '../lib/configure/collector.mjs';
 
 const LIVE = liveRegistry();
 const MAX_STARS = expectedStarMax(LIVE);
@@ -351,12 +353,65 @@ test('spot: the lines are valid, six pipelines, and exactly the two that feed sp
   assert.deepEqual(spec.lines.filter(rule).map((l) => l.id).sort(), [...spec.faults].sort(), 'the faults are exactly the lines that match the rule');
   assert.deepEqual([...spec.faults].sort(), ['traces', 'traces-checkout']);
   assert.equal(text('traces-metrics').includes('processors: [memory_limiter] exporters: [span_metrics/all]'), true, 'the connector fed with nothing in between');
-  assert.equal(text('metrics-spans').startsWith('metrics/spans: receivers: [span_metrics/all]'), true, 'the receiving end of the connector');
+  assert.equal(text('metrics-spans').startsWith('metrics/spans: receivers: [span_metrics/web, span_metrics/checkout, span_metrics/audit, span_metrics/all]'), true, 'the receiving end of every connector');
   // A connector that is the exporter of several pipelines counts all of them together, so each traces pipeline names its own.
   const connectors = spec.lines.flatMap((l) => (/^traces/.test(l.text) ? l.text.match(/span_metrics\/[a-z]+/g) ?? [] : []));
   assert.deepEqual(connectors.sort(), ['span_metrics/all', 'span_metrics/audit', 'span_metrics/checkout', 'span_metrics/web']);
   assert.equal(new Set(connectors).size, connectors.length, 'no connector is fed by two pipelines');
   assert.equal(spec.lines.every((l) => !l.text.includes('spanmetrics')), true, 'the current component name, span_metrics');
+});
+
+// The Spot it lines are pipelines of one gateway, so together they must be a config the Collector accepts. They are assembled
+// into one config here (the traces pipelines read the otlp receiver, which the lines leave out) and checked: every component
+// is defined (the real checkConfig), and every connector is the exporter of a traces pipeline AND the receiver of a metrics
+// pipeline (checkConfig does not model that pairing, the Collector refuses to start without it, so it is checked here).
+const assembled = (lines) => {
+  const pipelines = lines.map((text) => {
+    const [, name, body] = text.match(/^([a-z/]+): (.*)$/);
+    const fields = Object.fromEntries([...body.matchAll(/(receivers|processors|exporters): \[([^\]]*)\]/g)].map((m) => [m[1], m[2].split(',').map((s) => s.trim())]));
+    return { name, receivers: fields.receivers ?? ['otlp'], processors: fields.processors ?? [], exporters: fields.exporters };
+  });
+  const ids = (key) => [...new Set(pipelines.flatMap((p) => p[key]))];
+  const connectors = [...new Set(ids('exporters').concat(ids('receivers')).filter((id) => id.startsWith('span_metrics')))];
+  const yaml = [
+    'receivers:\n  otlp:',
+    `processors:\n${ids('processors').map((id) => `  ${id}:`).join('\n')}`,
+    'exporters:\n  otlp_grpc/dash0:',
+    `connectors:\n${connectors.map((id) => `  ${id}:`).join('\n')}`,
+    `service:\n  pipelines:\n${pipelines.map((p) => `    ${p.name}:\n      receivers: [${p.receivers.join(', ')}]\n      processors: [${p.processors.join(', ')}]\n      exporters: [${p.exporters.join(', ')}]`).join('\n')}`,
+  ].join('\n');
+  return { pipelines, yaml };
+};
+const connectorProblems = ({ pipelines }) => {
+  const problems = [];
+  const all = new Set(pipelines.flatMap((p) => [...p.exporters, ...p.receivers]).filter((id) => id.startsWith('span_metrics')));
+  for (const id of all) {
+    const exportedBy = pipelines.filter((p) => p.exporters.includes(id)).map((p) => p.name);
+    const receivedBy = pipelines.filter((p) => p.receivers.includes(id)).map((p) => p.name);
+    if (exportedBy.length === 0) problems.push(`${id} is received but never an exporter`);
+    if (receivedBy.length === 0) problems.push(`${id} is an exporter of ${exportedBy.join(',')} but no pipeline receives it`);
+    for (const n of exportedBy) if (!n.startsWith('traces')) problems.push(`${id} exported by ${n}, not a traces pipeline`);
+    for (const n of receivedBy) if (!n.startsWith('metrics')) problems.push(`${id} received by ${n}, not a metrics pipeline`);
+  }
+  return problems;
+};
+
+test('spot: all six lines together are one config the Collector accepts: every component defined, every connector exported by a traces pipeline and received by a metrics one', () => {
+  const cfg = assembled(spot().lines.map((l) => l.text));
+  const result = checkConfig(cfg.yaml, COLLECTOR_SCHEMA);
+  assert.deepEqual(result.errors.map((e) => `${e.kind} ${e.path}`), []);
+  assert.equal(result.verdict.flowing, true);
+  assert.deepEqual(result.verdict.inactive, [], 'nothing defined is left unused');
+  assert.deepEqual(connectorProblems(cfg), []);
+  assert.deepEqual(cfg.pipelines.map((p) => p.name).sort(), ['metrics/spans', 'traces', 'traces/audit', 'traces/checkout', 'traces/metrics', 'traces/sampled']);
+});
+
+test('spot: the config check has teeth: a connector nobody receives, or received but never exported, is refused', () => {
+  const lines = spot().lines.map((l) => l.text);
+  const noReceiver = lines.map((l) => l.replace('span_metrics/checkout, ', ''));
+  assert.deepEqual(connectorProblems(assembled(noReceiver)), ['span_metrics/checkout is an exporter of traces/checkout but no pipeline receives it']);
+  const noExporter = lines.map((l) => l.replace(', span_metrics/audit]', ']'));
+  assert.deepEqual(connectorProblems(assembled(noExporter)), ['span_metrics/audit is received but never an exporter']);
 });
 
 test('spot: the real grader accepts exactly the two faults; one, all, the decoys or a mix fail', () => {
