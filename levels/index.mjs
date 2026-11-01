@@ -22,12 +22,14 @@ import autoVsManual from './auto-vs-manual.mjs';
 import baggage from './baggage.mjs';
 import checkoutIsSlow from './checkout-is-slow.mjs';
 import contextPropagation from './context-propagation.mjs';
+import detectorsAndKubernetes from './detectors-and-kubernetes.mjs';
 import eventsAndLinks from './events-and-links.mjs';
 import histograms from './histograms.mjs';
 import instruments from './instruments.mjs';
 import monitoringVsObservability from './monitoring-vs-observability.mjs';
 import namingYourService from './naming-your-service.mjs';
 import promqlBasics from './promql-basics.mjs';
+import resources from './resources.mjs';
 import spanKinds from './span-kinds.mjs';
 import spansAndTraces from './spans-and-traces.mjs';
 import statusAndErrors from './status-and-errors.mjs';
@@ -50,7 +52,7 @@ export const ACTS = [
     no: 1,
     name: 'Resources and identity',
     sub: 'Who is talking?',
-    levels: [namingYourService],
+    levels: [resources, namingYourService, detectorsAndKubernetes],
     boss: null,
   },
   {

@@ -16,6 +16,18 @@ const ANSWERS = {
     'choice avm-why: two-setups',
     'choice avm-fix: keep-one',
   ],
+  resources: [
+    'sort res-sort: service-name=resource http-method=signal pod-name=resource http-route=signal host-name=resource status-code=signal cloud-region=resource url-path=signal',
+    'choice res-pod: set-once',
+    'choice res-dash0: resource-attributes',
+  ],
+  'detectors-and-kubernetes': [
+    'choice det-when: at-start',
+    'choice det-where: collector',
+    'configure det-config: receivers: otlp: protocols: grpc: processors: k8sattributes: extract: metadata: - k8s.namespace.name - k8s.pod.name - k8s.pod.uid - k8s.deployment.name - k8s.node.name batch: exporters: otlp/dash0: endpoint: ${env:DASH0_ENDPOINT} service: pipelines: traces: receivers: [otlp] processors: [k8sattributes, batch] exporters: [otlp/dash0]',
+    'choice det-rbac: pods-namespaces',
+    'choice det-dash0: operator-adds',
+  ],
   instruments: [
     'sort instr-sort: orders-placed=counter warehouse-temp=gauge queue-length=up-down-counter checkout-duration=histogram payment-declines=counter cache-hit-ratio=gauge active-requests=up-down-counter response-bytes=histogram',
     'choice instr-async: async-updown',
