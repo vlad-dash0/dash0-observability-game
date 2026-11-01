@@ -185,3 +185,9 @@ test('output is deterministic and the dataset is not mutated', () => {
   assert.equal(a, JSON.stringify(evaluate(D, 100, 'sum by (code) (req)')));
   assert.equal(before, JSON.stringify(D));
 });
+
+test('an escaped backslash gives a working regex digit class, a bare \\d is rejected', () => {
+  const d = at(1, [N('v', { a: '12' }), 1], [N('v', { a: 'ab' }), 2]);
+  assert.deepEqual(show(evaluate(d, 1, 'v{a=~"\\\\d+"}')), ['__name__=v,a=12=1']);
+  assert.equal(evaluate(d, 1, 'v{a=~"\\d+"}').kind, 'syntax');
+});

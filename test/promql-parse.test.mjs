@@ -99,3 +99,15 @@ test('syntax errors carry a message and the offset', () => {
     assert.match(r.message, msg, q);
   }
 });
+
+test('string escapes follow Go: valid ones work, unknown ones are syntax errors at the backslash', () => {
+  for (const q of ['x{a="\\\\d+"}', 'x{a="\\\\"}', 'x{a="\\""}', "x{a='\\''}", 'x{a="\\n\\t\\x41\\u0041\\U00000041\\101"}', 'x{a=`\\d`}']) {
+    assert.equal(kind(q), 'ok', q);
+  }
+  const bad = { 'x{a=~"\\d+"}': 6, 'x{a="\\."}': 5, "x{a=\"\\'\"}": 5, "x{a='\\\"'}": 5, 'x{a="\\x4"}': 5, 'x{a="\\400"}': 5, 'x{a="\\"}': 4, 'x{a="\\U00110000"}': 5, 'x{a="\\ud800"}': 5 };
+  for (const [q, at] of Object.entries(bad)) {
+    const r = parse(q);
+    assert.equal(r.kind, 'syntax', q + ' -> ' + detail(q));
+    assert.equal(r.at, at, q);
+  }
+});

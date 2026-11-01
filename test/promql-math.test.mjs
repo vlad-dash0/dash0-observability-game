@@ -19,10 +19,16 @@ test('rate divides the extrapolated increase by the range, not by the sampled in
   assert.ok(approx(extrapolatedDelta(s, 0, 60, 60, true), 1));
 });
 
-test('extrapolation to the start stops where the counter would have been zero', () => {
-  // t=20,30,40 values 2,4,6; delta 4 over 20s. Zero is 10s before t=20 (20 * 2/4), that is
-  // inside the 11s threshold -> +10. End gap 20 >= 11 -> + half an interval (5). 35/20 * 4 = 7.
-  assert.ok(approx(INCREASE(S([20, 2], [30, 4], [40, 6])), 7));
+test('start gap: replaced by half a spacing first (3.x), then clamped to the zero point', () => {
+  // t=20,30,40 values 2,4,6; delta 4 over 20s, avg 10, threshold 11. Start gap 20 >= 11 -> 5, and
+  // the zero point (20 * 2/4 = 10s back) is further than that, so it stays 5. End gap 20 -> 5.
+  // 30/20 * 4 = 6. (Prometheus 2.x clamped first, gave 10 + 5 and 7: this pins the 3.x order.)
+  assert.ok(approx(INCREASE(S([20, 2], [30, 4], [40, 6])), 6));
+});
+
+test('the zero clamp bites when the zero point is closer than half a spacing', () => {
+  // values 0.5,2.5,4.5: zero point 20 * 0.5/4 = 2.5s back < 5 -> start +2.5, end +5: 27.5/20 * 4 = 5.5.
+  assert.ok(approx(INCREASE(S([20, 0.5], [30, 2.5], [40, 4.5])), 5.5));
 });
 
 test('a gap at the end extrapolates by half a sample interval only', () => {
