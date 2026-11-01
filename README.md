@@ -19,6 +19,7 @@ Next is the platform milestone (OUTLINE §8). Foundation design:
 - [docs/GLOSSARY.md](docs/GLOSSARY.md): the glossary the game teaches and links to
 - [docs/FOUNDATION.md](docs/FOUNDATION.md): M0 design (contracts, invariants, test spec)
 - [docs/M1-DESIGN.md](docs/M1-DESIGN.md): M1 design (Act 0 and Act 2 content, widgets)
+- [docs/DECLARATIVE-LEVELS.md](docs/DECLARATIVE-LEVELS.md): M2 declarative level format (#71)
 
 ## Run and test
 
