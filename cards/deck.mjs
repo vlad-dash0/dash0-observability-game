@@ -365,8 +365,9 @@ export const DECK = [
       'host and a port with no path. For OTLP/HTTP, OTEL_EXPORTER_OTLP_ENDPOINT is a base URL: the exporter adds /v1/traces, ' +
       '/v1/metrics or /v1/logs to it. The per-signal variables, such as OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, are used as they ' +
       'are, with no path added: set to http://collector:4318 it sends traces to the root path, so it has to carry /v1/traces ' +
-      "itself. The Collector's otlphttp exporter follows the same rule: endpoint is a base URL that gets the signal path, " +
-      'traces_endpoint is used as is.',
+      "itself. The Collector's otlp_http exporter follows the same rule: endpoint is a base URL that gets the signal path, " +
+      'traces_endpoint is used as is. Its gRPC counterpart, otlp_grpc, takes a host and a port with no path. In Collector v0.164.0 ' +
+      'otlp and otlphttp are deprecated aliases for these two exporter types and still resolve.',
     specUrl: 'https://opentelemetry.io/docs/specs/otel/protocol/exporter/#endpoint-urls-for-otlphttp',
     dash0Angle:
       'Dash0 takes OTLP over gRPC and over HTTP. The Collector example in the Dash0 docs uses the OTLP/gRPC ingress endpoint ' +
@@ -431,7 +432,7 @@ export const DECK = [
     back:
       'The project ships pre-built Collector distributions (core, contrib, k8s, otlp and an eBPF profiling one), ' +
       'and each ships a different set of components, listed in its manifest.yaml and in the Distributions row of ' +
-      'each component README. batch, memory_limiter and the otlp exporter are in core, contrib and k8s. ' +
+      'each component README. batch, memory_limiter and the otlp_grpc exporter are in core, contrib and k8s. ' +
       'k8sattributes, redaction and tail_sampling are in contrib and k8s but not core, and vendor exporters such as ' +
       'awss3 and awsxray are in contrib only. A config that names a component the binary does not contain stops the ' +
       'Collector with an unknown type error. When no distribution has what you need, including a component your ' +

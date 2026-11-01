@@ -2,8 +2,8 @@
 // player follows it from the data-arrival view (eu-west is flat at zero, the other clusters are normal), to
 // the Collector pods in that cluster (restarting, never ready), to the Collector's own log (the config is
 // invalid: a pipeline lists an exporter that is not configured), to the config diff and the rollout time
-// (the rollout renamed the exporter `otlp/dash0` to `otlp/dash0-eu` in `exporters` and left the three
-// pipelines listing `otlp/dash0`). Four views hold the chain (clues); two are red herrings; three are
+// (the rollout renamed the exporter `otlp_grpc/dash0` to `otlp_grpc/dash0-eu` in `exporters` and left the three
+// pipelines listing `otlp_grpc/dash0`). Four views hold the chain (clues); two are red herrings; three are
 // neutral. Scored. A plain-data Scenario for the incident engine, played through one declarative
 // `incident` step (lib/widgets/incident.mjs, docs/M1-DESIGN.md §4.3, docs/DECLARATIVE-LEVELS.md §2),
 // then one closing Choice on the rule that was broken.
@@ -21,7 +21,7 @@
 //
 // Facts used, each from the sources above:
 // - Component ids follow `type[/name]`; the same type can be defined more than once as long as the ids are
-//   unique, so `otlp/dash0` and `otlp/dash0-eu` are two different exporters (configuration docs).
+//   unique, so `otlp_grpc/dash0` and `otlp_grpc/dash0-eu` are two different exporters (configuration docs).
 // - Before a receiver, processor or exporter goes into a pipeline its configuration must be defined in its
 //   own section, and a component that is configured but not listed under `service` is not enabled
 //   (configuration docs, Service section; the same rules 5.1 teaches).
@@ -38,11 +38,11 @@
 // - `k8s.cluster.name` is a resource attribute, `k8s.container.restart.count` is a metric, and
 //   `k8s.container.status.last_terminated_reason` has `Error` among its example values (Kubernetes semconv).
 // - The gRPC exporter takes a `host:port` endpoint; a wrong port is not a config validation error, so it
-//   would show up while the Collector runs (otlp exporter README). Not used as a fact beyond that.
+//   would show up while the Collector runs (otlp_grpc exporter README). Not used as a fact beyond that.
 //
 // Invented for the game: the clusters, pod names, counts, times, the PR title and the Helm-style rollout; the
 // timestamps on the two log lines (the lines themselves use the forms quoted above, with `exporter` and
-// `otlp/dash0` in place of the README's processor and `nop`); that the rollout starts the new pods only after
+// `otlp_grpc/dash0` in place of the README's processor and `nop`); that the rollout starts the new pods only after
 // stopping the old ones (a Deployment can be set to do that), which is why eu-west goes to zero and not to half.
 // The Collector's error names one pipeline, not all three: the validation returns at the first error it finds, and
 // it walks the pipelines in a Go map, whose iteration order is random, so Go map iteration order picks which of
@@ -100,8 +100,8 @@ const SCENARIO = {
       kind: 'clue',
       html:
         `<p>The log of the last terminated container of <code>${POD_A}</code>. A restart prints these two lines and nothing else, naming one of the three pipelines (traces, metrics or logs) each time:</p>` +
-        '<pre><code>Error: invalid configuration: service::pipelines::traces: references exporter "otlp/dash0" which is not configured\n' +
-        '2026/11/01 14:21:07 collector server run finished with error: invalid configuration: service::pipelines::traces: references exporter "otlp/dash0" which is not configured</code></pre>' +
+        '<pre><code>Error: invalid configuration: service::pipelines::traces: references exporter "otlp_grpc/dash0" which is not configured\n' +
+        '2026/11/01 14:21:07 collector server run finished with error: invalid configuration: service::pipelines::traces: references exporter "otlp_grpc/dash0" which is not configured</code></pre>' +
         '<p>The Collector reads its configuration, finds it invalid and exits. It never gets as far as receiving data.</p>',
     },
     {
@@ -113,23 +113,23 @@ const SCENARIO = {
         '<p>ConfigMap <code>otel-collector-config</code>. The change "Name the exporter by region" was merged at 14:01 and ' +
         'applied to eu-west at 14:02, the first cluster in the rollout. us-east, us-west and ap-south are scheduled for tomorrow and still run the previous config.</p>' +
         '<pre><code>   exporters:\n' +
-        '-    otlp/dash0:\n' +
-        '+    otlp/dash0-eu:\n' +
+        '-    otlp_grpc/dash0:\n' +
+        '+    otlp_grpc/dash0-eu:\n' +
         '       endpoint: ${env:DASH0_ENDPOINT}\n' +
         '   service:\n' +
         '     pipelines:\n' +
         '       traces:\n' +
         '         receivers: [otlp]\n' +
         '         processors: [memory_limiter, batch]\n' +
-        '         exporters: [otlp/dash0]\n' +
+        '         exporters: [otlp_grpc/dash0]\n' +
         '       metrics:\n' +
         '         receivers: [otlp]\n' +
         '         processors: [memory_limiter, batch]\n' +
-        '         exporters: [otlp/dash0]\n' +
+        '         exporters: [otlp_grpc/dash0]\n' +
         '       logs:\n' +
         '         receivers: [otlp]\n' +
         '         processors: [memory_limiter, batch]\n' +
-        '         exporters: [otlp/dash0]</code></pre>' +
+        '         exporters: [otlp_grpc/dash0]</code></pre>' +
         '<p>Nothing else changed: the receivers, the endpoint and the processors are as before.</p>',
     },
     {
@@ -175,9 +175,9 @@ const SCENARIO = {
   hypotheses: [
     {
       id: 'exporter-renamed',
-      label: 'The rollout renamed the exporter to otlp/dash0-eu, but service.pipelines still lists otlp/dash0, so the Collector in eu-west refuses to start',
+      label: 'The rollout renamed the exporter to otlp_grpc/dash0-eu, but service.pipelines still lists otlp_grpc/dash0, so the Collector in eu-west refuses to start',
       right: true,
-      why: 'All three signals stopped in eu-west at 14:02 and nowhere else, the Collector pods there restart and are never ready, and their log says the configuration is invalid: a pipeline references exporter "otlp/dash0", which is not configured. The diff, merged at 14:01 and applied to eu-west at 14:02, renamed that exporter and left the three pipelines listing the old id. An id a pipeline lists must be defined, so the Collector exits at validation.',
+      why: 'All three signals stopped in eu-west at 14:02 and nowhere else, the Collector pods there restart and are never ready, and their log says the configuration is invalid: a pipeline references exporter "otlp_grpc/dash0", which is not configured. The diff, merged at 14:01 and applied to eu-west at 14:02, renamed that exporter and left the three pipelines listing the old id. An id a pipeline lists must be defined, so the Collector exits at validation.',
     },
     {
       id: 'memory-limiter',
@@ -206,19 +206,19 @@ const RULE = [
   {
     key: 'listed-must-be-defined',
     label:
-      'Every id listed in <code>service.pipelines</code> must be defined in its own section. The pipelines listed <code>otlp/dash0</code>, which the config no longer defined, so the Collector failed validation and exited',
+      'Every id listed in <code>service.pipelines</code> must be defined in its own section. The pipelines listed <code>otlp_grpc/dash0</code>, which the config no longer defined, so the Collector failed validation and exited',
     right: true,
-    why: 'The Collector checks every receiver, processor and exporter a pipeline lists against the config and returns "references exporter ... which is not configured", an error, before it starts anything. Renaming the definition to <code>otlp/dash0-eu</code> without changing the three pipelines left every exporter list pointing at nothing.',
+    why: 'The Collector checks every receiver, processor and exporter a pipeline lists against the config and returns "references exporter ... which is not configured", an error, before it starts anything. Renaming the definition to <code>otlp_grpc/dash0-eu</code> without changing the three pipelines left every exporter list pointing at nothing.',
   },
   {
     key: 'defined-not-listed',
-    label: 'The new <code>otlp/dash0-eu</code> exporter is defined but listed in no pipeline, so it does nothing and the pipelines run without it',
-    why: 'The first half is true: a component that is defined but not listed does nothing (level 5.1). It is not what stopped the data. The pipelines also list <code>otlp/dash0</code>, which nothing defines, and an id that is listed but not defined is an error that stops the Collector, not an exporter that is skipped.',
+    label: 'The new <code>otlp_grpc/dash0-eu</code> exporter is defined but listed in no pipeline, so it does nothing and the pipelines run without it',
+    why: 'The first half is true: a component that is defined but not listed does nothing (level 5.1). It is not what stopped the data. The pipelines also list <code>otlp_grpc/dash0</code>, which nothing defines, and an id that is listed but not defined is an error that stops the Collector, not an exporter that is skipped.',
   },
   {
     key: 'same-exporter',
-    label: 'The part after the slash is only a label, so <code>otlp/dash0</code> and <code>otlp/dash0-eu</code> are the same exporter and the rename changes nothing',
-    why: 'Ids follow <code>type[/name]</code>, and the full id is what identifies a component: the same type can be defined many times as long as the ids are different. <code>otlp/dash0</code> and <code>otlp/dash0-eu</code> are different exporters, and only the second is defined.',
+    label: 'The part after the slash is only a label, so <code>otlp_grpc/dash0</code> and <code>otlp_grpc/dash0-eu</code> are the same exporter and the rename changes nothing',
+    why: 'Ids follow <code>type[/name]</code>, and the full id is what identifies a component: the same type can be defined many times as long as the ids are different. <code>otlp_grpc/dash0</code> and <code>otlp_grpc/dash0-eu</code> are different exporters, and only the second is defined.',
   },
 ];
 

@@ -6,10 +6,12 @@
 // Spec: https://opentelemetry.io/docs/collector/distributions/ , https://opentelemetry.io/docs/collector/extend/ocb/ , https://opentelemetry.io/docs/collector/components/processor/
 // Docs (GitHub, not an allowed Spec host): https://github.com/open-telemetry/opentelemetry-collector-releases/blob/main/distributions/otelcol/manifest.yaml , https://github.com/open-telemetry/opentelemetry-collector-releases/blob/main/distributions/otelcol-contrib/manifest.yaml , https://github.com/open-telemetry/opentelemetry-collector-releases/blob/main/distributions/otelcol-k8s/manifest.yaml , https://github.com/open-telemetry/opentelemetry-collector-releases/blob/main/distributions/otelcol-k8s/README.md , https://github.com/open-telemetry/opentelemetry-collector-releases/blob/main/distributions/otelcol-contrib/README.md
 //
+// Docs (exporter type names, Collector v0.164.0): https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/otlpexporter/metadata.yaml , https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/otlphttpexporter/metadata.yaml
+//
 // What is taught is the part that does not change: a distribution is a fixed set of components
 // compiled into one binary, and a config can only use what is in it. The items are components whose
 // distribution list is the same on their README, on the processors, receivers and exporters pages of
-// the docs and in the manifests (v0.164.0): batch, memory_limiter and the otlp exporter (core,
+// the docs and in the manifests (v0.164.0): batch, memory_limiter and the otlp_grpc exporter (core,
 // contrib, k8s); k8sattributes, redaction and tail_sampling (contrib, k8s); the awss3 and awsxray
 // exporters (contrib only). The core distribution has been gaining components (transform, filter and
 // attributes are in its manifest while some component pages still list contrib and k8s), and the
@@ -76,8 +78,8 @@ const SORT = {
       bucket: 'contrib-only',
       why: 'A vendor exporter: only the contrib distribution ships it.',
       whyNot: {
-        'all-three': 'The core distribution has a short exporter list (otlp, debug, file and a few more), and this is not on it.',
-        'contrib-k8s': 'The k8s distribution ships a short list of exporters (otlp, otlphttp, otelarrow, load_balancing, nop, debug and file), so a vendor exporter is not in it.',
+        'all-three': 'The core distribution has a short exporter list (otlp_grpc, debug, file and a few more), and this is not on it.',
+        'contrib-k8s': 'The k8s distribution ships a short list of exporters (otlp_grpc, otlp_http, otelarrow, load_balancing, nop, debug and file), so a vendor exporter is not in it.',
         none: 'The contrib distribution ships it, so it is not a custom build.',
       },
     },
@@ -127,7 +129,7 @@ const SORT = {
     },
     {
       id: 'otlp-exporter',
-      label: 'otlp (exporter)',
+      label: 'otlp_grpc (exporter)',
       bucket: 'all-three',
       why: 'The OTLP exporter is in core, so contrib and k8s have it too (the otlp distribution ships it as well).',
       whyNot: {
@@ -142,8 +144,8 @@ const SORT = {
       bucket: 'contrib-only',
       why: 'A vendor exporter: only the contrib distribution ships it.',
       whyNot: {
-        'all-three': 'The core distribution has a short exporter list (otlp, debug, file and a few more), and this is not on it.',
-        'contrib-k8s': 'The k8s distribution ships a short list of exporters (otlp, otlphttp, otelarrow, load_balancing, nop, debug and file), so a vendor exporter is not in it.',
+        'all-three': 'The core distribution has a short exporter list (otlp_grpc, debug, file and a few more), and this is not on it.',
+        'contrib-k8s': 'The k8s distribution ships a short list of exporters (otlp_grpc, otlp_http, otelarrow, load_balancing, nop, debug and file), so a vendor exporter is not in it.',
         none: 'The contrib distribution ships it, so it is not a custom build.',
       },
     },

@@ -94,7 +94,7 @@ const CARDS = {
     back:
       'The project ships pre-built Collector distributions (core, contrib, k8s, otlp and an eBPF profiling one), and each ships a ' +
       'different set of components, listed in its manifest.yaml and in the Distributions row of each component README. batch, ' +
-      'memory_limiter and the otlp exporter are in core, contrib and k8s. k8sattributes, redaction and tail_sampling are in contrib ' +
+      'memory_limiter and the otlp_grpc exporter are in core, contrib and k8s. k8sattributes, redaction and tail_sampling are in contrib ' +
       'and k8s but not core, and vendor exporters such as awss3 and awsxray are in contrib only. A config that names a component the ' +
       'binary does not contain stops the Collector with an unknown type error. When no distribution has what you need, including a ' +
       'component your team wrote, build your own with ocb, the OpenTelemetry Collector Builder, from a manifest that lists the components ' +
@@ -194,7 +194,7 @@ const without = (text, ...parts) => parts.reduce((t, p) => { assert.equal(t.incl
 const PII_DEF = /  transform\/pii:\n(?:    .*\n|      .*\n)+?(?=  batch:)/;
 const LISTED = '      processors: [memory_limiter, transform/pii, batch]\n';
 const PLAIN = '      processors: [memory_limiter, batch]\n';
-const pipeline = (name, procs) => `    ${name}:\n      receivers: [otlp]\n${procs}      exporters: [otlp/dash0]\n`;
+const pipeline = (name, procs) => `    ${name}:\n      receivers: [otlp]\n${procs}      exporters: [otlp_grpc/dash0]\n`;
 
 test('ottl config: the given cannot start (logs names transform/redact, which is not defined) and traces has no redaction', () => {
   const given = checkConfig(config().given, COLLECTOR_SCHEMA);
@@ -212,7 +212,7 @@ test('ottl config: the reference starts, flows traces and logs, lists transform/
   assert.deepEqual(ref.verdict.inactive, []);
   for (const name of ['traces', 'logs']) {
     assert.deepEqual(ref.doc.service.pipelines[name].processors, ['memory_limiter', 'transform/pii', 'batch'], name);
-    assert.deepEqual(ref.doc.service.pipelines[name].exporters, ['otlp/dash0'], name);
+    assert.deepEqual(ref.doc.service.pipelines[name].exporters, ['otlp_grpc/dash0'], name);
   }
   assert.deepEqual(ref.doc.processors['transform/pii'].trace_statements, ['delete_key(span.attributes, "user.email")']);
   assert.deepEqual(ref.doc.processors['transform/pii'].log_statements, ['delete_key(log.attributes, "user.email")']);
@@ -258,7 +258,7 @@ test('ottl config shortcut: a new pipeline with the redaction beside the unredac
 });
 
 test('ottl config shortcut: listing the processor as an exporter is refused by the checker', () => {
-  const asExporter = REF().replace(LISTED, PLAIN).replace('exporters: [otlp/dash0]\n    logs', 'exporters: [otlp/dash0, transform/pii]\n    logs');
+  const asExporter = REF().replace(LISTED, PLAIN).replace('exporters: [otlp_grpc/dash0]\n    logs', 'exporters: [otlp_grpc/dash0, transform/pii]\n    logs');
   const r = run(asExporter);
   assert.deepEqual(verdictOf(r), { outcome: 'wrong', reason: 'invalid', unmet: undefined });
   assert.equal(r.result.errors.some((e) => e.kind === 'unknown-ref'), true);
@@ -362,7 +362,8 @@ test('distributions sort: k8sattributes is in contrib and k8s, not core; batch, 
   for (const id of ['awss3-exporter', 'awsxray-exporter']) {
     const w = plain(by(id).whyNot['contrib-k8s']);
     assert.equal(/only OTLP|allows only/.test(w), false, `${id}: the k8s list is not only OTLP`);
-    for (const e of ['otlp', 'otlphttp', 'otelarrow', 'load_balancing', 'nop', 'debug', 'file']) assert.equal(w.includes(e), true, `${id} names ${e}`);
+    for (const e of ['otlp_grpc', 'otlp_http', 'otelarrow', 'load_balancing', 'nop', 'debug', 'file']) assert.equal(w.includes(e), true, `${id} names ${e}`);
+    assert.equal(plain(by(id).whyNot['all-three']).includes('(otlp_grpc, debug, file'), true, `${id}: the core list names otlp_grpc`);
   }
   assert.equal(/ocb|OCB|build/.test(plain(by('acme-scrubber').why)), true, 'a component nobody ships is built with OCB');
 });

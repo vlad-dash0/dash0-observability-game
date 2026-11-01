@@ -1,10 +1,11 @@
 // Level 5.3: OTLP endpoints. The player says which port an OTLP/HTTP client uses (4318, not the gRPC 4317),
 // where a per-signal endpoint variable sends traces (as is, with no /v1/traces added, unlike the general
-// OTEL_EXPORTER_OTLP_ENDPOINT), wires the Collector's otlp/dash0 exporter into the traces and metrics
+// OTEL_EXPORTER_OTLP_ENDPOINT), wires the Collector's otlp_grpc/dash0 exporter into the traces and metrics
 // pipelines so the Collector starts, and says where the Dash0 auth token goes (an Authorization: Bearer header).
 // Spec: docs/OUTLINE.md §4 Act 5.
 // Spec: https://opentelemetry.io/docs/specs/otel/protocol/exporter/ , https://opentelemetry.io/docs/specs/otlp/
 // Docs (GitHub READMEs, not an allowed Spec host): https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/otlpexporter/README.md , https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/otlphttpexporter/README.md , https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/extension/headerssetterextension/README.md
+// Docs (exporter type names, Collector v0.164.0): https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/otlpexporter/metadata.yaml , https://github.com/open-telemetry/opentelemetry-collector/blob/main/exporter/otlphttpexporter/metadata.yaml (`type` is the current name, `deprecated_type` the old one) , https://github.com/open-telemetry/opentelemetry-collector/blob/main/CHANGELOG.md (v0.144.0: #14403, #14396)
 // Dash0 docs (not an allowed Spec host): https://www.dash0.com/docs/dash0/monitoring/websites/proxying-the-ingestion-endpoint , https://www.dash0.com/docs/dash0/monitoring/kubernetes/dash0-operator/configuration , https://www.dash0.com/docs/dash0/opentelemetry/distributions/python/configuration , https://www.dash0.com/docs/dash0/miscellaneous/glossary/endpoints , https://www.dash0.com/docs/dash0/opentelemetry/distributions/python/exporters
 //
 // Facts used: OTLP/gRPC defaults to port 4317 and OTLP/HTTP to 4318 (the OTLP spec). With OTEL_EXPORTER_OTLP_ENDPOINT
@@ -15,7 +16,7 @@
 // header, read from an environment variable in its Collector example. The only token shown is the made-up auth_token_example.
 //
 // COLLECTOR_SCHEMA (docs/M1-DESIGN.md §4.8) does not model component settings, so the configure step grades the wiring
-// (`uses` requires otlp/dash0 in the traces and the metrics pipeline) and says so. A minimal schema extension to also
+// (`uses` requires otlp_grpc/dash0 in the traces and the metrics pipeline) and says so. A minimal schema extension to also
 // grade `endpoint`, `auth` or `headers` was not worth it: those are free-form per component, so grading one key would
 // special-case one component in the shared schema. The port and path nuances are graded by the Choice steps instead.
 
@@ -60,7 +61,7 @@ const SIGNAL = [
 ];
 
 // Step 3: the config. The given sends traces to the debug exporter only and names an exporter nobody defined in
-// metrics (the Collector would refuse to start); otlp/dash0 is defined, with its auth, and listed nowhere.
+// metrics (the Collector would refuse to start); otlp_grpc/dash0 is defined, with its auth, and listed nowhere.
 const GIVEN = [
   'extensions:',
   '  headers_setter:',
@@ -79,7 +80,7 @@ const GIVEN = [
   '  batch:',
   'exporters:',
   '  debug:',
-  '  otlp/dash0:',
+  '  otlp_grpc/dash0:',
   '    endpoint: ${env:DASH0_ENDPOINT}',
   '    auth:',
   '      authenticator: headers_setter',
@@ -93,26 +94,26 @@ const GIVEN = [
   '    metrics:',
   '      receivers: [otlp]',
   '      processors: [batch]',
-  '      exporters: [otlphttp/dash0]',
+  '      exporters: [otlp_http/dash0]',
   '',
 ].join('\n');
 
-const REFERENCE = GIVEN.replace('exporters: [debug]', 'exporters: [debug, otlp/dash0]').replace('exporters: [otlphttp/dash0]', 'exporters: [otlp/dash0]');
+const REFERENCE = GIVEN.replace('exporters: [debug]', 'exporters: [debug, otlp_grpc/dash0]').replace('exporters: [otlp_http/dash0]', 'exporters: [otlp_grpc/dash0]');
 
 const CONFIG = {
   id: 'otlp-config',
   schema: 'collector',
   given: GIVEN,
   reference: REFERENCE,
-  uses: { traces: ['otlp/dash0'], metrics: ['otlp/dash0'] },
+  uses: { traces: ['otlp_grpc/dash0'], metrics: ['otlp_grpc/dash0'] },
   hint: 'Two things are off. Which exporter does the <code>metrics</code> pipeline name, and is it defined? And which exporters does <code>traces</code> list: does any of them reach Dash0?',
   explain:
-    'A pipeline sends data only to the exporters it lists, and an exporter that is defined but not listed does nothing: <code>otlp/dash0</code> was defined and listed nowhere, ' +
-    'while <code>metrics</code> named an <code>otlphttp/dash0</code> that nobody defined, so the Collector would not start. ' +
-    '<code>otlp</code> is the Collector\'s OTLP/gRPC exporter: its <code>endpoint</code> is a host and a port with no path, and it sends the token in an <code>Authorization</code> header that the ' +
-    '<code>headers_setter</code> extension adds, read from an environment variable. <code>otlphttp</code> is the HTTP exporter, another component: its endpoint is a base URL that gets the signal path, ' +
+    'A pipeline sends data only to the exporters it lists, and an exporter that is defined but not listed does nothing: <code>otlp_grpc/dash0</code> was defined and listed nowhere, ' +
+    'while <code>metrics</code> named an <code>otlp_http/dash0</code> that nobody defined, so the Collector would not start. ' +
+    '<code>otlp_grpc</code> is the Collector\'s OTLP/gRPC exporter: its <code>endpoint</code> is a host and a port with no path, and it sends the token in an <code>Authorization</code> header that the ' +
+    '<code>headers_setter</code> extension adds, read from an environment variable. <code>otlp_http</code> is the HTTP exporter, another component: its endpoint is a base URL that gets the signal path, ' +
     'and <code>traces_endpoint</code> is used as is. Pointing the pipelines at the debug exporter or deleting a pipeline would leave a pipeline without Dash0, ' +
-    'and a second Dash0 exporter under another name would be a different component, so this task asks for <code>otlp/dash0</code> in both. This game checks the wiring, not the settings, so the headers and endpoints are the next question\'s business.',
+    'and a second Dash0 exporter under another name would be a different component, so this task asks for <code>otlp_grpc/dash0</code> in both. This game checks the wiring, not the settings, so the headers and endpoints are the next question\'s business.',
 };
 
 // Step 4: the token. `why` follows "Right." or "Not quite.".
@@ -166,9 +167,9 @@ export default {
       },
       {
         intro:
-          'The Collector in front of the apps accepts both transports, on 4317 and 4318, and should send to Dash0 through the exporter <code>otlp/dash0</code>. ' +
+          'The Collector in front of the apps accepts both transports, on 4317 and 4318, and should send to Dash0 through the exporter <code>otlp_grpc/dash0</code>. ' +
           'Its config is half done: traces go to the debug exporter only, and metrics name an exporter nobody defined, so it will not start.',
-        question: 'Fix the config so the Collector starts and both traces and metrics go to Dash0 through <code>otlp/dash0</code>.',
+        question: 'Fix the config so the Collector starts and both traces and metrics go to Dash0 through <code>otlp_grpc/dash0</code>.',
         qid: 'otlp-q-config',
         configure: CONFIG,
       },

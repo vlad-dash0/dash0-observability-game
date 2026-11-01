@@ -86,7 +86,7 @@ const ANSWERS = {
   ],
   pipelines: [
     'choice pipe-connector: connector',
-    'configure pipe-config: extensions: health_check: receivers: otlp: protocols: grpc: processors: memory_limiter: check_interval: 1s limit_mib: 400 spike_limit_mib: 100 batch: exporters: otlp/dash0: endpoint: ${env:DASH0_ENDPOINT} service: extensions: [health_check] pipelines: traces: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp/dash0] metrics: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp/dash0]',
+    'configure pipe-config: extensions: health_check: receivers: otlp: protocols: grpc: processors: memory_limiter: check_interval: 1s limit_mib: 400 spike_limit_mib: 100 batch: exporters: otlp_grpc/dash0: endpoint: ${env:DASH0_ENDPOINT} service: extensions: [health_check] pipelines: traces: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp_grpc/dash0] metrics: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp_grpc/dash0]',
     'choice pipe-extension: service-extensions',
   ],
   'order-matters': [
@@ -97,13 +97,13 @@ const ANSWERS = {
   'otlp-endpoints': [
     'choice otlp-port: http-port',
     'choice otlp-signal: as-is',
-    'configure otlp-config: extensions: headers_setter: headers: - action: insert key: Authorization value: "Bearer ${env:DASH0_TOKEN}" receivers: otlp: protocols: grpc: endpoint: 0.0.0.0:4317 http: endpoint: 0.0.0.0:4318 processors: batch: exporters: debug: otlp/dash0: endpoint: ${env:DASH0_ENDPOINT} auth: authenticator: headers_setter service: extensions: [headers_setter] pipelines: traces: receivers: [otlp] processors: [batch] exporters: [debug, otlp/dash0] metrics: receivers: [otlp] processors: [batch] exporters: [otlp/dash0]',
+    'configure otlp-config: extensions: headers_setter: headers: - action: insert key: Authorization value: "Bearer ${env:DASH0_TOKEN}" receivers: otlp: protocols: grpc: endpoint: 0.0.0.0:4317 http: endpoint: 0.0.0.0:4318 processors: batch: exporters: debug: otlp_grpc/dash0: endpoint: ${env:DASH0_ENDPOINT} auth: authenticator: headers_setter service: extensions: [headers_setter] pipelines: traces: receivers: [otlp] processors: [batch] exporters: [debug, otlp_grpc/dash0] metrics: receivers: [otlp] processors: [batch] exporters: [otlp_grpc/dash0]',
     'choice otlp-token: header',
   ],
   'agent-vs-gateway': [
     'choice agw-pattern: gateway',
     'choice agw-why: same-instance',
-    'configure agw-config: receivers: otlp: protocols: grpc: endpoint: 0.0.0.0:4317 processors: memory_limiter: check_interval: 1s limit_mib: 400 batch: exporters: otlp/gateway: endpoint: gateway-collector:4317 load_balancing: routing_key: traceID protocol: otlp: tls: insecure: true resolver: dns: hostname: gateway-collector-headless service: pipelines: traces: receivers: [otlp] processors: [memory_limiter, batch] exporters: [load_balancing] metrics: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp/gateway]',
+    'configure agw-config: receivers: otlp: protocols: grpc: endpoint: 0.0.0.0:4317 processors: memory_limiter: check_interval: 1s limit_mib: 400 batch: exporters: otlp_grpc/gateway: endpoint: gateway-collector:4317 load_balancing: routing_key: traceID protocol: otlp: tls: insecure: true resolver: dns: hostname: gateway-collector-headless service: pipelines: traces: receivers: [otlp] processors: [memory_limiter, batch] exporters: [load_balancing] metrics: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp_grpc/gateway]',
     'choice agw-key: trace-id',
   ],
   'collecting-logs': [
@@ -132,7 +132,7 @@ const ANSWERS = {
   'ottl-and-transforms': [
     'choice ottl-rename: set-then-delete',
     'spot ottl-spot: resource-map,copy-only,admin-only,typo-key',
-    'configure ottl-config: receivers: otlp: protocols: grpc: processors: memory_limiter: check_interval: 1s limit_mib: 400 spike_limit_mib: 100 transform/pii: error_mode: ignore trace_statements: - delete_key(span.attributes, "user.email") log_statements: - delete_key(log.attributes, "user.email") batch: exporters: otlp/dash0: endpoint: ${env:DASH0_ENDPOINT} service: pipelines: traces: receivers: [otlp] processors: [memory_limiter, transform/pii, batch] exporters: [otlp/dash0] logs: receivers: [otlp] processors: [memory_limiter, transform/pii, batch] exporters: [otlp/dash0]',
+    'configure ottl-config: receivers: otlp: protocols: grpc: processors: memory_limiter: check_interval: 1s limit_mib: 400 spike_limit_mib: 100 transform/pii: error_mode: ignore trace_statements: - delete_key(span.attributes, "user.email") log_statements: - delete_key(log.attributes, "user.email") batch: exporters: otlp_grpc/dash0: endpoint: ${env:DASH0_ENDPOINT} service: pipelines: traces: receivers: [otlp] processors: [memory_limiter, transform/pii, batch] exporters: [otlp_grpc/dash0] logs: receivers: [otlp] processors: [memory_limiter, transform/pii, batch] exporters: [otlp_grpc/dash0]',
     'choice ottl-backend: pipeline',
   ],
   distributions: [

@@ -239,14 +239,14 @@ test('pipelines config: renaming memory_limiter (a new id used everywhere) is a 
 });
 
 test('pipelines config: deleting the metrics pipeline leaves a required pipeline that does not flow', () => {
-  const noMetrics = REF().replace(/    metrics:\n      receivers: \[otlp\]\n      processors: \[memory_limiter, batch\]\n      exporters: \[otlp\/dash0\]\n/, '');
+  const noMetrics = REF().replace(/    metrics:\n      receivers: \[otlp\]\n      processors: \[memory_limiter, batch\]\n      exporters: \[otlp_grpc\/dash0\]\n/, '');
   assert.equal(noMetrics.includes('metrics:'), false);
   assert.equal(checkConfig(noMetrics, COLLECTOR_SCHEMA).ok, true);
   assert.deepEqual(verdictOf(run(noMetrics)), { outcome: 'wrong', reason: 'target', unmet: ['metrics'] });
 });
 
 test('pipelines config: memory_limiter under a pipeline stage that is not processors is refused by the checker', () => {
-  const stage = REF().replace('exporters: [otlp/dash0]\n    metrics', 'exporters: [otlp/dash0, memory_limiter]\n    metrics');
+  const stage = REF().replace('exporters: [otlp_grpc/dash0]\n    metrics', 'exporters: [otlp_grpc/dash0, memory_limiter]\n    metrics');
   assert.notEqual(stage, REF());
   const r = run(stage);
   assert.deepEqual(verdictOf(r), { outcome: 'wrong', reason: 'invalid', unmet: undefined });
