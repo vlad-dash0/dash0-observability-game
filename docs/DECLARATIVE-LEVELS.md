@@ -36,12 +36,12 @@ Evidence:
 
 ## 2. The declarative level
 
-A level file keeps today's metadata (FOUNDATION §2.1), declares `play` instead of `run`, and does not declare `mechanics`.
+A level file keeps today's metadata (FOUNDATION §2.1) and declares `play` instead of `run`. New levels omit `mechanics`.
 
 | Field | Rule |
 |---|---|
 | `id`, `no`, `name`, `sub`, `icon`, `rewardTitle`, `cards`, `lights`, `scored`, `scoring` | unchanged (FOUNDATION §2.1) |
-| `mechanics` | forbidden with `play`: derived from the step types, in order of first appearance |
+| `mechanics` | derived from the step types, in order of first appearance. Optional with `play`: if declared it must equal the derived list (registry error otherwise). Migrated levels keep it because existing tests read it from the raw export (`act-2.test.mjs:349`, `act-0.test.mjs:145`); new levels omit it |
 | `run` | forbidden with `play`; required without it |
 | `play.prefix` | optional plain token; default is `id`. Sets the button ids `<prefix>-next` and `<prefix>-finish` |
 | `play.steps` | non-empty array of steps |
@@ -212,7 +212,7 @@ Each type also has a test driver in `test/helpers/step-drivers.mjs` (§4). Addin
 | Fact | Sites today | After (play levels) |
 |---|---|---|
 | cards awarded on finish | `level.cards` plus `finish({cards})` in all 13 levels | `runPlay` passes `level.cards`; one home. Run-levels keep theirs, guarded by `levels-play` "card … is not in level.cards" (`levels-play.test.mjs:488-490`) |
-| level mechanics | hand-written per level | derived by `validatePlay`; declaring it with `play` is an error |
+| level mechanics | hand-written per level | derived by `validatePlay`, the one source; a declared value must equal it (registry error otherwise) |
 | choice spec validity | only inside `mountChoice` (`choice.mjs:51-63`) | `validateChoiceSpec`; `mountChoice` calls it (like `mountSort` → `validateSortSpec`, `sort-it-view.mjs:75`) |
 | Next/Finish markup, gating, `data-finish` | 13 copies | `runPlay` only |
 | reference answer solvable (I7) | per-act test loops (`act-2.test.mjs:358-393`), plus `validateBuildSpec` and `validateScenario` | each type's `validate`, run when the registry is built, plus the generated suite. The per-act loops stay (not deleted in M2) |
@@ -277,12 +277,12 @@ Run when the registry is built; all errors are collected into one `RegistryError
 - the `finish` text length;
 - every type's `validate`.
 
-The registry adds: run and play are mutually exclusive, play requires the kit, `mechanics` is forbidden with play, and the derived mechanics are non-empty.
+The registry adds: run and play are mutually exclusive, play requires the kit, a declared `mechanics` equals the derived list, and the derived mechanics are non-empty.
 
 **Messages an author sees** (prefix `level "<id>": `):
 - `declares both run and play; use one`
 - `play needs the step kit (buildRegistry option "play")`
-- `must not declare "mechanics" with play (derived from its steps: sort)`
+- `declares mechanics ["build"] but its steps give ["sort"]; fix or remove mechanics`
 - `play must be plain data: steps[1].choice.choices[0].why is a function; write run(ctx) for custom behaviour`
 - `step 2: unknown key "inrto" (did you mean "intro"?)`
 - `step 2 has no step type (one of choice, sort, build, incident)` / `step 2 has two step types ("choice", "sort")`
@@ -323,7 +323,7 @@ There is no hybrid "mostly steps plus one hook". Two clean modes are cheaper to 
 - the-pager.
 
 In each migration PR (#71 AC4: existing tests unchanged and green):
-- The level keeps its `CONTENT` export, and steps set `qid` to the current heading ids, so no existing test line changes. `PIN`, `SLIPS` and `DRIVERS` stay byte-identical: they are the proof that behaviour is identical.
+- The level keeps its `CONTENT` export and its `mechanics` (checked equal to the derived list), and steps set `qid` to the current heading ids, so no existing test line changes. `PIN`, `SLIPS` and `DRIVERS` stay byte-identical: they are the proof that behaviour is identical.
 - The only test edits allowed are additions (the `ANSWERS` line). If a migration cannot avoid editing an existing test line, it stops and the PR body names the line and why, for the user to decide.
 
 ## 8. Phased plan (one PR each, never stacked, each mergeable to main)
@@ -331,7 +331,7 @@ In each migration PR (#71 AC4: existing tests unchanged and green):
 | # | Phase | Owner | Depends on | RED (one-line mutation in brackets) |
 |---|---|---|---|---|
 | P1 | `validateChoiceSpec` pulled out of `mountChoice`; no "at least 2" rule here, because `choice.test.mjs:260-268` mounts a single choice and expects the "rendered" error | backend | – | `test/choice.test.mjs` adds: valid → `[]`; 0 or 2 rights → `needs exactly one right answer, has N`; duplicate key; non-string why; `null` → a problem, no throw. Existing assertions unchanged. [drop the rights check in the validator → the new test and the existing `mountChoice` test both go red, proving the delegation] |
-| P2 | Platform: `lib/play.mjs`, registry `play` key and option, `liveRegistry`, `test/fixtures/play-level.mjs` (one step of each live type), `test/helpers/step-drivers.mjs`, `test/play.test.mjs`, `test/answers.test.mjs`, derived drivers in `levels-play`, `levels/index.mjs` "TO ADD A LEVEL" comment, FOUNDATION §2.1 and §2.4 | backend (registry, validate) + frontend (runner) | P1 | (a) fixture clean run 3★ with cards = `level.cards` [runner passes `cards: []`]; (b) each slip exactly 2★ [drop `ctx.mistake()` in `mountChoice`]; (c) Next disabled before solve [render Next without `disabled`]; (d) focus walk ends on `#fx-finish` [`onDone` returns undefined]; (e) registry errors: both run and play, no kit, mechanics declared, function in play, two bad steps → 2 errors [return on first]; (f) built `play` is frozen and survives mutation of the source [skip the clone]; (g) derived mechanics `['sort','build','incident']` [count choice]; (h) `code` `<img onerror>` renders escaped [drop `e()`]; (i) `lib/play.mjs` source has no `mistake(` or `hint(` [add one on Next]; (j) the suite ran ≥1 level [drop the fixture]; (k) a second clean run of the same level starts at step 1 with 3★ [module-level step index] |
+| P2 | Platform: `lib/play.mjs`, registry `play` key and option, `liveRegistry`, `test/fixtures/play-level.mjs` (one step of each live type), `test/helpers/step-drivers.mjs`, `test/play.test.mjs`, `test/answers.test.mjs`, derived drivers in `levels-play`, `levels/index.mjs` "TO ADD A LEVEL" comment, FOUNDATION §2.1 and §2.4 | backend (registry, validate) + frontend (runner) | P1 | (a) fixture clean run 3★ with cards = `level.cards` [runner passes `cards: []`]; (b) each slip exactly 2★ [drop `ctx.mistake()` in `mountChoice`]; (c) Next disabled before solve [render Next without `disabled`]; (d) focus walk ends on `#fx-finish` [`onDone` returns undefined]; (e) registry errors: both run and play, no kit, declared mechanics differing from derived (equal is accepted), function in play, two bad steps → 2 errors [return on first]; (f) built `play` is frozen and survives mutation of the source [skip the clone]; (g) derived mechanics `['sort','build','incident']` [count choice]; (h) `code` `<img onerror>` renders escaped [drop `e()`]; (i) `lib/play.mjs` source has no `mistake(` or `hint(` [add one on Next]; (j) the suite ran ≥1 level [drop the fixture]; (k) a second clean run of the same level starts at step 1 with 3★ [module-level step index] |
 | P3 | Migrate 2.7 (keeps `CONTENT` and current heading ids via `qid`; no existing test line edited) | frontend | P2 | Add `'auto-vs-manual'` to `ANSWERS` → red (gap: not a play level); migrate; `git diff` of existing test files is empty; `PIN`, `SLIPS` and `DRIVERS` byte-identical [swap `right` from two-setups to retries → `ANSWERS`, `PIN` and the clean run go red] |
 | P4 | Migrate 0.1–0.3, 2.3, 2.5 (optional) | frontend | P3 | as P3, per level |
 | P5 | Migrate 2.1, 2.6 (2.4 optional, last) | frontend | P3 | as P3; build answer key lines |
