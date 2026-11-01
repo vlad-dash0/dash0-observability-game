@@ -49,6 +49,7 @@ import temporality from './temporality.mjs';
 import the3amErrors from './the-3am-errors.mjs';
 import thePager from './the-pager.mjs';
 import theSignals from './the-signals.mjs';
+import whoIsTalking from './who-is-talking.mjs';
 import whyOpentelemetry from './why-opentelemetry.mjs';
 
 export const ACTS = [
@@ -66,7 +67,7 @@ export const ACTS = [
     name: 'Resources and identity',
     sub: 'Who is talking?',
     levels: [resources, namingYourService, detectorsAndKubernetes],
-    boss: null,
+    boss: whoIsTalking,
   },
   {
     id: 'act-2',

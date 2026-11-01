@@ -117,6 +117,10 @@ const ANSWERS = {
     'incident the-3am-errors: error-patterns,trace-of-error > inventory-reply',
     'choice tae-link: trace-and-resource',
   ],
+  'who-is-talking': [
+    'incident who-is-talking: alert-resource,deploy-history > name-dropped',
+    'choice wit-fix: env-var',
+  ],
   'ottl-and-transforms': [
     'choice ottl-rename: set-then-delete',
     'spot ottl-spot: resource-map,copy-only,admin-only,typo-key',
