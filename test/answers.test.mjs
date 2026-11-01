@@ -113,6 +113,17 @@ const ANSWERS = {
     'incident the-3am-errors: error-patterns,trace-of-error > inventory-reply',
     'choice tae-link: trace-and-resource',
   ],
+  'ottl-and-transforms': [
+    'choice ottl-rename: set-then-delete',
+    'spot ottl-spot: resource-map,copy-only,admin-only,typo-key',
+    'configure ottl-config: receivers: otlp: protocols: grpc: processors: memory_limiter: check_interval: 1s limit_mib: 400 spike_limit_mib: 100 transform/pii: error_mode: ignore trace_statements: - delete_key(span.attributes, "user.email") log_statements: - delete_key(log.attributes, "user.email") batch: exporters: otlp/dash0: endpoint: ${env:DASH0_ENDPOINT} service: pipelines: traces: receivers: [otlp] processors: [memory_limiter, transform/pii, batch] exporters: [otlp/dash0] logs: receivers: [otlp] processors: [memory_limiter, transform/pii, batch] exporters: [otlp/dash0]',
+    'choice ottl-backend: pipeline',
+  ],
+  distributions: [
+    'choice dist-unknown: refuses-to-start',
+    'sort dist-sort: k8sattributes=contrib-k8s batch=all-three awss3-exporter=contrib-only memory-limiter=all-three redaction=contrib-k8s acme-scrubber=none tail-sampling=contrib-k8s otlp-exporter=all-three awsxray-exporter=contrib-only',
+    'choice dist-build: ocb',
+  ],
   'play-fixture': [
     'choice fx-pick: trace',
     'sort fx-sort: server=auto loyalty=manual',

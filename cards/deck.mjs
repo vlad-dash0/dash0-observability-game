@@ -390,4 +390,40 @@ export const DECK = [
       'Dash0 Log AI infers a severity and extracts patterns from unstructured logs as they are ingested. It keeps a severity ' +
       'that is already set and leaves structured JSON logs to JSON log processing.',
   },
+  {
+    id: 'redact-in-the-pipeline',
+    front:
+      'Redact PII in the Collector before export. A spam filter drops whole points after they reach Dash0 and ' +
+      'cannot edit one attribute.',
+    back:
+      'OTTL statements in the transform processor change telemetry inside the pipeline. A rename is a set followed ' +
+      'by a delete_key, a redaction is a delete_key, a masking set or a replace_pattern, and dropping whole ' +
+      'telemetry is the job of the filter processor. Sensitive values have to go before the exporter sends them, so ' +
+      'the processor must be listed in every pipeline that carries them: defined but not listed does nothing. A ' +
+      'statement that deletes from the wrong map, a misspelled key or a where clause that matches only some spans ' +
+      'still leaks. Dash0 spam filters are the backend-side drop: they drop whole spans, logs or data points that ' +
+      'match, at ingestion. A drop cannot be recovered, a filter cannot edit one attribute, and filtered telemetry ' +
+      'still carries the ingest charge.',
+    specUrl: 'https://opentelemetry.io/docs/collector/transforming-telemetry/',
+    dash0Angle:
+      'A Dash0 spam filter drops matching spans, logs and data points at ingestion. It is the backend-side drop, ' +
+      'not a way to redact one attribute, and filtered telemetry still carries the ingest charge.',
+  },
+  {
+    id: 'not-every-component',
+    front:
+      'A component works only in a distribution that ships it: check its Distributions row or the manifest, or ' +
+      'build your own with OCB.',
+    back:
+      'The project ships pre-built Collector distributions (core, contrib, k8s, otlp and an eBPF profiling one), ' +
+      'and each ships a different set of components, listed in its manifest.yaml and in the Distributions row of ' +
+      'each component README. batch, memory_limiter and the otlp exporter are in core, contrib and k8s. ' +
+      'k8sattributes, redaction and tail_sampling are in contrib and k8s but not core, and vendor exporters such as ' +
+      'awss3 and awsxray are in contrib only. A config that names a component the binary does not contain stops the ' +
+      'Collector with an unknown type error. When no distribution has what you need, including a component your ' +
+      'team wrote, build your own with ocb, the OpenTelemetry Collector Builder, from a manifest that lists the ' +
+      'components you want. The core list has grown over time, so read the current manifest rather than a copy.',
+    specUrl: 'https://opentelemetry.io/docs/collector/distributions/',
+    dash0Angle: null,
+  },
 ];

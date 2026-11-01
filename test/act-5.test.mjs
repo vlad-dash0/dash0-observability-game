@@ -37,14 +37,14 @@ const rightOf = (levelId, widgetId) => choiceOf(levelId, widgetId).find((c) => c
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-5 "The Collector" holds 5.1 to 5.4 after Act 4, with no boss (its boss waits on decision #16)', () => {
+test('act-5 "The Collector" holds 5.1 to 5.6 after Act 4, with no boss (its boss waits on decision #16)', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-5');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 5, name: 'The Collector', sub: 'The plumbing', levelIds: ['pipelines', 'order-matters', 'otlp-endpoints', 'agent-vs-gateway'], bossId: null },
+    { no: 5, name: 'The Collector', sub: 'The plumbing', levelIds: ['pipelines', 'order-matters', 'otlp-endpoints', 'agent-vs-gateway', 'ottl-and-transforms', 'distributions'], bossId: null },
   );
   assert.deepEqual(LIVE.acts.map((a) => a.id), ['act-0', 'act-1', 'act-2', 'act-3', 'act-4', 'act-5'], 'act-5 is the last act');
-  assert.deepEqual(LIVE.order.slice(-4), ['pipelines', 'order-matters', 'otlp-endpoints', 'agent-vs-gateway']);
+  assert.deepEqual(LIVE.order.slice(-6), ['pipelines', 'order-matters', 'otlp-endpoints', 'agent-vs-gateway', 'ottl-and-transforms', 'distributions']);
 });
 
 test('act-5 unlocks like the acts before it: every earlier act complete (Act 4 included), or entered', () => {
@@ -74,9 +74,9 @@ test('act-5 levels are scored with no par time, and belong to act-5', () => {
   }
 });
 
-test('star totals count 5.1 and 5.2 among 28 scored levels, max 84', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 84 });
-  assert.deepEqual(starTotals(progressOf(['pipelines', 'order-matters']), LIVE), { earned: 6, max: 84 });
+test('star totals count 5.1 and 5.2 among 30 scored levels, max 90', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 90 });
+  assert.deepEqual(starTotals(progressOf(['pipelines', 'order-matters']), LIVE), { earned: 6, max: 90 });
 });
 
 // ---- level fields and lights --------------------------------------------------------
