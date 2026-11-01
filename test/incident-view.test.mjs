@@ -195,3 +195,58 @@ test('a herring that also exhausts the budget costs two mistakes and one combine
   assert.equal(counts.mistakes, 2);
   assert.equal(feedback(), 'Herring was a red herring, and the error budget is spent.');
 });
+
+const HINT = 'Look for more evidence before naming the cause.';
+// Text (or null), never the element: a failed assert would inspect the whole DOM graph.
+const hintText = () => qa('#checkout-slow-locked-hint')[0]?.textContent ?? null;
+const group = () => q('.incident-hypotheses');
+
+test('locked: a generic line says to look for more evidence and describes the hypothesis group', () => {
+  setup();
+  assert.equal(hintText(), HINT);
+  assert.equal(group().getAttribute('role'), 'group');
+  assert.equal(group().getAttribute('aria-label'), 'Hypotheses');
+  assert.equal(group().getAttribute('aria-describedby'), 'checkout-slow-locked-hint');
+  assert.equal(qa('[aria-live]').length, 1, 'the feedback region stays the only live region');
+  assert.equal(q('#checkout-slow-locked-hint').getAttribute('aria-live'), null);
+  assert.equal(q('#checkout-slow-locked-hint').getAttribute('role'), null);
+});
+
+test('locked after only neutral and herring opens: the same line, revealing nothing', () => {
+  setup();
+  const before = hintText();
+  click('[data-view="status-page"]');
+  click('[data-view="deploys"]');
+  assert.equal(hintText(), before);
+  assert.equal(group().getAttribute('aria-describedby'), 'checkout-slow-locked-hint');
+  click('[data-view="traces"]');
+  assert.equal(hintText(), HINT, 'one clue of two: same text, no count');
+});
+
+test('unlocked: the line and the description are gone', () => {
+  setup();
+  click('[data-view="traces"]');
+  click('[data-view="db-metrics"]');
+  assert.equal(hintText(), null);
+  assert.equal(group().getAttribute('aria-describedby'), null);
+  assert.equal(group().getAttribute('role'), 'group');
+});
+
+test('unlocked but one hypothesis answered wrong: still no line', () => {
+  setup();
+  click('[data-view="traces"]');
+  click('[data-view="db-metrics"]');
+  click('[data-hypothesis="bad-deploy"]');
+  assert.equal(hypDisabled().join(), 'false,true,false');
+  assert.equal(hintText(), null);
+  assert.equal(group().getAttribute('aria-describedby'), null);
+});
+
+test('solved: no line', () => {
+  setup();
+  click('[data-view="traces"]');
+  click('[data-view="db-metrics"]');
+  click('[data-hypothesis="slow-query"]');
+  assert.equal(hintText(), null);
+  assert.equal(group().getAttribute('aria-describedby'), null);
+});
