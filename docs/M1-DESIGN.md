@@ -146,6 +146,22 @@ buttons `Label (N min)`, opened panels with `tabindex="-1"` headings, hypothesis
 disabled until `canAnswer`. Mistakes: first open of a herring, a wrong hypothesis (repeat free),
 `exhaustedNow` exactly once.
 
+### 4.4 Spot it (M2, #5)
+Core `lib/widgets/spot-it.mjs`, view `lib/widgets/spot-it-view.mjs`; step type `spot`, mechanic `spot`.
+```
+SpotSpec = { id, target: 'config'|'span'|'metric', lines: [{id, text}] (2..12),
+  faults: [lineId] (>=1, fewer than all lines), whyNot?: {[lineId]: html}, explain: html }
+  config: any text per line; span: `key=value` per attribute; metric: `name{labels}` per series
+validateSpotSpec(spec) → string[]   // kebab ids, unique, faults/whyNot name real lines, whyNot never on a fault
+newSpotState(spec) → {selected: [], tried: [], solved: false}
+toggleLine(spec, st, id) → {state, outcome: selected|unselected|unknown|solved}
+checkSpot(spec, st) → {state, outcome: right|wrong|repeat|empty|solved, extra, missing}
+```
+- **Interaction:** each line is a real `<button aria-pressed>` whose name is its text, rendered escaped in `<code>` (monospace); `explain` and `whyNot` are trusted authored HTML. Toggling is free and updates in place. `#ID-check` grades the whole selection.
+- **Outcomes:** `right` = the selection is exactly the fault set (order irrelevant): `Right. <explain>`, lines and Check lock, `onComplete()`. Anything else is one mistake (I1) in `mountSpot` only: `Not quite. N of your picks is/are not a fault.` plus the `whyNot` of each picked non-fault, or `Everything you picked is a fault, but there is more.` when nothing extra was picked. The faults are never named or counted. The same wrong selection again is free (`Same as last time: ...`); Check with nothing selected is free.
+- **Solvability (I7):** `validateSpotSpec` guarantees the fault set is a non-empty proper subset of real lines, so the reference path (select the faults, Check) always passes; the generated step driver plays exactly that.
+- **A11y and focus:** feedback is `role=status aria-live=polite tabindex=-1`; with `labelledBy` the widget is a labelled group. Focus: first line on mount, stays on the toggled line, feedback after a Check that does not finish, `onComplete()`'s return after the last. No timers (I2).
+
 ## 5. Phases (one PR each, never stacked, each mergeable to main)
 
 | # | Phase | Owner | Depends | Must not batch |

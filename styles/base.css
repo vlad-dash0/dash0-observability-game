@@ -106,6 +106,20 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
   border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
 
+/* ---------- Spot it (lib/widgets/spot-it-view.mjs) ---------- */
+/* Lines are monospace toggle buttons; pressed is a thicker text-coloured border (not colour
+   alone). Same text/surface pairs as Sort it, so test/theme.test.mjs's contrast checks cover them. */
+.spot-lines { list-style: none; display: flex; flex-direction: column; gap: 6px; margin: 4px 0 14px; }
+.spot-line {
+  display: block; width: 100%; text-align: left; border: 1.5px solid var(--color-border);
+  background: var(--color-surface); color: var(--color-text); border-radius: var(--radius-sm);
+  padding: 9px 13px; cursor: pointer; transition: all .15s; overflow-wrap: anywhere;
+}
+.spot-line code { font-size: 13.5px; background: none; padding: 0; }
+.spot-line:hover:not(:disabled) { border-color: var(--color-accent); }
+.spot-line[aria-pressed="true"] { border: 3px solid var(--color-text); background: var(--color-surface-2); padding: 7.5px 11.5px; }
+.spot-line:disabled { cursor: default; }
+
 /* ---------- Sort it (lib/widgets/sort-it-view.mjs) ---------- */
 /* Labels may hold long <code> names: items, bucket buttons and placed items wrap anywhere
    (as does .feedback above, which quotes them), so no Sort it label overflows at 320px.

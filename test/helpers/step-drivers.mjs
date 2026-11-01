@@ -86,7 +86,26 @@ const incident = {
   answerKey: (s) => `incident ${s.id}: ${clues(s).join(',')} > ${s.hypotheses.find((h) => h.right).id}`,
 };
 
-export const STEP_DRIVERS = { choice, sort, build, incident };
+const spotCheck = (s) => `#${s.id}-check`;
+const spotPick = (ids) => ids.map((id) => `[data-line="${id}"]`);
+
+const spot = {
+  solve: (s) => [...spotPick(s.faults), spotCheck(s)],
+  slips(s) {
+    const other = s.lines.find((l) => !s.faults.includes(l.id)).id;
+    // Each slip unselects its pick afterwards, so solve() starts from an empty selection.
+    const slip = (name, id) => ({ name, clicks: [...spotPick([id]), spotCheck(s), ...spotPick([id])], says: NOT_QUITE });
+    return [
+      slip(`pick ${other}`, other),
+      // Part of a multi-fault set is still wrong.
+      ...(s.faults.length > 1 ? [slip(`only ${s.faults[0]}`, s.faults[0])] : []),
+    ];
+  },
+  first: (s) => `line:${s.lines[0].id}`,
+  answerKey: (s) => `spot ${s.id}: ${s.lines.map((l) => l.id).filter((id) => s.faults.includes(id)).join(',')}`,
+};
+
+export const STEP_DRIVERS = { choice, sort, build, incident, spot };
 
 /** A play level's steps as `{step, key, spec, type, driver}` in order. */
 export function stepsOf(level) {
