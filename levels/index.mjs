@@ -14,6 +14,7 @@
 // Act: { id, no, name, sub, levels: [level, ...], boss: level | null }.
 import autoVsManual from './auto-vs-manual.mjs';
 import baggage from './baggage.mjs';
+import checkoutIsSlow from './checkout-is-slow.mjs';
 import contextPropagation from './context-propagation.mjs';
 import eventsAndLinks from './events-and-links.mjs';
 import monitoringVsObservability from './monitoring-vs-observability.mjs';
@@ -48,6 +49,6 @@ export const ACTS = [
     name: 'Traces',
     sub: 'Follow the request',
     levels: [spansAndTraces, spanKinds, statusAndErrors, contextPropagation, baggage, eventsAndLinks, autoVsManual],
-    boss: null,
+    boss: checkoutIsSlow,
   },
 ];

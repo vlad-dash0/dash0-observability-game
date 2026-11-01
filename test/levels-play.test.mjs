@@ -320,6 +320,27 @@ const DRIVERS = {
       expect: { stars: 2, cards: ['double-instrumentation'] },
     },
   },
+  // Act 2 boss: reference path is the two clues and n-plus-one (3 stars). Sloppy: a herring
+  // (one mistake) and a wrong hypothesis (another) are 2 penalties, so 2 stars.
+  'checkout-is-slow': {
+    play() {
+      click('[data-view="trace-slow"]');
+      click('[data-view="triage"]');
+      click('[data-hypothesis="n-plus-one"]');
+      click('#cis-finish');
+    },
+    expect: { stars: 3, cards: [] },
+    sloppy: {
+      play() {
+        click('[data-view="payments-errors"]');
+        click('[data-view="trace-slow"]');
+        click('[data-hypothesis="provider"]');
+        click('[data-hypothesis="n-plus-one"]');
+        click('#cis-finish');
+      },
+      expect: { stars: 2, cards: [] },
+    },
+  },
   'naming-your-service': {
     play() {
       click('[data-pick="fallback"]');
