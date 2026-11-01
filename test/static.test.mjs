@@ -12,6 +12,7 @@ import { headersFor, ignoreMatcher } from '../tools/serve.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const VENDOR = join(ROOT, 'vendor');
 const ALPINE = 'alpine-3.14.1.min.js';
+const JS_YAML = 'js-yaml-5.5.0.mjs';
 
 // docs/FOUNDATION.md §7, verbatim.
 const CSP =
@@ -160,6 +161,12 @@ test('vendored files match vendor/SHA256SUMS', () => {
     return [m[2], m[1]];
   }));
   assert.ok(sums[ALPINE], `${ALPINE} is not listed in SHA256SUMS`);
+  assert.ok(sums[JS_YAML], `${JS_YAML} is not listed in SHA256SUMS`);
+  // Every vendored file (not the two bookkeeping files) is pinned and documented.
+  const files = readdirSync(VENDOR).filter((f) => f !== 'README.md' && f !== 'SHA256SUMS').sort();
+  assert.deepEqual(Object.keys(sums).sort(), files, 'vendor/ and SHA256SUMS list different files');
+  const readme = readFileSync(join(VENDOR, 'README.md'), 'utf8');
+  for (const file of files) assert.ok(readme.includes(`\`${file}\``), `vendor/README.md does not list ${file}`);
   for (const [file, want] of Object.entries(sums)) {
     const got = createHash('sha256').update(readFileSync(join(VENDOR, file))).digest('hex');
     assert.equal(got, want, `sha256 mismatch for vendor/${file}`);
