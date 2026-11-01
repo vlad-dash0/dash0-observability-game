@@ -63,7 +63,7 @@ A level file keeps today's metadata (FOUNDATION §2.1) and declares `play` inste
 | `build` | BuildSpec (§4.2) | build | live |
 | `incident` | Scenario (§4.3) | incident | live |
 | `configure` | reserved for #3, e.g. `{id, given, lang, checker: '<name>', target, hint?}` | configure | reserved |
-| `query` | reserved for #4, e.g. `{id, dataset: '<name>', reference: '<query>'}`, graded by comparing result series | query | reserved |
+| `query` | QuerySpec (§4.7 of M1-DESIGN): `{id, dataset: '<name>', at, reference: '<query>', given?, hint?, explain}`, graded by comparing result series | query | live |
 | `spot` | SpotSpec (§4.4 of M1-DESIGN) | spot | live |
 | `tradeoff` | TradeoffSpec (§4.5 of M1-DESIGN) | tradeoff | live |
 
@@ -196,6 +196,7 @@ The live adapters are thin wrappers:
 - **incident:** `renderIncident`, `mountIncident`, `validateScenario`.
 - **spot:** `renderSpot(spec, newSpotState(spec), …)`, `mountSpot`, `validateSpotSpec`.
 - **tradeoff:** `renderTradeoff(spec, newTradeoffState(spec), …)`, `mountTradeoff`, `validateTradeoffSpec`.
+- **query:** `renderQuery(spec, newQueryState(spec), …)`, `mountQuery`, `validateQuerySpec`. The driver types into the field: a click may be `{type: selector, text}` (`test/helpers/dom.mjs`).
 
 Each type also has a test driver in `test/helpers/step-drivers.mjs` (§4). Adding a widget means: core and view (M1-DESIGN §4 pattern), plus one `STEP_TYPES` entry, plus one step driver, plus one thin level.
 
@@ -297,7 +298,7 @@ The registry adds: run and play are mutually exclusive, play requires the kit, a
 - `declares mechanics ["build"] but its steps give ["sort"]; fix or remove mechanics`
 - `play must be plain data: steps[1].choice.choices[0].why is a function; write run(ctx) for custom behaviour`
 - `step 2: unknown key "inrto" (did you mean "intro"?)`
-- `step 2 has no step type (one of choice, sort, build, incident, spot, tradeoff)` / `step 2 has two step types ("choice", "sort")`
+- `step 2 has no step type (one of choice, sort, build, incident, spot, tradeoff, query)` / `step 2 has two step types ("choice", "sort")`
 - `step 3: step type "configure" is reserved for Configure it (#3) and not available yet`
 - `step 2 (choice "avm-why"): needs exactly one right answer, has 0`
 - `step 1 (sort "avm-sort"): item "redis": unknown bucket "automatic"`

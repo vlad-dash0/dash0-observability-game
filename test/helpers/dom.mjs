@@ -24,8 +24,18 @@ export function makeDom(html = SHELL) {
 export const q = (sel) => globalThis.document.querySelector(sel);
 export const qa = (sel) => [...globalThis.document.querySelectorAll(sel)];
 
-/** Click an element or selector; throws if it is missing, disabled or unwired. */
+/**
+ * Click an element or selector; throws if it is missing, disabled or unwired. `{type, text}`
+ * types `text` into the field `type` selects (a textarea or input) instead of clicking.
+ */
 export function click(elOrSel) {
+  if (Object.getPrototypeOf(elOrSel) === Object.prototype) {
+    const field = q(elOrSel.type);
+    assert.ok(field, `expected a field for ${elOrSel.type}`);
+    assert.ok(!field.disabled, `${elOrSel.type} is disabled`);
+    field.value = elOrSel.text;
+    return;
+  }
   const el = typeof elOrSel === 'string' ? q(elOrSel) : elOrSel;
   assert.ok(el, `expected an element for ${elOrSel}`);
   assert.ok(!el.disabled, `${elOrSel} is disabled (dead end?)`);

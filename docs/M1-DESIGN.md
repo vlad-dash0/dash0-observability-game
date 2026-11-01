@@ -182,7 +182,7 @@ checkTradeoff(spec, st) → {state, outcome: right|wrong|repeat|incomplete|solve
 - **A11y and focus:** feedback is `role=status aria-live=polite tabindex=-1`; the total is `aria-live=polite`; with `labelledBy` the widget is a labelled group. Focus: first radio on mount, stays on the picked radio, feedback after a Check that does not finish, `onComplete()`'s return after the last. No timers (I2).
 
 ### 4.6 Query it core (M2, #4, part 1)
-Core `lib/promql/` (`lex`, `parse`, `math`, `eval`, `grade`, `datasets`). Pure, DOM-free, no timers (I2), no randomness. The view and the `query` step type are part 2; nothing here is wired into a level yet.
+Core `lib/promql/` (`lex`, `parse`, `math`, `eval`, `grade`, `datasets`). Pure, DOM-free, no timers (I2), no randomness. The view and the `query` step type are part 2 (§4.7).
 ```
 evaluate(dataset, time, query) → {kind:'vector', series:[{labels, value}]}   // sorted by label set
                                | {kind:'scalar', value}
@@ -219,6 +219,25 @@ Dataset = {id, title, meta, series: [{labels: {__name__, ...}, samples: [[t, v]]
 **Grading:** `gradeQuery` evaluates the reference query (a text) and the learner's query on the same dataset at the same `time` and compares the RESULT series, never the query text, so any equivalent formulation passes. Both results are sorted by label set. Order of checks, first hit wins: `syntax` (+`message`, `at`), `unsupported` (+`what`), `error` (+`message`) → `empty` (vector with no series) → `wrong-count` → `wrong-labels` (same count, different label sets; a scalar answer to a vector question, or the reverse, also lands here; `__name__` is part of the label set) → `wrong-values` (a value outside tolerance) → `{ok:true}`. Scalar vs scalar compares by value. Tolerance: `|a-b| <= 1e-9 + 1e-6 * max(|a|,|b|)`; NaN equals NaN, infinities equal themselves. `result` (the learner's evaluation) rides along so the view can show it; it is never a hint at the reference. A reference that gives no data (or fails) is an authoring bug and throws, so the I7 check is: every level's reference query grades `ok` against itself on its dataset.
 
 **Datasets:** `DATASETS = {name: generator}` in `datasets.mjs`, read through `getDataset(name)` (built once, deep-frozen, throws on an unknown name). A level names a dataset (and an eval time) and never inlines series. `checkout-http`: scrape every 15s for t = 0..3600; `http_server_requests_total{service,route,status}`, `http_server_request_duration_seconds_{bucket{le},sum,count}{service,route}` for checkout `/pay` `/quote` and cart `/add` `/view`. At `meta.deployAt` = 2400 the checkout counters reset (pods restart, so `rate` must cope) and `/pay` gets slower (p99 0.9s → 2.5s) and failing (1/30 → 1/4 of requests); other routes do not change. `meta.end` = 3600 is the natural eval time. The generator's per-scrape table is the single source for every figure in `test/promql-datasets.test.mjs`.
+
+### 4.7 Query it (M2, #4, part 2)
+Core `lib/widgets/query-it.mjs`, view `lib/widgets/query-it-view.mjs`, list data `lib/promql/supported.mjs`; step type `query`, mechanic `query`.
+```
+QuerySpec = { id, dataset: name, at: seconds, reference: query, given?: text, hint?: html, explain: html }
+validateQuerySpec(spec) → string[]   // kebab id, known dataset, at inside the dataset's start..end, reference gives data (so it grades ok
+                                     // against itself, I7), given (if any) does NOT already pass, explain/hint/given non-empty text
+newQueryState(spec) → {tried: [], solved: false}
+runQuery(spec, st, text) → {state, outcome, reason?, grade?}
+  outcome: right | wrong (+reason: empty | wrong-count | wrong-labels | wrong-values) | syntax | unsupported | error | repeat | blank | solved
+SUPPORTED → [{title, items: string[], note}]   // functions, aggregations, units and operators read from the parser's own tables
+```
+- **Grading** is `gradeQuery(dataset, at, text, reference)` (§4.6): result series, never query text, so the reference and any equivalent formulation pass. A level names the dataset and the time; it never inlines data.
+- **Documented in the widget:** a collapsible `Supported here` list rendered from `SUPPORTED` (one source; a test evaluates every listed function and aggregation) plus "Anything else is reported as unsupported, not as wrong."
+- **Interaction:** a labelled `<textarea>` (monospace, no spellcheck/autocorrect/autocapitalize, prefilled with `given`), `#ID-input`, `#ID-run`, optional `#ID-hint`, `#ID-result`, `#ID-feedback`. `explain` and `hint` are trusted authored HTML; the dataset title, query text, labels, values and every engine message are escaped.
+- **Result display:** each Run shows the learner's own result: a table of `series` (`name{a="b"}`, labels sorted) and `value` (six significant digits, `+Inf`/`-Inf`/`NaN`), at most 20 rows then `and N more series`, or `Scalar: v`. The reference result is never shown.
+- **Outcomes:** `right`: `Right. <explain>`, input, Run and hint lock, `onComplete()`. `syntax`, `unsupported`, `error` are FREE: `Syntax error at character N: ...`, `Not supported here: <what>. Nothing was marked wrong; ...`, `That query could not run: ...`; they are not remembered. `wrong` costs one mistake (I1) in `mountQuery` only: `Not quite.` plus `Your query returned no data.`, `Different series than expected: the number of series is not right.` / `...the labels are not right.` or `Right shape, wrong values.` The same failing query again (whitespace trimmed and collapsed) is `Same as last time: ...` (free). Blank text is free.
+- **Solvability (I7):** `validateQuerySpec` guarantees the reference gives data and `given` is not already a pass. The generated step driver types the reference and Runs; its slip is `(reference) + 1`, valid, with the reference's series and wrong values, costing exactly one mistake. The equivalent-query proof is in `test/query-it-view.test.mjs`.
+- **A11y and focus:** feedback is `role=status aria-live=polite tabindex=-1`; with `labelledBy` the widget is a labelled group. Focus: the textarea on mount; a Run that does not finish leaves focus where it is (the live region announces it, so the player keeps typing); `onComplete()`'s return after the pass. No timers (I2).
 
 ## 5. Phases (one PR each, never stacked, each mergeable to main)
 

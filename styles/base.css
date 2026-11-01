@@ -131,6 +131,16 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .tradeoff-cost { font-weight: 600; font-variant-numeric: tabular-nums; }
 .tradeoff-keeps { color: var(--color-text-muted); font-size: 13.5px; }
 .tradeoff-total { font-weight: 700; margin: 4px 0 12px; }
+.query-data { color: var(--color-text-muted); font-size: 13.5px; margin: 0 0 8px; }
+.query-supported { border: 1.5px solid var(--color-border); border-radius: var(--radius-sm); padding: 6px 13px; margin: 0 0 10px; }
+.query-supported summary { cursor: pointer; font-weight: 600; }
+.query-group { margin: 8px 0 0; overflow-wrap: anywhere; }
+.query-note { color: var(--color-text-muted); font-size: 13.5px; }
+.query-label { display: block; font-weight: 600; margin: 0 0 4px; }
+.query-input { display: block; box-sizing: border-box; width: 100%; font-family: var(--font-mono); font-size: 14px; padding: 8px 10px; margin: 0 0 8px; border: 1.5px solid var(--color-border); border-radius: var(--radius-sm); }
+.query-table { border-collapse: collapse; margin: 10px 0 4px; max-width: 100%; }
+.query-table th, .query-table td { text-align: left; padding: 3px 12px 3px 0; overflow-wrap: anywhere; }
+.query-num { font-variant-numeric: tabular-nums; text-align: right; }
 
 /* ---------- Sort it (lib/widgets/sort-it-view.mjs) ---------- */
 /* Labels may hold long <code> names: items, bucket buttons and placed items wrap anywhere

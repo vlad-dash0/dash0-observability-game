@@ -1,6 +1,7 @@
 // One driver per play step type (docs/DECLARATIVE-LEVELS.md §4), all derived from the step's
 // spec, so a generated test can play any declarative level without a hand-written driver.
-//   solve(spec) -> selector[]   clicks that finish the step cleanly
+//   solve(spec) -> click[]      clicks that finish the step cleanly; a click is a selector, or
+//                  {type: selector, text} to type `text` into a field (test/helpers/dom.mjs click)
 //   slips(spec) -> [{name, clicks, says, at?}]  each costs exactly one penalty; `says` matches the
 //                  text of `at` (default `#<id>-feedback`) afterwards
 //   first(spec) -> focus name the step starts on (test/helpers/focus.mjs names)
@@ -123,7 +124,21 @@ const tradeoff = {
   answerKey: (s) => `tradeoff ${s.id}: ${s.knobs.map((k) => `${k.id}=${s.answer[k.id]}`).join(' ')}`,
 };
 
-export const STEP_DRIVERS = { choice, sort, build, incident, spot, tradeoff };
+const query = {
+  solve: (s) => [{ type: `#${s.id}-input`, text: s.reference }, `#${s.id}-run`],
+  // `(reference) + 1` is valid, has the reference's series and never its values.
+  slips: (s) => [
+    {
+      name: 'right shape, wrong values',
+      clicks: [{ type: `#${s.id}-input`, text: `(${s.reference}) + 1` }, `#${s.id}-run`],
+      says: /^Not quite\. Right shape, wrong values\./,
+    },
+  ],
+  first: (s) => `#${s.id}-input`,
+  answerKey: (s) => `query ${s.id}: ${s.dataset}@${s.at} ${s.reference}`,
+};
+
+export const STEP_DRIVERS = { choice, sort, build, incident, spot, tradeoff, query };
 
 /** A play level's steps as `{step, key, spec, type, driver}` in order. */
 export function stepsOf(level) {

@@ -115,6 +115,18 @@ export function playFixture() {
             explain: 'Tail sampling keeps the errors; a tier is bounded.',
           },
         },
+        {
+          intro: 'Checkout traffic looks busy. How much, per service?',
+          question: 'Write a query for the request rate of each service.',
+          query: {
+            id: 'fx-query',
+            dataset: 'checkout-http',
+            at: 3000,
+            reference: 'sum by (service) (rate(http_server_requests_total[5m]))',
+            hint: 'A counter only grows: take its <code>rate</code> first.',
+            explain: 'Rate turns a counter into a per-second figure; sum by keeps one series per service.',
+          },
+        },
       ],
       finish: 'You played every live step type.',
     },
