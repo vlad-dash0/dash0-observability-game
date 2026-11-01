@@ -462,6 +462,8 @@ test('spot: the explain teaches the nuance with the recomputed figures: 39 of 40
   const t = plain(spot().explain);
   for (const w of ['39', '400', '21%', '2%', 'exporter', 'end of', 'before', 'its own', 'span_metrics', 'spanmetrics', 'deprecated']) assert.equal(t.includes(w), true, w);
   for (const w of ['39 of 400', '8 of 39', 'traces/metrics', 'no sampling processor', 'one span_metrics']) assert.equal(t.includes(w), true, w);
+  assert.equal(t.includes('take span_metrics out of the exporters of traces, so traces/metrics is the only pipeline that feeds it'), true, 'the fix removes the connector from traces, or two pipelines feed one instance');
+  assert.equal(/policies: \[/.test(spot().lines.find((l) => l.id === 'sampler-def').text), true, 'the sampler decoy is a complete, correct definition: policies has no default');
   assert.equal(/four|all of them together|own connector/.test(t), false, 'one connector, no namespaces');
   const intro = plain(LIVE.levels['tail-sampling'].play.steps[1].intro);
   for (const w of ['span_metrics', 'tail_sampling']) assert.equal(intro.includes(w), true, w);
