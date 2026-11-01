@@ -463,7 +463,24 @@ test('spot: the explain teaches the nuance with the recomputed figures: 39 of 40
   for (const w of ['39', '400', '21%', '2%', 'exporter', 'end of', 'before', 'its own', 'span_metrics', 'spanmetrics', 'deprecated']) assert.equal(t.includes(w), true, w);
   for (const w of ['39 of 400', '8 of 39', 'traces/metrics', 'no sampling processor', 'one span_metrics']) assert.equal(t.includes(w), true, w);
   assert.equal(t.includes('take span_metrics out of the exporters of traces, so traces/metrics is the only pipeline that feeds it'), true, 'the fix removes the connector from traces, or two pipelines feed one instance');
-  assert.equal(/policies: \[/.test(spot().lines.find((l) => l.id === 'sampler-def').text), true, 'the sampler decoy is a complete, correct definition: policies has no default');
+  // The sampler decoy shows the policies of the Trade-off answer, derived from that option, so the 39 of 400 holds.
+  const answerOption = ts().knobs.find((k) => k.id === 'policies').options.find((o) => o.id === ts().answer.policies);
+  const answerLabel = answerOption.label;
+  const wantTypes = [...answerLabel.matchAll(/<code>(\w+)<\/code>/g)].map((m) => m[1]);
+  assert.deepEqual(wantTypes, ['status_code', 'latency', 'probabilistic']);
+  const wantMs = Number(answerLabel.match(/above (\d+) seconds/)[1]) * 1000;
+  const wantPercent = Number(answerLabel.match(/at (\d+)% of the rest/)[1]);
+  const samplerLine = spot().lines.find((l) => l.id === 'sampler-def').text;
+  assert.deepEqual([...samplerLine.matchAll(/type: (\w+)/g)].map((m) => m[1]), wantTypes, 'exactly the answer\'s policies, in order');
+  assert.equal(Number(samplerLine.match(/threshold_ms: (\d+)/)[1]), wantMs);
+  assert.equal(Number(samplerLine.match(/sampling_percentage: (\d+)/)[1]), wantPercent);
+  assert.equal(wantMs, 2000);
+  assert.equal(wantPercent, 5);
+  assert.equal(answerLabel.includes('8 + 12 + 19 = 39 of 400'), true, 'the policies keep the 39 of 400 the explain uses');
+  assert.equal(KEPT_ERRORS + KEPT_SLOW + KEPT_BASELINE, 39);
+  assert.equal(/ERROR/.test(samplerLine), true);
+  assert.equal(t.includes('the sampler kept every error and few of the rest'), true);
+  assert.equal(t.split('. ').some((s) => s.length > 260), false, 'no run-on sentence in the explain');
   assert.equal(/four|all of them together|own connector/.test(t), false, 'one connector, no namespaces');
   const intro = plain(LIVE.levels['tail-sampling'].play.steps[1].intro);
   for (const w of ['span_metrics', 'tail_sampling']) assert.equal(intro.includes(w), true, w);

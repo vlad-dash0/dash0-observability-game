@@ -144,7 +144,7 @@ const SPOT = {
     { id: 'metrics-spans', text: 'metrics/spans: receivers: [span_metrics] processors: [batch] exporters: [otlp_grpc/dash0]' },
     { id: 'logs', text: 'logs: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp_grpc/dash0]' },
     { id: 'connector-def', text: 'connectors: span_metrics:' },
-    { id: 'sampler-def', text: 'processors: tail_sampling: decision_wait: 30s policies: [{name: errors, type: status_code, status_code: {status_codes: [ERROR]}}]' },
+    { id: 'sampler-def', text: 'processors: tail_sampling: decision_wait: 30s policies: [{name: errors, type: status_code, status_code: {status_codes: [ERROR]}}, {name: slow, type: latency, latency: {threshold_ms: 2000}}, {name: baseline, type: probabilistic, probabilistic: {sampling_percentage: 5}}]' },
   ],
   faults: ['traces'],
   whyNot: {
@@ -158,7 +158,7 @@ const SPOT = {
     `In <code>traces</code>, <code>tail_sampling</code> runs first and <code>span_metrics</code> gets only what it kept: ${n(KEPT)} of ${n(TRACES)} traces a second. ` +
     `The request rate it computes is ${n(KEPT)} a second, not ${n(TRACES)}, and the error ratio is ${n(ERRORS)} of ${n(KEPT)}, ${ERROR_SHARE}%, not the real ${pct(ERROR_RATE)}, because the sampler kept every error and few of the rest. ` +
     'Compute span metrics before sampling: give the connector its own traces pipeline with no sampling processor, <code>traces/metrics</code>, ' +
-    'with <code>exporters: [span_metrics]</code>, and keep <code>tail_sampling</code> only on the <code>traces</code> pipeline that goes to the backend, and take <code>span_metrics</code> out of the exporters of <code>traces</code>, so <code>traces/metrics</code> is the only pipeline that feeds it. ' +
+    'with <code>exporters: [span_metrics]</code>. Keep <code>tail_sampling</code> only on the <code>traces</code> pipeline that goes to the backend, and take <code>span_metrics</code> out of the exporters of <code>traces</code>, so <code>traces/metrics</code> is the only pipeline that feeds it. ' +
     'It is still one span_metrics connector, received by <code>metrics/spans</code>: the README warns that several pipelines using one instance, or several instances writing the same metrics, can conflict or lose series. ' +
     'A receiver can be listed in more than one pipeline, so both traces pipelines can read the same <code>otlp</code> receiver. ' +
     'The connector was renamed from <code>spanmetrics</code> to <code>span_metrics</code>; the old name still works and is deprecated. ' +
