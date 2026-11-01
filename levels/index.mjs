@@ -23,6 +23,7 @@ import autoVsManual from './auto-vs-manual.mjs';
 import baggage from './baggage.mjs';
 import cardinality from './cardinality.mjs';
 import checkoutIsSlow from './checkout-is-slow.mjs';
+import collectingLogs from './collecting-logs.mjs';
 import contextPropagation from './context-propagation.mjs';
 import correlation from './correlation.mjs';
 import detectorsAndKubernetes from './detectors-and-kubernetes.mjs';
@@ -42,6 +43,7 @@ import spansAndTraces from './spans-and-traces.mjs';
 import statusAndErrors from './status-and-errors.mjs';
 import structuredLogs from './structured-logs.mjs';
 import temporality from './temporality.mjs';
+import the3amErrors from './the-3am-errors.mjs';
 import thePager from './the-pager.mjs';
 import theSignals from './the-signals.mjs';
 import whyOpentelemetry from './why-opentelemetry.mjs';
@@ -84,8 +86,8 @@ export const ACTS = [
     no: 4,
     name: 'Logs',
     sub: 'What did it say?',
-    levels: [structuredLogs, correlation],
-    boss: null,
+    levels: [structuredLogs, correlation, collectingLogs],
+    boss: the3amErrors,
   },
   {
     id: 'act-5',

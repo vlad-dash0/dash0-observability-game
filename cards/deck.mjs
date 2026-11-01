@@ -375,4 +375,19 @@ export const DECK = [
     specUrl: 'https://opentelemetry.io/docs/collector/deployment/gateway/#load-balancing-exporter',
     dash0Angle: null,
   },
+  {
+    id: 'filelog-tails-files',
+    front: 'filelog tails files from the end by default and splits on newlines; multiline needs a pattern for where an entry starts.',
+    back:
+      'The filelog receiver (contrib and Kubernetes distributions, beta for logs) reads the files that match include. start_at ' +
+      'defaults to end, so lines already in a file are skipped unless you set beginning. Entries split at newlines unless ' +
+      'multiline gives a line_start_pattern or a line_end_pattern, which is how a stack trace stays one record; the split happens ' +
+      'as the file is read, before any operator runs. Operators such as json_parser and regex_parser turn each entry into fields, ' +
+      'and an embedded severity block sets the severity. Like any component it does nothing until a logs pipeline lists it. For ' +
+      'code you own, exporting over OTLP with a log appender needs no files and no parsing, and carries the trace context.',
+    specUrl: 'https://opentelemetry.io/docs/specs/otel/logs/',
+    dash0Angle:
+      'Dash0 Log AI infers a severity and extracts patterns from unstructured logs as they are ingested. It keeps a severity ' +
+      'that is already set and leaves structured JSON logs to JSON log processing.',
+  },
 ];
