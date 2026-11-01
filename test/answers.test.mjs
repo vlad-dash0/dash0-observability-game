@@ -80,6 +80,16 @@ const ANSWERS = {
     'choice cor-fix: run-in-span',
     'choice cor-dash0: resource-mode',
   ],
+  pipelines: [
+    'choice pipe-connector: connector',
+    'configure pipe-config: extensions: health_check: receivers: otlp: protocols: grpc: processors: memory_limiter: check_interval: 1s limit_mib: 400 spike_limit_mib: 100 batch: exporters: otlp/dash0: endpoint: ${env:DASH0_ENDPOINT} service: extensions: [health_check] pipelines: traces: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp/dash0] metrics: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp/dash0]',
+    'choice pipe-extension: service-extensions',
+  ],
+  'order-matters': [
+    'spot order-spot: metrics,traces-checkout,logs-audit,logs-noisy',
+    'choice order-why: refuse-early',
+    'choice order-batch: late',
+  ],
   'play-fixture': [
     'choice fx-pick: trace',
     'sort fx-sort: server=auto loyalty=manual',

@@ -30,6 +30,8 @@ import histograms from './histograms.mjs';
 import instruments from './instruments.mjs';
 import monitoringVsObservability from './monitoring-vs-observability.mjs';
 import namingYourService from './naming-your-service.mjs';
+import orderMatters from './order-matters.mjs';
+import pipelines from './pipelines.mjs';
 import promqlBasics from './promql-basics.mjs';
 import resources from './resources.mjs';
 import redAndUse from './red-and-use.mjs';
@@ -81,6 +83,14 @@ export const ACTS = [
     name: 'Logs',
     sub: 'What did it say?',
     levels: [structuredLogs, correlation],
+    boss: null,
+  },
+  {
+    id: 'act-5',
+    no: 5,
+    name: 'The Collector',
+    sub: 'The plumbing',
+    levels: [pipelines, orderMatters],
     boss: null,
   },
 ];
