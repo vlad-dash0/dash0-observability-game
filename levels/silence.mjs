@@ -44,7 +44,9 @@
 // timestamps on the two log lines (the lines themselves use the forms quoted above, with `exporter` and
 // `otlp/dash0` in place of the README's processor and `nop`); that the rollout starts the new pods only after
 // stopping the old ones (a Deployment can be set to do that), which is why eu-west goes to zero and not to half.
-// The Collector's error is reported for the traces pipeline only: the validation returns the first error it finds.
+// The Collector's error names one pipeline, not all three: the validation returns at the first error it finds, and
+// it walks the pipelines in a Go map, whose iteration order is random, so Go map iteration order picks which of
+// the three (traces, metrics or logs) is named. The shown line, with traces, is one valid instance.
 
 const POD_A = 'otel-collector-7c8d9b6f5-4xk2p';
 const POD_B = 'otel-collector-7c8d9b6f5-q8w7n';
@@ -97,7 +99,7 @@ const SCENARIO = {
       costMin: 3,
       kind: 'clue',
       html:
-        `<p>The log of the last terminated container of <code>${POD_A}</code>. Every restart prints the same two lines and nothing else:</p>` +
+        `<p>The log of the last terminated container of <code>${POD_A}</code>. A restart prints these two lines and nothing else, naming one of the three pipelines (traces, metrics or logs) each time:</p>` +
         '<pre><code>Error: invalid configuration: service::pipelines::traces: references exporter "otlp/dash0" which is not configured\n' +
         '2026/11/01 14:21:07 collector server run finished with error: invalid configuration: service::pipelines::traces: references exporter "otlp/dash0" which is not configured</code></pre>' +
         '<p>The Collector reads its configuration, finds it invalid and exits. It never gets as far as receiving data.</p>',

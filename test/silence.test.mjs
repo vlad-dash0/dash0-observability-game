@@ -123,6 +123,8 @@ test('one exporter id runs through the log, the diff and the answer: the pipelin
   const log = plain(view('collector-log').html);
   assert.equal(log.includes('references exporter "otlp/dash0" which is not configured'), true);
   assert.equal(log.includes('service::pipelines::'), true);
+  assert.equal(log.includes('naming one of the three pipelines (traces, metrics or logs)'), true, 'the log does not claim a fixed pipeline');
+  assert.equal(log.includes('same two lines'), false, 'no claim that every restart prints identical lines');
   const right = plain(S.hypotheses.find((h) => h.id === RIGHT).label + S.hypotheses.find((h) => h.id === RIGHT).why);
   for (const w of ['otlp/dash0-eu', 'otlp/dash0', 'service.pipelines', 'refuses to start']) assert.equal(right.includes(w), true, w);
 });
