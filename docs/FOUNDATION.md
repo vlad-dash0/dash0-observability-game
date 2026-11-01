@@ -138,10 +138,11 @@ finished or `signal.aborted`. Non-array `cards` → `[]`.
 
 ### 2.7 Map (`hub/map-data.mjs`)
 
-`NODES = [{ id, label, kind: 'service'|'datastore'|'queue'|'external', x: 0..100, y: 0..60 }]`
+`NODES = [{ id, label, kind: 'service'|'datastore'|'queue'|'external'|'telemetry', x: 0..100, y: 0..60 }]`
 (SVG viewBox `0 0 100 60`), `EDGES = [{ from, to }]`. Nodes: storefront, api-gateway,
 catalog, cart, checkout, payments, inventory, orders, shipping, notifications,
-recommendations, postgres, redis, kafka, payment-provider (external).
+recommendations, postgres, redis, kafka, payment-provider (external), collector (telemetry,
+off the request path, no edges; the Act 5 levels light it).
 Node lit when ANY level in `nodeLitBy(node)` is completed; edge lit when both ends lit;
 node pulses when an `'open'` boss lights it. Positions are SVG attributes, never `style`.
 

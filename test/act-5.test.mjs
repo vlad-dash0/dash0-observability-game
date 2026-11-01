@@ -84,8 +84,8 @@ test('star totals count 5.1 and 5.2 among the derived scored levels', () => {
 // ---- level fields and lights --------------------------------------------------------
 
 const FIELDS = {
-  pipelines: { no: '5.1', name: 'Pipelines', mechanics: ['configure'], cards: ['configured-not-enabled'], lights: [] },
-  'order-matters': { no: '5.2', name: 'Order matters', mechanics: ['spot'], cards: ['memory-limiter-first'], lights: [] },
+  pipelines: { no: '5.1', name: 'Pipelines', mechanics: ['configure'], cards: ['configured-not-enabled'], lights: ['collector'] },
+  'order-matters': { no: '5.2', name: 'Order matters', mechanics: ['spot'], cards: ['memory-limiter-first'], lights: ['collector'] },
 };
 
 for (const [id, want] of Object.entries(FIELDS)) {
@@ -100,13 +100,15 @@ for (const [id, want] of Object.entries(FIELDS)) {
   });
 }
 
-test('lights: the map has no Collector node, so Act 5 lights nothing and finishing it changes no node or edge', () => {
+test('lights: finishing any Act 5 level lights the Collector node and nothing else; no edge lights', () => {
   const lit = (done) => {
     const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
-    return { nodes: NODES.filter((n) => s.nodes[n.id].lit).length, edges: s.edges.filter((e) => e.lit).length };
+    return { nodes: NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id), edges: s.edges.filter((e) => e.lit).length };
   };
-  assert.deepEqual(lit([]), { nodes: 0, edges: 0 });
-  assert.deepEqual(lit(['pipelines', 'order-matters']), { nodes: 0, edges: 0 });
+  assert.deepEqual(lit([]), { nodes: [], edges: 0 });
+  assert.deepEqual(lit(['pipelines']), { nodes: ['collector'], edges: 0 });
+  assert.deepEqual(lit(['order-matters']), { nodes: ['collector'], edges: 0 });
+  assert.deepEqual(lit(['pipelines', 'order-matters']), { nodes: ['collector'], edges: 0 });
 });
 
 // ---- cards --------------------------------------------------------------------------

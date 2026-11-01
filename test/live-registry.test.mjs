@@ -109,17 +109,34 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
 
 test('map nodes: the §2.7 ids, unique, valid kinds and positions in the viewBox', () => {
   assert.deepEqual([...nodeIds].sort(), [
-    'api-gateway', 'cart', 'catalog', 'checkout', 'inventory', 'kafka', 'notifications', 'orders',
+    'api-gateway', 'cart', 'catalog', 'checkout', 'collector', 'inventory', 'kafka', 'notifications', 'orders',
     'payment-provider', 'payments', 'postgres', 'recommendations', 'redis', 'shipping', 'storefront',
   ]);
   assert.equal(new Set(nodeIds).size, nodeIds.length, 'node ids are unique');
   for (const n of NODES) {
-    assert.ok(['service', 'datastore', 'queue', 'external'].includes(n.kind), `${n.id} kind ${n.kind}`);
+    assert.ok(['service', 'datastore', 'queue', 'external', 'telemetry'].includes(n.kind), `${n.id} kind ${n.kind}`);
     assert.ok(typeof n.label === 'string' && n.label.length > 0, `${n.id} label`);
     assert.ok(Number.isFinite(n.x) && n.x >= 0 && n.x <= 100, `${n.id} x ${n.x}`);
     assert.ok(Number.isFinite(n.y) && n.y >= 0 && n.y <= 60, `${n.id} y ${n.y}`);
   }
   assert.equal(NODES.find((n) => n.id === 'payment-provider').kind, 'external');
+  const collector = NODES.find((n) => n.id === 'collector');
+  assert.equal(collector.label, 'Collector');
+  assert.equal(collector.kind, 'telemetry', 'a Collector is telemetry plumbing, not on the request path');
+  assert.ok(!EDGES.some((e) => e.from === 'collector' || e.to === 'collector'), 'no request-flow edge to the Collector');
+});
+
+// Labels sit 5.4 below a node centre, so two nodes closer than the tightest pair in the
+// current layout (shipping and notifications, 10 apart in the same column) risk touching
+// labels. This pins that floor for every pair, including any node added later.
+const MIN_NODE_DISTANCE = 10;
+test(`map nodes: no two nodes closer than ${MIN_NODE_DISTANCE} (keeps circles and labels apart)`, () => {
+  for (let i = 0; i < NODES.length; i++) {
+    for (let j = i + 1; j < NODES.length; j++) {
+      const d = Math.hypot(NODES[i].x - NODES[j].x, NODES[i].y - NODES[j].y);
+      assert.ok(d >= MIN_NODE_DISTANCE, `${NODES[i].id} and ${NODES[j].id} are ${d.toFixed(2)} apart`);
+    }
+  }
 });
 
 test('map edges reference real nodes, never loop and never repeat', () => {
@@ -135,5 +152,7 @@ test('map edges reference real nodes, never loop and never repeat', () => {
     seen.add(key);
   }
   const linked = new Set(EDGES.flatMap((e) => [e.from, e.to]));
-  assert.deepEqual(nodeIds.filter((id) => !linked.has(id)), [], 'every node has an edge');
+  // Every request-path node has an edge; telemetry plumbing (the Collector) deliberately has none.
+  const requestPath = NODES.filter((n) => n.kind !== 'telemetry').map((n) => n.id);
+  assert.deepEqual(requestPath.filter((id) => !linked.has(id)), [], 'every request-path node has an edge');
 });

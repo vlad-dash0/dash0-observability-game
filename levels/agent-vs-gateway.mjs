@@ -147,7 +147,7 @@ export default {
   icon: '\u{1F500}',
   rewardTitle: 'Trace router',
   cards: ['tail-sampling-needs-one-collector'],
-  lights: [],
+  lights: ['collector'],
   scoring: { parMs: null },
   play: {
     prefix: 'agw',

@@ -6,6 +6,7 @@ import { parseHTML } from 'linkedom';
 import { buildRegistry } from '../lib/registry.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
 import { nodeStates, renderMap } from '../lib/map.mjs';
+import { NODES as REAL_NODES } from '../hub/map-data.mjs';
 
 const NODES = [
   { id: 'cart', label: 'Cart', kind: 'service', x: 10, y: 10 },
@@ -128,4 +129,13 @@ test('two bosses open at once (one act open only by entry) both pulse', () => {
   assert.equal(s.nodes.cart.pulse, true);
   assert.equal(s.nodes.payments.pulse, true);
   assert.equal(s.nodes.checkout.pulse, false);
+});
+
+test('the real map renders the Collector as a lit kind-telemetry node, with no edge to it', () => {
+  const state = { nodes: Object.fromEntries(REAL_NODES.map((n) => [n.id, { lit: n.id === 'collector', pulse: false }])), edges: [] };
+  const { document } = parseHTML(`<svg xmlns="http://www.w3.org/2000/svg">${renderMap(state, REAL_NODES, [])}</svg>`);
+  const g = document.querySelector('[data-node="collector"]');
+  assert.match(g.getAttribute('class'), /\bkind-telemetry\b/);
+  assert.match(g.getAttribute('class'), /\blit\b/);
+  assert.equal(g.querySelector('text').textContent, 'Collector');
 });

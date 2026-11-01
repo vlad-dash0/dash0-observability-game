@@ -2,7 +2,8 @@
 // Nodes sit in an SVG viewBox of 0 0 100 60, laid out left to right in the direction
 // requests flow; a level names node ids in its `lights`. Edges point from caller to
 // callee (or producer to queue to consumer). Ids are never renamed: levels refer to them.
-// kind: 'service' | 'datastore' | 'queue' | 'external'.
+// kind: 'service' | 'datastore' | 'queue' | 'external' | 'telemetry' (telemetry plumbing,
+// off the request path, so it has no EDGES).
 export const NODES = Object.freeze([
   { id: 'storefront', label: 'Storefront', kind: 'service', x: 8, y: 30 },
   { id: 'api-gateway', label: 'API gateway', kind: 'service', x: 25, y: 30 },
@@ -19,6 +20,7 @@ export const NODES = Object.freeze([
   { id: 'postgres', label: 'Postgres', kind: 'datastore', x: 86, y: 30 },
   { id: 'shipping', label: 'Shipping', kind: 'service', x: 86, y: 43 },
   { id: 'notifications', label: 'Notifications', kind: 'service', x: 86, y: 53 },
+  { id: 'collector', label: 'Collector', kind: 'telemetry', x: 10, y: 10 },
 ].map(Object.freeze));
 
 export const EDGES = Object.freeze([

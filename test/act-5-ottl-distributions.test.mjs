@@ -41,8 +41,8 @@ const DIST = 'distributions';
 
 test('5.5 and 5.6: level fields, derived mechanics, cards, lights and no par time', () => {
   const want = {
-    [OTTL]: { no: '5.5', name: 'OTTL and transforms', mechanics: ['spot', 'configure'], cards: ['redact-in-the-pipeline'], lights: [] },
-    [DIST]: { no: '5.6', name: 'Distributions', mechanics: ['sort'], cards: ['not-every-component'], lights: [] },
+    [OTTL]: { no: '5.5', name: 'OTTL and transforms', mechanics: ['spot', 'configure'], cards: ['redact-in-the-pipeline'], lights: ['collector'] },
+    [DIST]: { no: '5.6', name: 'Distributions', mechanics: ['sort'], cards: ['not-every-component'], lights: ['collector'] },
   };
   for (const [id, w] of Object.entries(want)) {
     const level = LIVE.levels[id];
@@ -58,10 +58,12 @@ test('5.5 and 5.6: level fields, derived mechanics, cards, lights and no par tim
   }
 });
 
-test('5.5 and 5.6 light nothing (the map has no Collector node) and add 2 levels to the scored total', () => {
-  const s = nodeStates(LIVE, progressOf([OTTL, DIST]), NODES, EDGES);
-  assert.equal(NODES.filter((n) => s.nodes[n.id].lit).length, 0);
-  assert.equal(s.edges.filter((e) => e.lit).length, 0);
+test('5.5 and 5.6 each light only the Collector node (no edge) and add 2 levels to the scored total', () => {
+  for (const done of [[OTTL], [DIST], [OTTL, DIST]]) {
+    const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
+    assert.deepEqual(NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id), ['collector'], done.join());
+    assert.equal(s.edges.filter((e) => e.lit).length, 0, done.join());
+  }
   assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: MAX_STARS });
   assert.deepEqual(starTotals(progressOf([OTTL, DIST]), LIVE), { earned: 6, max: MAX_STARS });
   assert.equal(levelState(OTTL, progressOf(['pipelines']), LIVE), 'open', 'an entered act opens its levels');

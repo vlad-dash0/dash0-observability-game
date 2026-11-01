@@ -88,7 +88,7 @@ export default {
   icon: '\u{1F522}',
   rewardTitle: 'Order keeper',
   cards: ['memory-limiter-first'],
-  lights: [],
+  lights: ['collector'],
   scoring: { parMs: null },
   play: {
     prefix: 'order',

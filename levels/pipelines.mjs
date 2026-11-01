@@ -138,7 +138,7 @@ export default {
   icon: '\u{1F527}',
   rewardTitle: 'Pipeline plumber',
   cards: ['configured-not-enabled'],
-  lights: [],
+  lights: ['collector'],
   scoring: { parMs: null },
   play: {
     prefix: 'pipe',
