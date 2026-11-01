@@ -8,6 +8,7 @@ import { makeDom, q, qa, click } from './helpers/dom.mjs';
 import { recordFocus } from './helpers/focus.mjs';
 import { STEP_DRIVERS, stepsOf } from './helpers/step-drivers.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
+import { validateChoiceSpec } from '../lib/widgets/choice.mjs';
 import { runPlay, STEP_TYPES, validatePlay } from '../lib/play.mjs';
 import { buildRegistry, RegistryError, validateRegistry } from '../lib/registry.mjs';
 import { liveRegistry } from '../app.mjs';
@@ -266,5 +267,45 @@ test('validatePlay never throws, whatever it is given', () => {
   for (const v of [undefined, null, 3, 'x', [], {}, cyclic, { steps: [null, 4, []] }, { steps: [{ intro: 'x', sort: null }] }, { get steps() { throw new Error('boom'); } }]) {
     const r = validatePlay(v);
     assert.ok(Array.isArray(r.errors) && r.errors.length > 0, JSON.stringify(r));
+  }
+});
+
+// ---- sparse arrays and unknown widget keys ---------------------------------------
+
+test('a hole in an array is not plain data, whether in steps or in choices', () => {
+  const steps = playFixture();
+  delete steps.play.steps[1];
+  assert.deepEqual(errorsOf(steps), [`${AT}: play must be plain data: steps[1] is a hole in an array; write run(ctx) for custom behaviour`]);
+  const choices = playFixture();
+  delete choices.play.steps[0].choice.choices[2];
+  assert.deepEqual(errorsOf(choices), [
+    `${AT}: play must be plain data: steps[0].choice.choices[2] is a hole in an array; write run(ctx) for custom behaviour`,
+  ]);
+});
+
+test('validateChoiceSpec reports a hole instead of skipping it', () => {
+  const choices = [{ key: 'a', why: 'x', right: true }, { key: 'b', why: 'y' }, { key: 'c', why: 'z' }];
+  delete choices[2];
+  assert.ok(validateChoiceSpec(choices).includes('choice 2 is not an object'));
+});
+
+test('an unknown key in a widget spec is named, with a hint when close', () => {
+  const cases = [
+    [(p) => { p.steps[0].choice.extra = 1; }, 'step 1 (choice "fx-pick"): unknown key "extra" on spec'],
+    [(p) => { p.steps[1].sort.bogus = 1; }, 'step 2 (sort "fx-sort"): unknown key "bogus" on spec'],
+    [(p) => { p.steps[1].sort.items[0].bucktet = 'auto'; }, 'step 2 (sort "fx-sort"): unknown key "bucktet" on item "server" (did you mean "bucket"?)'],
+    [(p) => { p.steps[1].sort.buckets[0].lable = 'x'; }, 'step 2 (sort "fx-sort"): unknown key "lable" on bucket "auto" (did you mean "label"?)'],
+    [(p) => { const b = p.steps[2].build; b.hin = b.hint; delete b.hint; }, 'step 3 (build "fx-tree"): unknown key "hin" on spec (did you mean "hint"?)'],
+    [(p) => { p.steps[2].build.spans[0].serivce = 'x'; }, 'step 3 (build "fx-tree"): unknown key "serivce" on span 0 (did you mean "service"?)'],
+    [(p) => { p.steps[2].build.answer.aaaaaaaaaaaaaaa2.kidn = 'SERVER'; }, 'step 3 (build "fx-tree"): unknown key "kidn" on answer aaaaaaaaaaaaaaa2 (did you mean "kind"?)'],
+    [(p) => { p.steps[3].incident.answerAfterView = 2; }, 'step 4 (incident "checkout-slow"): unknown key "answerAfterView" on spec (did you mean "answerAfterViews"?)'],
+    [(p) => { p.steps[3].incident.views[0].costMn = 1; }, 'step 4 (incident "checkout-slow"): unknown key "costMn" on view "traces" (did you mean "costMin"?)'],
+    [(p) => { p.steps[3].incident.hypotheses[0].wy = 1; }, 'step 4 (incident "checkout-slow"): unknown key "wy" on hypothesis "slow-query" (did you mean "why"?)'],
+    [(p) => { p.steps[3].incident.alert.titel = 'x'; }, 'step 4 (incident "checkout-slow"): unknown key "titel" on alert (did you mean "title"?)'],
+    [(p) => { p.steps[3].incident.budget.startPc = 1; }, 'step 4 (incident "checkout-slow"): unknown key "startPc" on budget (did you mean "startPct"?)'],
+  ];
+  for (const [edit, want] of cases) {
+    const got = problems(edit);
+    assert.ok(got.includes(want), `${want}\n  got: ${JSON.stringify(got)}`);
   }
 });
