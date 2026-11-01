@@ -76,14 +76,6 @@ const PLAN = {
           cost: ALWAYS_ON_CHILDREN,
           keeps: ['enough-traces'],
         },
-        {
-          id: 'children-ratio',
-          label:
-            `<code>parentbased_traceidratio</code> at <code>0.1</code> on storefront, and <code>${SAMPLER}=traceidratio</code> with <code>${ARG}=0.1</code> on checkout and payments, ` +
-            `priced as if every SDK agrees: ${n(TEN)} traces/s × ${WHOLE} = ${n(AT_TEN)}`,
-          cost: AT_TEN,
-          keeps: ['enough-traces'],
-        },
       ],
     },
   ],
@@ -100,11 +92,6 @@ const PLAN = {
     'sampler:children-always-on':
       `Storefront drops ${n(DROPPED)} of every ${n(TRACES)} traces a second at the root, and checkout and payments, set to <code>always_on</code>, ignore that and sample their spans anyway: ` +
       `${n(DROPPED)} traces/s × ${CHILDREN} spans = ${n(ORPHANS)} spans a second for traces whose root is gone. Those traces arrive with holes, and they cost ${n(ORPHANS)} spans a second of the budget.`,
-    'sampler:children-ratio':
-      '<code>traceidratio</code> ignores the parent\'s sampled flag and decides again from the trace ID. The spec says its exact algorithm was never specified, ' +
-      'that it is not defined to be compatible with any other SDK, and that different SDKs or versions may give inconsistent results for the same input, ' +
-      'which is why it recommends it only for root spans, in combination with ParentBased. Where two services disagree, a trace has holes. ' +
-      'It is priced here as if every SDK agrees, which the spec does not promise.',
   },
   explain:
     `The plan costs ${n(AT_TEN)} of ${n(CAP)} spans/s: ${n(TEN)} of ${n(TRACES)} traces a second, ${WHOLE} spans each. ` +
@@ -125,12 +112,12 @@ const WHY = [
     key: 'own-decision',
     label: 'A child set to <code>always_on</code> ignores the parent\'s sampled flag and samples its spans anyway, so it keeps spans of traces whose root was dropped',
     right: true,
-    why: 'Only ParentBased uses the parent\'s decision: for a span with a parent it follows the sampled flag in <code>traceparent</code>, so a trace is kept whole or not at all. <code>always_on</code> ignores the flag and records everything, and so does <code>traceidratio</code>: the spec says TraceIdRatioBased must ignore the parent\'s sampled flag and decide again from the trace ID. Whether two services reach the same answer is not guaranteed, because the spec says its exact algorithm was never specified, which is why it recommends it only for root spans, in combination with ParentBased. Either way the children keep spans of traces whose root was dropped, and those traces have holes.',
+    why: 'Only ParentBased uses the parent\'s decision: for a span with a parent it follows the sampled flag in <code>traceparent</code>, so a trace is kept whole or not at all. <code>always_on</code> ignores the flag and records every span, so checkout and payments keep spans of traces whose root was dropped, and those traces have holes.',
   },
   {
     key: 'ratio-stacks',
     label: 'Each service applies its own ratio on top of the root\'s, so the chances multiply and the children keep too little',
-    why: 'Ratios do not multiply. Under ParentBased the ratio belongs to the root sampler, which never runs for a span that has a parent, so a child follows the flag. A child set to <code>always_on</code> keeps too much, not too little, and a child set to <code>traceidratio</code> decides again from the trace ID rather than stacking a second chance.',
+    why: 'Ratios do not multiply. Under ParentBased the ratio belongs to the root sampler, which never runs for a span that has a parent, so a child follows the flag. A child set to <code>always_on</code> keeps too much, not too little.',
   },
 ];
 

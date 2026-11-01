@@ -4,7 +4,8 @@
 // it computes come from the kept traces only.
 // Spec: docs/OUTLINE.md §4 Act 6.
 // Spec: https://opentelemetry.io/docs/concepts/sampling/#tail-sampling , https://opentelemetry.io/docs/collector/configuration/#connectors
-// Docs (GitHub READMEs, not an allowed Spec host): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md , https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/connector/spanmetricsconnector/README.md
+// Docs (GitHub READMEs, not an allowed Spec host): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md , https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/connector/spanmetricsconnector/README.md , https://github.com/open-telemetry/opentelemetry-collector/blob/main/connector/README.md
+// (the connector README shows one connector as the exporter of several pipelines, which then all feed that one connector; each traces pipeline here therefore names its own span_metrics connector)
 //
 // Facts used (each read on the page above): tail sampling decides on all or most of the spans of a trace, so it can always keep
 // traces with an error or a high latency, and its downsides are that it is hard to implement and to operate, because the component
@@ -118,8 +119,7 @@ const BUDGET = {
       `A trace that takes ${SLOWEST} seconds is still running when the 10 seconds are up, so the processor decides on part of it, and the rest arrives late. ` +
       'A late span can cause different sampling decisions for different parts of the same trace.',
     'wait:wait-120s':
-      `It sees every trace whole, and holds ${n(held(120))} traces to do it, ${n(mib(120))} MiB. The processor also keeps at most <code>num_traces</code>, ${n(NUM_TRACES)} by default: ` +
-      `with ${n(held(120))} traces waiting, the oldest are dropped before they are sampled.`,
+      `It sees every trace whole, and holds ${n(held(120))} traces to do it, ${n(mib(120))} MiB: far more than the ${n(CAP)} MiB the replica has, for traces that were whole after ${SLOWEST} seconds anyway.`,
   },
   explain:
     `The plan costs ${n(mib(30))} of ${n(CAP)} MiB: ${n(TRACES)} new traces a second, each held for the 30-second <code>decision_wait</code>, is ${n(held(30))} traces at once, under the default <code>num_traces</code> of ${n(NUM_TRACES)}. ` +
@@ -137,12 +137,12 @@ const SPOT = {
   id: 'ts-spot',
   target: 'config',
   lines: [
-    { id: 'traces', text: 'traces: processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0, span_metrics]' },
-    { id: 'traces-checkout', text: 'traces/checkout: processors: [memory_limiter, tail_sampling] exporters: [span_metrics]' },
-    { id: 'traces-metrics', text: 'traces/metrics: processors: [memory_limiter] exporters: [span_metrics]' },
+    { id: 'traces', text: 'traces: processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0, span_metrics/web]' },
+    { id: 'traces-checkout', text: 'traces/checkout: processors: [memory_limiter, tail_sampling] exporters: [span_metrics/checkout]' },
+    { id: 'traces-metrics', text: 'traces/metrics: processors: [memory_limiter] exporters: [span_metrics/all]' },
     { id: 'traces-sampled', text: 'traces/sampled: processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0]' },
-    { id: 'traces-audit', text: 'traces/audit: processors: [memory_limiter, batch] exporters: [otlp_grpc/dash0, span_metrics]' },
-    { id: 'metrics-spans', text: 'metrics/spans: receivers: [span_metrics] processors: [batch] exporters: [otlp_grpc/dash0]' },
+    { id: 'traces-audit', text: 'traces/audit: processors: [memory_limiter, batch] exporters: [otlp_grpc/dash0, span_metrics/audit]' },
+    { id: 'metrics-spans', text: 'metrics/spans: receivers: [span_metrics/all] processors: [batch] exporters: [otlp_grpc/dash0]' },
   ],
   faults: ['traces', 'traces-checkout'],
   whyNot: {
@@ -153,9 +153,10 @@ const SPOT = {
   },
   explain:
     'A connector is an exporter at the end of one pipeline and a receiver at the start of another, so it receives what comes out of the processors of the traces pipeline that lists it. ' +
-    `In <code>traces</code> and <code>traces/checkout</code> that is what <code>tail_sampling</code> kept, ${n(KEPT)} of ${n(TRACES)} traces a second. ` +
-    `The request rate it computes is ${n(KEPT)} a second, not ${n(TRACES)}, and the error ratio is ${n(ERRORS)} of ${n(KEPT)}, ${ERROR_SHARE}%, not the real ${pct(ERROR_RATE)}, because the sampler kept every error and few of the rest. ` +
-    'Compute span metrics before sampling: give the connector a traces pipeline of its own with no sampling processor, as <code>traces/metrics</code> does, and let a pipeline like <code>traces/sampled</code> send the sampled traces to the backend. ' +
+    'Each pipeline here has its own connector, named after it, because a connector that is the exporter of several pipelines counts the spans of all of them together. ' +
+    `In <code>traces</code> and <code>traces/checkout</code> the connector gets what <code>tail_sampling</code> kept. For a pipeline whose connector sees only the sampled spans of the ${n(TRACES)} traces a second, ` +
+    `the request rate it computes is ${n(KEPT)} a second, not ${n(TRACES)}, and the error ratio is ${n(ERRORS)} of ${n(KEPT)}, ${ERROR_SHARE}%, not the real ${pct(ERROR_RATE)}, because the sampler kept every error and few of the rest. ` +
+    'Compute span metrics before sampling: give the connector a traces pipeline with no sampling processor, as <code>traces/metrics</code> does, and let a pipeline like <code>traces/sampled</code> send the sampled traces to the backend. ' +
     'A receiver can be listed in more than one pipeline, so both can read the same <code>otlp</code> receiver. ' +
     'The connector was renamed from <code>spanmetrics</code> to <code>span_metrics</code>; the old name still works and is deprecated. ' +
     'This step grades the lines you select, not a parsed config: it does not check that the pipelines are wired.',

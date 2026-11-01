@@ -195,7 +195,7 @@ test('head sampling: the table behind the copy, recomputed: 12 spans a trace, 4,
   assert.equal(option(spec, 'sampler', 'ratio-1pct').cost, 48);
   assert.equal(option(spec, 'sampler', 'ratio-10pct').cost, 480);
   assert.equal(option(spec, 'sampler', 'children-always-on').cost, 480 + 2880);
-  assert.equal(option(spec, 'sampler', 'children-ratio').cost, 480);
+  assert.deepEqual(spec.knobs[0].options.map((o) => o.id), ['defaults', 'ratio-1pct', 'ratio-10pct', 'children-always-on'], 'no option about a child traceidratio: the level teaches always_on against ParentBased');
   const intro = plain(LIVE.levels['head-sampling'].play.steps[0].intro);
   for (const w of ['400 traces', '12 spans', '4,800 spans', '600 spans', 'storefront', 'checkout', 'payments']) assert.equal(intro.includes(w), true, w);
   assert.equal(/authored|not run|does not run|simulat/.test(intro + plain(spec.explain)), true, 'the copy says the arithmetic is worked out, not run by an engine');
@@ -217,7 +217,6 @@ test('head sampling: every shortcut fails the real grader for its own reason', (
   assert.deepEqual(run('defaults'), { outcome: 'wrong', total: 4800, over: 4200, lost: [] }, 'sampling everything keeps every need and blows the budget');
   assert.deepEqual(run('ratio-1pct'), { outcome: 'wrong', total: 48, over: 0, lost: ['enough-traces'] }, 'cheap and too few traces');
   assert.deepEqual(run('children-always-on'), { outcome: 'wrong', total: 3360, over: 2760, lost: ['whole-traces'] }, 'children that ignore the parent: holes and over budget');
-  assert.deepEqual(run('children-ratio'), { outcome: 'wrong', total: 480, over: 0, lost: ['whole-traces'] }, 'within budget, but each service decides again');
 });
 
 test('head sampling: a plan with nothing picked is incomplete and free, and a repeated wrong plan is a repeat', () => {
@@ -232,10 +231,7 @@ test('head sampling: the nuance is graded: the wrong options say why a child tha
   const spec = hs();
   const alwaysOn = plain(spec.whyNot['sampler:children-always-on']);
   for (const w of ['360 traces', '8 spans', '2,880', 'root', 'holes']) assert.equal(alwaysOn.includes(w), true, w);
-  const ratio = plain(spec.whyNot['sampler:children-ratio']);
-  for (const w of ['ignores', 'sampled flag', 'never specified', 'inconsistent', 'root spans', 'ParentBased']) assert.equal(ratio.includes(w), true, w);
-  assert.equal(/consistent across|same decision in every SDK/.test(ratio), false, 'no claim that TraceIdRatioBased agrees across SDKs');
-  assert.equal(ratio.includes('if every'), true, 'the price assumes the services agree, and says so');
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['sampler:children-always-on', 'sampler:defaults', 'sampler:ratio-1pct']);
   const label = plain(option(spec, 'sampler', 'children-always-on').label);
   assert.equal(label.includes('always_on'), true);
   assert.equal(label.includes('3,360'), true);
@@ -248,12 +244,13 @@ test('head sampling: the closing Choice grades the nuance in words: a child that
   assert.deepEqual(choices.filter((c) => c.right).map((c) => c.key), ['own-decision']);
   const rightChoice = choices.find((c) => c.right);
   const right = plain(rightChoice.label + rightChoice.why);
-  for (const w of ['always_on', 'traceidratio', 'sampled flag', 'traceparent', 'ParentBased', 'root', 'holes', 'ignore']) assert.equal(right.includes(w), true, w);
-  assert.equal(/consistent across|same decision in every SDK/.test(right), false, 'no claim that TraceIdRatioBased agrees across SDKs');
+  for (const w of ['always_on', 'sampled flag', 'traceparent', 'ParentBased', 'root', 'holes', 'ignore']) assert.equal(right.includes(w), true, w);
+  for (const w of ['traceidratio', 'TraceIdRatioBased', 'never specified', 'and so does']) assert.equal(right.includes(w), false, `the right answer is about always_on only: ${w}`);
   const lost = plain(choices.find((c) => c.key === 'header-lost').why);
   for (const w of ['propagat', 'sampler']) assert.equal(lost.includes(w), true, w);
   const stacks = plain(choices.find((c) => c.key === 'ratio-stacks').why);
-  for (const w of ['never runs', 'again']) assert.equal(stacks.includes(w), true, w);
+  assert.equal(stacks.includes('never runs'), true);
+  assert.equal(stacks.includes('traceidratio'), false);
   const step = LIVE.levels['head-sampling'].play.steps[1];
   assert.equal(step.qid, 'hs-q-why');
   assert.equal(plain(step.intro).includes('always_on'), true);
@@ -323,7 +320,9 @@ test('tail sampling: the trade-off teaches the cost: the wait holds traces in me
   const t = plain(spec.explain);
   for (const w of ['600 of 1,000 MiB', '12,000 traces', 'num_traces', '50,000', 'decision_wait', 'whichever policies', 'late']) assert.equal(t.includes(w), true, w);
   const long = plain(spec.whyNot['wait:wait-120s']);
-  for (const w of ['48,000', 'num_traces', 'dropped']) assert.equal(long.includes(w), true, w);
+  for (const w of ['48,000', '2,400']) assert.equal(long.includes(w), true, w);
+  assert.equal(TRACES * 120 > 50000, false, '48,000 held traces fit the default num_traces of 50,000');
+  assert.equal(/num_traces|dropped/.test(long), false, 'no claim that traces are dropped for want of buffer: 48,000 is under 50,000');
   const short = plain(spec.whyNot['wait:wait-10s']);
   for (const w of ['20 seconds', 'late', 'different']) assert.equal(short.includes(w), true, w);
   assert.equal(plain(spec.whyNot['policies:probabilistic']).includes('head sampling'), true);
@@ -349,8 +348,12 @@ test('spot: the lines are valid, six pipelines, and exactly the two that feed sp
   const rule = (l) => /processors: \[[^\]]*tail_sampling[^\]]*\]/.test(l.text) && /exporters: \[[^\]]*span_metrics[^\]]*\]/.test(l.text);
   assert.deepEqual(spec.lines.filter(rule).map((l) => l.id).sort(), [...spec.faults].sort(), 'the faults are exactly the lines that match the rule');
   assert.deepEqual([...spec.faults].sort(), ['traces', 'traces-checkout']);
-  assert.equal(text('traces-metrics').includes('processors: [memory_limiter] exporters: [span_metrics]'), true, 'the connector fed with nothing in between');
-  assert.equal(text('metrics-spans').startsWith('metrics/spans: receivers: [span_metrics]'), true, 'the receiving end of the connector');
+  assert.equal(text('traces-metrics').includes('processors: [memory_limiter] exporters: [span_metrics/all]'), true, 'the connector fed with nothing in between');
+  assert.equal(text('metrics-spans').startsWith('metrics/spans: receivers: [span_metrics/all]'), true, 'the receiving end of the connector');
+  // A connector that is the exporter of several pipelines counts all of them together, so each traces pipeline names its own.
+  const connectors = spec.lines.flatMap((l) => (/^traces/.test(l.text) ? l.text.match(/span_metrics\/[a-z]+/g) ?? [] : []));
+  assert.deepEqual(connectors.sort(), ['span_metrics/all', 'span_metrics/audit', 'span_metrics/checkout', 'span_metrics/web']);
+  assert.equal(new Set(connectors).size, connectors.length, 'no connector is fed by two pipelines');
   assert.equal(spec.lines.every((l) => !l.text.includes('spanmetrics')), true, 'the current component name, span_metrics');
 });
 
@@ -381,6 +384,7 @@ test('spot: the explain teaches the nuance with the recomputed figures: 39 of 40
   assert.equal(KEPT_ERRORS / TRACES, 0.02);
   const t = plain(spot().explain);
   for (const w of ['39', '400', '21%', '2%', 'exporter', 'end of', 'before', 'its own', 'span_metrics', 'spanmetrics', 'deprecated']) assert.equal(t.includes(w), true, w);
+  for (const w of ['counts the spans of all of them together', 'own connector', 'a pipeline whose connector sees only']) assert.equal(t.includes(w), true, w);
   const intro = plain(LIVE.levels['tail-sampling'].play.steps[1].intro);
   for (const w of ['span_metrics', 'tail_sampling']) assert.equal(intro.includes(w), true, w);
 });
@@ -408,6 +412,7 @@ test('the 6.1 and 6.2 level files cite the pages their facts come from: Spec lin
   for (const u of [
     'https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md',
     'https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/connector/spanmetricsconnector/README.md',
+    'https://github.com/open-telemetry/opentelemetry-collector/blob/main/connector/README.md',
   ]) assert.equal(docs.includes(u), true, u);
   for (const f of ['head-sampling', 'tail-sampling']) {
     for (const u of [...urls(f, '// Spec: ')]) assert.equal(['opentelemetry.io', 'www.w3.org', 'prometheus.io'].includes(new URL(u).host), true, `${f} Spec line ${u}`);
