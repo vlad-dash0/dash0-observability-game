@@ -28,6 +28,7 @@ import contextPropagation from './context-propagation.mjs';
 import correlation from './correlation.mjs';
 import detectorsAndKubernetes from './detectors-and-kubernetes.mjs';
 import distributions from './distributions.mjs';
+import errorsTripled from './errors-tripled.mjs';
 import eventsAndLinks from './events-and-links.mjs';
 import exemplars from './exemplars.mjs';
 import headSampling from './head-sampling.mjs';
@@ -112,6 +113,6 @@ export const ACTS = [
     name: 'Sampling and cost',
     sub: 'You can\'t keep everything',
     levels: [headSampling, tailSampling, whatCostsMoney],
-    boss: null,
+    boss: errorsTripled,
   },
 ];

@@ -13,7 +13,7 @@ import { liveRegistry } from '../app.mjs';
 import { expectedStarMax } from './helpers/stars.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { nodeStates } from '../lib/map.mjs';
-import { isActUnlocked, levelState, lockReason } from '../lib/unlock.mjs';
+import { isActComplete, isActUnlocked, levelState, lockReason } from '../lib/unlock.mjs';
 import { allPlans, checkTradeoff, evaluatePlan, newTradeoffState, pickOption, validateTradeoffSpec } from '../lib/widgets/trade-off.mjs';
 import { checkSpot, newSpotState, toggleLine, validateSpotSpec } from '../lib/widgets/spot-it.mjs';
 import { checkConfig } from '../lib/configure/check.mjs';
@@ -39,14 +39,14 @@ const stepKinds = (levelId) => LIVE.levels[levelId].play.steps.map((st) => ['cho
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-6 "Sampling and cost" holds 6.1 to 6.3 after Act 5, with no boss yet', () => {
+test('act-6 "Sampling and cost" holds 6.1 to 6.3 after Act 5, then its boss "Errors tripled overnight"', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-6');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 6, name: 'Sampling and cost', sub: 'You can\'t keep everything', levelIds: ['head-sampling', 'tail-sampling', 'what-costs-money'], bossId: null },
+    { no: 6, name: 'Sampling and cost', sub: 'You can\'t keep everything', levelIds: ['head-sampling', 'tail-sampling', 'what-costs-money'], bossId: 'errors-tripled' },
   );
   assert.deepEqual(LIVE.acts.map((a) => a.id).slice(-2), ['act-5', 'act-6']);
-  assert.deepEqual(LIVE.order.slice(-4), ['silence', 'head-sampling', 'tail-sampling', 'what-costs-money']);
+  assert.deepEqual(LIVE.order.slice(-5), ['silence', 'head-sampling', 'tail-sampling', 'what-costs-money', 'errors-tripled']);
 });
 
 test('act-6 unlocks like the acts before it: every earlier act complete (Act 5 and its boss included), or entered', () => {
@@ -67,9 +67,11 @@ test('act-6 unlocks like the acts before it: every earlier act complete (Act 5 a
   assert.equal(levelState('head-sampling', progressOf(['tail-sampling']), LIVE), 'open');
 });
 
-test('act-6 is complete once both levels are done: there is no boss to wait for', () => {
-  assert.equal(isActUnlocked(7, progressOf([...[0, 1, 2, 3, 4, 5].flatMap((n) => idsOf(`act-${n}`)), 'head-sampling']), LIVE), false);
-  assert.equal(LIVE.acts.find((a) => a.id === 'act-6').bossId, null);
+test('act-6 is not complete until its boss is done too', () => {
+  const act = LIVE.acts.find((a) => a.id === 'act-6');
+  assert.equal(act.bossId, 'errors-tripled');
+  assert.equal(isActComplete(act, progressOf([...act.levelIds])), false, 'the levels alone do not complete the act');
+  assert.equal(isActComplete(act, progressOf([...act.levelIds, 'errors-tripled'])), true);
 });
 
 test('act-6 levels are scored with no par time, belong to act-6, and add 6 stars to the derived total', () => {
