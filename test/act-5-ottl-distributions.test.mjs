@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { DECK } from '../cards/deck.mjs';
 import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
+import { expectedStarMax } from './helpers/stars.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { nodeStates } from '../lib/map.mjs';
 import { levelState } from '../lib/unlock.mjs';
@@ -18,6 +19,7 @@ import { COLLECTOR_SCHEMA } from '../lib/configure/collector.mjs';
 import { newConfigureState, runConfigure } from '../lib/widgets/configure-it.mjs';
 
 const LIVE = liveRegistry();
+const MAX_STARS = expectedStarMax(LIVE);
 const read = (rel) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 const plain = (html) => html.replace(/<[^>]+>/g, '');
 const progressOf = (ids) => {
@@ -56,12 +58,12 @@ test('5.5 and 5.6: level fields, derived mechanics, cards, lights and no par tim
   }
 });
 
-test('5.5 and 5.6 light nothing (the map has no Collector node) and add 2 levels: 30 scored, max 90', () => {
+test('5.5 and 5.6 light nothing (the map has no Collector node) and add 2 levels to the scored total', () => {
   const s = nodeStates(LIVE, progressOf([OTTL, DIST]), NODES, EDGES);
   assert.equal(NODES.filter((n) => s.nodes[n.id].lit).length, 0);
   assert.equal(s.edges.filter((e) => e.lit).length, 0);
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 90 });
-  assert.deepEqual(starTotals(progressOf([OTTL, DIST]), LIVE), { earned: 6, max: 90 });
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: MAX_STARS });
+  assert.deepEqual(starTotals(progressOf([OTTL, DIST]), LIVE), { earned: 6, max: MAX_STARS });
   assert.equal(levelState(OTTL, progressOf(['pipelines']), LIVE), 'open', 'an entered act opens its levels');
   assert.equal(levelState(DIST, emptyProgress(), LIVE), 'locked');
 });

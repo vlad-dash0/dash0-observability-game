@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { DECK } from '../cards/deck.mjs';
 import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
+import { expectedStarMax } from './helpers/stars.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { nodeStates } from '../lib/map.mjs';
 import { isActUnlocked, levelState, lockReason } from '../lib/unlock.mjs';
@@ -17,6 +18,7 @@ import { COLLECTOR_SCHEMA } from '../lib/configure/collector.mjs';
 import { newConfigureState, runConfigure } from '../lib/widgets/configure-it.mjs';
 
 const LIVE = liveRegistry();
+const MAX_STARS = expectedStarMax(LIVE);
 const read = (rel) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 const plain = (html) => html.replace(/<[^>]+>/g, '');
 
@@ -85,9 +87,9 @@ test('existing players: a saved 1.2 and Act 0 stay valid; Act 2 waits for 1.1 an
   assert.equal(levelState('spans-and-traces', entered, LIVE), 'done');
 });
 
-test('star totals count both new levels: 30 scored levels, max 90', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 90 });
-  assert.deepEqual(starTotals(progressOf(['resources', 'detectors-and-kubernetes']), LIVE), { earned: 6, max: 90 });
+test('star totals count both new levels against the derived scored-level max', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: MAX_STARS });
+  assert.deepEqual(starTotals(progressOf(['resources', 'detectors-and-kubernetes']), LIVE), { earned: 6, max: MAX_STARS });
 });
 
 // ---- level fields and lights --------------------------------------------------------

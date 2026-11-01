@@ -14,9 +14,11 @@ import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { answer, budgetLeft, newIncident, openView, validateScenario } from '../lib/widgets/incident.mjs';
 import { compareAttribute } from '../lib/widgets/triage.mjs';
 import { liveRegistry } from '../app.mjs';
+import { expectedStarMax } from './helpers/stars.mjs';
 import boss, { CONTENT } from '../levels/checkout-is-slow.mjs';
 
 const LIVE = liveRegistry();
+const MAX_STARS = expectedStarMax(LIVE);
 const S = CONTENT.scenario;
 
 // ---- content pin: docs/M1-DESIGN.md §6 Boss checkout-is-slow ------------------------
@@ -54,8 +56,8 @@ test('checkout-is-slow: a scored Act 2 boss lighting inventory, no cards', () =>
   assert.equal(LIVE.acts.find((a) => a.id === 'act-2').bossId, 'checkout-is-slow');
 });
 
-test('checkout-is-slow: star totals count the boss (30 scored levels, max 90)', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 90 });
+test('checkout-is-slow: star totals count the boss (the derived scored-level max)', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: MAX_STARS });
 });
 
 test('checkout-is-slow: no em dash in the level file', () => {

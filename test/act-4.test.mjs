@@ -10,12 +10,14 @@ import { readFileSync } from 'node:fs';
 import { DECK } from '../cards/deck.mjs';
 import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
+import { expectedStarMax } from './helpers/stars.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { nodeStates } from '../lib/map.mjs';
 import { isActUnlocked, levelState, lockReason } from '../lib/unlock.mjs';
 import { checkSpot, newSpotState, toggleLine } from '../lib/widgets/spot-it.mjs';
 
 const LIVE = liveRegistry();
+const MAX_STARS = expectedStarMax(LIVE);
 const read = (rel) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
 const plain = (html) => html.replace(/<[^>]+>/g, '');
 
@@ -92,10 +94,10 @@ test('existing players: adding Act 4 changes no earlier act or level state', () 
   assert.equal(levelState('structured-logs', partway, LIVE), 'locked');
 });
 
-test('star totals count all four Act 4 entries: 30 scored levels, max 90', () => {
-  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: 90 });
-  assert.deepEqual(starTotals(progressOf(ACT_4), LIVE), { earned: 6, max: 90 });
-  assert.deepEqual(starTotals(progressOf([...ACT_4_LEVELS, ACT_4_BOSS]), LIVE), { earned: 12, max: 90 });
+test('star totals count all four Act 4 entries against the derived scored-level max', () => {
+  assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: MAX_STARS });
+  assert.deepEqual(starTotals(progressOf(ACT_4), LIVE), { earned: 6, max: MAX_STARS });
+  assert.deepEqual(starTotals(progressOf([...ACT_4_LEVELS, ACT_4_BOSS]), LIVE), { earned: 12, max: MAX_STARS });
 });
 
 // ---- level fields and lights --------------------------------------------------------
