@@ -74,7 +74,7 @@ test('the-pager: an unscored Act 0 boss with no cards and no lights', () => {
 test('the-pager: star totals ignore this boss (the derived scored-level max)', () => {
   assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: MAX_STARS });
   const all = emptyProgress();
-  for (const id of LIVE.order) all.levels[id] = { stars: 3, at: null };
+  for (const id of LIVE.order) all.levels[id] = { stars: 5, at: null };
   assert.deepEqual(starTotals(all, LIVE), { earned: MAX_STARS, max: MAX_STARS }, 'the pager adds nothing');
 });
 

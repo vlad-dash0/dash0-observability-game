@@ -322,7 +322,7 @@ test('who-is-talking: shortcut: every clue and neutral in any order never exhaus
   assert.equal(q('#wit-next').disabled, false);
 });
 
-test('who-is-talking: the shortest path is two clues (resource, deploys); it solves at 60% with no penalty and 3 stars', () => {
+test('who-is-talking: the shortest path is two clues (resource, deploys); it solves at 60% with no penalty and 5 stars', () => {
   const { finished, slips } = start();
   open('alert-resource');
   open('deploy-history');
@@ -332,13 +332,13 @@ test('who-is-talking: the shortest path is two clues (resource, deploys); it sol
   assert.equal(budget(), 'Error budget: 60% left (8 min in).');
   finish();
   assert.equal(finished.length, 1);
-  assert.equal(finished[0].stars, 3);
+  assert.equal(finished[0].stars, 5);
   assert.equal(finished[0].text, BOSS.play.finish);
 });
 
 // ---- penalties: one each from a clean start ------------------------------------------
 
-test('who-is-talking: a herring costs one mistake on its first open only, and the run still finishes with 2 stars', () => {
+test('who-is-talking: a herring costs one mistake on its first open only, and the run still finishes with 4 stars', () => {
   const { slips, finished } = start();
   open('catalog-rename');
   assert.equal(slips.mistakes, 1);
@@ -350,10 +350,10 @@ test('who-is-talking: a herring costs one mistake on its first open only, and th
   guess('name-dropped');
   finish();
   assert.equal(slips.mistakes, 1);
-  assert.equal(finished[0].stars, 2);
+  assert.equal(finished[0].stars, 4);
 });
 
-test('who-is-talking: the second herring is a second mistake; a wrong answer on top is a third and leaves 1 star', () => {
+test('who-is-talking: the second herring is a second mistake; a wrong answer on top is a third and leaves 2 stars', () => {
   const { slips, finished } = start();
   open('catalog-rename');
   open('k8s-warnings');
@@ -364,7 +364,7 @@ test('who-is-talking: the second herring is a second mistake; a wrong answer on 
   guess('name-dropped');
   finish();
   assert.equal(slips.mistakes, 3);
-  assert.equal(finished[0].stars, 1);
+  assert.equal(finished[0].stars, 2);
 });
 
 for (const id of ['new-service', 'detector-broken', 'collector-renamed']) {
@@ -379,7 +379,7 @@ for (const id of ['new-service', 'detector-broken', 'collector-renamed']) {
     guess('name-dropped');
     finish();
     assert.equal(slips.mistakes, 1);
-    assert.equal(finished[0].stars, 2);
+    assert.equal(finished[0].stars, 4);
   });
 }
 
@@ -395,7 +395,7 @@ test('who-is-talking: every clue and neutral leaves 5% and no mistake; a herring
   assert.equal(q('[data-hypothesis="name-dropped"]').disabled, false, 'still answerable at 0');
   guess('name-dropped');
   finish();
-  assert.equal(finished[0].stars, 2, 'two penalties still leave 2 stars (the star rule: 1 or 2 penalties)');
+  assert.equal(finished[0].stars, 3, 'two penalties leave 3 stars (the star rule: 2 penalties)');
 });
 
 test('who-is-talking: opening a view again costs neither time nor a mistake, so repeat opens cannot exhaust the budget', () => {
@@ -419,7 +419,7 @@ test('who-is-talking: the closing step grades the fix and the fallback; renaming
   assert.equal(plain(fix.find((c) => c.key === 'k8s-attribute').why).includes('already'), true);
 });
 
-test('who-is-talking: a wrong answer on the closing step costs one mistake, once, and leaves 2 stars', () => {
+test('who-is-talking: a wrong answer on the closing step costs one mistake, once, and leaves 4 stars', () => {
   const { slips, finished } = start();
   open('alert-resource');
   open('deploy-history');
@@ -431,7 +431,7 @@ test('who-is-talking: a wrong answer on the closing step costs one mistake, once
   click('[data-pick="env-var"]');
   click('[data-finish]');
   assert.equal(slips.mistakes, 1);
-  assert.equal(finished[0].stars, 2);
+  assert.equal(finished[0].stars, 4);
 });
 
 test('who-is-talking: focus walk: first view, an opened heading, then Finish', () => {

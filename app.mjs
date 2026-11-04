@@ -17,11 +17,15 @@ import { globeState } from './lib/globe.mjs';
 import { dotStates, globeLabel, globeLines, globeTarget } from './lib/globe-view.mjs';
 import { createLevelContext } from './lib/level-context.mjs';
 import { cardTotals, mergeProgress, recordCompletion, registryIds, starTotals } from './lib/progress.mjs';
+import { MAX_STARS } from './lib/scoring.mjs';
 import { runPlay, validatePlay } from './lib/play.mjs';
 import { buildRegistry } from './lib/registry.mjs';
 import { loadProgress, saveProgress, STORAGE_KEY } from './lib/storage.mjs';
 import { readTheme, writeTheme } from './lib/theme.mjs';
 import { levelState, lockReason } from './lib/unlock.mjs';
+
+// A star row always shows MAX_STARS glyphs: `n` filled, the rest empty.
+const starGlyphs = (n) => '★'.repeat(n) + '☆'.repeat(MAX_STARS - n);
 
 /**
  * The shipped registry: levels/index.mjs checked against the deck and the `lights` ids.
@@ -190,8 +194,7 @@ export function createGame(deps) {
       return 'This level is not available in this version.';
     },
     starText(id) {
-      const s = this.progress.levels[id]?.stars ?? 0;
-      return '★'.repeat(s) + '☆'.repeat(3 - s);
+      return starGlyphs(this.progress.levels[id]?.stars ?? 0);
     },
     starSummary() {
       const { earned, max } = this.stars;
@@ -353,10 +356,10 @@ export function createGame(deps) {
       this.returnFocus();
     },
     rewardStarsText() {
-      return this.rewardStars == null ? '' : '★'.repeat(this.rewardStars) + '☆'.repeat(3 - this.rewardStars);
+      return this.rewardStars == null ? '' : starGlyphs(this.rewardStars);
     },
     rewardStarsLabel() {
-      return this.rewardStars == null ? 'Not scored' : `${this.rewardStars} of 3 stars`;
+      return this.rewardStars == null ? 'Not scored' : `${this.rewardStars} of ${MAX_STARS} stars`;
     },
 
     // Another tab saved: merge its progress in (progress only goes up, never replaced).

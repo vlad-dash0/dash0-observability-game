@@ -289,13 +289,13 @@ test('the-bill: the shortest path is two clues (volume, labels); it solves at 55
   assert.equal(budget(), 'Error budget: 55% left (9 min in).');
   finish();
   assert.equal(finished.length, 1);
-  assert.equal(finished[0].stars, 3);
+  assert.equal(finished[0].stars, 5);
   assert.equal(finished[0].text, BOSS.play.finish);
 });
 
 // ---- penalties: one each from a clean start ------------------------------------------
 
-test('the-bill: a herring costs one mistake on its first open only, and the run still finishes with 2 stars', () => {
+test('the-bill: a herring costs one mistake on its first open only, and the run still finishes with 4 stars', () => {
   const { slips, finished } = start();
   open('biggest-metric');
   assert.equal(slips.mistakes, 1);
@@ -307,10 +307,10 @@ test('the-bill: a herring costs one mistake on its first open only, and the run 
   guess('user-id-label');
   finish();
   assert.equal(slips.mistakes, 1);
-  assert.equal(finished[0].stars, 2);
+  assert.equal(finished[0].stars, 4);
 });
 
-test('the-bill: the second herring is a second mistake; a wrong answer on top is a third and leaves 1 star', () => {
+test('the-bill: the second herring is a second mistake; a wrong answer on top is a third and leaves 2 stars', () => {
   const { slips, finished } = start();
   open('biggest-metric');
   open('new-service');
@@ -321,7 +321,7 @@ test('the-bill: the second herring is a second mistake; a wrong answer on top is
   guess('user-id-label');
   finish();
   assert.equal(slips.mistakes, 3);
-  assert.equal(finished[0].stars, 1);
+  assert.equal(finished[0].stars, 2);
 });
 
 for (const id of ['traffic-growth', 'new-service-metrics', 'export-interval-change']) {
@@ -336,7 +336,7 @@ for (const id of ['traffic-growth', 'new-service-metrics', 'export-interval-chan
     guess('user-id-label');
     finish();
     assert.equal(slips.mistakes, 1);
-    assert.equal(finished[0].stars, 2);
+    assert.equal(finished[0].stars, 4);
   });
 }
 
@@ -352,7 +352,7 @@ test('the-bill: every clue and neutral leaves 5% and no mistake; a herring then 
   assert.equal(q('[data-hypothesis="user-id-label"]').disabled, false, 'still answerable at 0');
   guess('user-id-label');
   finish();
-  assert.equal(finished[0].stars, 2, 'two penalties still leave 2 stars (the star rule: 1 or 2 penalties)');
+  assert.equal(finished[0].stars, 3, 'two penalties leave 3 stars (the star rule: 2 penalties)');
 });
 
 test('the-bill: opening a view again costs neither time nor a mistake, so repeat opens cannot exhaust the budget', () => {
@@ -380,7 +380,7 @@ test('the-bill: the closing step grades the fix: drop the label and keep per-use
   assert.equal(fix.some((c) => /more budget|raise/i.test(c.label) && c.right === true), false, 'more budget is never the right fix');
 });
 
-test('the-bill: a wrong answer on the closing step costs one mistake, once, and leaves 2 stars', () => {
+test('the-bill: a wrong answer on the closing step costs one mistake, once, and leaves 4 stars', () => {
   const { slips, finished } = start();
   open('volume-by-metric');
   open('label-breakdown');
@@ -392,7 +392,7 @@ test('the-bill: a wrong answer on the closing step costs one mistake, once, and 
   click('[data-pick="drop-the-label"]');
   click('[data-finish]');
   assert.equal(slips.mistakes, 1);
-  assert.equal(finished[0].stars, 2);
+  assert.equal(finished[0].stars, 4);
 });
 
 test('the-bill: focus walk: first view, an opened heading, then Finish', () => {

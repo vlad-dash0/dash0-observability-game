@@ -326,7 +326,7 @@ test('silence: shortcut impossible: three neutrals leave every hypothesis disabl
   assert.equal(slips.mistakes, 0);
 });
 
-test('silence: shortcut impossible: three neutrals plus two clues still lock the answers; the third clue unlocks them and a first-try right guess wins with 3 stars', () => {
+test('silence: shortcut impossible: three neutrals plus two clues still lock the answers; the third clue unlocks them and a first-try right guess wins with 5 stars', () => {
   const { finished, slips } = start();
   for (const id of NEUTRALS) open(id);
   open('arrival-by-cluster');
@@ -337,7 +337,7 @@ test('silence: shortcut impossible: three neutrals plus two clues still lock the
   guess(RIGHT);
   finish();
   assert.equal(slips.mistakes, 0);
-  assert.equal(finished[0].stars, 3);
+  assert.equal(finished[0].stars, 5);
 });
 
 test('silence: shortcut: solving the incident does not finish the level; there is no Finish on the incident screen', () => {
@@ -349,7 +349,7 @@ test('silence: shortcut: solving the incident does not finish the level; there i
   assert.equal(q('#sil-next').disabled, false);
 });
 
-test('silence: the shortest path is three clues (arrival, log, diff); it solves at 55% with no penalty and 3 stars', () => {
+test('silence: the shortest path is three clues (arrival, log, diff); it solves at 55% with no penalty and 5 stars', () => {
   const { finished, slips } = start();
   for (const id of WALK) open(id);
   assert.equal(q('#sil-next').disabled, true, 'Next waits for the right answer');
@@ -358,13 +358,13 @@ test('silence: the shortest path is three clues (arrival, log, diff); it solves 
   assert.equal(budget(), 'Error budget: 55% left (9 min in).');
   finish();
   assert.equal(finished.length, 1);
-  assert.equal(finished[0].stars, 3);
+  assert.equal(finished[0].stars, 5);
   assert.equal(finished[0].text, BOSS.play.finish);
 });
 
 // ---- penalties: one each from a clean start ------------------------------------------
 
-test('silence: a herring costs one mistake on its first open only, and the run still finishes with 2 stars', () => {
+test('silence: a herring costs one mistake on its first open only, and the run still finishes with 4 stars', () => {
   const { slips, finished } = start();
   open('network-blip');
   assert.equal(slips.mistakes, 1);
@@ -377,10 +377,10 @@ test('silence: a herring costs one mistake on its first open only, and the run s
   guess(RIGHT);
   finish();
   assert.equal(slips.mistakes, 1);
-  assert.equal(finished[0].stars, 2);
+  assert.equal(finished[0].stars, 4);
 });
 
-test('silence: the second herring is a second mistake; a wrong answer on top is a third and leaves 1 star', () => {
+test('silence: the second herring is a second mistake; a wrong answer on top is a third and leaves 2 stars', () => {
   const { slips, finished } = start();
   open('network-blip');
   open('memory-limiter-refusals');
@@ -393,7 +393,7 @@ test('silence: the second herring is a second mistake; a wrong answer on top is 
   guess(RIGHT);
   finish();
   assert.equal(slips.mistakes, 3);
-  assert.equal(finished[0].stars, 1);
+  assert.equal(finished[0].stars, 2);
 });
 
 for (const id of ['memory-limiter', 'wrong-port', 'apps-stopped']) {
@@ -407,7 +407,7 @@ for (const id of ['memory-limiter', 'wrong-port', 'apps-stopped']) {
     guess(RIGHT);
     finish();
     assert.equal(slips.mistakes, 1);
-    assert.equal(finished[0].stars, 2);
+    assert.equal(finished[0].stars, 4);
   });
 }
 
@@ -423,7 +423,7 @@ test('silence: every clue and neutral leaves 5% and no mistake; a herring then s
   assert.equal(q(`[data-hypothesis="${RIGHT}"]`).disabled, false, 'still answerable at 0');
   guess(RIGHT);
   finish();
-  assert.equal(finished[0].stars, 2, 'two penalties still leave 2 stars (the star rule: 1 or 2 penalties)');
+  assert.equal(finished[0].stars, 3, 'two penalties leave 3 stars (the star rule: 2 penalties)');
 });
 
 test('silence: opening a view again costs neither time nor a mistake, so repeat opens cannot exhaust the budget', () => {
@@ -447,7 +447,7 @@ test('silence: the closing step grades the wiring rule: a listed id must be defi
   assert.equal(/type\[\/name\]|different/.test(plain(pick.find((c) => c.key === 'same-exporter').why)), true);
 });
 
-test('silence: a wrong answer on the closing step costs one mistake, once, and leaves 2 stars', () => {
+test('silence: a wrong answer on the closing step costs one mistake, once, and leaves 4 stars', () => {
   const { slips, finished } = start();
   for (const id of WALK) open(id);
   guess(RIGHT);
@@ -458,7 +458,7 @@ test('silence: a wrong answer on the closing step costs one mistake, once, and l
   click('[data-pick="listed-must-be-defined"]');
   click('[data-finish]');
   assert.equal(slips.mistakes, 1);
-  assert.equal(finished[0].stars, 2);
+  assert.equal(finished[0].stars, 4);
 });
 
 test('silence: focus walk: first view, an opened heading, then Finish', () => {

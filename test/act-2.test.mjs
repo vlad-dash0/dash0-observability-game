@@ -661,24 +661,24 @@ const SLIPS = {
 
 
 for (const [id, slips] of Object.entries(SLIPS)) {
-  test(`${id}: a clean run earns 3 stars and its card, and each penalty alone costs one`, () => {
+  test(`${id}: a clean run earns 5 stars and its card, and each penalty alone costs one`, () => {
     const clean = runWith(id);
-    assert.equal(clean.stars, 3, 'a clean run');
+    assert.equal(clean.stars, 5, 'a clean run');
     assert.deepEqual(clean.cards, PIN[id].level.cards);
     for (const [name, slip] of Object.entries(slips)) {
-      assert.equal(runWith(id, slip).stars, 2, name);
+      assert.equal(runWith(id, slip).stars, 4, name);
     }
   });
 }
 
-test('spans-and-traces: an identical failed recheck is free (one slip, 2 stars)', () => {
+test('spans-and-traces: an identical failed recheck is free (one slip, 4 stars)', () => {
   const slip = {
     1: () => {
       click('#sat-tree-check');
       click('#sat-tree-check');
     },
   };
-  assert.equal(runWith('spans-and-traces', slip).stars, 2);
+  assert.equal(runWith('spans-and-traces', slip).stars, 4);
 });
 
 test('every Act 2 step waits for its answer and states each outcome in words', () => {

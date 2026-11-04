@@ -28,7 +28,7 @@ playable end to end. M1b = P10–P11 (incident engine + Act 2 boss "Checkout is 
 - I6. No Alpine attributes; wire with `el.on* = …` after render (incl. `ondragstart`/`ondrop`).
   `draggable="true"` is allowed.
 - I7. A widget spec's reference answer passes that widget's own checker; every level tests it.
-- One slip costs one star: tests start from a clean run and add exactly one slip (→ 2★).
+- One slip costs one star: tests start from a clean run and add exactly one slip (→ 4★).
 - Tests assert booleans/strings/numbers only (never DOM nodes); every run uses
   `NODE_OPTIONS=--max-old-space-size=2048`.
 - Every level file has a `// Spec: <https URL>` line; teaching claims cite the spec.
@@ -568,7 +568,7 @@ herring). Hypotheses: n-plus-one (right), provider, redis, replicas.
 - P2: `test/sort-it.test.mjs` (validate, place outcomes incl. repeat/placed/unknown, frozen
   input, untried/remaining) and `test/sort-it-view.test.mjs` (render, penalties, drop path,
   focus sequence, `Pick an item first.`, no timers in `lib/widgets`).
-- P3/P4/P6–P9: per level a DRIVER (happy 3★ + cards, sloppy 2★), per-penalty runs, a content
+- P3/P4/P6–P9: per level a DRIVER (happy 5★ + cards, sloppy fewer; one slip 4★), per-penalty runs, a content
   pin of the answer tables above, reference solvability via validators, focus walk ending on
   `[data-finish]`; `EXPECTED_ORDER` updated; `test/content.test.mjs` (Spec line, no em dash,
   specUrl hosts opentelemetry.io/www.w3.org). Pager: `scored:false`, `starTotals.max` unchanged.

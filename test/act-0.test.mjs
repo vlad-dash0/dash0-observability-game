@@ -255,10 +255,10 @@ const SLIPS = {
 };
 
 for (const [id, slips] of Object.entries(SLIPS)) {
-  test(`${id}: a clean run earns 3 stars, and each penalty alone costs one`, () => {
-    assert.equal(runWith(id), 3, 'a clean run');
+  test(`${id}: a clean run earns 5 stars, and each penalty alone costs one`, () => {
+    assert.equal(runWith(id), 5, 'a clean run');
     for (const [name, slip] of Object.entries(slips)) {
-      assert.equal(runWith(id, slip), 2, name);
+      assert.equal(runWith(id, slip), 4, name);
     }
   });
 }

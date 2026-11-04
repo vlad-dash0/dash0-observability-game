@@ -69,9 +69,16 @@ test('sanitize: not a plain object, or levels not a plain object, gives the empt
   assert.deepEqual(plain(sanitizeProgress({ v: 1, levels: {} })), { v: 1, levels: {}, cards: [] }, 'missing cards → []');
 });
 
-test('sanitize: stars are floored and clamped to 0..3', () => {
+test('sanitize: stars are floored and clamped to 0..5', () => {
   const p = P({ a: { stars: 2.7, at: null }, b: { stars: 5, at: null }, u: { stars: -1, at: null } });
-  assert.deepEqual(stars(p), { a: 2, b: 3, u: 0 });
+  assert.deepEqual(stars(p), { a: 2, b: 5, u: 0 });
+  const q = P({ a: { stars: 4.9, at: null }, b: { stars: 6, at: null }, u: { stars: 99, at: null } });
+  assert.deepEqual(stars(q), { a: 4, b: 5, u: 5 }, '6 and 99 clamp to 5');
+});
+
+test('sanitize: saved 0..3 star values from the three-star era stay as stored', () => {
+  const p = P({ a: { stars: 0, at: null }, b: { stars: 1, at: null }, u: { stars: 3, at: null } });
+  assert.deepEqual(stars(p), { a: 0, b: 1, u: 3 });
 });
 
 test('sanitize: non-finite or non-number stars drop the entry', () => {
@@ -263,7 +270,11 @@ test('recordCompletion: stars 0 is a completion; stars are clamped; at is normal
   assert.deepEqual(plain(r.progress.levels), { b: { stars: 0, at: null } });
   assert.equal(r.firstCompletion, true);
   const r7 = recordCompletion(emptyProgress(), 'b', { stars: 7, at: '2026-10-30T10:00:00Z' }, REG);
-  assert.deepEqual(plain(r7.progress.levels.b), { stars: 3, at: '2026-10-30T10:00:00.000Z' });
+  assert.deepEqual(plain(r7.progress.levels.b), { stars: 5, at: '2026-10-30T10:00:00.000Z' });
+  const r5 = recordCompletion(emptyProgress(), 'b', { stars: 5, at: null }, REG);
+  assert.equal(r5.progress.levels.b.stars, 5, 'five is kept');
+  const r6 = recordCompletion(emptyProgress(), 'b', { stars: 6, at: null }, REG);
+  assert.equal(r6.progress.levels.b.stars, 5, 'six clamps to five');
   assert.deepEqual(r7.progress.cards, [], 'missing cards → none');
 });
 
@@ -407,9 +418,10 @@ test('merge: never mutates either side', () => {
 // ---- totals ----
 
 test('starTotals counts scored registered levels only, on both sides', () => {
-  assert.deepEqual(starTotals(P({ a: { stars: 2, at: null }, u: { stars: 0, at: null } }), REG), { earned: 2, max: 6 });
-  assert.deepEqual(starTotals(P({ u: { stars: 3, at: null }, zz: { stars: 3, at: null } }), REG), { earned: 0, max: 6 });
-  assert.deepEqual(starTotals(emptyProgress(), REG), { earned: 0, max: 6 });
+  assert.deepEqual(starTotals(P({ a: { stars: 2, at: null }, u: { stars: 0, at: null } }), REG), { earned: 2, max: 10 });
+  assert.deepEqual(starTotals(P({ u: { stars: 3, at: null }, zz: { stars: 3, at: null } }), REG), { earned: 0, max: 10 });
+  assert.deepEqual(starTotals(emptyProgress(), REG), { earned: 0, max: 10 });
+  assert.deepEqual(starTotals(P({ a: { stars: 5, at: null }, b: { stars: 4, at: null } }), REG), { earned: 9, max: 10 });
 });
 
 test('cardTotals counts the registered levels\' card union', () => {

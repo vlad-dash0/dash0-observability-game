@@ -96,7 +96,7 @@ const DRIVERS = {
       click('[data-pick="rich"]');
       click('#mvo-finish');
     },
-    expect: { stars: 3, cards: [] },
+    expect: { stars: 5, cards: [] },
     sloppy: {
       play() {
         sortAll([['cpu', 'new'], ...MVO_SORT]); // one wrong placement
@@ -104,7 +104,7 @@ const DRIVERS = {
         click('[data-pick="rich"]');
         click('#mvo-finish');
       },
-      expect: { stars: 2, cards: [] },
+      expect: { stars: 4, cards: [] },
     },
   },
   'the-signals': {
@@ -116,7 +116,7 @@ const DRIVERS = {
       click('[data-pick="profiles"]');
       click('#sig-finish');
     },
-    expect: { stars: 3, cards: ['profiles-signal'] },
+    expect: { stars: 5, cards: ['profiles-signal'] },
     sloppy: {
       play() {
         sortAll(SIG_DATA);
@@ -127,7 +127,7 @@ const DRIVERS = {
         click('[data-pick="profiles"]');
         click('#sig-finish');
       },
-      expect: { stars: 2, cards: ['profiles-signal'] },
+      expect: { stars: 4, cards: ['profiles-signal'] },
     },
   },
   'why-opentelemetry': {
@@ -137,7 +137,7 @@ const DRIVERS = {
       click('[data-pick="api"]');
       click('#otel-finish');
     },
-    expect: { stars: 3, cards: ['api-vs-sdk'] },
+    expect: { stars: 5, cards: ['api-vs-sdk'] },
     sloppy: {
       play() {
         sortAll([['batch', 'collector'], ...OTEL_PARTS]); // one wrong placement
@@ -145,7 +145,7 @@ const DRIVERS = {
         click('[data-pick="api"]');
         click('#otel-finish');
       },
-      expect: { stars: 2, cards: ['api-vs-sdk'] },
+      expect: { stars: 4, cards: ['api-vs-sdk'] },
     },
   },
   // Act 0 boss: unscored, so every run earns 0; the sloppy run takes all four looks.
@@ -176,7 +176,7 @@ const DRIVERS = {
       click('[data-pick="other-request"]');
       click('#sat-finish');
     },
-    expect: { stars: 3, cards: ['no-trace-object'] },
+    expect: { stars: 5, cards: ['no-trace-object'] },
     sloppy: {
       play() {
         click('[data-pick="trace-id"]');
@@ -190,7 +190,7 @@ const DRIVERS = {
         click('[data-pick="other-request"]');
         click('#sat-finish');
       },
-      expect: { stars: 2, cards: ['no-trace-object'] },
+      expect: { stars: 4, cards: ['no-trace-object'] },
     },
   },
   'span-kinds': {
@@ -201,7 +201,7 @@ const DRIVERS = {
       click('[data-pick="loses-edge"]');
       click('#kinds-finish');
     },
-    expect: { stars: 3, cards: ['span-kind-edges'] },
+    expect: { stars: 5, cards: ['span-kind-edges'] },
     sloppy: {
       play() {
         buildAll('kind', KINDS_MAP);
@@ -211,7 +211,7 @@ const DRIVERS = {
         click('[data-pick="loses-edge"]');
         click('#kinds-finish');
       },
-      expect: { stars: 2, cards: ['span-kind-edges'] },
+      expect: { stars: 4, cards: ['span-kind-edges'] },
     },
   },
   'status-and-errors': {
@@ -221,7 +221,7 @@ const DRIVERS = {
       click('[data-pick="stays-ok"]');
       click('#status-finish');
     },
-    expect: { stars: 3, cards: ['span-status'] },
+    expect: { stars: 5, cards: ['span-status'] },
     sloppy: {
       play() {
         sortAll([['b', 'ok'], ...STATUS_SORT]); // one wrong placement: a SERVER 404 as Error
@@ -229,7 +229,7 @@ const DRIVERS = {
         click('[data-pick="stays-ok"]');
         click('#status-finish');
       },
-      expect: { stars: 2, cards: ['span-status'] },
+      expect: { stars: 4, cards: ['span-status'] },
     },
   },
   baggage: {
@@ -239,7 +239,7 @@ const DRIVERS = {
       click('[data-pick="only-if-copied"]');
       click('#bag-finish');
     },
-    expect: { stars: 3, cards: ['baggage-leaks'] },
+    expect: { stars: 5, cards: ['baggage-leaks'] },
     sloppy: {
       play() {
         sortAll(BAG_SORT);
@@ -248,7 +248,7 @@ const DRIVERS = {
         click('[data-pick="only-if-copied"]');
         click('#bag-finish');
       },
-      expect: { stars: 2, cards: ['baggage-leaks'] },
+      expect: { stars: 4, cards: ['baggage-leaks'] },
     },
   },
   'context-propagation': {
@@ -261,7 +261,7 @@ const DRIVERS = {
       click('#prop-tree-check');
       click('#prop-finish');
     },
-    expect: { stars: 3, cards: ['broken-propagation'] },
+    expect: { stars: 5, cards: ['broken-propagation'] },
     sloppy: {
       play() {
         click('[data-pick="proxy"]');
@@ -273,7 +273,7 @@ const DRIVERS = {
         click('#prop-tree-check');
         click('#prop-finish');
       },
-      expect: { stars: 2, cards: ['broken-propagation'] },
+      expect: { stars: 4, cards: ['broken-propagation'] },
     },
   },
   'events-and-links': {
@@ -287,7 +287,7 @@ const DRIVERS = {
       click('#evl-batch-check');
       click('#evl-finish');
     },
-    expect: { stars: 3, cards: ['exception-no-status', 'batch-links'] },
+    expect: { stars: 5, cards: ['exception-no-status', 'batch-links'] },
     sloppy: {
       play() {
         click('[data-pick="unset"]');
@@ -301,7 +301,7 @@ const DRIVERS = {
         click('#evl-batch-check');
         click('#evl-finish');
       },
-      expect: { stars: 2, cards: ['exception-no-status', 'batch-links'] },
+      expect: { stars: 4, cards: ['exception-no-status', 'batch-links'] },
     },
   },
   'auto-vs-manual': {
@@ -313,7 +313,7 @@ const DRIVERS = {
       click('[data-pick="keep-one"]');
       click('#avm-finish');
     },
-    expect: { stars: 3, cards: ['double-instrumentation'] },
+    expect: { stars: 5, cards: ['double-instrumentation'] },
     sloppy: {
       play() {
         sortAll(AVM_SORT);
@@ -324,11 +324,11 @@ const DRIVERS = {
         click('[data-pick="keep-one"]');
         click('#avm-finish');
       },
-      expect: { stars: 2, cards: ['double-instrumentation'] },
+      expect: { stars: 4, cards: ['double-instrumentation'] },
     },
   },
-  // Act 2 boss: reference path is the two clues and n-plus-one (3 stars). Sloppy: a herring
-  // (one mistake) and a wrong hypothesis (another) are 2 penalties, so 2 stars.
+  // Act 2 boss: reference path is the two clues and n-plus-one (5 stars). Sloppy: a herring
+  // (one mistake) and a wrong hypothesis (another) are 2 penalties, so 3 stars.
   'checkout-is-slow': {
     play() {
       click('[data-view="trace-slow"]');
@@ -336,7 +336,7 @@ const DRIVERS = {
       click('[data-hypothesis="n-plus-one"]');
       click('#cis-finish');
     },
-    expect: { stars: 3, cards: [] },
+    expect: { stars: 5, cards: [] },
     sloppy: {
       play() {
         click('[data-view="payments-errors"]');
@@ -345,7 +345,7 @@ const DRIVERS = {
         click('[data-hypothesis="n-plus-one"]');
         click('#cis-finish');
       },
-      expect: { stars: 2, cards: [] },
+      expect: { stars: 3, cards: [] },
     },
   },
   'naming-your-service': {
@@ -358,7 +358,7 @@ const DRIVERS = {
       click('[data-pick="env-var"]');
       click('#nys-finish');
     },
-    expect: { stars: 3, cards: ['unknown-service'] },
+    expect: { stars: 5, cards: ['unknown-service'] },
     sloppy: {
       play() {
         click('[data-pick="name"]');
@@ -371,7 +371,7 @@ const DRIVERS = {
         click('[data-pick="env-var"]');
         click('#nys-finish');
       },
-      expect: { stars: 2, cards: ['unknown-service'] },
+      expect: { stars: 3, cards: ['unknown-service'] },
     },
   },
 };
@@ -553,7 +553,7 @@ function derivedDriver(level) {
     });
   const expect = (stars) => ({ stars: level.scored ? stars : 0, cards: [...level.cards] });
   const slipAt = steps.findIndex(({ driver, spec }) => driver.slips(spec).length > 0);
-  return { play: run(), expect: expect(3), sloppy: { play: run(slipAt), expect: expect(2) } };
+  return { play: run(), expect: expect(5), sloppy: { play: run(slipAt), expect: expect(4) } };
 }
 
 const PLAY_LEVELS = [
@@ -601,7 +601,7 @@ const FIXTURE_DRIVER = {
     click('#fx-next');
     click('#fx-finish');
   },
-  expect: { stars: 3, cards: ['fixture-card'] },
+  expect: { stars: 5, cards: ['fixture-card'] },
   sloppy: {
     play() {
       click('[data-pick="metric"]');
@@ -609,14 +609,14 @@ const FIXTURE_DRIVER = {
       click('#fx-next');
       click('#fx-finish');
     },
-    expect: { stars: 2, cards: ['fixture-card'] },
+    expect: { stars: 4, cards: ['fixture-card'] },
   },
 };
 
-test('harness: the fixture level finishes once with 3 stars, sloppy with 2', () => {
+test('harness: the fixture level finishes once with 5 stars, sloppy with 4', () => {
   const { calls } = playLevel(FIXTURE, FIXTURE_DRIVER.play);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].result.stars, 3);
+  assert.equal(calls[0].result.stars, 5);
   checkLevel(FIXTURE, FIXTURE_DRIVER);
 });
 
@@ -657,7 +657,7 @@ test('harness: a driver that never finishes fails the run', () => {
 test('harness: a first screen with an enabled Finish fails', () => {
   const lvl = FIXTURES['fx-first-finish'];
   assert.throws(
-    () => checkRun(lvl, { play: () => click('#ff'), expect: { stars: 3, cards: [] } }),
+    () => checkRun(lvl, { play: () => click('#ff'), expect: { stars: 5, cards: [] } }),
     /first screen has no enabled Finish/,
   );
 });
@@ -665,7 +665,7 @@ test('harness: a first screen with an enabled Finish fails', () => {
 test('harness: finishing inside run() fails', () => {
   const lvl = FIXTURES['fx-run-finish'];
   assert.throws(
-    () => checkRun(lvl, { play() {}, expect: { stars: 3, cards: [] } }),
+    () => checkRun(lvl, { play() {}, expect: { stars: 5, cards: [] } }),
     /run\(\) alone does not finish/,
   );
 });
@@ -673,7 +673,7 @@ test('harness: finishing inside run() fails', () => {
 test('harness: finishing from a button that is not the Finish button fails', () => {
   const lvl = FIXTURES['fx-other-button'];
   assert.throws(
-    () => checkRun(lvl, { play: () => click('#go'), expect: { stars: 3, cards: [] } }),
+    () => checkRun(lvl, { play: () => click('#go'), expect: { stars: 5, cards: [] } }),
     /finished from a \[data-finish\] click/,
   );
 });
@@ -684,7 +684,7 @@ test('harness: awarding a card the level does not list fails', () => {
     () =>
       checkRun(lvl, {
         play: () => (click('#go'), click('#fin')),
-        expect: { stars: 3, cards: ['other-card'] },
+        expect: { stars: 5, cards: ['other-card'] },
       }),
     /not in level.cards/,
   );
@@ -694,14 +694,14 @@ test('harness: a Finish named only in text, never rendered as an element, fails'
   const lvl = FIXTURES['fx-outside-render'];
   assert.throws(
     () =>
-      checkRun(lvl, { play: () => (click('#go'), click('#fin')), expect: { stars: 3, cards: [] } }),
+      checkRun(lvl, { play: () => (click('#go'), click('#fin')), expect: { stars: 5, cards: [] } }),
     /some step shows a Finish button/,
   );
 });
 
 test('harness: an earlier Finish click does not cover a finish from outside a click', () => {
   const lvl = FIXTURES['fx-stale-click'];
-  const expect = { stars: 3, cards: [] };
+  const expect = { stars: 5, cards: [] };
   const bypasses = [
     () => domClick('#real'), // the F1 helper, which does not record
     () => q('#real').onclick(), // calling the handler directly
@@ -742,7 +742,7 @@ test('harness: a step with an Alpine attribute (x-, @ or :) fails', () => {
       q('#fin').disabled = false;
       click('#fin');
     };
-    assert.throws(() => checkRun(lvl, { play, expect: { stars: 3, cards: [] } }), /Alpine attribute/, attr);
+    assert.throws(() => checkRun(lvl, { play, expect: { stars: 5, cards: [] } }), /Alpine attribute/, attr);
   }
   assert.deepEqual(alpineAttrs('<p data-x="1" class="x-y" aria-label=":)">ok</p>'), []);
 });
@@ -786,12 +786,12 @@ test('harness: an Alpine attribute added outside renderStep, after run() or duri
       { deck: [FIXTURE_CARD], nodeIds: [] },
     ).levels[id];
     const play = () => (click('#go'), click('#fin'));
-    assert.throws(() => checkRun(lvl, { play, expect: { stars: 3, cards: [] } }), /Alpine attribute \(set outside/, id);
+    assert.throws(() => checkRun(lvl, { play, expect: { stars: 5, cards: [] } }), /Alpine attribute \(set outside/, id);
   }
   // The same flow with nothing injected passes, so the cases above fail only on the attribute.
   const clean = buildRegistry(
     [{ id: 'fx-act', no: 0, levels: [level('fx-clean', {})], boss: null }],
     { deck: [FIXTURE_CARD], nodeIds: [] },
   ).levels['fx-clean'];
-  checkRun(clean, { play: () => (click('#go'), click('#fin')), expect: { stars: 3, cards: [] } });
+  checkRun(clean, { play: () => (click('#go'), click('#fin')), expect: { stars: 5, cards: [] } });
 });
