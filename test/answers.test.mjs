@@ -129,6 +129,10 @@ const ANSWERS = {
     'tradeoff ts-budget: policies=errors-slow-baseline wait=wait-30s',
     'spot ts-spot: traces',
   ],
+  'errors-tripled': [
+    'incident errors-tripled: rate-vs-lb,error-count,collector-diff > metrics-after-sampling',
+    'choice eto-ratio: counted-after-sampling',
+  ],
   'who-is-talking': [
     'incident who-is-talking: alert-resource,deploy-history > name-dropped',
     'choice wit-fix: env-var',
