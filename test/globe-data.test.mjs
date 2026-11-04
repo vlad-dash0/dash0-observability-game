@@ -11,7 +11,7 @@ import { globeState } from '../lib/globe.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
 import { latticePoint } from '../lib/globe-lattice.mjs';
 import {
-  SOURCE_SHA256, SOURCE_URL, SOURCE_VERSION, renderModule, sampleDots, verifyHash,
+  OVERSEAS_DEG, SOURCE_SHA256, SOURCE_URL, SOURCE_VERSION, renderModule, sampleDots, verifyHash,
 } from '../tools/build-globe-data.mjs';
 
 const REG = liveRegistry();
@@ -148,4 +148,75 @@ test('the committed module names the pinned source and hash', () => {
   assert.ok(head.includes(SOURCE_URL) && head.includes(SOURCE_SHA256) && head.includes(SOURCE_VERSION));
   assert.match(SOURCE_URL, new RegExp(`natural-earth-vector/${SOURCE_VERSION}/`), 'a tagged release, not a branch');
   assert.match(SOURCE_SHA256, /^[0-9a-f]{64}$/);
+});
+
+// [minLat, maxLat, minLon, maxLon]: each mapped country's home area, a little wider than the
+// country. Overseas parts that stay on purpose (Alaska, Hawaii, Svalbard) are inside their box.
+const HOME = {
+  FRA: [41, 51.5, -5.5, 9.8], DEU: [47, 55.2, 5.8, 15.2], ESP: [35.5, 44, -9.5, 4.5],
+  NOR: [57.5, 81, 4, 32], SWE: [55, 69.5, 10.5, 24.5], FIN: [59.5, 70.5, 20, 32],
+  USA: [18, 72, -170, -66], CAN: [41, 84, -142, -52], MEX: [14, 33, -118, -86],
+  GRL: [59, 84, -74, -11], CUB: [19.5, 23.5, -85.5, -74], GTM: [13.5, 18, -92.5, -88],
+  HND: [12.5, 16.5, -89.5, -83], BRA: [-34, 6, -74, -34], ARG: [-56, -21.5, -74, -53],
+  PER: [-19, 0, -82, -68.5], COL: [-4.5, 13.5, -79, -66], BOL: [-23, -9.5, -70, -57.5],
+  VEN: [0, 12.5, -73.5, -59.5], CHL: [-56, -17.5, -76, -66.5], DZA: [18.9, 37.5, -9, 12],
+  COD: [-13.5, 5.5, 12, 31.5], ZAF: [-35, -22, 16, 33], KAZ: [40.5, 55.5, 46, 88],
+  SAU: [16, 32.5, 34.5, 56], TUR: [35.5, 42.5, 25.5, 45], UZB: [37, 45.5, 55, 73],
+  TKM: [35, 42.5, 52, 66], IRQ: [29, 37.5, 38.5, 48.5], IND: [6.5, 36, 68, 97.5],
+  IRN: [25, 40, 44, 63.5], PAK: [23.5, 37.5, 60.5, 77.5],
+};
+
+test('every mapped country has a home box, and all its dots lie inside it', () => {
+  assert.deepEqual(Object.keys(HOME).sort(), Object.values(LEVEL_COUNTRY).sort(), 'a box for exactly the mapped countries');
+  for (const [iso, [la0, la1, lo0, lo1]] of Object.entries(HOME)) {
+    for (const [lat, lon] of dotsOf(iso)) {
+      assert.ok(lat >= la0 && lat <= la1 && lon >= lo0 && lon <= lo1, `${iso} dot at ${lat},${lon} is outside its home area`);
+    }
+  }
+});
+
+test('generator: a part far from its country main landmass is dropped, a near one stays', () => {
+  const far = (iso, lon) => ({
+    properties: { ADM0_A3: iso, SUBREGION: 'S' },
+    geometry: { type: 'MultiPolygon', coordinates: [[SQUARE(0, 0, 40, 40)], [SQUARE(lon, 0, lon + 20, 20)]] },
+  });
+  assert.ok(OVERSEAS_DEG < 90);
+  const dotsIn = (f, lonMin) => sampleDots({ features: [f] }, 4000).dots.filter(([i]) => latticePoint(i, 4000)[1] >= lonMin);
+  assert.equal(dotsIn(far('NEAR', 45), 41).length > 0, true, 'a part 45 degrees away stays');
+  assert.equal(dotsIn(far('FAR', 120), 99).length, 0, 'a part 100 degrees away is dropped');
+});
+
+test('generator: indices that do not fit the packed format throw', () => {
+  const c = [['AAA', 'S']];
+  assert.throws(() => renderModule({ countries: c, dots: [[70000, 0]] }), /does not fit in a u16/);
+  assert.throws(() => renderModule({ countries: c, dots: [[1, 300]] }), /does not fit in a u8/);
+  assert.doesNotThrow(() => renderModule({ countries: c, dots: [[65535, 255]] }));
+});
+
+test('the committed module is exactly what the generator renders for its own dots', () => {
+  const countryIndex = new Map(COUNTRIES.map(([iso], i) => [iso, i]));
+  const dots = [];
+  let at = 0;
+  for (const [lat, lon, iso] of DOTS) {
+    // DOTS is in lattice order: walk forward to the next lattice point at this position.
+    while (latticePoint(at, LATTICE_POINTS).join() !== `${lat},${lon}`) at += 1;
+    dots.push([at, countryIndex.get(iso)]);
+    at += 1;
+  }
+  const committed = readFileSync(new URL('../hub/globe-data.mjs', import.meta.url), 'utf8');
+  assert.equal(renderModule({ countries: COUNTRIES, dots }, LATTICE_POINTS), committed, 'hub/globe-data.mjs was edited by hand or is stale');
+});
+
+// The renderModule comparison above cannot see a hand edit to COUNTRIES (it renders from them),
+// so the file is also pinned by digest. Regenerating changes it: run the generator, then paste
+// the new `shasum -a 256 hub/globe-data.mjs` here.
+const MODULE_SHA256 = 'e95d16159163d39189dccac65e9907510eecce4d50f6646e46aa66f3abac09af';
+
+test('the committed module has the digest the generator produced', () => {
+  const committed = readFileSync(new URL('../hub/globe-data.mjs', import.meta.url));
+  assert.equal(
+    createHash('sha256').update(committed).digest('hex'),
+    MODULE_SHA256,
+    'hub/globe-data.mjs differs from the generator output: regenerate it, do not edit it, then update MODULE_SHA256',
+  );
 });

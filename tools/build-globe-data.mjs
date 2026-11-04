@@ -24,6 +24,15 @@ export function verifyHash(bytes, expected = SOURCE_SHA256) {
   if (got !== expected) throw new Error(`refusing: source SHA-256 ${got} does not match the pinned ${expected}`);
 }
 
+export const OVERSEAS_DEG = 60;
+
+/** Great-circle distance in degrees between two [lon, lat] points. */
+export function arcDegrees([x0, y0], [x1, y1]) {
+  const r = Math.PI / 180;
+  const c = Math.sin(y0 * r) * Math.sin(y1 * r) + Math.cos(y0 * r) * Math.cos(y1 * r) * Math.cos((x0 - x1) * r);
+  return Math.acos(Math.max(-1, Math.min(1, c))) / r;
+}
+
 // Ray casting; ring is [[lon, lat], ...].
 function inRing(x, y, ring) {
   let inside = false;
@@ -47,12 +56,20 @@ export function sampleDots(geojson, n = LATTICE_POINTS) {
     const { ADM0_A3: iso, SUBREGION: sub } = f.properties;
     if (SKIP.has(iso)) continue;
     byIso.set(iso, sub);
-    const parts = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
-    for (const rings of parts) {
+    const all = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+    const parts = all.map((rings) => {
       const xs = rings[0].map((p) => p[0]);
       const ys = rings[0].map((p) => p[1]);
-      polys.push({ iso, rings, box: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)] });
-    }
+      const box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+      return { iso, rings, box, centre: [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2], area: (box[2] - box[0]) * (box[3] - box[1]) };
+    });
+    // Overseas rule: a part whose bounding-box centre is more than OVERSEAS_DEG of arc from the
+    // centre of the country's largest part is an overseas territory and is dropped, so a country
+    // never lights a far-away region. In the pinned file this drops only French Guiana (64 deg
+    // from France); Svalbard (14), the Canaries (n/a at 110m), Alaska (41 to 50) and Hawaii (54
+    // to 56) stay.
+    const main = parts.reduce((a, b) => (b.area > a.area ? b : a));
+    for (const p of parts) if (arcDegrees(main.centre, p.centre) <= OVERSEAS_DEG) polys.push(p);
   }
   const countries = [...byIso].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
   const index = new Map(countries.map(([iso], i) => [iso, i]));
@@ -75,6 +92,8 @@ export function sampleDots(geojson, n = LATTICE_POINTS) {
 export function renderModule({ countries, dots }, n = LATTICE_POINTS) {
   const buf = Buffer.alloc(dots.length * 3);
   dots.forEach(([i, c], k) => {
+    if (!Number.isInteger(i) || i < 0 || i > 0xffff) throw new Error(`lattice index ${i} does not fit in a u16`);
+    if (!Number.isInteger(c) || c < 0 || c > 0xff) throw new Error(`country index ${c} does not fit in a u8`);
     buf.writeUInt16LE(i, k * 3);
     buf.writeUInt8(c, k * 3 + 2);
   });
@@ -85,7 +104,7 @@ export function renderModule({ countries, dots }, n = LATTICE_POINTS) {
 //   ${SOURCE_URL}
 //   SHA-256 ${SOURCE_SHA256}
 // Regenerate: node tools/build-globe-data.mjs   (refuses if the download hash differs)
-// ${dots.length} land dots from a ${n}-point Fibonacci lattice; Antarctica left out.
+// ${dots.length} land dots from a ${n}-point Fibonacci lattice; Antarctica and overseas parts (over ${OVERSEAS_DEG} deg from a country's main landmass: French Guiana) left out.
 // A dot is stored as its lattice index (u16) and a COUNTRIES index (u8), base64, 3 bytes each.
 import { latticePoint } from '../lib/globe-lattice.mjs';
 
