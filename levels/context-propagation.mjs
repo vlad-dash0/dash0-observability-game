@@ -79,6 +79,7 @@ const VALID = [
 
 // Step 3: nginx now forwards the header, so checkout's spans carry trace 4bf9..., but its
 // SERVER span still arrives as a root. The answer gives it the parent the parent-id names.
+// Help ladder (docs/M1-DESIGN.md §4.2): no queue, guide or tint, a Check button, hints on.
 const TREE = {
   id: 'prop-tree',
   spans: [
@@ -90,6 +91,7 @@ const TREE = {
   ],
   edit: ['parent'],
   answer: { [CHECKOUT]: { parentId: CALL } },
+  helps: { hints: true },
 };
 
 /** The level's answer tables, in play order (pinned by test/act-2.test.mjs). */
@@ -129,7 +131,7 @@ export default {
           }</li>`,
       ).join('');
       const roots = ROOTS.map(
-        (r) => `<li><code>${e(r.name)}</code> on ${e(r.service)}, trace <code>${e(r.traceId.slice(0, 4))}…</code>, no parent</li>`,
+        (r) => `<li><code>${e(r.name)}</code> on ${e(r.service)}, trace <code>${e(r.traceId.slice(0, 8))}</code>, no parent</li>`,
       ).join('');
       ctx.renderStep(
         `<div class="lesson-intro">${ctx.speech(
@@ -184,7 +186,7 @@ export default {
       ctx.renderStep(
         `<div class="lesson-intro">${ctx.speech(
           `nginx now forwards <code>traceparent: ${e(TRACEPARENT)}</code>, so checkout's spans ` +
-            'join trace <code>4bf9…</code>. Its SERVER span still shows as a root here: give it ' +
+            'join trace <code>4bf92f35</code>. Its SERVER span still shows as a root here: give it ' +
             'the parent that the header\'s parent-id names.',
         )}</div>
         <div class="lesson-stage">

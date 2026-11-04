@@ -119,6 +119,7 @@ ctx = {
   shuffle(arr): any[]      // NEW array; app passes Math.random-based, harness identity
   mistake(): void          // mistakes += 1
   hint(): void             // hintsUsed += 1
+  peekStars(extra = 0): number  // read-only: the stars finish would give now, with `extra` more penalties (#146 score card)
   finish({text = '', cards = []}): {stars, cards, text} | null
   reduceMotion: boolean
   ovBody, ovActions: Element

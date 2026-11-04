@@ -1,6 +1,6 @@
 // Fixture B1 (docs/M1-DESIGN.md §7 P5): the level 2.1 trace from §6, taken from the level
 // itself (levels/spans-and-traces.mjs TREE) so the two cannot drift. Trace 4bf9…: A
-// storefront `POST /checkout` SERVER 0–100 root; B storefront `POST api-gateway` CLIENT
+// storefront `POST /checkout` SERVER 0–100 root; B storefront `POST` CLIENT
 // 10–90 under A; C api-gateway `POST /checkout` SERVER 15–85 under B; D api-gateway
 // `validate cart` INTERNAL 20–30 under C. E belongs to another trace (0af7…, which sorts
 // before 4bf9… but starts later, at 40) and overlaps C on purpose, so parenting it there

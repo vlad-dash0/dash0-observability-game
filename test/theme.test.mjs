@@ -372,3 +372,33 @@ test('globe: legend text reaches 4.5:1 and the lit and pulse colours 3:1 on its 
   assert.notDeepEqual(pulse, lit);
   assert.notDeepEqual(pulse, red);
 });
+
+test('trace waterfall (#146): bar text on every service fill, trace chips, hint text and the success card reach AA, both themes', () => {
+  for (const theme of ['light', 'dark']) {
+    for (let i = 0; i < 6; i++) {
+      const r = contrast('--color-text', `--color-svc-${i}`, theme);
+      assert.ok(r >= 4.5, `${theme}: text on --color-svc-${i} is ${r.toFixed(2)}, needs 4.5`);
+    }
+    for (const t of [0, 1]) {
+      const r = contrast('--color-text', `--color-trace-${t}`, theme);
+      assert.ok(r >= 4.5, `${theme}: text on --color-trace-${t} is ${r.toFixed(2)}, needs 4.5`);
+    }
+    for (const bg of ['--color-surface', '--color-bg']) {
+      const hint = contrast('--color-hint', bg, theme);
+      assert.ok(hint >= 4.5, `${theme}: hint text on ${bg} is ${hint.toFixed(2)}, needs 4.5`);
+      for (const fg of ['--color-parent', '--color-note']) {
+        const r = contrast(fg, bg, theme);
+        assert.ok(r >= 3, `${theme}: ${fg} on ${bg} is ${r.toFixed(2)}, needs 3 (markers and borders)`);
+      }
+    }
+    for (const fg of ['--color-win-text', '--color-win-muted']) {
+      const r = contrast(fg, '--color-win-bg', theme);
+      assert.ok(r >= 4.5, `${theme}: ${fg} on the success card is ${r.toFixed(2)}, needs 4.5`);
+    }
+  }
+  // Six service fills, each its own colour, in each theme.
+  for (const theme of ['light', 'dark']) {
+    const fills = Array.from({ length: 6 }, (_, i) => resolveColor(`var(--color-svc-${i})`, theme).join());
+    assert.equal(new Set(fills).size, 6, theme);
+  }
+});

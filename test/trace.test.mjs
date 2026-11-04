@@ -32,7 +32,7 @@ test('waterfall on fixture B1: rows in trace and DFS order with depth, x and wid
   assert.deepEqual(traces, [TRACE, OTHER_TRACE], 'by earliest start, not by trace id');
   assert.deepEqual(rows, [
     { spanId: A, traceId: TRACE, depth: 0, x: 0, width: 100, name: 'POST /checkout', service: 'storefront', kind: 'SERVER', status: 'UNSET', orphan: false, crossTrace: false },
-    { spanId: B, traceId: TRACE, depth: 1, x: 10, width: 80, name: 'POST api-gateway', service: 'storefront', kind: 'CLIENT', status: 'UNSET', orphan: false, crossTrace: false },
+    { spanId: B, traceId: TRACE, depth: 1, x: 10, width: 80, name: 'POST', service: 'storefront', kind: 'CLIENT', status: 'UNSET', orphan: false, crossTrace: false },
     { spanId: C, traceId: TRACE, depth: 2, x: 15, width: 70, name: 'POST /checkout', service: 'api-gateway', kind: 'SERVER', status: 'UNSET', orphan: false, crossTrace: false },
     { spanId: D, traceId: TRACE, depth: 3, x: 20, width: 10, name: 'validate cart', service: 'api-gateway', kind: 'INTERNAL', status: 'UNSET', orphan: false, crossTrace: false },
     { spanId: E, traceId: OTHER_TRACE, depth: 0, x: 40, width: 20, name: 'GET /products', service: 'storefront', kind: 'SERVER', status: 'UNSET', orphan: false, crossTrace: false },

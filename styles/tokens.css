@@ -52,6 +52,39 @@
   --globe-coral: #e8786a;
   --globe-night-text: #8f8b85;
 
+  /* Trace waterfall primitives (#146, from the Build it prototype the owner approved on
+     2026-11-04; not dash0.com brand values). Services get muted fills, one per service in the
+     order a step names them, cycling after six: darker on dark, paler on light, so bar text
+     (--color-text) reads on both. Two pale trace tints tell trace ids apart. Hint violet,
+     parent amber and note orange are the prototype's light-theme values; their dark sides
+     reuse --d0-orange-soft and --globe-amber. */
+  --wf-svc-0-dark: #3f556b;
+  --wf-svc-1-dark: #335b58;
+  --wf-svc-2-dark: #455941;
+  --wf-svc-3-dark: #5e5135;
+  --wf-svc-4-dark: #694944;
+  --wf-svc-5-dark: #5e4b62;
+  --wf-svc-0-light: #c5d8ed;
+  --wf-svc-1-light: #bddedb;
+  --wf-svc-2-light: #cadcc6;
+  --wf-svc-3-light: #e0d5bc;
+  --wf-svc-4-light: #eccec8;
+  --wf-svc-5-light: #e1cfe5;
+  --wf-trace-0-dark: #3e3729;
+  --wf-trace-0-edge-dark: #726852;
+  --wf-trace-1-dark: #43323d;
+  --wf-trace-1-edge-dark: #816577;
+  --wf-trace-0-light: #f0e7d6;
+  --wf-trace-0-edge-light: #b0a389;
+  --wf-trace-1-light: #f7e1ee;
+  --wf-trace-1-edge-light: #b593a8;
+  --wf-parent-light: #a8650f;
+  --wf-hint-dark: #c9b6ff;
+  --wf-hint-light: #6a4fc2;
+  --wf-note-light: #b34a22;
+  --wf-win-text: #e9e6e1;
+  --wf-win-muted: #b8b3ac;
+
   /* Semantic colours: light-dark(<light>, <dark>). */
   --color-bg: light-dark(var(--d0-white), var(--d0-grey-900));
   --color-surface: light-dark(color-mix(in srgb, var(--d0-grey-400) 10%, var(--d0-white)), var(--d0-grey-800));
@@ -79,6 +112,27 @@
   --color-globe-pulse: light-dark(var(--globe-coral), var(--globe-coral));
   --color-globe-rim: light-dark(var(--globe-amber), var(--globe-amber));
   --color-globe-text: light-dark(var(--globe-night-text), var(--globe-night-text));
+  /* The trace waterfall (#146): service fills, trace tints, and the highlight roles. */
+  --color-svc-0: light-dark(var(--wf-svc-0-light), var(--wf-svc-0-dark));
+  --color-svc-1: light-dark(var(--wf-svc-1-light), var(--wf-svc-1-dark));
+  --color-svc-2: light-dark(var(--wf-svc-2-light), var(--wf-svc-2-dark));
+  --color-svc-3: light-dark(var(--wf-svc-3-light), var(--wf-svc-3-dark));
+  --color-svc-4: light-dark(var(--wf-svc-4-light), var(--wf-svc-4-dark));
+  --color-svc-5: light-dark(var(--wf-svc-5-light), var(--wf-svc-5-dark));
+  --color-trace-0: light-dark(var(--wf-trace-0-light), var(--wf-trace-0-dark));
+  --color-trace-0-edge: light-dark(var(--wf-trace-0-edge-light), var(--wf-trace-0-edge-dark));
+  --color-trace-1: light-dark(var(--wf-trace-1-light), var(--wf-trace-1-dark));
+  --color-trace-1-edge: light-dark(var(--wf-trace-1-edge-light), var(--wf-trace-1-edge-dark));
+  /* Its current parent, the arriving span, the time-window band and the stars. */
+  --color-parent: light-dark(var(--wf-parent-light), var(--globe-amber));
+  --color-band: light-dark(color-mix(in srgb, var(--wf-parent-light) 8%, transparent), color-mix(in srgb, var(--globe-amber) 9%, transparent));
+  --color-hint: light-dark(var(--wf-hint-light), var(--wf-hint-dark));
+  --color-note: light-dark(var(--wf-note-light), var(--d0-orange-soft));
+  /* The success card keeps the globe's night in both themes, like the globe. */
+  --color-win-bg: light-dark(var(--globe-night), var(--globe-night));
+  --color-win-text: light-dark(var(--wf-win-text), var(--wf-win-text));
+  --color-win-muted: light-dark(var(--wf-win-muted), var(--wf-win-muted));
+  --color-swirl-dot: light-dark(var(--globe-amber), var(--globe-amber));
   --color-shadow: light-dark(color-mix(in srgb, var(--d0-grey-900) 15%, transparent), color-mix(in srgb, var(--d0-grey-900) 60%, transparent));
 
   /* Type and shape. */

@@ -55,6 +55,7 @@ const ERRORS = {
   ],
   edit: ['status'],
   answer: { [CHARGE]: { status: 'ERROR' }, [RETRY]: { status: 'UNSET' } },
+  helps: {}, // the help ladder's last rung (docs/M1-DESIGN.md §4.2): no helps, a Check button, no hints
 };
 
 const STORIES = [
@@ -75,6 +76,7 @@ const BATCH = {
   ],
   edit: ['links'],
   answer: { [SEND]: { links: [P1, P2, P3] } },
+  helps: {}, // no helps, a Check button, no hints
 };
 
 /** The level's answer tables, in play order (pinned by test/act-2.test.mjs). */

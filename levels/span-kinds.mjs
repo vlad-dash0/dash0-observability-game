@@ -25,7 +25,9 @@ const span = (spanId, traceId, service, name, startMs, endMs, parentId, links = 
 });
 
 // Step 1: every span given INTERNAL; the parents and the consumer's link are fixed. The
-// publish and process spans are roots of their own traces, joined by the link.
+// publish and process spans are roots of their own traces, joined by the link. Help ladder
+// (docs/M1-DESIGN.md §4.2): no queue; trace tint, instant feedback and hints on. The
+// time-window guide needs parent editing, so it is off here.
 const MAP = {
   id: 'kinds-map',
   spans: [
@@ -46,6 +48,7 @@ const MAP = {
     [PUBLISH]: { kind: 'PRODUCER' },
     [PROCESS]: { kind: 'CONSUMER' },
   },
+  helps: { tint: true, instant: true, hints: true },
 };
 
 // Step 2: what one wrong kind costs the map. `why` follows "Right." or "Not quite.".
