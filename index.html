@@ -28,6 +28,7 @@
         <span class="brand-name">On Call <span>by Dash0</span></span>
       </div>
       <div class="head-right">
+        <span class="debug-badge" x-show="debug" x-cloak>DEBUG</span>
         <!-- A live region announces its text, not aria-label changes: the spoken summary
              is visually hidden text inside it. -->
         <div class="star-count" role="status">
@@ -128,6 +129,7 @@
       <p class="reward-stars" role="img" :aria-label="rewardStarsLabel()" x-show="rewardStars !== null"
          x-text="rewardStarsText()"></p>
       <p x-text="rewardText"></p>
+      <p class="reward-debug" x-show="rewardDebug" x-cloak x-text="rewardNote()"></p>
       <div class="reward-cards" x-show="rewardCards.length > 0">
         <p class="reward-cards-title">New nuance card</p>
         <template x-for="front in rewardCards" :key="front">

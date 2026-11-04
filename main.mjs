@@ -2,6 +2,7 @@
 // deferred Alpine script (index.html), so `alpine:init` is registered in time.
 import { createGame, liveRegistry } from './app.mjs';
 import { mountGlobe } from './lib/globe-render.mjs';
+import { isDebugMode } from './lib/debug-mode.mjs';
 import { prefersReducedMotion } from './lib/lesson-kit.mjs';
 import { readTheme } from './lib/theme.mjs';
 
@@ -15,6 +16,7 @@ function browserDeps() {
     storage: () => window.localStorage,
     document,
     window,
+    debug: isDebugMode(window.location.search),
     now: Date.now,
     rand: Math.random,
     reduceMotion: () => prefersReducedMotion(window),
