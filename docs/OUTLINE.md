@@ -29,7 +29,7 @@ PromQL, real semantic-convention names.
 | Town hub; a prop pops in when a lesson completes | **World globe**: each act is a world region and each level a country; a country lights up when you finish its level, so a region fills in as you work through its act; a coral pulse marks the current incident (an open boss pulses its whole region); no edges between countries |
 | One ES module per lesson + ordered registry (`lessons/index.mjs`) | Same. Each level is one file that exports `{id, no, name, …, run(ctx)}` (its act comes from its registry position; FOUNDATION.md §2.1); the hub, progress and rewards derive from the registry |
 | `lesson-kit` primitives (`renderStep`, `speech`, `finish`) | Same kit plus engineer-grade widgets: YAML editor with validation, PromQL box run against a fake TSDB, trace waterfall, log stream, drag-to-classify |
-| Stars per lesson | Stars (0 to 3) for accuracy and speed, plus collectible **Nuance cards** (section 5) |
+| Stars per lesson | Stars (0 to 5) for accuracy and speed, plus collectible **Nuance cards** (section 5) |
 | Lessons unlock in order | Acts unlock in order, except that an act stays open once entered (any of its levels or its boss completed); levels inside an act can be played in any order; a "boss" incident ends each act |
 | Progress in `localStorage` + anonymous save codes | Keep both. Drop the COPPA-specific machinery; optionally add sign-in later for leaderboards |
 | "Ask Webo" Claude proxy with moderation | **Ask the guide**: a Claude-backed helper that knows the glossary and the current level, gives hints rather than answers, and keeps the key server-side |
