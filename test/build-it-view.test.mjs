@@ -19,7 +19,7 @@ import { S1, S2, S3, S4, T2, logsSpec } from './fixtures/build-logs.mjs';
 const ALL = { queue: true, tint: true, guide: true, instant: true, hints: true };
 const CHECK = { hints: true }; // context-propagation's ladder: Check button, hints on
 
-/** A counting ctx on a fresh DOM with the widget rendered; peekStars follows the real rule. */
+/** A counting ctx on a fresh DOM with the widget rendered; peekStars follows the real rule over the whole level (the board must not use it). */
 function setup(spec = b1Spec(), { reduceMotion = false } = {}) {
   const dom = makeDom();
   const focus = recordFocus(dom.window);
@@ -491,6 +491,131 @@ test('status and links in Check mode with no helps: edits are free, Check grades
   assert.equal(counts.done, 1);
 });
 
+// ---- findings of the review of c7f2f6c (#146) ---------------------------------------------
+test('stars are this board only: a penalty on an earlier step is not counted, the board\'s own wrong drop is', () => {
+  const clean = setup(withHelps(ALL));
+  clean.counts.mistakes = 1; // a slip on an earlier step of the level: ctx.peekStars() says 4
+  clean.mount();
+  assert.equal(clean.ctx.peekStars(), 4);
+  assert.equal(q('#b1-stars').getAttribute('aria-label'), '5 of 5 stars still possible');
+  solveQueue();
+  assert.equal(q('#b1-win-stars').textContent, '5 of 5 stars: 0 wrong drops, 0 hints.');
+  assert.equal(q('#b1-stars').getAttribute('aria-label'), '5 of 5 stars');
+  assert.deepEqual(qa('#b1-stars [data-star]').map((s) => s.dataset.star), ['earned', 'earned', 'earned', 'earned', 'earned']);
+  assert.equal(q('.help-rule').textContent.startsWith('Stars count this board only'), true);
+
+  const slip = setup(withHelps(ALL));
+  slip.counts.mistakes = 1;
+  slip.mount();
+  drag(B, 'root');
+  assert.equal(q('#b1-stars').getAttribute('aria-label'), '4 of 5 stars still possible');
+  click('#b1-hint');
+  assert.equal(q('#b1-hint-cost').textContent, 'costs 1 star', 'the hint cost is read from the board too');
+  drag(B, A);
+  drag(C, B);
+  drag(D, C);
+  drag(E, 'root');
+  assert.equal(q('#b1-win-stars').textContent, '3 of 5 stars: 1 wrong drop, 1 hint.');
+});
+
+test('Check mode: the board\'s stars count its own failed Checks, not the level\'s', () => {
+  const { counts, mount } = setup(withHelps(CHECK));
+  counts.mistakes = 2;
+  mount();
+  assert.equal(q('#b1-stars').getAttribute('aria-label'), '5 of 5 stars still possible');
+  click('#b1-check');
+  assert.equal(q('#b1-stars').getAttribute('aria-label'), '4 of 5 stars still possible');
+});
+
+test('pick path on the rows: pick a span, then click its parent row; the same span again cancels', () => {
+  const { counts, focus, mount } = setup(withHelps({ ...ALL, queue: false }));
+  mount();
+  click(`[data-span="${B}"]`);
+  assert.equal(q(`[data-span="${B}"]`).getAttribute('aria-pressed'), 'true');
+  click(`[data-span="${A}"]`);
+  assert.equal(status(), 'POST (storefront) sits under POST /checkout (storefront). Right.');
+  assert.equal(label(B).endsWith('parent POST /checkout (storefront), right'), true);
+  assert.equal(q(`[data-span="${B}"]`).getAttribute('aria-pressed'), 'false');
+  assert.equal(counts.mistakes, 0);
+  assert.equal(focus.last(), `span:${B}`);
+  click(`[data-span="${C}"]`);
+  click(`[data-span="${C}"]`);
+  assert.equal(status(), 'Cancelled.');
+  assert.equal(q(`[data-span="${C}"]`).getAttribute('aria-pressed'), 'false');
+  assert.equal(label(C).endsWith('root'), true, 'nothing moved');
+  click(`[data-span="${C}"]`);
+  click(`[data-span="${E}"]`);
+  assert.equal(counts.mistakes, 1, 'a wrong parent row costs like a wrong drop');
+  assert.equal(status().startsWith('POST /checkout (api-gateway) sits under GET /products (storefront), but not quite.'), true);
+});
+
+test('pick path on the rows: a descendant row is refused as a loop, free; the root zone makes a root; Escape cancels', () => {
+  const { counts, mount } = setup(withHelps({ ...ALL, queue: false }));
+  mount();
+  pick(B, A);
+  pick(C, B);
+  click(`[data-span="${B}"]`);
+  click(`[data-span="${C}"]`);
+  assert.equal(status(), 'POST /checkout (api-gateway) is already below POST (storefront), so that would make a loop.');
+  assert.equal(counts.mistakes, 0);
+  assert.equal(label(B).endsWith('parent POST /checkout (storefront), right'), true, 'nothing changed');
+  click(`[data-span="${E}"]`);
+  click('[data-drop="root"]');
+  assert.equal(status(), 'GET /products (storefront) is already a root.');
+  click(`[data-span="${C}"]`);
+  click('[data-drop="root"]');
+  assert.equal(status().startsWith('POST /checkout (api-gateway) is a root, but not quite.'), true);
+  assert.equal(counts.mistakes, 1);
+  click(`[data-span="${E}"]`);
+  q('[data-build="b1"]').onkeydown({ key: 'Escape', preventDefault() {} });
+  click(`[data-span="${A}"]`);
+  assert.equal(q(`[data-span="${E}"]`).getAttribute('aria-pressed'), 'false', 'a row click after Escape picks, it does not move');
+  assert.equal(label(E).endsWith('root'), true);
+});
+
+test('pick path on the rows with the queue: the arriving span is not a parent yet', () => {
+  const { counts, mount } = setup(withHelps(ALL));
+  mount();
+  click(`[data-span="${A}"]`);
+  click(`[data-span="${B}"]`);
+  assert.deepEqual([arriving(), counts.mistakes], [[B], 0], 'nothing moved, nothing paid');
+  assert.equal(label(A).endsWith('root'), true);
+});
+
+test('a recheck with the same links in another order is free', () => {
+  const spec = b1Spec();
+  spec.edit = ['links'];
+  spec.answer = { [E]: { links: [A] } };
+  const { counts, mount } = setup(spec);
+  mount();
+  click(`[data-span="${E}"]`);
+  click(`[data-link="${B}"]`);
+  click(`[data-link="${C}"]`);
+  click('#b1-check');
+  assert.equal(counts.mistakes, 1);
+  assert.equal(q('#b1-feedback').firstChild.textContent, 'Not yet: 3 problems.');
+  click(`[data-link="${B}"]`);
+  click(`[data-link="${B}"]`);
+  click('#b1-check');
+  assert.equal(counts.mistakes, 1, 'links {B, C} added as C then B are the same graded state');
+  assert.equal(q('#b1-feedback').firstChild.textContent, 'Same as last time: 3 problems.');
+});
+
+test('V5 a recheck after attaching the same records in another order is free', () => {
+  const { counts, mount } = setup(logsSpec());
+  mount();
+  attach('l-cart', S2);
+  attach('l-charge', S3);
+  click('#l1-check');
+  attach('l-charge', 'none');
+  attach('l-cart', 'none');
+  attach('l-charge', S3);
+  attach('l-cart', S2);
+  click('#l1-check');
+  assert.equal(counts.mistakes, 1);
+  assert.equal(q('#l1-feedback').firstChild.textContent, 'Same as last time: 1 problem.');
+});
+
 // ---- markup hygiene, escaping, errors -------------------------------------------------
 
 test('no Alpine, style= or on*= attributes and no em dash, before, during and after play', () => {
@@ -532,7 +657,7 @@ test('data text is escaped everywhere: rows, bars, panel, notes and problems', (
   assert.equal(hostile(), 0);
 });
 
-test('an invalid spec or helps, a missing render, a missing onComplete or a ctx without peekStars is a TypeError naming the id', () => {
+test('an invalid spec or helps, a missing render, or a missing onComplete is a TypeError naming the id', () => {
   const bad = b1Spec();
   bad.spans[0].kind = 'server';
   assert.throws(() => setup(bad).mount(), (err) => err instanceof TypeError && err.message.startsWith('build "b1": invalid spec:') && err.message.includes('kind "server"'));
@@ -541,9 +666,6 @@ test('an invalid spec or helps, a missing render, a missing onComplete or a ctx 
   ctx.ovBody.innerHTML = '';
   assert.throws(() => unrendered(), { name: 'TypeError', message: /^build "b1": not rendered/ });
   assert.throws(() => setup().mount({ onComplete: undefined }), { name: 'TypeError', message: /onComplete/ });
-  const noPeek = setup();
-  delete noPeek.ctx.peekStars;
-  assert.throws(() => noPeek.mount(), { name: 'TypeError', message: /peekStars/ });
 });
 
 test('every focus target could take focus', () => {

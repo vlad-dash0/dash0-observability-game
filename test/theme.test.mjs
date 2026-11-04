@@ -386,10 +386,14 @@ test('trace waterfall (#146): bar text on every service fill, trace chips, hint 
     for (const bg of ['--color-surface', '--color-bg']) {
       const hint = contrast('--color-hint', bg, theme);
       assert.ok(hint >= 4.5, `${theme}: hint text on ${bg} is ${hint.toFixed(2)}, needs 4.5`);
-      for (const fg of ['--color-parent', '--color-note']) {
+      // Used as text in styles/base.css (the "its parent" tag, the queue heading, the muted copy): 4.5.
+      for (const fg of ['--color-parent', '--color-text-muted']) {
         const r = contrast(fg, bg, theme);
-        assert.ok(r >= 3, `${theme}: ${fg} on ${bg} is ${r.toFixed(2)}, needs 3 (markers and borders)`);
+        assert.ok(r >= 4.5, `${theme}: text in ${fg} on ${bg} is ${r.toFixed(2)}, needs 4.5`);
       }
+      // Marker only (the failed tick glyph): 3.
+      const note = contrast('--color-note', bg, theme);
+      assert.ok(note >= 3, `${theme}: --color-note on ${bg} is ${note.toFixed(2)}, needs 3 (markers and borders)`);
     }
     for (const fg of ['--color-win-text', '--color-win-muted']) {
       const r = contrast(fg, '--color-win-bg', theme);

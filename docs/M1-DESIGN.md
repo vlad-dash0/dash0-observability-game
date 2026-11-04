@@ -506,10 +506,10 @@ could not answer one question. With telemetry, all four took seconds. Time to in
 ### Act 2
 **2.1 `spans-and-traces`**: build; cards `['no-trace-object']`. Step 1 choice "What makes these
 spans one trace?" → shared trace ID (decoy: "the SDK sends a trace object at the end"). Step 2
-Build `edit:['parent']`, trace `4bf92f3577b34da6a3ce929d0e0e4736`: A storefront `POST
-/checkout` SERVER 0–100 root; B storefront `POST api-gateway` CLIENT 10–90 → A; C api-gateway
+Build `edit:['parent']`, trace `4bf92f35` (8-char ids, the full id in a tooltip): A storefront `POST
+/checkout` SERVER 0–100 root; B storefront `POST` CLIENT 10–90 → A; C api-gateway
 `POST /checkout` SERVER 15–85 → B; D api-gateway `validate cart` INTERNAL 20–30 → C; E other
-trace `0af7…` 40–60 stays root (overlaps C on purpose → `cross-trace-parent`). Step 3 choice
+trace `0af76519` 40–60 stays root (overlaps C on purpose → `cross-trace-parent`). Step 3 choice
 about E → another request. Card: "There is no trace object: a trace is just the spans that
 share a trace ID, each exported on its own." Spec:
 https://opentelemetry.io/docs/specs/otel/overview/#traces ,

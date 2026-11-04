@@ -180,3 +180,43 @@ test('an aborted signal (the overlay closed) stops it and releases the context',
   assert.equal(rec.loop, null);
   assert.equal(qa('#swirl canvas').length, 0);
 });
+
+test('an abort that lands while three.js loads: stopped, no renderer, no loop, nothing in the host', async () => {
+  const { el } = host();
+  const { rec, importThree } = fakeThree();
+  const ac = new AbortController();
+  const slow = async () => {
+    const three = await importThree();
+    ac.abort(); // the player left as the module arrived
+    return three;
+  };
+  assert.equal(await playSwirl(el, { reduced: false, importThree: slow, signal: ac.signal, now: () => 0 }), 'stopped');
+  assert.equal(rec.renderers, 0, 'no renderer was made');
+  assert.equal(rec.loop, null);
+  assert.equal(qa('#swirl canvas').length, 0);
+  assert.equal(qa('#swirl svg').length, 0, 'nothing is drawn for a card that is gone');
+});
+
+test('an abort that lands as the renderer is made: stopped, the context released, no loop, no canvas', async () => {
+  const { el } = host();
+  const { rec, importThree } = fakeThree();
+  const ac = new AbortController();
+  const made = async () => {
+    const three = await importThree();
+    const Renderer = three.WebGLRenderer;
+    return {
+      ...three,
+      WebGLRenderer: class extends Renderer {
+        constructor(opts) {
+          super(opts);
+          ac.abort();
+        }
+      },
+    };
+  };
+  assert.equal(await playSwirl(el, { reduced: false, importThree: made, signal: ac.signal, now: () => 0 }), 'stopped');
+  assert.equal(rec.renderers, 1);
+  assert.deepEqual([rec.disposed, rec.contextLoss], [1, 1], 'the context is released');
+  assert.equal(rec.loop, null);
+  assert.equal(qa('#swirl canvas').length, 0);
+});

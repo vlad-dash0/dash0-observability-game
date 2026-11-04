@@ -41,10 +41,12 @@ test('validateBuildHelps: known keys, queue and guide only with parent editing, 
   assert.deepEqual(validateBuildHelps({ ...logsSpec(), helps: { tint: true, hints: true } }), ['helps: logs mode takes only hints']);
   const given = b1Spec();
   given.spans[1].parentId = A;
-  assert.deepEqual(validateBuildHelps({ ...given, helps: { queue: true } }), ['helps: queue needs every span given as a root']);
+  assert.deepEqual(validateBuildHelps({ ...given, helps: { queue: true, instant: true } }), ['helps: queue needs every span given as a root']);
   const late = b1Spec();
   late.spans[0].startMs = 12;
-  assert.deepEqual(validateBuildHelps({ ...late, helps: { queue: true } }), ['helps: queue needs the first span to arrive to be a root in the answer']);
+  assert.deepEqual(validateBuildHelps({ ...late, helps: { queue: true, instant: true } }), ['helps: queue needs the first span to arrive to be a root in the answer']);
+  assert.deepEqual(validateBuildHelps({ ...b1Spec(), helps: { queue: true, hints: true } }), ['helps: queue needs instant feedback'], 'Check would bypass the queue');
+  assert.deepEqual(validateBuildHelps({ ...b1Spec(), helps: { queue: true, instant: true } }), []);
   assert.deepEqual(validateBuildHelps({ ...b1Spec(), hint: 'x', helps: { hints: false } }), ['hint: shown only when helps.hints is on']);
   assert.deepEqual(validateBuildHelps({ ...b1Spec(), closing: ' ' }), ['closing: not non-empty text']);
 });
