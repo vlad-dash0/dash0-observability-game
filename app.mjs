@@ -74,7 +74,7 @@ const CONFETTI = 40;
  * Storage), document, window?, deck?, globe? ((host, view) → Promise of a globe handle or
  * null; lib/globe-render.mjs mountGlobe in the browser), globeMap? ({ACT_REGIONS,
  * LEVEL_COUNTRY, actOf}), dots?, now?, rand?, reduceMotion? (() → boolean), reportError?,
- * setTimeout?, clearTimeout? }. Without `globe` the hub shows the globe's text fallback.
+ * setTimeout?, clearTimeout?, debug? (boolean, ?mode=debug: every level opens, nothing is saved) }. Without `globe` the hub shows the globe's text fallback.
  */
 export function createGame(deps) {
   const {
@@ -92,6 +92,7 @@ export function createGame(deps) {
     reportError = (e) => console.error(e),
     setTimeout: later = globalThis.setTimeout,
     clearTimeout: cancel = globalThis.clearTimeout,
+    debug = false,
   } = deps;
   const report = (e) => {
     try {
@@ -112,6 +113,8 @@ export function createGame(deps) {
   let mounts = 0;
 
   return {
+    debug: debug === true,
+    rewardDebug: false,
     progress: loaded.progress,
     notice: loaded.status === 'fresh' || loaded.status === 'ok' ? null : loaded.status,
     theme: readTheme(storage),
@@ -163,8 +166,10 @@ export function createGame(deps) {
     level(id) {
       return registry.levels[id];
     },
+    // The one debug override: a known level the rules lock is open (lib/unlock.mjs is untouched).
     levelState(id) {
-      return levelState(id, this.progress, registry);
+      const state = levelState(id, this.progress, registry);
+      return this.debug && state === 'locked' && Object.hasOwn(registry.levels, id) ? 'open' : state;
     },
     // A class string, never a mixed :class array (Alpine renders "[object Object]").
     levelClasses(id) {
@@ -335,10 +340,13 @@ export function createGame(deps) {
     completeLevel(levelId, result) {
       const level = registry.levels[levelId];
       const rec = recordCompletion(this.progress, levelId, result, registry);
-      const saved = saveProgress(storage, rec.progress, registry);
-      this.progress = saved.progress;
-      // A save that went through clears corrupt (the backup now exists) and unavailable.
-      this.notice = saved.saved ? null : saved.reason;
+      this.rewardDebug = this.debug;
+      if (!this.debug) {
+        const saved = saveProgress(storage, rec.progress, registry);
+        this.progress = saved.progress;
+        // A save that went through clears corrupt (the backup now exists) and unavailable.
+        this.notice = saved.saved ? null : saved.reason;
+      }
       this.endSession();
       this.overlayOpen = false;
       this.showGlobe();
@@ -354,6 +362,9 @@ export function createGame(deps) {
     closeReward() {
       this.rewardOpen = false;
       this.returnFocus();
+    },
+    rewardNote() {
+      return this.rewardDebug ? 'Debug run: not saved.' : '';
     },
     rewardStarsText() {
       return this.rewardStars == null ? '' : starGlyphs(this.rewardStars);
