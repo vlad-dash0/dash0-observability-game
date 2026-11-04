@@ -287,26 +287,28 @@ test('focus returns to the level card after closing the level and after the rewa
 
 test('completion: stored with its stars, done, its country lit, totals and reward updated', () => {
   const { game, store } = setup();
-  assert.deepEqual(game.stars, { earned: 0, max: 15 });
+  assert.deepEqual(game.stars, { earned: 0, max: 25 });
   game.openLevel('x');
   ctxs.x.mistake();
   const result = ctxs.x.finish({ text: 'You lit up checkout.', cards: ['c1'] });
-  assert.equal(result.stars, 2);
-  assert.deepEqual(stored(store).levels.x, { stars: 2, at: AT });
+  assert.equal(result.stars, 4);
+  assert.deepEqual(stored(store).levels.x, { stars: 4, at: AT });
   assert.deepEqual(stored(store).cards, ['c1']);
   assert.equal(game.levelState('x'), 'done');
   const map = game.mapState();
   assert.equal(map.countries.XXX.lit, true);
   assert.equal(map.countries.YYY.lit, false);
   assert.equal(map.regions.a0.done, 1);
-  assert.deepEqual(game.stars, { earned: 2, max: 15 });
+  assert.deepEqual(game.stars, { earned: 4, max: 25 });
   assert.deepEqual(game.cards, { earned: 1, max: 1 });
   assert.equal(game.overlayOpen, false);
   assert.equal(ctxs.x.signal.aborted, true, 'finishing ends the session');
   assert.equal(game.rewardOpen, true);
   assert.equal(game.rewardTitle, 'Title x');
   assert.equal(game.rewardText, 'You lit up checkout.');
-  assert.equal(game.rewardStars, 2);
+  assert.equal(game.rewardStars, 4);
+  assert.equal(game.rewardStarsText(), '★★★★☆');
+  assert.equal(game.rewardStarsLabel(), '4 of 5 stars');
   assert.deepEqual(game.rewardCards, ['Front of c1.']);
   game.closeReward();
   assert.equal(game.rewardOpen, false);
@@ -353,7 +355,7 @@ test('a storage event merges another tab\'s progress into memory', () => {
   store.data.set(STORAGE_KEY, v1({ y: { stars: 3, at: AT } }));
   game.onStorage({ key: STORAGE_KEY });
   assert.equal(game.progress.levels.y.stars, 3);
-  assert.equal(game.progress.levels.x.stars, 3, 'memory keeps its own completions');
+  assert.equal(game.progress.levels.x.stars, 5, 'memory keeps its own completions');
   store.data.set(STORAGE_KEY, v1({ y: { stars: 1, at: AT } }));
   game.onStorage({ key: STORAGE_KEY });
   assert.equal(game.progress.levels.y.stars, 3, 'never downgrades');
@@ -388,7 +390,7 @@ test('a successful save clears the corrupt and unavailable notices', () => {
   flaky.game.openLevel('x');
   ctxs.x.finish({ text: 'storage came back' });
   assert.equal(flaky.game.notice, null);
-  assert.equal(stored(store).levels.x.stars, 3);
+  assert.equal(stored(store).levels.x.stars, 5);
 });
 
 test('storage events for other keys are ignored; a corrupt write changes nothing', () => {
@@ -441,7 +443,8 @@ test('level labels and classes cover every state', () => {
   assert.equal(game.levelClasses('z'), 'locked');
   game.openLevel('z');
   assert.equal(game.levelClasses('z'), 'locked nudge');
-  assert.equal(game.starText('y'), '★★☆');
+  assert.equal(game.starText('y'), '★★☆☆☆', 'a saved 2 shows two filled of five');
+  assert.equal(game.starSummary(), '2 of 25 stars');
 });
 
 test('the globe text alternative counts levels done and names the lit regions', () => {
@@ -684,4 +687,18 @@ test('main.mjs applies the stored theme before anything else runs', () => {
     .map((s) => s.trim())
     .filter((s) => s && !s.startsWith('import '));
   assert.match(statements[0], /^document\.documentElement\.dataset\.theme\s*=\s*readTheme\(/);
+});
+
+test('every star display shows five: filled then empty, for each value 0 to 5 and an old 3', () => {
+  const { game } = setup({ initial: { [STORAGE_KEY]: v1({ y: { stars: 3, at: null } }) } });
+  assert.equal(game.starText('y'), '★★★☆☆', 'a saved three-star value still shows 3 of 5');
+  assert.equal(game.starText('x'), '☆☆☆☆☆', 'no entry shows five empty');
+  for (let n = 0; n <= 5; n++) {
+    game.rewardStars = n;
+    assert.equal(game.rewardStarsText(), '★'.repeat(n) + '☆'.repeat(5 - n), `reward ${n}`);
+    assert.equal(game.rewardStarsLabel(), `${n} of 5 stars`);
+  }
+  game.rewardStars = null;
+  assert.equal(game.rewardStarsText(), '');
+  assert.equal(game.rewardStarsLabel(), 'Not scored');
 });

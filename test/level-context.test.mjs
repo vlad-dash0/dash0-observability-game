@@ -68,26 +68,26 @@ test('ctx.shuffle returns a new array even when the injected shuffle is identity
   assert.deepEqual(input, [1, 2, 3]);
 });
 
-test('two mistakes then finish scores 2 stars and reports once to onFinish', () => {
+test('two mistakes then finish scores 3 stars and reports once to onFinish', () => {
   const { ctx, calls } = setup();
   ctx.mistake();
   ctx.mistake();
   const result = ctx.finish({ cards: ['c1'] });
-  assert.deepEqual(result, { stars: 2, cards: ['c1'], text: '' });
+  assert.deepEqual(result, { stars: 3, cards: ['c1'], text: '' });
   assert.deepEqual(calls, [
-    ['lvl-a', { stars: 2, cards: ['c1'], text: '', at: '2026-01-01T00:00:00.000Z' }],
+    ['lvl-a', { stars: 3, cards: ['c1'], text: '', at: '2026-01-01T00:00:00.000Z' }],
   ]);
 });
 
 test('a hint costs a star like a mistake', () => {
   const { ctx } = setup();
   ctx.hint();
-  assert.equal(ctx.finish({ text: 'done' }).stars, 2);
+  assert.equal(ctx.finish({ text: 'done' }).stars, 4);
 });
 
-test('finish with no argument is a clean 3-star run with empty text and cards', () => {
+test('finish with no argument is a clean 5-star run with empty text and cards', () => {
   const { ctx } = setup();
-  assert.deepEqual(ctx.finish(), { stars: 3, cards: [], text: '' });
+  assert.deepEqual(ctx.finish(), { stars: 5, cards: [], text: '' });
 });
 
 const PAR_60S = { id: 'lvl-a', scored: true, scoring: { parMs: 60000 } };
@@ -95,21 +95,21 @@ const PAR_60S = { id: 'lvl-a', scored: true, scoring: { parMs: 60000 } };
 test('elapsed time is measured from creation: 61 s over a 60 s par costs a star', () => {
   const times = [NOW, NOW + 61000];
   const { ctx, calls } = setup({ level: PAR_60S, now: () => times.shift() });
-  assert.equal(ctx.finish({ text: 'slow' }).stars, 2);
+  assert.equal(ctx.finish({ text: 'slow' }).stars, 4);
   assert.equal(calls[0][1].at, '2026-01-01T00:01:01.000Z');
 });
 
-test('59 s under a 60 s par keeps 3 stars', () => {
+test('59 s under a 60 s par keeps 5 stars', () => {
   const times = [NOW, NOW + 59000];
   const { ctx } = setup({ level: PAR_60S, now: () => times.shift() });
-  assert.equal(ctx.finish({ text: 'quick' }).stars, 3);
+  assert.equal(ctx.finish({ text: 'quick' }).stars, 5);
 });
 
 test('a non-finite or out-of-range clock counts as no elapsed time and no date', () => {
   for (const bad of [NaN, 1e20]) {
     const times = [NOW, bad];
     const { ctx, calls, reported } = setup({ level: PAR_60S, now: () => times.shift() });
-    assert.equal(ctx.finish({ text: 'clock' }).stars, 3);
+    assert.equal(ctx.finish({ text: 'clock' }).stars, 5);
     assert.equal(calls[0][1].at, null);
     assert.equal(reported.length, 1, 'a broken clock is reported');
   }
@@ -122,7 +122,7 @@ test('an onFinish that throws is reported; the player still gets the result once
       throw boom;
     },
   });
-  assert.deepEqual(ctx.finish({ text: 'done' }), { stars: 3, cards: [], text: 'done' });
+  assert.deepEqual(ctx.finish({ text: 'done' }), { stars: 5, cards: [], text: 'done' });
   assert.deepEqual(reported, [boom]);
   assert.equal(ctx.finish({ text: 'again' }), null);
 });
@@ -134,7 +134,7 @@ test('a throwing clock at finish: elapsed 0, no date, reported, one onFinish', (
     return NOW;
   };
   const { ctx, calls, reported } = setup({ level: PAR_60S, now });
-  assert.equal(ctx.finish({ text: 'done' }).stars, 3);
+  assert.equal(ctx.finish({ text: 'done' }).stars, 5);
   assert.equal(calls.length, 1);
   assert.equal(calls[0][1].at, null);
   assert.equal(reported.length, 1);
@@ -158,7 +158,7 @@ test('a reportError that throws is swallowed; onFinish still fires once', () => 
     throw new Error('logger down');
   };
   const { ctx, calls } = setup({ level: PAR_60S, now: () => NaN, reportError });
-  assert.deepEqual(ctx.finish({ text: 'x' }), { stars: 3, cards: [], text: 'x' });
+  assert.deepEqual(ctx.finish({ text: 'x' }), { stars: 5, cards: [], text: 'x' });
   assert.equal(calls.length, 1);
   const thrower = setup({
     reportError,
@@ -166,7 +166,7 @@ test('a reportError that throws is swallowed; onFinish still fires once', () => 
       throw new Error('store down');
     },
   });
-  assert.deepEqual(thrower.ctx.finish(), { stars: 3, cards: [], text: '' });
+  assert.deepEqual(thrower.ctx.finish(), { stars: 5, cards: [], text: '' });
 });
 
 test('if building the result throws, nothing is latched and finish can be retried', () => {
@@ -198,7 +198,7 @@ test('reportError defaults to console.error', (t) => {
 });
 
 test('finish(null) is a clean finish; non-string text is stringified', () => {
-  assert.deepEqual(setup().ctx.finish(null), { stars: 3, cards: [], text: '' });
+  assert.deepEqual(setup().ctx.finish(null), { stars: 5, cards: [], text: '' });
   assert.equal(setup().ctx.finish({ text: 42 }).text, '42');
   assert.equal(setup().ctx.finish({ text: null }).text, '');
 });

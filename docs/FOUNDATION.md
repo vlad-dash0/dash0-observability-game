@@ -9,7 +9,7 @@ makes them pass, then proves each test by a one-line mutation of the implementat
 ## 1. Decisions
 
 1. Levels never pass stars. ctx counts `mistake()` / `hint()`; one pure `scoreStars`
-   turns counts into stars.
+   turns counts into stars, 0 to `MAX_STARS` (5, exported by `lib/scoring.mjs`, the only place the maximum is written).
 2. `act` and `kind` come from the registry position: `ACTS[i].levels[]` and
    `ACTS[i].boss` (module or null). A level file declaring `act` or `kind` is an error.
 3. The map link lives on the level (`lights: nodeId[]`); `nodeLitBy` derives the reverse.
@@ -30,7 +30,7 @@ makes them pass, then proves each test by a one-line mutation of the implementat
 
 Provisional answers (recorded on #16; the user can override):
 success = mint `#a8fbbe`; error = purple `#ad46ff` (dash0.com purple-500); dark by
-default with an explicit light toggle; star rule as §2.6; Martian Mono self-hosted
+default with an explicit light toggle; star rule as §2.6 (five stars since #155); Martian Mono self-hosted
 (OFL); no finale until after M0; F6 ships Act 1 only (first unlocked act).
 
 ## 2. Data contracts
@@ -89,7 +89,7 @@ never throws. F4 codes against this shape with hand-written fixtures and does no
 
 ```
 { v: 1,
-  levels: { [levelId]: { stars: 0|1|2|3, at: string|null } },  // at = first completion, ISO UTC
+  levels: { [levelId]: { stars: 0|1|2|3|4|5, at: string|null } },  // at = first completion, ISO UTC
   cards: string[] }                                             // sorted, unique
 ```
 Completed = has an own entry, whatever its stars (`stars: 0` is real and distinct from no
@@ -99,7 +99,7 @@ entry). `CURRENT_VERSION = 1`; `MIGRATIONS = {}` where `MIGRATIONS[n]` maps v n 
 - Not a plain object, or `levels` not a plain object → `emptyProgress()`; missing `cards` → `[]`.
 - Own keys only; ignore `__proto__`, `constructor`, `prototype`; outputs null-prototype.
 - Id must match `^[a-z0-9-]{1,64}$`, else the entry is DROPPED (never cleaned).
-- `stars` must be a finite number, else drop; clamp `Math.min(3, Math.max(0, Math.floor(s)))`.
+- `stars` must be a finite number, else drop; clamp `Math.min(MAX_STARS, Math.max(0, Math.floor(s)))`, so 6 or more become 5. Values 0–3 saved in the three-star era stay valid as stored; there is no migration (no players, #16).
 - `at`: an ISO-8601 date-time with `Z` or `±HH:MM` that exists on the calendar as written
   (no Feb 30, no `T24:00`) → `toISOString()` if that stays in years 0000–9999, else `null`.
 - Cards: strings only, valid ids, dedupe, sort. Caps (one rule, applied by sanitize and
@@ -134,7 +134,10 @@ finished or `signal.aborted`. Non-array `cards` → `[]`.
 
 `scoreStars({mistakes, hintsUsed, elapsedMs}, {scored, scoring})`: `!scored` → 0; else
 `p = mistakes + hintsUsed + (parMs != null && elapsedMs > parMs ? 1 : 0)`;
-`p === 0` → 3, `p <= 2` → 2, else 1.
+`MAX_STARS` is 5. Penalties 0 → 5, 1 → 4, 2 → 3, 3 or 4 → 2, 5 or more → 1 (never 0 for a
+scored level). `scoreStars` is the one star rule and `MAX_STARS` the one place the maximum is
+written: `lib/progress.mjs` (clamp, totals) and every star display (`★` filled, `☆` empty, always
+`MAX_STARS` glyphs, the reward label `n of 5 stars`) derive it.
 
 ### 2.7 Map: the globe (#150; replaced the SVG system map)
 
@@ -164,7 +167,7 @@ non-boss level; card and node references exist; `no` format and order; no `act`/
 declared; valid mechanics; `run` is a function; reward titles unique.
 
 Progress: never downgrades (best stars, earliest non-null `at`, card union); stars
-integers 0–3; corrupt input → empty, no throw; `recordCompletion` idempotent;
+integers 0–5 (`MAX_STARS`); corrupt input → empty, no throw; `recordCompletion` idempotent;
 `mergeProgress` commutative, associative, idempotent for a fixed `keep`.
 
 Unlock (`lib/unlock.mjs`, pure; entered rule decided 2026-10-30, see [M1-DESIGN](M1-DESIGN.md) §3):
@@ -190,7 +193,7 @@ builds run side by side, only the current build's registry is protected at the c
 |---|---|
 | `escapeHtml`, `speech`, `shuffle(arr, rand)`, `prefersReducedMotion(win = globalThis.window)` | `lib/lesson-kit.mjs` |
 | `validateDeck`, `validateRegistry`, `buildRegistry`, `nodeLitBy` | `lib/registry.mjs` |
-| `scoreStars` | `lib/scoring.mjs` |
+| `scoreStars`, `MAX_STARS` | `lib/scoring.mjs` |
 | `createLevelContext` | `lib/level-context.mjs` |
 | `emptyProgress`, `sanitizeProgress`, `registryIds(registry)` → `{levelIds, cardIds}` (the `keep` ids), `migrate(raw, {current, migrations})` → migrated record, `raw` if at/past `current`, or `null` (corrupt), `mergeProgress(a, b, {keep}?)`, `recordCompletion(progress, levelId, {stars, cards, at}, registry)` → `{progress, firstCompletion, newBest, newCards}`, `starTotals` → `{earned, max}`, `cardTotals` → `{earned, max}` | `lib/progress.mjs` |
 | `isCompleted`, `isActComplete`, `isActUnlocked`, `levelState`, `lockReason` | `lib/unlock.mjs` |
@@ -200,7 +203,7 @@ builds run side by side, only the current build's registry is protected at the c
 | `dotStates`, `currentActId`, `regionCentre`, `facingRotation`, `globeTarget`, `globeLines`, `globeLabel`, `parseColor`, `readColors`, `createLoop` | `lib/globe-view.mjs` |
 | `parseEnv`, `effectiveResource`, `checkConfig` | `lib/widgets/env-config.mjs` |
 
-Totals: star `max = 3 × |scored registered levels|`, `earned` sums best stars over the
+Totals: star `max = MAX_STARS × |scored registered levels|` (5 ×), `earned` sums best stars over the
 same set. Card `max = |union of registered levels' cards|`, `earned = |progress.cards ∩ that union|`.
 `recordCompletion` is the only place cards are filtered (`cards ∩ level.cards`); an unknown
 level id returns the progress unchanged with all flags false.
@@ -336,10 +339,10 @@ Mutations: `p < 2`; `>=` against par; drop the `scored` check.
   Mutation: drop `|| ''`.
 - `speech('<b>hi</b>')` contains `<b>hi</b>`, `class="speech"`, `class="bubble"`.
 - `shuffle` returns a new array; frozen input unchanged.
-- `mistake()` ×2 then `finish({cards:['c1']})` → `{stars:2, cards:['c1'], text:''}`;
-  `onFinish` once with `('lvl-a', {stars:2, cards:['c1'], text:'', at:'2026-01-01T00:00:00.000Z'})`
+- `mistake()` ×2 then `finish({cards:['c1']})` → `{stars:3, cards:['c1'], text:''}`;
+  `onFinish` once with `('lvl-a', {stars:3, cards:['c1'], text:'', at:'2026-01-01T00:00:00.000Z'})`
   (now = 1767225600000).
-- `now` 0 at create, 61000 at finish, `parMs 60000` → stars 2.
+- `now` 0 at create, 61000 at finish, `parMs 60000` → stars 4 (one penalty).
 - Second `finish` → null, `onFinish` count stays 1. Mutation: drop the `finished` flag.
 - `abort()` then `finish` → null, no `onFinish`. Mutation: drop the abort check.
 - `finish({cards:'c1'})` → `cards: []`.
@@ -371,7 +374,7 @@ synchronously.
   `cards`; `text.length > 10`; every rendered step has a `<button` or `<input`; no em dash.
 - Sloppy run scores fewer stars than happy.
 - First screen has no enabled Finish.
-- Harness teeth: fixture level finishes once with 3 stars; `click('#missing')` throws
+- Harness teeth: fixture level finishes once with 5 stars; `click('#missing')` throws
   mentioning `#missing`; clicking a disabled button throws "disabled".
 
 ### F4 `test/unlock.test.mjs`
@@ -387,7 +390,7 @@ Registry: a0 `['l0a','l0b']` boss `b0`; a1 `['l1a','l1b']` no boss; a2 `['l2a']`
 
 ### F4 `test/progress.test.mjs`
 Fixture: `levelIds ['a','b','u']`, `cardIds ['c1','c2']`; `a.cards ['c1','c2']`; `u.scored false`.
-- sanitize: `null`, `'x'`, `42`, `[]`, `{v:1, levels:[]}` → empty. Stars 2.7→2, 5→3, −1→0;
+- sanitize: `null`, `'x'`, `42`, `[]`, `{v:1, levels:[]}` → empty. Stars 2.7→2, 5→5, 6→5, 99→5, −1→0; a saved 3 stays 3;
   `NaN`, `'3'`, `null`, missing → dropped (mutation: `Math.round`). `__proto__` key → no
   keys, `({}).stars` undefined. Unknown `zz` dropped with `levelIds`, kept without (mutation:
   always filter). Cards `['c2','c1','c1','zz',7]` → `['c1','c2']`. `at`
@@ -400,13 +403,13 @@ Fixture: `levelIds ['a','b','u']`, `cardIds ['c1','c2']`; `a.cards ['c1','c2']`;
 - recordCompletion: empty + a `{stars:2, cards:['c1','zz'], at:T1}` → `{stars:2, at:T1}`,
   cards `['c1']`, flags first/newBest true, `newCards ['c1']`; then `{stars:1, at:T2}` →
   stays 2 and T1, newBest false (mutation: assign instead of max); then 3/T3 → 3, T1; same
-  call twice → equal progress, `newCards []`; `{stars:0}` on b → completed; stars 7 → 3;
+  call twice → equal progress, `newCards []`; `{stars:0}` on b → completed; stars 7 → 5;
   unknown id → unchanged, flags false; input not mutated.
 - mergeProgress: A `{a: 2@T2, b: 0@null}, [c1]`; B `{a: 1@T1, u: 0}, [c2]` →
   `{a:{2, T1}, b:{0, null}, u:{0}}`, `[c1, c2]` (mutations: whole entry from higher side;
   max of `at`). Commutative, idempotent, associative (three fixtures). Null `at` never
   beats a date.
-- totals: `{a:2, u:0}` → stars `{earned:2, max:6}` (mutation: count unscored → 9); cards
+- totals: `{a:2, u:0}` → stars `{earned:2, max:10}` (mutation: count unscored → 15); cards
   `['c1']` → `{earned:1, max:2}`.
 
 ### F4 `test/storage.test.mjs` (`fakeStorage({initial, throwOn})` records every `setItem`)
@@ -430,7 +433,7 @@ edge and position checks with the SVG map).
 ### F5 `test/game.test.mjs` (`createGame` with fake storage, fixture registry, fixed now)
 Fresh boot `notice null`; corrupt → `'corrupt'`; throwing getter → `'unavailable'`.
 `openLevel` on a locked level → false, `overlayOpen false` (mutation: drop the check).
-Completion: open `x`, finish with 1 mistake → stored `x` 2 stars, `levelState 'done'`, its
+Completion: open `x`, finish with 1 mistake → stored `x` 4 stars, `levelState 'done'`, its
 country lit and its region's `done` counted (`mapState()`, #150), totals updated. `storage` event with `y:3` → `progress.levels.y.stars === 3`.
 Stale finish: open `a`, keep ctx, close, open `b`, `a.finish({text:'stale'})` → null,
 neither recorded, storage unchanged (mutation: R's `complete(this.currentLevel)`).
@@ -454,10 +457,9 @@ neither recorded, storage unchanged (mutation: R's `complete(this.currentLevel)`
 ### F6 driver (`naming-your-service`)
 Steps: (1) given config, "what does it show up as?" (4 choices, `unknown_service:node`
 correct; wrong → `mistake()`); (2) fix the config and `check` (each new failing config → `mistake()`);
-(3) precedence question (`checkout` correct). Happy → `{stars:3, cards:['unknown-service']}`;
-sloppy (one wrong choice, one failed check) → `{stars:2, …}`. A single dropped `mistake()`
-cannot flip the sloppy run (1 and 2 penalties both score 2★), so
-`test/naming-your-service.test.mjs` plays one-penalty runs (each must score 2★). Mutation:
+(3) precedence question (`checkout` correct). Happy → `{stars:5, cards:['unknown-service']}`;
+sloppy (one wrong choice, one failed check) → `{stars:3, …}`. A single dropped `mistake()`
+would still change the count, but `test/naming-your-service.test.mjs` plays one-penalty runs (each must score 4★) so each slip is pinned alone. Mutation:
 skip `mistake()` on a failed check, or on a wrong pick; that test goes red. DECK adds
 `unknown-service` (front: "Without service.name, your telemetry arrives as
 unknown_service:<executable>.").

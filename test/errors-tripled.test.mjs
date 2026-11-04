@@ -475,7 +475,7 @@ test('errors-tripled: shortcut impossible: both neutrals leave every hypothesis 
   assert.equal(slips.mistakes, 0);
 });
 
-test('errors-tripled: shortcut impossible: neutrals plus two clues still lock the answers; the third clue unlocks them and a first-try right guess wins with 3 stars', () => {
+test('errors-tripled: shortcut impossible: neutrals plus two clues still lock the answers; the third clue unlocks them and a first-try right guess wins with 5 stars', () => {
   const { finished, slips } = start();
   for (const id of NEUTRALS) open(id);
   open('rate-vs-lb');
@@ -486,7 +486,7 @@ test('errors-tripled: shortcut impossible: neutrals plus two clues still lock th
   guess(RIGHT);
   finish();
   assert.equal(slips.mistakes, 0);
-  assert.equal(finished[0].stars, 3);
+  assert.equal(finished[0].stars, 5);
 });
 
 test('errors-tripled: shortcut: solving the incident does not finish the level; there is no Finish on the incident screen', () => {
@@ -498,7 +498,7 @@ test('errors-tripled: shortcut: solving the incident does not finish the level; 
   assert.equal(q('#eto-next').disabled, false);
 });
 
-test('errors-tripled: the shortest path is the three clues; it solves at 46% with no penalty and 3 stars', () => {
+test('errors-tripled: the shortest path is the three clues; it solves at 46% with no penalty and 5 stars', () => {
   const { finished, slips } = start();
   for (const id of CLUES) open(id);
   assert.equal(q('#eto-next').disabled, true, 'Next waits for the right answer');
@@ -507,13 +507,13 @@ test('errors-tripled: the shortest path is the three clues; it solves at 46% wit
   assert.equal(budget(), 'Error budget: 46% left (9 min in).');
   finish();
   assert.equal(finished.length, 1);
-  assert.equal(finished[0].stars, 3);
+  assert.equal(finished[0].stars, 5);
   assert.equal(finished[0].text, BOSS.play.finish);
 });
 
 // ---- penalties: one each from a clean start ------------------------------------------
 
-test('errors-tripled: a herring costs one mistake on its first open only, and the run still finishes with 2 stars', () => {
+test('errors-tripled: a herring costs one mistake on its first open only, and the run still finishes with 4 stars', () => {
   const { slips, finished } = start();
   open('payments-deploy');
   assert.equal(slips.mistakes, 1);
@@ -524,10 +524,10 @@ test('errors-tripled: a herring costs one mistake on its first open only, and th
   guess(RIGHT);
   finish();
   assert.equal(slips.mistakes, 1);
-  assert.equal(finished[0].stars, 2);
+  assert.equal(finished[0].stars, 4);
 });
 
-test('errors-tripled: the second herring is a second mistake; a wrong answer on top is a third and leaves 1 star', () => {
+test('errors-tripled: the second herring is a second mistake; a wrong answer on top is a third and leaves 2 stars', () => {
   const { slips, finished } = start();
   open('payments-deploy');
   open('provider-blip');
@@ -538,7 +538,7 @@ test('errors-tripled: the second herring is a second mistake; a wrong answer on 
   guess(RIGHT);
   finish();
   assert.equal(slips.mistakes, 3);
-  assert.equal(finished[0].stars, 1);
+  assert.equal(finished[0].stars, 2);
 });
 
 for (const id of ['payments-regression', 'traffic-fell', 'provider-failing']) {
@@ -552,7 +552,7 @@ for (const id of ['payments-regression', 'traffic-fell', 'provider-failing']) {
     guess(RIGHT);
     finish();
     assert.equal(slips.mistakes, 1);
-    assert.equal(finished[0].stars, 2);
+    assert.equal(finished[0].stars, 4);
   });
 }
 
@@ -568,7 +568,7 @@ test('errors-tripled: every clue and neutral leaves 10% and no mistake; a herrin
   assert.equal(q(`[data-hypothesis="${RIGHT}"]`).disabled, false, 'still answerable at 0');
   guess(RIGHT);
   finish();
-  assert.equal(finished[0].stars, 2, 'two penalties still leave 2 stars (the star rule: 1 or 2 penalties)');
+  assert.equal(finished[0].stars, 3, 'two penalties leave 3 stars (the star rule: 2 penalties)');
 });
 
 test('errors-tripled: opening a view again costs neither time nor a mistake, so repeat opens cannot exhaust the budget', () => {
@@ -579,7 +579,7 @@ test('errors-tripled: opening a view again costs neither time nor a mistake, so 
   assert.equal(budget(), 'Error budget: 10% left (15 min in).');
 });
 
-test('errors-tripled: a wrong answer on the closing step costs one mistake, once, and leaves 2 stars', () => {
+test('errors-tripled: a wrong answer on the closing step costs one mistake, once, and leaves 4 stars', () => {
   const { slips, finished } = start();
   for (const id of CLUES) open(id);
   guess(RIGHT);
@@ -590,7 +590,7 @@ test('errors-tripled: a wrong answer on the closing step costs one mistake, once
   click(`[data-pick="${RULE}"]`);
   click('[data-finish]');
   assert.equal(slips.mistakes, 1);
-  assert.equal(finished[0].stars, 2);
+  assert.equal(finished[0].stars, 4);
 });
 
 test('errors-tripled: focus walk: first view, an opened heading, then Finish', () => {

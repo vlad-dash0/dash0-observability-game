@@ -95,7 +95,7 @@ test('the hint is offered once and costs a star', () => {
   click('[data-pick="env-var"]');
   click('[data-finish]');
   assert.equal(finished.length, 1);
-  assert.equal(finished[0].stars, 2, 'a clean run with one hint');
+  assert.equal(finished[0].stars, 4, 'a clean run with one hint');
 });
 
 test('step 3: Finish waits for the right answer, and both answers are stated in words', () => {
@@ -113,9 +113,9 @@ test('step 3: Finish waits for the right answer, and both answers are stated in 
   assert.ok(!q('[data-finish]').disabled);
 });
 
-// scoreStars maps 1 and 2 penalties to the same 2 stars, so the sloppy run in
-// levels-play (one wrong pick plus one failed check) cannot tell if either mistake was
-// dropped. These runs carry exactly one penalty each, from a clean 3-star baseline.
+// The sloppy run in levels-play carries several penalties at once, so it is a coarse check
+// that either mistake was dropped. These runs carry exactly one penalty each, from a clean
+// 5-star baseline.
 /** Play the level through, adding the named slips; returns the stars earned. */
 function runWith({ wrongPick = false, failedCheck = false, wrongLast = false }) {
   const finished = start();
@@ -133,10 +133,10 @@ function runWith({ wrongPick = false, failedCheck = false, wrongLast = false }) 
 }
 
 test('each wrong pick and each failed check costs a star on its own', () => {
-  assert.equal(runWith({}), 3, 'a clean run');
-  assert.equal(runWith({ wrongPick: true }), 2, 'one wrong pick in step 1');
-  assert.equal(runWith({ failedCheck: true }), 2, 'one failed check in step 2');
-  assert.equal(runWith({ wrongLast: true }), 2, 'one wrong pick in step 3');
+  assert.equal(runWith({}), 5, 'a clean run');
+  assert.equal(runWith({ wrongPick: true }), 4, 'one wrong pick in step 1');
+  assert.equal(runWith({ failedCheck: true }), 4, 'one failed check in step 2');
+  assert.equal(runWith({ wrongLast: true }), 4, 'one wrong pick in step 3');
 });
 
 test('step 2 fails a config that names checkout twice, or that turns the SDK off', () => {
@@ -185,7 +185,7 @@ test('re-checking the same failed config costs nothing more; a new failing one d
   click('#nys-next');
   click('[data-pick="env-var"]');
   click('[data-finish]');
-  assert.equal(once[0].stars, 2, 'wrong pick + one failed check: 2 penalties');
+  assert.equal(once[0].stars, 3, 'wrong pick + one failed check: 2 penalties');
 
   const twice = start();
   click('[data-pick="bare"]');
@@ -199,7 +199,7 @@ test('re-checking the same failed config costs nothing more; a new failing one d
   click('#nys-next');
   click('[data-pick="env-var"]');
   click('[data-finish]');
-  assert.equal(twice[0].stars, 1, 'wrong pick + two different failed configs: 3 penalties');
+  assert.equal(twice[0].stars, 2, 'wrong pick + two different failed configs: 3 penalties');
 });
 
 test('focus never drops to the page: each step, pick, hint and pass moves it on', () => {

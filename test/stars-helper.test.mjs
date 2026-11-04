@@ -1,5 +1,5 @@
 // Self-test for test/helpers/stars.mjs: the expected star max is derived from the registry
-// (scored levels x 3), not restated per level PR. Issue #88.
+// (scored levels x 5), not restated per level PR. Issue #88.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { STARS_PER_LEVEL, expectedStarMax, scoredLevelCount } from './helpers/stars.mjs';
@@ -17,8 +17,8 @@ const fixture = (scoredFlags) => {
 test('the helper counts scored levels only: an unscored boss in the fixture is left out', () => {
   const reg = fixture([['a', true], ['b', true], ['boss', false], ['c', true]]);
   assert.equal(scoredLevelCount(reg), 3);
-  assert.equal(expectedStarMax(reg), 9);
-  assert.equal(STARS_PER_LEVEL, 3);
+  assert.equal(expectedStarMax(reg), 15);
+  assert.equal(STARS_PER_LEVEL, 5);
 });
 
 test('the helper only walks the order: a level outside it adds nothing', () => {
@@ -39,5 +39,5 @@ test('the live scored count is the order length minus exactly the listed unscore
   const unscored = live.order.filter((id) => live.levels[id].scored !== true);
   assert.deepEqual(unscored, UNSCORED);
   assert.equal(scoredLevelCount(live), live.order.length - UNSCORED.length);
-  assert.equal(expectedStarMax(live), 3 * (live.order.length - UNSCORED.length));
+  assert.equal(expectedStarMax(live), 5 * (live.order.length - UNSCORED.length));
 });

@@ -177,7 +177,7 @@ test('checkout-is-slow: the reference path (two clues, n-plus-one) solves within
   assert.equal(mistakes, 0);
 });
 
-test('checkout-is-slow: the reference run ends with 3 stars-worth of play: no mistakes, Finish with the reward', () => {
+test('checkout-is-slow: the reference run ends with 5 stars-worth of play: no mistakes, Finish with the reward', () => {
   const { finished, slips } = start();
   open('trace-slow');
   open('triage');
@@ -187,7 +187,7 @@ test('checkout-is-slow: the reference run ends with 3 stars-worth of play: no mi
   assert.equal(budget(), 'Error budget: 64% left (9 min in).');
   click('[data-finish]');
   assert.equal(finished.length, 1);
-  assert.equal(finished[0].stars, 3);
+  assert.equal(finished[0].stars, 5);
   assert.equal(finished[0].text.includes('N+1'), true);
 });
 
@@ -202,10 +202,10 @@ test('checkout-is-slow: a herring costs one mistake on its first open only', () 
   open('trace-slow');
   guess('n-plus-one');
   click('[data-finish]');
-  assert.equal(finished[0].stars, 2);
+  assert.equal(finished[0].stars, 4);
 });
 
-test('checkout-is-slow: the second herring is a second mistake (1 star after a wrong answer too)', () => {
+test('checkout-is-slow: the second herring is a second mistake (2 stars after a wrong answer too)', () => {
   const { slips, finished } = start();
   open('payments-errors');
   open('redis-cpu');
@@ -215,7 +215,7 @@ test('checkout-is-slow: the second herring is a second mistake (1 star after a w
   assert.equal(slips.mistakes, 3);
   guess('n-plus-one');
   click('[data-finish]');
-  assert.equal(finished[0].stars, 1);
+  assert.equal(finished[0].stars, 2);
 });
 
 test('checkout-is-slow: a wrong hypothesis costs one mistake, once, and is then disabled', () => {
@@ -228,7 +228,7 @@ test('checkout-is-slow: a wrong hypothesis costs one mistake, once, and is then 
   guess('n-plus-one');
   click('[data-finish]');
   assert.equal(slips.mistakes, 1);
-  assert.equal(finished[0].stars, 2);
+  assert.equal(finished[0].stars, 4);
 });
 
 test('checkout-is-slow: opening every clue and neutral view exhausts the budget with one mistake and no herring', () => {
@@ -244,7 +244,7 @@ test('checkout-is-slow: opening every clue and neutral view exhausts the budget 
   assert.equal(q('[data-hypothesis="n-plus-one"]').disabled, false, 'still answerable at 0');
   guess('n-plus-one');
   click('[data-finish]');
-  assert.equal(finished[0].stars, 2);
+  assert.equal(finished[0].stars, 4);
 });
 
 test('checkout-is-slow: focus walk: first view, an opened heading, then Finish', () => {

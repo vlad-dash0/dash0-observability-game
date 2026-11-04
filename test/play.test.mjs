@@ -56,7 +56,7 @@ function playAll(level, during = () => {}, run = start(level)) {
   return run;
 }
 
-const stars = (level) => (level.scored ? 3 : 0);
+const stars = (level) => (level.scored ? 5 : 0);
 
 for (const level of LEVELS) {
   const steps = stepsOf(level);
@@ -112,7 +112,7 @@ for (const level of LEVELS) {
           for (const sel of slip.clicks) click(sel);
           assert.match(text(slip.at ?? `#${spec.id}-feedback`), slip.says);
         });
-        assert.equal(calls[0].result.stars, level.scored ? 2 : 0);
+        assert.equal(calls[0].result.stars, level.scored ? 4 : 0);
         ran += 1;
       });
       if (slip.name === 'check') {
@@ -122,7 +122,7 @@ for (const level of LEVELS) {
             for (const sel of [...slip.clicks, ...slip.clicks]) click(sel);
             assert.match(text(`#${spec.id}-feedback`), /^Same as last time:/);
           });
-          assert.equal(calls[0].result.stars, level.scored ? 2 : 0);
+          assert.equal(calls[0].result.stars, level.scored ? 4 : 0);
           ran += 1;
         });
       }
