@@ -7,11 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DECK } from '../cards/deck.mjs';
-import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
 import { expectedStarMax } from './helpers/stars.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
-import { nodeStates } from '../lib/map.mjs';
+import { litIds } from './helpers/lights.mjs';
 import { isActUnlocked, levelState, lockReason } from '../lib/unlock.mjs';
 import { checkConfig } from '../lib/configure/check.mjs';
 import { COLLECTOR_SCHEMA } from '../lib/configure/collector.mjs';
@@ -119,18 +118,12 @@ for (const [id, want] of Object.entries(FIELDS)) {
   });
 }
 
-test('lights: 1.1 lights Recommendations and 1.3 Redis, so their edge lights only when both are done', () => {
-  const lit = (done) => {
-    const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
-    return {
-      nodes: NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id).sort(),
-      edge: s.edges.find((e) => e.from === 'recommendations' && e.to === 'redis').lit,
-    };
-  };
-  assert.deepEqual(lit([]), { nodes: [], edge: false });
-  assert.deepEqual(lit(['resources']), { nodes: ['recommendations'], edge: false });
-  assert.deepEqual(lit(['detectors-and-kubernetes']), { nodes: ['redis'], edge: false });
-  assert.deepEqual(lit(['resources', 'detectors-and-kubernetes']), { nodes: ['recommendations', 'redis'], edge: true });
+test('lights: 1.1 lights Recommendations and 1.3 Redis', () => {
+  const lit = (done) => litIds(LIVE, progressOf(done)).sort();
+  assert.deepEqual(lit([]), []);
+  assert.deepEqual(lit(['resources']), ['recommendations']);
+  assert.deepEqual(lit(['detectors-and-kubernetes']), ['redis']);
+  assert.deepEqual(lit(['resources', 'detectors-and-kubernetes']), ['recommendations', 'redis']);
 });
 
 // ---- cards --------------------------------------------------------------------------

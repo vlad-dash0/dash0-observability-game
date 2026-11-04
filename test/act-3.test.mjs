@@ -12,10 +12,9 @@ import { evaluate } from '../lib/promql/eval.mjs';
 import { allPlans, evaluatePlan } from '../lib/widgets/trade-off.mjs';
 import { gradeQuery } from '../lib/promql/grade.mjs';
 import { checkSpot, newSpotState, toggleLine } from '../lib/widgets/spot-it.mjs';
-import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
-import { nodeStates } from '../lib/map.mjs';
+import { litIds } from './helpers/lights.mjs';
 import { isActUnlocked, levelState, lockReason } from '../lib/unlock.mjs';
 
 const LIVE = liveRegistry();
@@ -98,24 +97,17 @@ for (const [id, want] of Object.entries(FIELDS)) {
   });
 }
 
-test('lights: 3.1 lights Kafka and 3.2 Notifications, so the order pipeline fills in and its edge lights', () => {
-  const lit = (done) => {
-    const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
-    return {
-      nodes: NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id).sort(),
-      edge: s.edges.find((e) => e.from === 'kafka' && e.to === 'notifications').lit,
-    };
-  };
-  assert.deepEqual(lit([]), { nodes: [], edge: false });
-  assert.deepEqual(lit(['instruments']), { nodes: ['kafka'], edge: false });
-  assert.deepEqual(lit(['temporality']), { nodes: ['notifications'], edge: false });
-  assert.deepEqual(lit(['instruments', 'temporality']), { nodes: ['kafka', 'notifications'], edge: true });
+test('lights: 3.1 lights Kafka and 3.2 Notifications', () => {
+  const lit = (done) => litIds(LIVE, progressOf(done)).sort();
+  assert.deepEqual(lit([]), []);
+  assert.deepEqual(lit(['instruments']), ['kafka']);
+  assert.deepEqual(lit(['temporality']), ['notifications']);
+  assert.deepEqual(lit(['instruments', 'temporality']), ['kafka', 'notifications']);
 });
 
 test('lights: 3.3 lights the payment provider and 3.4 shipping, and each lights only its own node', () => {
   const lit = (done) => {
-    const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
-    return NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id).sort();
+    return litIds(LIVE, progressOf(done)).sort();
   };
   assert.deepEqual(lit(['histograms']), ['payment-provider']);
   assert.deepEqual(lit(['promql-basics']), ['shipping']);
@@ -124,8 +116,7 @@ test('lights: 3.3 lights the payment provider and 3.4 shipping, and each lights 
 
 test('lights: 3.5 lights Postgres and 3.7 Checkout (a node 1.2 also lights), each only its own node', () => {
   const lit = (done) => {
-    const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
-    return NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id).sort();
+    return litIds(LIVE, progressOf(done)).sort();
   };
   assert.deepEqual(lit(['cardinality']), ['postgres']);
   assert.deepEqual(lit(['red-and-use']), ['checkout']);
@@ -828,8 +819,7 @@ const spotGrade = (spec, ids) => {
 
 test('lights: 3.6 lights Payments and only that node; the card and the level are in the act-3 scoring rules', () => {
   const lit = (done) => {
-    const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
-    return NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id).sort();
+    return litIds(LIVE, progressOf(done)).sort();
   };
   assert.deepEqual(lit(['exemplars']), ['payments']);
   const level = LIVE.levels.exemplars;

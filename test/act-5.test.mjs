@@ -8,11 +8,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DECK } from '../cards/deck.mjs';
-import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
 import { expectedStarMax } from './helpers/stars.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
-import { nodeStates } from '../lib/map.mjs';
+import { litIds } from './helpers/lights.mjs';
 import { isActUnlocked, levelState, lockReason } from '../lib/unlock.mjs';
 import { checkConfig } from '../lib/configure/check.mjs';
 import { COLLECTOR_SCHEMA } from '../lib/configure/collector.mjs';
@@ -100,15 +99,12 @@ for (const [id, want] of Object.entries(FIELDS)) {
   });
 }
 
-test('lights: finishing any Act 5 level lights the Collector node and nothing else; no edge lights', () => {
-  const lit = (done) => {
-    const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
-    return { nodes: NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id), edges: s.edges.filter((e) => e.lit).length };
-  };
-  assert.deepEqual(lit([]), { nodes: [], edges: 0 });
-  assert.deepEqual(lit(['pipelines']), { nodes: ['collector'], edges: 0 });
-  assert.deepEqual(lit(['order-matters']), { nodes: ['collector'], edges: 0 });
-  assert.deepEqual(lit(['pipelines', 'order-matters']), { nodes: ['collector'], edges: 0 });
+test('lights: finishing any Act 5 level lights the Collector and nothing else', () => {
+  const lit = (done) => litIds(LIVE, progressOf(done));
+  assert.deepEqual(lit([]), []);
+  assert.deepEqual(lit(['pipelines']), ['collector']);
+  assert.deepEqual(lit(['order-matters']), ['collector']);
+  assert.deepEqual(lit(['pipelines', 'order-matters']), ['collector']);
 });
 
 // ---- cards --------------------------------------------------------------------------

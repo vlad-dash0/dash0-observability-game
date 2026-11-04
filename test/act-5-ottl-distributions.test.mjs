@@ -8,11 +8,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DECK } from '../cards/deck.mjs';
-import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
 import { expectedStarMax } from './helpers/stars.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
-import { nodeStates } from '../lib/map.mjs';
+import { litIds } from './helpers/lights.mjs';
 import { levelState } from '../lib/unlock.mjs';
 import { checkConfig } from '../lib/configure/check.mjs';
 import { COLLECTOR_SCHEMA } from '../lib/configure/collector.mjs';
@@ -58,11 +57,9 @@ test('5.5 and 5.6: level fields, derived mechanics, cards, lights and no par tim
   }
 });
 
-test('5.5 and 5.6 each light only the Collector node (no edge) and add 2 levels to the scored total', () => {
+test('5.5 and 5.6 each light only the Collector and add 2 levels to the scored total', () => {
   for (const done of [[OTTL], [DIST], [OTTL, DIST]]) {
-    const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
-    assert.deepEqual(NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id), ['collector'], done.join());
-    assert.equal(s.edges.filter((e) => e.lit).length, 0, done.join());
+    assert.deepEqual(litIds(LIVE, progressOf(done)), ['collector'], done.join());
   }
   assert.deepEqual(starTotals(emptyProgress(), LIVE), { earned: 0, max: MAX_STARS });
   assert.deepEqual(starTotals(progressOf([OTTL, DIST]), LIVE), { earned: 6, max: MAX_STARS });

@@ -136,15 +136,25 @@ finished or `signal.aborted`. Non-array `cards` → `[]`.
 `p = mistakes + hintsUsed + (parMs != null && elapsedMs > parMs ? 1 : 0)`;
 `p === 0` → 3, `p <= 2` → 2, else 1.
 
-### 2.7 Map (`hub/map-data.mjs`)
+### 2.7 Map: the globe (#150; replaced the SVG system map)
 
-`NODES = [{ id, label, kind: 'service'|'datastore'|'queue'|'external'|'telemetry', x: 0..100, y: 0..60 }]`
-(SVG viewBox `0 0 100 60`), `EDGES = [{ from, to }]`. Nodes: storefront, api-gateway,
-catalog, cart, checkout, payments, inventory, orders, shipping, notifications,
-recommendations, postgres, redis, kafka, payment-provider (external), collector (telemetry,
-off the request path, no edges; the Act 5 levels light it).
-Node lit when ANY level in `nodeLitBy(node)` is completed; edge lit when both ends lit;
-node pulses when an `'open'` boss lights it. Positions are SVG attributes, never `style`.
+The hub map is a dotted globe: act = world region, level = country, a boss pulses its whole
+region while it is open. Data: `hub/globe-map.mjs` (`ACT_REGIONS`, `LEVEL_COUNTRY`,
+`actOfCountry`), `hub/globe-data.mjs` (generated `DOTS`, `[lat, lon, iso3, subregion]`).
+State: `lib/globe.mjs` `globeState` (country lit when its level is completed; region
+`{done, total, pulse}`, pulse while the act's boss is `'open'`).
+View, pure (`lib/globe-view.mjs`): `dotStates` (per dot UNLIT / LIT / PULSE; a pulsing region
+outranks lit), `currentActId` (lowest unlocked act not complete, else the last) and
+`globeTarget` (rotation facing that act's region centre), `globeLabel` (the accessible name)
+and `globeLines` (the no-WebGL text, one line per act), `readColors` (the `--color-globe-*`
+tokens via computed style), `createLoop` (rAF loop: stops while the tab is hidden or the
+globe is off screen; under reduced motion it draws single static frames only).
+Renderer (`lib/globe-render.mjs`, three.js 0.180.0 vendored): `THREE.Points` with additive
+halos, slow spin, drag to rotate, pixel ratio capped at 2, canvas sized by CSS and
+`setSize(w, h, false)` (no style attribute). `createGame` mounts it into `.globe-stage`,
+disposes it while a level covers the hub and on `pagehide`, and shows the text fallback when
+three.js, the colours or WebGL are unavailable. Level `lights` stay level data, validated
+against `hub/map-data.mjs` `NODE_IDS`, and are no longer drawn.
 
 ## 3. Invariants
 
@@ -186,7 +196,8 @@ builds run side by side, only the current build's registry is protected at the c
 | `isCompleted`, `isActComplete`, `isActUnlocked`, `levelState`, `lockReason` | `lib/unlock.mjs` |
 | `loadProgress(storageGetter, registry)` → `{status, progress}` (`TypeError` before any read without a registry), `saveProgress(storageGetter, progress, registry)` → `{saved, reason?, progress}` (`progress` is always the registry view; `TypeError` before any storage access without a registry) | `lib/storage.mjs` |
 | `resolveTheme`, `readTheme(getter)`, `writeTheme(getter, t)` | `lib/theme.mjs` |
-| `nodeStates(registry, progress, NODES, EDGES)` | `lib/map.mjs` |
+| `globeState(registry, progress, map?)` | `lib/globe.mjs` |
+| `dotStates`, `currentActId`, `regionCentre`, `facingRotation`, `globeTarget`, `globeLines`, `globeLabel`, `parseColor`, `readColors`, `createLoop` | `lib/globe-view.mjs` |
 | `parseEnv`, `effectiveResource`, `checkConfig` | `lib/widgets/env-config.mjs` |
 
 Totals: star `max = 3 × |scored registered levels|`, `earned` sums best stars over the
@@ -407,15 +418,14 @@ Save keeps unknown ids. Throwing `setItem` → `{saved:false, reason:'unavailabl
 progress write, and a second corrupt value doesn't overwrite the backup (it goes to
 `.latest`). A registered completion is never evicted by the cap.
 
-### F5 `test/map.test.mjs`
-A lights `['checkout','payments']`, B `['checkout']`, progress `{B:1}`: checkout lit,
-payments dark (mutation: require all); edge dark until A done; unlinked node dark; open
-boss lighting `cart` → pulse true, false once done.
+### F5 `test/map.test.mjs` (retired by #150)
+Replaced by `test/globe.test.mjs` and `test/globe-view.test.mjs` (§2.7); level tests pin
+`lights` through `test/helpers/lights.mjs`.
 
 ### F5 `test/live-registry.test.mjs`
 `buildRegistry(ACTS, {deck: DECK, nodeIds})` doesn't throw; flattened order deepEqual the
-expected ids (F6 sets `['naming-your-service']`); node ids unique; edges reference nodes;
-no self-edges; x in [0,100], y in [0,60].
+expected ids (F6 sets `['naming-your-service']`); `lights` ids unique (#150 dropped the
+edge and position checks with the SVG map).
 
 ### F5 `test/game.test.mjs` (`createGame` with fake storage, fixture registry, fixed now)
 Fresh boot `notice null`; corrupt → `'corrupt'`; throwing getter → `'unavailable'`.
@@ -424,7 +434,8 @@ Completion: open `x`, finish with 1 mistake → stored `x` 2 stars, `levelState 
 nodes lit, totals updated. `storage` event with `y:3` → `progress.levels.y.stars === 3`.
 Stale finish: open `a`, keep ctx, close, open `b`, `a.finish({text:'stale'})` → null,
 neither recorded, storage unchanged (mutation: R's `complete(this.currentLevel)`).
-`index.html`: `#ov-body`/`#ov-actions` inside `[x-ignore]`; map is `<svg>` without `style`.
+`index.html`: `#ov-body`/`#ov-actions` inside `[x-ignore]`; the globe stage (#150) is
+`role="img"` named by `mapLabel()`, with a text fallback, and no `style`.
 
 ### F6 `test/env-config.test.mjs`
 - `parseEnv`: comments, blanks, `export ` prefix, double quotes; duplicate → last wins;

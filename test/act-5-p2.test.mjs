@@ -8,11 +8,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DECK } from '../cards/deck.mjs';
-import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
 import { expectedStarMax } from './helpers/stars.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
-import { nodeStates } from '../lib/map.mjs';
+import { litIds } from './helpers/lights.mjs';
 import { levelState } from '../lib/unlock.mjs';
 import { checkConfig } from '../lib/configure/check.mjs';
 import { COLLECTOR_SCHEMA } from '../lib/configure/collector.mjs';
@@ -69,11 +68,9 @@ test('5.3 and 5.4 open in any order once Act 5 is entered; they stay locked on a
   assert.equal(levelState('otlp-endpoints', progressOf(['agent-vs-gateway']), LIVE), 'open');
 });
 
-test('lights: 5.3 and 5.4 each light the Collector node and nothing else; no edge lights', () => {
+test('lights: 5.3 and 5.4 each light the Collector and nothing else', () => {
   for (const done of [['otlp-endpoints'], ['agent-vs-gateway'], ['otlp-endpoints', 'agent-vs-gateway']]) {
-    const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
-    assert.deepEqual(NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id), ['collector'], done.join());
-    assert.equal(s.edges.filter((e) => e.lit).length, 0, done.join());
+    assert.deepEqual(litIds(LIVE, progressOf(done)), ['collector'], done.join());
   }
 });
 

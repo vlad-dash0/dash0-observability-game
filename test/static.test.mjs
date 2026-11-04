@@ -13,6 +13,9 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const VENDOR = join(ROOT, 'vendor');
 const ALPINE = 'alpine-3.14.1.min.js';
 const JS_YAML = 'js-yaml-5.5.0.mjs';
+// three.js keeps its upstream file names (the module imports './three.core.min.js'), so the
+// version is in the directory.
+const THREE = ['three-0.180.0/three.module.min.js', 'three-0.180.0/three.core.min.js'];
 
 // docs/FOUNDATION.md §7, verbatim.
 const CSP =
@@ -162,8 +165,12 @@ test('vendored files match vendor/SHA256SUMS', () => {
   }));
   assert.ok(sums[ALPINE], `${ALPINE} is not listed in SHA256SUMS`);
   assert.ok(sums[JS_YAML], `${JS_YAML} is not listed in SHA256SUMS`);
-  // Every vendored file (not the two bookkeeping files) is pinned and documented.
-  const files = readdirSync(VENDOR).filter((f) => f !== 'README.md' && f !== 'SHA256SUMS').sort();
+  for (const f of THREE) assert.ok(sums[f], `${f} is not listed in SHA256SUMS`);
+  // Every vendored file, in subdirectories too (not the two bookkeeping files), is pinned and documented.
+  const files = readdirSync(VENDOR, { recursive: true })
+    .map((f) => f.split('\\').join('/'))
+    .filter((f) => statSync(join(VENDOR, f)).isFile() && f !== 'README.md' && f !== 'SHA256SUMS')
+    .sort();
   assert.deepEqual(Object.keys(sums).sort(), files, 'vendor/ and SHA256SUMS list different files');
   const readme = readFileSync(join(VENDOR, 'README.md'), 'utf8');
   for (const file of files) assert.ok(readme.includes(`\`${file}\``), `vendor/README.md does not list ${file}`);
@@ -331,7 +338,9 @@ test('everything main.mjs imports, transitively, is deployed (not in .verceligno
     }
   };
   visit('main.mjs');
-  assert.ok(seen.has('app.mjs') && seen.has('hub/map-data.mjs'), `walked ${[...seen].join(', ')}`);
+  for (const rel of ['app.mjs', 'hub/map-data.mjs', 'lib/globe-render.mjs', `vendor/${THREE[0]}`]) {
+    assert.ok(seen.has(rel), `${rel} not reached; walked ${[...seen].join(', ')}`);
+  }
 });
 
 // Tripwire, not proof. A failing assert.equal / deepEqual on a linkedom node (or a ctx

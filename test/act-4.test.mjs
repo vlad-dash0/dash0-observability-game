@@ -8,11 +8,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DECK } from '../cards/deck.mjs';
-import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
 import { expectedStarMax } from './helpers/stars.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
-import { nodeStates } from '../lib/map.mjs';
+import { litIds } from './helpers/lights.mjs';
 import { isActUnlocked, levelState, lockReason } from '../lib/unlock.mjs';
 import { attachLog, checkBuild, newBuildState, validateBuildSpec } from '../lib/widgets/build-it.mjs';
 
@@ -119,18 +118,12 @@ for (const [id, want] of Object.entries(FIELDS)) {
   });
 }
 
-test('lights: 4.1 lights Payments and 4.2 Checkout, so their edge lights only when both are done', () => {
-  const lit = (done) => {
-    const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
-    return {
-      nodes: NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id).sort(),
-      edge: s.edges.find((e) => e.from === 'checkout' && e.to === 'payments').lit,
-    };
-  };
-  assert.deepEqual(lit([]), { nodes: [], edge: false });
-  assert.deepEqual(lit(['structured-logs']), { nodes: ['payments'], edge: false });
-  assert.deepEqual(lit(['correlation']), { nodes: ['checkout'], edge: false });
-  assert.deepEqual(lit(ACT_4), { nodes: ['checkout', 'payments'], edge: true });
+test('lights: 4.1 lights Payments and 4.2 Checkout', () => {
+  const lit = (done) => litIds(LIVE, progressOf(done)).sort();
+  assert.deepEqual(lit([]), []);
+  assert.deepEqual(lit(['structured-logs']), ['payments']);
+  assert.deepEqual(lit(['correlation']), ['checkout']);
+  assert.deepEqual(lit(ACT_4), ['checkout', 'payments']);
 });
 
 // ---- cards --------------------------------------------------------------------------

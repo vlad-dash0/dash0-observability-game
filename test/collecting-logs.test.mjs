@@ -8,10 +8,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DECK } from '../cards/deck.mjs';
-import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
-import { nodeStates } from '../lib/map.mjs';
+import { litIds } from './helpers/lights.mjs';
 import { levelState } from '../lib/unlock.mjs';
 import { checkConfig } from '../lib/configure/check.mjs';
 import { COLLECTOR_SCHEMA } from '../lib/configure/collector.mjs';
@@ -53,8 +52,7 @@ test('collecting-logs: lights Shipping (shared with 3.4: a node lit by either le
   const lit = (done) => {
     const p = emptyProgress();
     for (const id of done) p.levels[id] = { stars: 3, at: null };
-    const s = nodeStates(LIVE, p, NODES, EDGES);
-    return NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id).sort();
+    return litIds(LIVE, p).sort();
   };
   assert.deepEqual(lit([]), []);
   assert.deepEqual(lit([ID]), ['shipping']);

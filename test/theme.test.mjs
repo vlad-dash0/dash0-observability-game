@@ -360,16 +360,15 @@ test('readTheme / writeTheme: storage round trip, and safe when storage fails', 
   assert.equal(writeTheme(boom, 'light'), false);
 });
 
-test('map: the telemetry ring is dotted, with a visible gap between round-capped dots', () => {
-  const rule = rules(stripComments(read('styles/hub.css'))).find((r) => r.selector.includes('kind-telemetry'));
-  assert.ok(rule, 'a .kind-telemetry rule');
-  const num = (prop) => rule.body.match(new RegExp(`${prop}:\\s*([\\d.]+)`));
-  const width = Number(num('stroke-width')[1]);
-  const [dash, gap] = rule.body.match(/stroke-dasharray:\s*([\d.]+)\s+([\d.]+)/).slice(1).map(Number);
-  assert.match(rule.body, /stroke-linecap:\s*round/);
-  // A round cap adds width/2 at each end of a dash, so the visible gap is gap - width.
-  assert.ok(gap - width >= 0.4, `visible gap ${(gap - width).toFixed(2)} (gap ${gap}, width ${width})`);
-  // On the real node radius (2.6, lib/map.mjs) a ring of 10 to 14 dots reads as dotted.
-  const dots = (2 * Math.PI * 2.6) / (dash + gap);
-  assert.ok(dots >= 10 && dots <= 14, `${dots.toFixed(1)} dots per ring`);
+test('globe: legend text reaches 4.5:1 and the lit and pulse colours 3:1 on its night sky, both themes', () => {
+  for (const theme of ['light', 'dark']) {
+    assert.ok(contrast('--color-globe-text', '--color-globe-sky', theme) >= 4.5, `legend text, ${theme}`);
+    for (const role of ['lit', 'pulse']) {
+      assert.ok(contrast(`--color-globe-${role}`, '--color-globe-sky', theme) >= 3, `${role} on sky, ${theme}`);
+    }
+  }
+  // The pulse must read apart from the lit glow, and not as brand red (an alarm).
+  const [lit, pulse, red] = ['var(--color-globe-lit)', 'var(--color-globe-pulse)', 'var(--d0-red)'].map((v) => resolveColor(v, 'dark'));
+  assert.notDeepEqual(pulse, lit);
+  assert.notDeepEqual(pulse, red);
 });
