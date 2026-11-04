@@ -216,9 +216,10 @@ export function createGame(deps) {
         target: globeTarget(registry, this.progress, dots, globeMap.actOf),
       };
     },
-    // Draw the globe into .globe-stage (once; the fallback stays once shown).
+    // Draw the globe into .globe-stage (once; the fallback stays once shown). Never while a
+    // level covers the hub (a back/forward cache restore can ask then); closing it mounts.
     showGlobe() {
-      if (globe || this.globeFallback) return;
+      if (globe || this.globeFallback || this.overlayOpen) return;
       const host = doc.querySelector('.globe-stage');
       if (!mountGlobe || !host) {
         this.globeFallback = true;

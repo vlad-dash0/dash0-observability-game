@@ -26,7 +26,7 @@ PromQL, real semantic-convention names.
 
 | webo-money-world | This game |
 | --- | --- |
-| Town hub; a prop pops in when a lesson completes | **System map**: services start grey and "light up" as you instrument them; edges appear as traces connect them; a red pulse marks the current incident |
+| Town hub; a prop pops in when a lesson completes | **World globe**: each act is a world region and each level a country; a country lights up when you finish its level, so a region fills in as you work through its act; a coral pulse marks the current incident (an open boss pulses its whole region); no edges between countries |
 | One ES module per lesson + ordered registry (`lessons/index.mjs`) | Same. Each level is one file that exports `{id, no, name, …, run(ctx)}` (its act comes from its registry position; FOUNDATION.md §2.1); the hub, progress and rewards derive from the registry |
 | `lesson-kit` primitives (`renderStep`, `speech`, `finish`) | Same kit plus engineer-grade widgets: YAML editor with validation, PromQL box run against a fake TSDB, trace waterfall, log stream, drag-to-classify |
 | Stars per lesson | Stars (0 to 3) for accuracy and speed, plus collectible **Nuance cards** (section 5) |

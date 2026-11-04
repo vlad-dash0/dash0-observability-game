@@ -526,6 +526,24 @@ test('progress from another tab updates the drawn globe; pagehide disposes it', 
   assert.equal(log.mounts.length, 2, 'back from the back/forward cache: drawn again');
 });
 
+test('a back/forward cache restore with a level open does not mount behind it; closing the level does, once', async () => {
+  const { mount, log } = fakeGlobe();
+  const listeners = {};
+  const { game } = setup({ globe: mount, window: { addEventListener: (type, fn) => (listeners[type] = fn) } });
+  game.init();
+  await tick();
+  game.openLevel('x');
+  listeners.pagehide();
+  listeners.pageshow({ persisted: true });
+  await tick();
+  assert.equal(log.mounts.length, 1, 'no mount while the level covers the hub');
+  assert.equal(log.mounts.length - log.disposed, 0, 'no live globe');
+  game.closeOverlay();
+  await tick();
+  assert.equal(log.mounts.length, 2);
+  assert.equal(log.mounts.length - log.disposed, 1, 'exactly one live globe');
+});
+
 test('no renderer, no WebGL, a failed load or a lost context: the text fallback shows', async () => {
   const none = setup().game;
   none.init();

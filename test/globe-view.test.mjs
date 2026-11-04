@@ -313,3 +313,206 @@ test('mountGlobe gives null before touching WebGL when the token colours cannot 
   assert.equal(made, 0);
   assert.equal(host.children.length, 0);
 });
+
+// ---- the renderer's lifecycle, with a recording fake three.js -------------------------
+
+/** A fake THREE that records what is made and released; `throwIn` names a class whose constructor throws. */
+function recordingThree(throwIn = null) {
+  const rec = { geometries: [], materials: [], renderer: null, renders: 0 };
+  const maybeThrow = (name) => {
+    if (name === throwIn) throw new Error(`${name} failed`);
+  };
+  class Disposable {
+    constructor() {
+      this.disposed = 0;
+    }
+    dispose() {
+      this.disposed++;
+    }
+  }
+  class BufferGeometry extends Disposable {
+    constructor() {
+      super();
+      maybeThrow('BufferGeometry');
+      rec.geometries.push(this);
+    }
+    setAttribute() {}
+  }
+  class SphereGeometry extends BufferGeometry {}
+  class ShaderMaterial extends Disposable {
+    constructor() {
+      super();
+      maybeThrow('ShaderMaterial');
+      rec.materials.push(this);
+    }
+  }
+  class Node3 {
+    constructor() {
+      maybeThrow(this.constructor.name);
+      this.rotation = { set() {} };
+      this.position = { set() {} };
+    }
+    add() {}
+    updateProjectionMatrix() {}
+  }
+  class WebGLRenderer {
+    constructor() {
+      rec.renderer = this;
+      this.calls = { pixelRatio: null, size: null, disposed: 0, contextLoss: 0 };
+    }
+    setPixelRatio(r) {
+      this.calls.pixelRatio = r;
+    }
+    getPixelRatio() {
+      return this.calls.pixelRatio;
+    }
+    setClearColor() {}
+    setSize(w, h, style) {
+      this.calls.size = [w, h, style];
+    }
+    render() {
+      rec.renders++;
+    }
+    dispose() {
+      this.calls.disposed++;
+    }
+    forceContextLoss() {
+      this.calls.contextLoss++;
+    }
+  }
+  const THREE = {
+    WebGLRenderer,
+    BufferGeometry,
+    SphereGeometry,
+    ShaderMaterial,
+    BufferAttribute: class {},
+    Vector3: class {},
+    Color: class {
+      setRGB() {
+        return this;
+      }
+    },
+    Scene: class Scene extends Node3 {},
+    PerspectiveCamera: class PerspectiveCamera extends Node3 {},
+    Group: class Group extends Node3 {},
+    Mesh: class Mesh extends Node3 {},
+    Points: class Points extends Node3 {},
+    AdditiveBlending: 2,
+    BackSide: 1,
+    SRGBColorSpace: 'srgb',
+  };
+  return { THREE, rec };
+}
+
+/** An event target that counts adds and removes per type. */
+function counting(extra = {}) {
+  const t = { added: {}, removed: {}, ...extra };
+  t.addEventListener = (type) => (t.added[type] = (t.added[type] ?? 0) + 1);
+  t.removeEventListener = (type) => (t.removed[type] = (t.removed[type] ?? 0) + 1);
+  return t;
+}
+const balanced = (t) =>
+  [...new Set([...Object.keys(t.added), ...Object.keys(t.removed)])].every((k) => t.added[k] === t.removed[k]);
+
+function recordingDom() {
+  const host = counting({ clientWidth: 400, clientHeight: 400, children: [] });
+  host.appendChild = (el) => host.children.push(el);
+  const elements = [];
+  const document = counting({ hidden: false });
+  document.createElement = (tag) => {
+    const el = counting({ tag, className: '', setAttribute() {} });
+    el.remove = () => (host.children = host.children.filter((c) => c !== el));
+    elements.push(el);
+    return el;
+  };
+  const observers = [];
+  const observer = (kind) =>
+    class {
+      constructor() {
+        this.kind = kind;
+        this.observed = 0;
+        this.disconnected = 0;
+        observers.push(this);
+      }
+      observe() {
+        this.observed++;
+      }
+      disconnect() {
+        this.disconnected++;
+      }
+    };
+  const frames = { requested: 0, cancelled: 0, pending: new Map(), next: 1 };
+  const window = {
+    devicePixelRatio: 3,
+    getComputedStyle: () => ({ color: 'rgb(10, 20, 30)' }),
+    ResizeObserver: observer('resize'),
+    IntersectionObserver: observer('intersection'),
+    requestAnimationFrame: (fn) => {
+      frames.requested++;
+      frames.pending.set(frames.next, fn);
+      return frames.next++;
+    },
+    cancelAnimationFrame: (id) => {
+      frames.cancelled++;
+      frames.pending.delete(id);
+    },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  return { host, document, window, elements, observers, frames };
+}
+const canvasOf = (dom) => dom.elements.find((e) => e.tag === 'canvas');
+
+test('mountGlobe draws into the host: canvas added, pixel ratio capped at 2, sized without style, a frame drawn', async () => {
+  const { THREE, rec } = recordingThree();
+  const dom = recordingDom();
+  const handle = await mountGlobe(dom.host, { ...VIEW, reduced: false, window: dom.window, document: dom.document, importThree: async () => THREE });
+  assert.equal(handle === null, false);
+  assert.deepEqual(dom.host.children.map((c) => c.className), ['globe-canvas'], 'the canvas, and no probe left');
+  assert.equal(rec.renderer.calls.pixelRatio, 2);
+  assert.deepEqual(rec.renderer.calls.size, [400, 400, false]);
+  assert.deepEqual(dom.observers.map((o) => [o.kind, o.observed]), [['resize', 1], ['intersection', 1]]);
+  assert.equal(dom.frames.pending.size, 1);
+  [...dom.frames.pending.values()][0](16);
+  assert.equal(rec.renders, 1);
+  handle.dispose();
+});
+
+test('dispose frees everything once: geometry, materials, renderer and context, observers, listeners, the frame', async () => {
+  const { THREE, rec } = recordingThree();
+  const dom = recordingDom();
+  const handle = await mountGlobe(dom.host, { ...VIEW, reduced: false, window: dom.window, document: dom.document, importThree: async () => THREE });
+  const canvas = canvasOf(dom);
+  assert.ok(Object.keys(dom.host.added).length > 0 && Object.keys(canvas.added).length > 0);
+  handle.dispose();
+  handle.dispose();
+  handle.update(new Uint8Array(3), null);
+  assert.equal(rec.geometries.length, 3);
+  assert.deepEqual(rec.geometries.map((g) => g.disposed), [1, 1, 1]);
+  assert.equal(rec.materials.length, 4);
+  assert.deepEqual(rec.materials.map((m) => m.disposed), [1, 1, 1, 1]);
+  assert.equal(rec.renderer.calls.disposed, 1);
+  assert.equal(rec.renderer.calls.contextLoss, 1);
+  assert.deepEqual(dom.observers.map((o) => o.disconnected), [1, 1]);
+  assert.equal(balanced(dom.host), true, `host listeners ${JSON.stringify(dom.host)}`);
+  assert.equal(balanced(canvas), true, 'canvas listeners');
+  assert.equal(balanced(dom.document), true, 'document listeners');
+  assert.equal(dom.frames.cancelled, 1, 'the pending frame is cancelled');
+  assert.equal(dom.frames.pending.size, 0);
+  assert.equal(dom.host.children.length, 0, 'the canvas is removed');
+});
+
+test('a failure part way through setup frees what was made, loses the context and gives null', async () => {
+  for (const where of ['BufferGeometry', 'ShaderMaterial', 'Group']) {
+    const { THREE, rec } = recordingThree(where);
+    const dom = recordingDom();
+    const out = await mountGlobe(dom.host, { ...VIEW, window: dom.window, document: dom.document, importThree: async () => THREE });
+    assert.equal(out, null, where);
+    assert.equal(rec.renderer.calls.disposed, 1, `${where}: renderer disposed`);
+    assert.equal(rec.renderer.calls.contextLoss, 1, `${where}: context lost`);
+    assert.equal(rec.geometries.every((g) => g.disposed === 1), true, `${where}: geometry freed`);
+    assert.equal(rec.materials.every((m) => m.disposed === 1), true, `${where}: materials freed`);
+    assert.equal(dom.host.children.length, 0, `${where}: nothing left in the host`);
+    assert.equal(balanced(dom.document) && balanced(dom.host), true, `${where}: no listener left`);
+  }
+});

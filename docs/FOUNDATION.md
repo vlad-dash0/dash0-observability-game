@@ -47,7 +47,7 @@ default with an explicit light toggle; star rule as §2.6; Martian Mono self-hos
 | rewardTitle | string | required | non-empty, unique |
 | mechanics | string[] | required with `run`; with `play` derived, optional | ≥1, unique, from `sort build configure query spot incident tradeoff`; with `play` a declared list must equal the one derived from the steps (docs/DECLARATIVE-LEVELS.md §2) |
 | cards | string[] | `[]` | ids that exist in DECK, unique |
-| lights | string[] | `[]` | ids that exist in map NODES, unique |
+| lights | string[] | `[]` | ids in `NODE_IDS` (`hub/map-data.mjs`), unique; not drawn since #150 |
 | scored | boolean | `true` | `false`: always 0 stars, excluded from both sides of star totals |
 | scoring | `{parMs: number\|null}` | `{parMs: null}` | positive integer or null |
 | run | `(ctx) => void` | required without `play` | function; forbidden with `play` |
@@ -431,7 +431,7 @@ edge and position checks with the SVG map).
 Fresh boot `notice null`; corrupt → `'corrupt'`; throwing getter → `'unavailable'`.
 `openLevel` on a locked level → false, `overlayOpen false` (mutation: drop the check).
 Completion: open `x`, finish with 1 mistake → stored `x` 2 stars, `levelState 'done'`, its
-nodes lit, totals updated. `storage` event with `y:3` → `progress.levels.y.stars === 3`.
+country lit and its region's `done` counted (`mapState()`, #150), totals updated. `storage` event with `y:3` → `progress.levels.y.stars === 3`.
 Stale finish: open `a`, keep ctx, close, open `b`, `a.finish({text:'stale'})` → null,
 neither recorded, storage unchanged (mutation: R's `complete(this.currentLevel)`).
 `index.html`: `#ov-body`/`#ov-actions` inside `[x-ignore]`; the globe stage (#150) is
