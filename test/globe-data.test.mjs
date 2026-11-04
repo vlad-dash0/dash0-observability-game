@@ -11,7 +11,7 @@ import { globeState } from '../lib/globe.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
 import { latticePoint } from '../lib/globe-lattice.mjs';
 import {
-  OVERSEAS_DEG, SOURCE_SHA256, SOURCE_URL, SOURCE_VERSION, renderModule, sampleDots, verifyHash,
+  OVERSEAS_DEG, SOURCE_SHA256, arcDegrees, SOURCE_URL, SOURCE_VERSION, renderModule, sampleDots, verifyHash,
 } from '../tools/build-globe-data.mjs';
 
 const REG = liveRegistry();
@@ -150,20 +150,11 @@ test('the committed module names the pinned source and hash', () => {
   assert.match(SOURCE_SHA256, /^[0-9a-f]{64}$/);
 });
 
-// [minLat, maxLat, minLon, maxLon]: each mapped country's home area, a little wider than the
-// country. Overseas parts that stay on purpose (Alaska, Hawaii, Svalbard) are inside their box.
+// [minLat, maxLat, minLon, maxLon]: each mapped country's home area, at least the country's
+// outline (overseas parts dropped) plus half a degree. Overseas parts that stay on purpose (Alaska, Hawaii, Svalbard) are
+// inside their box.
 const HOME = {
-  FRA: [41, 51.5, -5.5, 9.8], DEU: [47, 55.2, 5.8, 15.2], ESP: [35.5, 44, -9.5, 4.5],
-  NOR: [57.5, 81, 4, 32], SWE: [55, 69.5, 10.5, 24.5], FIN: [59.5, 70.5, 20, 32],
-  USA: [18, 72, -170, -66], CAN: [41, 84, -142, -52], MEX: [14, 33, -118, -86],
-  GRL: [59, 84, -74, -11], CUB: [19.5, 23.5, -85.5, -74], GTM: [13.5, 18, -92.5, -88],
-  HND: [12.5, 16.5, -89.5, -83], BRA: [-34, 6, -74, -34], ARG: [-56, -21.5, -74, -53],
-  PER: [-19, 0, -82, -68.5], COL: [-4.5, 13.5, -79, -66], BOL: [-23, -9.5, -70, -57.5],
-  VEN: [0, 12.5, -73.5, -59.5], CHL: [-56, -17.5, -76, -66.5], DZA: [18.9, 37.5, -9, 12],
-  COD: [-13.5, 5.5, 12, 31.5], ZAF: [-35, -22, 16, 33], KAZ: [40.5, 55.5, 46, 88],
-  SAU: [16, 32.5, 34.5, 56], TUR: [35.5, 42.5, 25.5, 45], UZB: [37, 45.5, 55, 73],
-  TKM: [35, 42.5, 52, 66], IRQ: [29, 37.5, 38.5, 48.5], IND: [6.5, 36, 68, 97.5],
-  IRN: [25, 40, 44, 63.5], PAK: [23.5, 37.5, 60.5, 77.5],
+  FRA: [40, 52, -6, 11], DEU: [46, 56, 5, 16], ESP: [35, 45, -10, 4], NOR: [57, 82, 4, 32], SWE: [54, 70, 10, 25], FIN: [59, 71, 20, 33], USA: [18, 72, -173, -66], CAN: [41, 84, -142, -52], MEX: [14, 34, -118, -86], GRL: [59, 85, -74, -11], CUB: [19, 24, -86, -73], GTM: [13, 19, -93, -87], HND: [12, 17, -90, -82], BRA: [-35, 6, -75, -34], ARG: [-56, -21, -74, -53], PER: [-19, 1, -82, -68], COL: [-5, 13, -80, -66], BOL: [-24, -9, -71, -56], VEN: [0, 13, -74, -59], CHL: [-57, -17, -77, -66], DZA: [18, 38, -10, 13], COD: [-14, 6, 11, 32], ZAF: [-36, -21, 15, 34], KAZ: [40, 56, 45, 88], SAU: [15, 33, 34, 57], TUR: [35, 43, 25, 46], UZB: [36, 47, 55, 74], TKM: [34, 44, 52, 68], IRQ: [28, 38, 38, 50], IND: [7, 36, 67, 98], IRN: [24, 41, 43, 64], PAK: [23, 38, 60, 79],
 };
 
 test('every mapped country has a home box, and all its dots lie inside it', () => {
@@ -175,15 +166,24 @@ test('every mapped country has a home box, and all its dots lie inside it', () =
   }
 });
 
-test('generator: a part far from its country main landmass is dropped, a near one stays', () => {
-  const far = (iso, lon) => ({
+test('generator: an overseas part is kept at 55 degrees from the main landmass and dropped at 65', () => {
+  // Main part: the square lon 0..40, lat 0..40 (centre 20,20). The second part is a 20-degree
+  // square on the equator, centred (c, 10).
+  const mainCentre = [20, 20];
+  const country = (iso, c) => ({
     properties: { ADM0_A3: iso, SUBREGION: 'S' },
-    geometry: { type: 'MultiPolygon', coordinates: [[SQUARE(0, 0, 40, 40)], [SQUARE(lon, 0, lon + 20, 20)]] },
+    geometry: { type: 'MultiPolygon', coordinates: [[SQUARE(0, 0, 40, 40)], [SQUARE(c - 10, 0, c + 10, 20)]] },
   });
-  assert.ok(OVERSEAS_DEG < 90);
-  const dotsIn = (f, lonMin) => sampleDots({ features: [f] }, 4000).dots.filter(([i]) => latticePoint(i, 4000)[1] >= lonMin);
-  assert.equal(dotsIn(far('NEAR', 45), 41).length > 0, true, 'a part 45 degrees away stays');
-  assert.equal(dotsIn(far('FAR', 120), 99).length, 0, 'a part 100 degrees away is dropped');
+  const inside = 76;
+  const outside = 87;
+  assert.equal(OVERSEAS_DEG, 60);
+  const arc = (c) => arcDegrees(mainCentre, [c, 10]);
+  assert.ok(arc(inside) > 54 && arc(inside) < 56, `fixture part is ${arc(inside)} degrees away`);
+  assert.ok(arc(outside) > 64 && arc(outside) < 66, `fixture part is ${arc(outside)} degrees away`);
+  const farDots = (iso, c) =>
+    sampleDots({ features: [country(iso, c)] }, 8000).dots.filter(([i]) => latticePoint(i, 8000)[1] > 50);
+  assert.ok(farDots('IN', inside).length > 0, 'a part 55 degrees out stays');
+  assert.equal(farDots('OUT', outside).length, 0, 'a part 65 degrees out is dropped');
 });
 
 test('generator: indices that do not fit the packed format throw', () => {
