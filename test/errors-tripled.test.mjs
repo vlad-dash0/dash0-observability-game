@@ -41,6 +41,7 @@ const RULE = 'counted-after-sampling';
 // The figures, derived here from three inputs and nothing else.
 const REQUESTS = 1000; // a second, at the load balancer, before and after
 const ERRORS = 40; // a second, before and after
+const BLIP = 52; // failed requests a second at the provider's incident peak, 03:30 to 03:40
 const KEEP_REST = 0.3; // the probabilistic policy keeps 30% of the traces that did not fail
 const KEPT = ERRORS + Math.round((REQUESTS - ERRORS) * KEEP_REST);
 const RATIO_BEFORE = (ERRORS / REQUESTS) * 100;
@@ -151,9 +152,7 @@ test('rate-vs-lb: the load balancer is flat at 1,000 a second while span metrics
     assert.equal(t.includes(w), true, `rate-vs-lb says "${w}"`);
   }
   assert.equal(t.includes('tail_sampling'), false, 'the clue does not give the cause away');
-  const sentences = t.split(/(?<=\.)\s/).filter((s) => !/\|/.test(s));
   assert.equal(plain(view('rate-vs-lb').html.replace(/<table[\s\S]*<\/table>/, '')).split(/(?<=\.)\s/).length <= 2, true, 'the evidence plus at most one sentence');
-  assert.equal(sentences.length > 0, true);
 });
 
 test('error-count: the error count is 40 a second before and after, only the ratio moves, 4.0% to 12.2%', () => {
@@ -187,6 +186,9 @@ test('herrings and neutrals say why they do not explain it, in times and numbers
   assert.equal(deploy.includes('02:20') && deploy.includes('02:05') && /already/.test(deploy), true, 'the deploy came after the jump');
   const blip = plain(view('provider-blip').html);
   assert.equal(blip.includes('03:30') && blip.includes('03:40') && blip.includes(`${f1(RATIO_AFTER)}%`) && /03:00/.test(blip), true);
+  assert.equal(BLIP > ERRORS, true, 'the incident peak is above the flat 40, so "rose" is true');
+  assert.equal(blip.includes(`rose to ${BLIP} a second`), true, 'the herring sentence shows the peak');
+  assert.equal(blip.includes(`back to ${ERRORS} by 03:45`), true);
   assert.equal(plain(view('collector-health').html).includes('no restarts'), true);
   assert.equal(plain(view('backend-ingest').html).includes('no rejected'), true);
 });
@@ -289,6 +291,8 @@ test('the config check has teeth: a second connector instance, an unreceived con
   assert.deepEqual(unused.verdict.inactive.map((x) => x.id), ['tail_sampling']);
 });
 
+// The 328 check models the kept share (a deterministic every-Nth pick of the healthy requests); it does not run the
+// tail_sampling processor, whose probabilistic policy samples by a hash of the trace ID.
 test('the policies shown, run over 1,000 requests of which 40 fail, keep exactly 40 + 288 = 328, the figure every text states', () => {
   const { doc } = accepted(AFTER);
   const policies = doc.processors.tail_sampling.policies;

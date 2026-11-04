@@ -31,6 +31,7 @@
 
 const REQUESTS = 1000; // a second, at the load balancer, before and after
 const ERRORS = 40; // a second, before and after
+const BLIP = 52; // failed requests a second at the provider's incident peak, 03:30 to 03:40
 const KEEP_PCT = 30; // the probabilistic policy keeps this share of the traces that did not fail
 const HEALTHY = REQUESTS - ERRORS;
 const KEPT_HEALTHY = Math.round((HEALTHY * KEEP_PCT) / 100);
@@ -143,7 +144,7 @@ const SCENARIO = {
       costMin: 4,
       kind: 'herring',
       html:
-        `<p>The provider reported an incident from 03:30 to 03:40: failed requests rose to 52 a second and were back to ${ERRORS} by 03:45. ` +
+        `<p>The provider reported an incident from 03:30 to 03:40: failed requests rose to ${BLIP} a second and were back to ${ERRORS} by 03:45. ` +
         `The ratio at 03:00 was already ${AFTER}.</p>`,
     },
   ],
