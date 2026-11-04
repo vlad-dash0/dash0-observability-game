@@ -5,11 +5,11 @@ import assert from 'node:assert/strict';
 import { buildRegistry } from '../lib/registry.mjs';
 import { ACTS } from '../levels/index.mjs';
 import { DECK } from '../cards/deck.mjs';
-import { EDGES, NODES } from '../hub/map-data.mjs';
+import { NODE_IDS } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
 import { runPlay, validatePlay } from '../lib/play.mjs';
 
-const nodeIds = NODES.map((n) => n.id);
+const nodeIds = NODE_IDS;
 
 // Extended on purpose with each level PR (docs/M1-DESIGN.md §5): Act 0 (P3) plays before Act 1;
 // its boss, the pager (P4), comes after its levels; Act 2 (P6: 2.1, 2.2) plays after Act 1; its boss, checkout-is-slow (P11), comes last; Act 3 (M3 P1: 3.1, 3.2; M3 P2: 3.3, 3.4; M3 P3: 3.5, 3.7; M3 P12: its boss the-bill) plays after Act 2; Act 1 (M3 P4: 1.1 before 1.2, 1.3 after it; M3 P11: its boss who-is-talking); Act 4 (M3 P5: 4.1, 4.2; M3 P6: 4.3 and its boss the-3am-errors) plays after Act 3; Act 5 (M3 P7: 5.1, 5.2; M3 P8: 5.3, 5.4; M3 P9: 5.5, 5.6; M3 P13: its boss silence) plays after Act 4; Act 6 (M4 P1: 6.1, 6.2; M4 P3: its boss errors-tripled) plays after Act 5.
@@ -123,52 +123,10 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
   ]);
 });
 
-test('map nodes: the §2.7 ids, unique, valid kinds and positions in the viewBox', () => {
+test('lights ids: the §2.7 ids, unique (levels name them in `lights`; the globe does not draw them)', () => {
   assert.deepEqual([...nodeIds].sort(), [
     'api-gateway', 'cart', 'catalog', 'checkout', 'collector', 'inventory', 'kafka', 'notifications', 'orders',
     'payment-provider', 'payments', 'postgres', 'recommendations', 'redis', 'shipping', 'storefront',
   ]);
-  assert.equal(new Set(nodeIds).size, nodeIds.length, 'node ids are unique');
-  for (const n of NODES) {
-    assert.ok(['service', 'datastore', 'queue', 'external', 'telemetry'].includes(n.kind), `${n.id} kind ${n.kind}`);
-    assert.ok(typeof n.label === 'string' && n.label.length > 0, `${n.id} label`);
-    assert.ok(Number.isFinite(n.x) && n.x >= 0 && n.x <= 100, `${n.id} x ${n.x}`);
-    assert.ok(Number.isFinite(n.y) && n.y >= 0 && n.y <= 60, `${n.id} y ${n.y}`);
-  }
-  assert.equal(NODES.find((n) => n.id === 'payment-provider').kind, 'external');
-  const collector = NODES.find((n) => n.id === 'collector');
-  assert.equal(collector.label, 'Collector');
-  assert.equal(collector.kind, 'telemetry', 'a Collector is telemetry plumbing, not on the request path');
-  assert.ok(!EDGES.some((e) => e.from === 'collector' || e.to === 'collector'), 'no request-flow edge to the Collector');
-});
-
-// Labels sit 5.4 below a node centre, so two nodes closer than the tightest pair in the
-// current layout (shipping and notifications, 10 apart in the same column) risk touching
-// labels. This pins that floor for every pair, including any node added later.
-const MIN_NODE_DISTANCE = 10;
-test(`map nodes: no two nodes closer than ${MIN_NODE_DISTANCE} (keeps circles and labels apart)`, () => {
-  for (let i = 0; i < NODES.length; i++) {
-    for (let j = i + 1; j < NODES.length; j++) {
-      const d = Math.hypot(NODES[i].x - NODES[j].x, NODES[i].y - NODES[j].y);
-      assert.ok(d >= MIN_NODE_DISTANCE, `${NODES[i].id} and ${NODES[j].id} are ${d.toFixed(2)} apart`);
-    }
-  }
-});
-
-test('map edges reference real nodes, never loop and never repeat', () => {
-  const ids = new Set(nodeIds);
-  const seen = new Set();
-  assert.ok(EDGES.length > 0);
-  for (const e of EDGES) {
-    assert.ok(ids.has(e.from), `edge from unknown node ${e.from}`);
-    assert.ok(ids.has(e.to), `edge to unknown node ${e.to}`);
-    assert.notEqual(e.from, e.to, `self-edge on ${e.from}`);
-    const key = [e.from, e.to].sort().join('|');
-    assert.ok(!seen.has(key), `duplicate edge ${key}`);
-    seen.add(key);
-  }
-  const linked = new Set(EDGES.flatMap((e) => [e.from, e.to]));
-  // Every request-path node has an edge; telemetry plumbing (the Collector) deliberately has none.
-  const requestPath = NODES.filter((n) => n.kind !== 'telemetry').map((n) => n.id);
-  assert.deepEqual(requestPath.filter((id) => !linked.has(id)), [], 'every request-path node has an edge');
+  assert.equal(new Set(nodeIds).size, nodeIds.length, 'ids are unique');
 });

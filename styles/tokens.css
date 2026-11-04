@@ -42,6 +42,16 @@
   --d0-mint: #a8fbbe;
   --d0-purple: #ad46ff;
 
+  /* Globe primitives (#150, from the look study the owner approved on 2026-11-04; not
+     dash0.com brand values). The globe keeps a dark night sky in both themes, so its
+     lights read the same on either. */
+  --globe-night: #0c0c0c;
+  --globe-body: #131211;
+  --globe-dim: #4d4a47;
+  --globe-amber: #f3b35f;
+  --globe-coral: #e8786a;
+  --globe-night-text: #8f8b85;
+
   /* Semantic colours: light-dark(<light>, <dark>). */
   --color-bg: light-dark(var(--d0-white), var(--d0-grey-900));
   --color-surface: light-dark(color-mix(in srgb, var(--d0-grey-400) 10%, var(--d0-white)), var(--d0-grey-800));
@@ -60,10 +70,15 @@
   /* Orange on white is under 3:1, so the light-theme ring is near-black. */
   --color-focus: light-dark(var(--d0-grey-900), var(--d0-orange));
   --color-code-bg: light-dark(var(--color-surface-2), var(--d0-grey-900));
-  --color-map-node-dark: light-dark(var(--color-surface-2), var(--d0-grey-700));
-  --color-map-node-lit: light-dark(var(--d0-orange), var(--d0-orange));
-  --color-map-edge: light-dark(var(--d0-grey-400), var(--d0-grey-600));
-  --color-pulse: light-dark(var(--d0-red), var(--d0-red)); /* OUTLINE: a red pulse marks the incident */
+  /* The globe (lib/globe-render.mjs reads these at mount): the same night in both themes. */
+  --color-globe-sky: light-dark(var(--globe-night), var(--globe-night));
+  --color-globe-body: light-dark(var(--globe-body), var(--globe-body));
+  --color-globe-dim: light-dark(var(--globe-dim), var(--globe-dim));
+  --color-globe-lit: light-dark(var(--globe-amber), var(--globe-amber));
+  /* The incident pulse is a dusty coral, not brand red: it reads as "open", not "alarm". */
+  --color-globe-pulse: light-dark(var(--globe-coral), var(--globe-coral));
+  --color-globe-rim: light-dark(var(--globe-amber), var(--globe-amber));
+  --color-globe-text: light-dark(var(--globe-night-text), var(--globe-night-text));
   --color-shadow: light-dark(color-mix(in srgb, var(--d0-grey-900) 15%, transparent), color-mix(in srgb, var(--d0-grey-900) 60%, transparent));
 
   /* Type and shape. */

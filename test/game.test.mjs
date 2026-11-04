@@ -55,8 +55,33 @@ const REG = buildRegistry(
   { deck: [CARD], nodeIds: ['checkout', 'payments'] },
 );
 const EMPTY = buildRegistry([], { deck: [], nodeIds: [] });
+// A tiny globe: act a0 is region Zero (countries XXX, YYY and AAA, which has no level), a1 is One.
+const GLOBE_MAP = {
+  ACT_REGIONS: { a0: { region: 'Zero' }, a1: { region: 'One' } },
+  LEVEL_COUNTRY: { x: 'XXX', y: 'YYY', z: 'ZZZ' },
+  actOf: (iso) => ({ XXX: 'a0', YYY: 'a0', AAA: 'a0', ZZZ: 'a1' })[iso] ?? null,
+};
+const DOTS = [[10, 0, 'XXX', ''], [12, 2, 'XXX', ''], [0, 20, 'YYY', ''], [5, 10, 'AAA', ''], [-30, 120, 'ZZZ', ''], [40, -60, 'QQQ', '']];
+const tick = () => new Promise((resolve) => setImmediate(resolve));
 
-function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true } = {}) {
+/** A fake globe renderer: records mounts, updates and disposals; `result` decides what a mount gives. */
+function fakeGlobe(result = 'handle') {
+  const log = { mounts: [], updates: [], disposed: 0, handles: [] };
+  const mount = async (host, view) => {
+    log.mounts.push({ host: host.className, dots: view.dots, states: [...view.states], actId: view.target?.actId ?? null, reduced: view.reduced, onFail: view.onFail });
+    if (result === 'throw') throw new Error('three.js failed to load');
+    if (result === null) return null;
+    const handle = {
+      update: (states, target) => log.updates.push({ states: [...states], actId: target?.actId ?? null }),
+      dispose: () => log.disposed++,
+    };
+    log.handles.push(handle);
+    return handle;
+  };
+  return { mount, log };
+}
+
+function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true, globe, window } = {}) {
   const dom = makeDom(read('index.html'));
   const store = fakeStorage({ initial, throwOn });
   const timers = [];
@@ -73,6 +98,10 @@ function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true 
     reportError: (e) => errors.push(e),
     setTimeout: (fn, ms) => timers.push({ fn, ms }),
     clearTimeout: () => {},
+    globe,
+    globeMap: GLOBE_MAP,
+    dots: DOTS,
+    window,
   });
   return { game, store, dom, timers, errors };
 }
@@ -256,7 +285,7 @@ test('focus returns to the level card after closing the level and after the rewa
   assert.deepEqual(focused, ['y']);
 });
 
-test('completion: stored with its stars, done, its nodes lit, totals and reward updated', () => {
+test('completion: stored with its stars, done, its country lit, totals and reward updated', () => {
   const { game, store } = setup();
   assert.deepEqual(game.stars, { earned: 0, max: 15 });
   game.openLevel('x');
@@ -267,8 +296,9 @@ test('completion: stored with its stars, done, its nodes lit, totals and reward 
   assert.deepEqual(stored(store).cards, ['c1']);
   assert.equal(game.levelState('x'), 'done');
   const map = game.mapState();
-  assert.equal(map.nodes.checkout.lit, true);
-  assert.equal(map.nodes.payments.lit, true);
+  assert.equal(map.countries.XXX.lit, true);
+  assert.equal(map.countries.YYY.lit, false);
+  assert.equal(map.regions.a0.done, 1);
   assert.deepEqual(game.stars, { earned: 2, max: 15 });
   assert.deepEqual(game.cards, { earned: 1, max: 1 });
   assert.equal(game.overlayOpen, false);
@@ -397,8 +427,8 @@ test('acts list every level and boss in order; the empty registry says levels ar
   assert.deepEqual(empty.acts, []);
   assert.equal(empty.hasLevels, false);
   assert.deepEqual(empty.stars, { earned: 0, max: 0 });
-  assert.equal(Object.keys(empty.mapState().nodes).length, 16, 'the map still shows');
-  assert.ok(empty.mapSvg().includes('data-node="storefront"'));
+  assert.equal(empty.mapLabel(), 'World map: 0 of 0 levels done.', 'the globe still has a name');
+  assert.deepEqual(empty.globeLines(), []);
 });
 
 test('level labels and classes cover every state', () => {
@@ -414,12 +444,130 @@ test('level labels and classes cover every state', () => {
   assert.equal(game.starText('y'), '★★☆');
 });
 
-test('the map text alternative names the lit components', () => {
+test('the globe text alternative counts levels done and names the lit regions', () => {
   const { game } = setup();
-  assert.equal(game.mapLabel(), 'System map: 0 of 16 components lit.');
+  assert.equal(game.mapLabel(), 'World map: 0 of 5 levels done.');
   game.openLevel('x');
   ctxs.x.finish({ text: 'x is finished now' });
-  assert.equal(game.mapLabel(), 'System map: 2 of 16 components lit: Checkout, Payments.');
+  assert.equal(game.mapLabel(), 'World map: 1 of 5 levels done. Lit: Zero 1 of 4.');
+  assert.deepEqual(game.globeLines(), ['Act 0, First act (Zero): 1 of 4 done', 'Act 1, Second act (One): 0 of 1 done']);
+});
+
+test('the globe mounts on init with the dot states, the current act and the motion preference', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game } = setup({ globe: mount, reduceMotion: false });
+  game.init();
+  await tick();
+  assert.equal(log.mounts.length, 1);
+  assert.equal(log.mounts[0].host, 'globe-stage');
+  assert.equal(log.mounts[0].dots === DOTS, true, 'the renderer gets the dots it draws');
+  assert.deepEqual(log.mounts[0].states, [0, 0, 0, 0, 0, 0]);
+  assert.equal(log.mounts[0].actId, 'a0');
+  assert.equal(log.mounts[0].reduced, false);
+  assert.equal(game.globeFallback, false);
+  assert.equal(setup({ globe: fakeGlobe().mount, reduceMotion: true }).game.globeView().states.length, DOTS.length);
+});
+
+test('opening a level disposes the globe; finishing it mounts it again with the new country lit', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game } = setup({ globe: mount });
+  game.init();
+  await tick();
+  game.openLevel('x');
+  assert.equal(log.disposed, 1, 'the hub is covered: the loop stops and the context is freed');
+  ctxs.x.finish({ text: 'x is finished now' });
+  await tick();
+  assert.equal(log.mounts.length, 2);
+  assert.deepEqual(log.mounts[1].states, [1, 1, 0, 0, 0, 0], "x's country XXX is lit");
+  assert.equal(log.mounts[1].reduced, true);
+  game.closeReward();
+  await tick();
+  assert.equal(log.mounts.length, 2, 'closing the reward keeps the same globe');
+});
+
+test('closing a level without finishing it mounts the globe again', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game } = setup({ globe: mount });
+  game.init();
+  await tick();
+  game.openLevel('x');
+  game.closeOverlay();
+  await tick();
+  assert.equal(log.disposed, 1);
+  assert.equal(log.mounts.length, 2);
+});
+
+test('a mount that resolves after the hub was hidden is disposed, not kept', async () => {
+  const { mount, log } = fakeGlobe();
+  const listeners = {};
+  const { game, store } = setup({ globe: mount, window: { addEventListener: (type, fn) => (listeners[type] = fn) } });
+  game.init();
+  game.openLevel('x'); // before the mount resolves
+  await tick();
+  assert.equal(log.disposed, 1, 'the late handle is disposed');
+  store.data.set(STORAGE_KEY, v1({ y: { stars: 3, at: AT } }));
+  listeners.storage({ key: STORAGE_KEY });
+  assert.equal(log.updates.length, 0, 'a disposed handle is never updated');
+});
+
+test('progress from another tab updates the drawn globe; pagehide disposes it', async () => {
+  const { mount, log } = fakeGlobe();
+  const listeners = {};
+  const { game, store } = setup({ globe: mount, window: { addEventListener: (type, fn) => (listeners[type] = fn) } });
+  game.init();
+  await tick();
+  store.data.set(STORAGE_KEY, v1({ y: { stars: 3, at: AT } }));
+  listeners.storage({ key: STORAGE_KEY });
+  assert.deepEqual(log.updates, [{ states: [0, 0, 1, 0, 0, 0], actId: 'a0' }]);
+  listeners.pagehide();
+  assert.equal(log.disposed, 1);
+  listeners.pageshow({ persisted: true });
+  await tick();
+  assert.equal(log.mounts.length, 2, 'back from the back/forward cache: drawn again');
+});
+
+test('a back/forward cache restore with a level open does not mount behind it; closing the level does, once', async () => {
+  const { mount, log } = fakeGlobe();
+  const listeners = {};
+  const { game } = setup({ globe: mount, window: { addEventListener: (type, fn) => (listeners[type] = fn) } });
+  game.init();
+  await tick();
+  game.openLevel('x');
+  listeners.pagehide();
+  listeners.pageshow({ persisted: true });
+  await tick();
+  assert.equal(log.mounts.length, 1, 'no mount while the level covers the hub');
+  assert.equal(log.mounts.length - log.disposed, 0, 'no live globe');
+  game.closeOverlay();
+  await tick();
+  assert.equal(log.mounts.length, 2);
+  assert.equal(log.mounts.length - log.disposed, 1, 'exactly one live globe');
+});
+
+test('no renderer, no WebGL, a failed load or a lost context: the text fallback shows', async () => {
+  const none = setup().game;
+  none.init();
+  assert.equal(none.globeFallback, true, 'no renderer given');
+  for (const result of [null, 'throw']) {
+    const { mount } = fakeGlobe(result);
+    const { game, errors } = setup({ globe: mount });
+    game.init();
+    assert.equal(game.globeFallback, false, 'the globe panel shows while it loads');
+    await tick();
+    assert.equal(game.globeFallback, true, `mount gave ${result}`);
+    assert.equal(errors.length, result === 'throw' ? 1 : 0, 'a load failure is reported');
+  }
+  const { mount, log } = fakeGlobe();
+  const { game } = setup({ globe: mount });
+  game.init();
+  await tick();
+  log.mounts[0].onFail();
+  assert.equal(game.globeFallback, true, 'context lost');
+  assert.equal(log.disposed, 1);
+  game.openLevel('x');
+  game.closeOverlay();
+  await tick();
+  assert.equal(log.mounts.length, 1, 'once on the fallback, the globe is not mounted again');
 });
 
 test('the theme toggle flips, applies and stores the theme', () => {
@@ -468,13 +616,20 @@ test('index.html: the level overlay elements live inside an x-ignore wrapper', (
   }
 });
 
-test('index.html: the map is an <svg> without style, filled by mapSvg()', () => {
-  const svg = shell.querySelector('svg.system-map');
-  assert.ok(svg, 'svg.system-map exists');
-  assert.equal(svg.getAttribute('viewBox'), '0 0 100 60');
-  assert.equal(svg.getAttribute('x-html'), 'mapSvg()');
-  for (const el of [svg, ...svg.querySelectorAll('*')]) {
-    assert.ok(!el.hasAttribute('style') && !el.hasAttribute(':style'), 'no style on the map');
+test('index.html: the globe stage is a named image, with a legend and a text fallback, and no style', () => {
+  assert.equal(shell.querySelector('svg.system-map') === null, true, 'the SVG system map is gone');
+  const stage = shell.querySelector('.globe .globe-stage');
+  assert.ok(stage, '.globe-stage inside .globe');
+  assert.equal(stage.getAttribute('role'), 'img');
+  assert.equal(stage.getAttribute(':aria-label'), 'mapLabel()');
+  assert.equal(shell.querySelector('.globe').getAttribute('x-show'), '!globeFallback');
+  const legend = shell.querySelector('.globe-legend').textContent.replace(/\s+/g, ' ').trim();
+  assert.equal(legend, 'Lit: level completed Pulsing: incident open Not reached');
+  const fallback = shell.querySelector('ul.globe-fallback');
+  assert.equal(fallback.getAttribute('x-show'), 'globeFallback');
+  assert.equal(fallback.querySelector('template').getAttribute('x-for'), 'line in globeLines()');
+  for (const el of [shell.querySelector('.map-panel'), ...shell.querySelectorAll('.map-panel *')]) {
+    assert.ok(!el.hasAttribute('style') && !el.hasAttribute(':style'), 'no style on the map panel');
   }
 });
 
@@ -498,7 +653,7 @@ test('index.html: the hub goes inert while a dialog is open; dialogs stay outsid
   const hub = shell.querySelector('.hub');
   assert.ok(hub, '.hub wrapper exists');
   assert.equal(hub.getAttribute(':inert'), 'overlayOpen || rewardOpen');
-  for (const sel of ['.hub-header', '.system-map', '.levels']) {
+  for (const sel of ['.hub-header', '.globe-stage', '.globe-fallback', '.levels']) {
     assert.ok(hub.querySelector(sel), `${sel} is inside .hub`);
   }
   for (const sel of ['.overlay', '.reward']) {

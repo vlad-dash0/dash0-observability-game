@@ -1,6 +1,7 @@
 // Browser entry: the only file that touches Alpine. Loaded as a module before the
 // deferred Alpine script (index.html), so `alpine:init` is registered in time.
 import { createGame, liveRegistry } from './app.mjs';
+import { mountGlobe } from './lib/globe-render.mjs';
 import { prefersReducedMotion } from './lib/lesson-kit.mjs';
 import { readTheme } from './lib/theme.mjs';
 
@@ -17,6 +18,8 @@ function browserDeps() {
     now: Date.now,
     rand: Math.random,
     reduceMotion: () => prefersReducedMotion(window),
+    // three.js loads on the first mount, after the hub has rendered.
+    globe: (host, view) => mountGlobe(host, { window, document, ...view }),
     reportError: (e) => console.error(e),
   };
 }

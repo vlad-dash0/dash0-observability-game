@@ -1,4 +1,4 @@
-// The hub game: progress, the system map, level cards, the level overlay and the reward
+// The hub game: progress, the globe, level cards, the level overlay and the reward
 // card (adapted from R's app.mjs; docs/FOUNDATION.md §5 F5). A plain object, no Alpine
 // import: main.mjs registers it as Alpine.data('game') and tests call it directly.
 // Everything from the browser (storage, document, window, clock, timers) comes in `deps`.
@@ -8,11 +8,14 @@
 // initialises nodes a level adds later (it never checks ancestors for x-ignore), so level
 // markup must not use Alpine attributes (x-*, @*, :*). test/levels-play.test.mjs checks.
 import { DECK } from './cards/deck.mjs';
-import { EDGES, NODES } from './hub/map-data.mjs';
+import { DOTS } from './hub/globe-data.mjs';
+import { ACT_REGIONS, actOfCountry, LEVEL_COUNTRY } from './hub/globe-map.mjs';
+import { NODE_IDS } from './hub/map-data.mjs';
 import { ACTS } from './levels/index.mjs';
 import { shuffle as kitShuffle } from './lib/lesson-kit.mjs';
+import { globeState } from './lib/globe.mjs';
+import { dotStates, globeLabel, globeLines, globeTarget } from './lib/globe-view.mjs';
 import { createLevelContext } from './lib/level-context.mjs';
-import { nodeStates, renderMap } from './lib/map.mjs';
 import { cardTotals, mergeProgress, recordCompletion, registryIds, starTotals } from './lib/progress.mjs';
 import { runPlay, validatePlay } from './lib/play.mjs';
 import { buildRegistry } from './lib/registry.mjs';
@@ -21,11 +24,11 @@ import { readTheme, writeTheme } from './lib/theme.mjs';
 import { levelState, lockReason } from './lib/unlock.mjs';
 
 /**
- * The shipped registry: levels/index.mjs checked against the deck and the map's node ids.
+ * The shipped registry: levels/index.mjs checked against the deck and the `lights` ids.
  * `acts` / `deck` default to the real ones; tests pass fixtures through the same checks.
  */
 export function liveRegistry(acts = ACTS, deck = DECK) {
-  return buildRegistry(acts, { deck, nodeIds: NODES.map((n) => n.id), play: { validatePlay, runPlay } });
+  return buildRegistry(acts, { deck, nodeIds: NODE_IDS, play: { validatePlay, runPlay } });
 }
 
 // Player-facing text for every non-null game.notice (§4 Absence).
@@ -64,8 +67,10 @@ const CONFETTI = 40;
 
 /**
  * The Alpine component data for the hub. deps: { registry (§2.4), storage (getter for a
- * Storage), document, window?, deck?, nodes?, edges?, now?, rand?, reduceMotion? (() →
- * boolean), reportError?, setTimeout?, clearTimeout? }.
+ * Storage), document, window?, deck?, globe? ((host, view) → Promise of a globe handle or
+ * null; lib/globe-render.mjs mountGlobe in the browser), globeMap? ({ACT_REGIONS,
+ * LEVEL_COUNTRY, actOf}), dots?, now?, rand?, reduceMotion? (() → boolean), reportError?,
+ * setTimeout?, clearTimeout? }. Without `globe` the hub shows the globe's text fallback.
  */
 export function createGame(deps) {
   const {
@@ -74,8 +79,9 @@ export function createGame(deps) {
     document: doc,
     window: win = null,
     deck = DECK,
-    nodes = NODES,
-    edges = EDGES,
+    globe: mountGlobe = null,
+    globeMap = { ACT_REGIONS, LEVEL_COUNTRY, actOf: actOfCountry },
+    dots = DOTS,
     now = Date.now,
     rand = Math.random,
     reduceMotion = () => false,
@@ -95,6 +101,11 @@ export function createGame(deps) {
   // The open level's AbortController; aborting it makes that ctx's finish a no-op.
   let session = null;
   let nudgeTimer = null;
+  // The drawn globe's handle, outside the component so Alpine never proxies three.js objects;
+  // `mounts` counts mount requests, so a mount that resolves after a newer one (or after the
+  // hub was hidden) is disposed instead of kept.
+  let globe = null;
+  let mounts = 0;
 
   return {
     progress: loaded.progress,
@@ -116,9 +127,20 @@ export function createGame(deps) {
     rewardText: '',
     rewardStars: null,
     rewardCards: [],
+    globeFallback: false,
 
     init() {
       win?.addEventListener('storage', (e) => this.onStorage(e));
+      // Leaving the page (or entering the back/forward cache) frees the WebGL context.
+      win?.addEventListener('pagehide', () => this.hideGlobe());
+      win?.addEventListener('pageshow', (e) => {
+        if (e?.persisted) this.showGlobe();
+      });
+      this.showGlobe();
+    },
+    // Alpine calls this when the component is torn down.
+    destroy() {
+      this.hideGlobe();
     },
 
     // ---------- derived ----------
@@ -175,18 +197,61 @@ export function createGame(deps) {
       const { earned, max } = this.stars;
       return `${earned} of ${max} stars`;
     },
+    // ---------- globe ----------
     mapState() {
-      return nodeStates(registry, this.progress, nodes, edges);
+      return globeState(registry, this.progress, globeMap);
     },
-    mapSvg() {
-      return renderMap(this.mapState(), nodes, edges);
-    },
-    // The map's text alternative: how many components are lit, and which.
+    // The globe's accessible name: levels done, regions lit, any open incident.
     mapLabel() {
-      const state = this.mapState().nodes;
-      const lit = nodes.filter((n) => state[n.id]?.lit).map((n) => n.label);
-      const names = lit.length ? `: ${lit.join(', ')}` : '';
-      return `System map: ${lit.length} of ${nodes.length} components lit${names}.`;
+      return globeLabel(this.mapState());
+    },
+    // The text fallback (no WebGL): one line per act with its region and progress.
+    globeLines() {
+      return globeLines(registry, this.mapState());
+    },
+    // What the renderer draws: a DOT state per dot and the rotation facing the current act.
+    globeView() {
+      return {
+        states: dotStates(this.mapState(), dots, globeMap.actOf),
+        target: globeTarget(registry, this.progress, dots, globeMap.actOf),
+      };
+    },
+    // Draw the globe into .globe-stage (once; the fallback stays once shown). Never while a
+    // level covers the hub (a back/forward cache restore can ask then); closing it mounts.
+    showGlobe() {
+      if (globe || this.globeFallback || this.overlayOpen) return;
+      const host = doc.querySelector('.globe-stage');
+      if (!mountGlobe || !host) {
+        this.globeFallback = true;
+        return;
+      }
+      const token = ++mounts;
+      const failed = (e) => {
+        if (e) report(e);
+        this.hideGlobe();
+        this.globeFallback = true;
+      };
+      Promise.resolve()
+        .then(() => mountGlobe(host, { ...this.globeView(), dots, reduced: !!reduceMotion(), onFail: () => failed() }))
+        .then(
+          (handle) => {
+            if (token !== mounts) handle?.dispose();
+            else if (handle) globe = handle;
+            else failed();
+          },
+          (e) => (token === mounts ? failed(e) : report(e)),
+        );
+    },
+    // Stop the loop and free the WebGL context (a level covers the hub, or the page goes).
+    hideGlobe() {
+      mounts++;
+      globe?.dispose();
+      globe = null;
+    },
+    refreshGlobe() {
+      if (!globe) return;
+      const view = this.globeView();
+      globe.update(view.states, view.target);
     },
 
     // ---------- theme ----------
@@ -210,6 +275,7 @@ export function createGame(deps) {
         return false;
       }
       this.endSession();
+      this.hideGlobe();
       this.nudgeId = null;
       const level = registry.levels[id];
       const controller = new AbortController();
@@ -258,6 +324,7 @@ export function createGame(deps) {
     closeOverlay() {
       this.endSession();
       this.overlayOpen = false;
+      this.showGlobe();
       this.returnFocus();
     },
 
@@ -271,6 +338,7 @@ export function createGame(deps) {
       this.notice = saved.saved ? null : saved.reason;
       this.endSession();
       this.overlayOpen = false;
+      this.showGlobe();
       this.fireConfetti();
       this.rewardTitle = level?.rewardTitle ?? 'Level complete';
       this.rewardText = result.text;
@@ -297,6 +365,7 @@ export function createGame(deps) {
       const { status, progress: other } = loadProgress(storage, registry);
       if (status === 'future') this.notice = 'future';
       this.progress = mergeProgress(this.progress, other, { keep: registryIds(registry) });
+      this.refreshGlobe();
     },
 
     // One window-level Escape handler: closes the reward, else the level, but never the

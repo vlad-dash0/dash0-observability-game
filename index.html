@@ -45,13 +45,25 @@
     <!-- Always rendered (a hidden live region would not announce); .show draws the box. -->
     <p class="notice" role="status" :class="notice ? 'show' : ''" x-text="noticeText()"></p>
 
-    <!-- SYSTEM MAP. Markup comes from mapSvg() (lib/map.mjs): Alpine's x-for cannot run
-         inside an svg (an SVG template element has no .content), so the whole map is one
-         x-html. Positions are SVG attributes only, never style (CSP style-src 'self'). -->
+    <!-- WORLD MAP. lib/globe-render.mjs draws a three.js globe into .globe-stage (act = region,
+         level = country); its canvas is sized by CSS classes, never a style attribute (CSP
+         style-src 'self'). Without WebGL the list below takes its place. -->
     <section class="map-panel" aria-labelledby="map-title">
-      <h2 id="map-title" class="section-label">System map</h2>
-      <svg class="system-map" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60"
-           role="img" :aria-label="mapLabel()" x-html="mapSvg()"></svg>
+      <h2 id="map-title" class="section-label">World map</h2>
+      <div class="globe" x-show="!globeFallback">
+        <div class="globe-stage" role="img" :aria-label="mapLabel()"></div>
+        <p class="globe-hint" aria-hidden="true">Drag to rotate</p>
+        <p class="globe-legend">
+          <span><i class="globe-key lit" aria-hidden="true"></i>Lit: level completed</span>
+          <span><i class="globe-key pulse" aria-hidden="true"></i>Pulsing: incident open</span>
+          <span><i class="globe-key" aria-hidden="true"></i>Not reached</span>
+        </p>
+      </div>
+      <ul class="globe-fallback" x-show="globeFallback" x-cloak>
+        <template x-for="line in globeLines()" :key="line">
+          <li x-text="line"></li>
+        </template>
+      </ul>
     </section>
 
     <section class="levels" aria-labelledby="levels-title">

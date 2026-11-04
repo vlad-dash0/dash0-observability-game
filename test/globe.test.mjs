@@ -1,4 +1,4 @@
-// Globe lit / pulse state. Spec: issue #149; rules mirror lib/map.mjs nodeStates
+// Globe lit / pulse state. Spec: issue #149; the rules of the retired system map's nodeStates
 // (docs/FOUNDATION.md §2.7).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

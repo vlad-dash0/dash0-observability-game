@@ -1,4 +1,4 @@
-/* Hub, system map, level cards, level overlay and reward card (F5, #13), adapted from
+/* Hub, globe, level cards, level overlay and reward card (F5, #13), adapted from
    R's styles.css. Colours come only from styles/tokens.css: no hex here
    (test/theme.test.mjs). Nothing is positioned with style attributes (CSP). */
 
@@ -60,35 +60,57 @@
   color: var(--color-text-muted); margin: 22px 6px 10px;
 }
 
-/* ---------- System map ---------- */
+/* ---------- World map: the globe (lib/globe-render.mjs) ---------- */
+/* A night panel in both themes: the lights need a dark sky. The stage is square and capped,
+   so the hub keeps its levels near the top; the canvas fills it (no style attributes). */
 .map-panel { margin: 0 16px; }
-.system-map {
-  display: block; width: 100%; height: auto; overflow: visible;
-  background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg); padding: 8px;
+.globe {
+  position: relative; background: var(--color-globe-sky); color: var(--color-globe-text);
+  border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  padding: 8px 12px 12px; overflow: hidden;
 }
-.system-map .edge {
-  stroke: var(--color-map-edge); stroke-width: 0.4; stroke-dasharray: 1 1;
-  transition: stroke .4s;
+.globe-stage {
+  position: relative; width: min(100%, 440px); aspect-ratio: 1 / 1; margin: 0 auto;
+  cursor: grab; touch-action: pan-y;
 }
-.system-map .edge.lit { stroke: var(--color-map-node-lit); stroke-dasharray: none; stroke-width: 0.6; }
-.system-map .node circle {
-  fill: var(--color-map-node-dark); stroke: var(--color-map-edge); stroke-width: 0.4;
-  transition: fill .4s, stroke .4s;
+.globe-stage:active { cursor: grabbing; }
+.globe-canvas { display: block; width: 100%; height: 100%; }
+.globe-hint {
+  position: absolute; top: 10px; right: 14px; pointer-events: none;
+  font-family: var(--font-mono); font-size: 11px;
 }
-.system-map .node.kind-datastore circle { stroke-width: 0.9; }
-.system-map .node.kind-queue circle { stroke-dasharray: 0.8 0.5; }
-.system-map .node.kind-external circle { stroke-dasharray: 0.4 0.6; fill: transparent; }
-.system-map .node.kind-telemetry circle { stroke: var(--color-text-muted); stroke-width: 0.7; stroke-dasharray: 0.01 1.35; stroke-linecap: round; }
-.system-map .node.lit circle { fill: var(--color-map-node-lit); stroke: var(--color-map-node-lit); }
-.system-map .node text {
-  fill: var(--color-text-muted); font-size: 2.3px; font-family: var(--font-sans);
+.globe-legend {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px;
+  font-family: var(--font-mono); font-size: 11px; margin-top: 4px;
 }
-.system-map .node.lit text { fill: var(--color-text); font-weight: 700; }
-/* A red pulse marks the current incident (an open boss). Reduced motion keeps the
-   colour (base.css shortens every animation). */
-.system-map .node.pulse circle { stroke: var(--color-pulse); stroke-width: 0.8; animation: pulse 1.4s ease-in-out infinite; }
-@keyframes pulse { 0%, 100% { stroke-opacity: 1; } 50% { stroke-opacity: .25; } }
+.globe-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.globe-key {
+  width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block;
+  background: var(--color-globe-dim);
+}
+.globe-key.lit {
+  background: var(--color-globe-lit);
+  box-shadow: 0 0 8px 2px color-mix(in srgb, var(--color-globe-lit) 55%, transparent);
+}
+.globe-key.pulse {
+  background: var(--color-globe-pulse);
+  box-shadow: 0 0 8px 2px color-mix(in srgb, var(--color-globe-pulse) 50%, transparent);
+}
+/* Colour probes: the renderer reads each role's computed colour once at mount. */
+.globe-probe { position: absolute; width: 0; height: 0; overflow: hidden; visibility: hidden; }
+.globe-probe.sky { color: var(--color-globe-sky); }
+.globe-probe.body { color: var(--color-globe-body); }
+.globe-probe.dim { color: var(--color-globe-dim); }
+.globe-probe.lit { color: var(--color-globe-lit); }
+.globe-probe.pulse { color: var(--color-globe-pulse); }
+.globe-probe.rim { color: var(--color-globe-rim); }
+/* No WebGL: the same progress as text. */
+.globe-fallback {
+  list-style: none; margin: 0; padding: 6px 14px;
+  background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+}
+.globe-fallback li { padding: 8px 0; font-size: 14px; }
+.globe-fallback li + li { border-top: 1px solid var(--color-border); }
 
 /* ---------- Level cards, grouped by act ---------- */
 .levels { padding: 0 16px; }

@@ -8,11 +8,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DECK } from '../cards/deck.mjs';
-import { EDGES, NODES } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
 import { expectedStarMax } from './helpers/stars.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
-import { nodeStates } from '../lib/map.mjs';
+import { litIds } from './helpers/lights.mjs';
 import { isActComplete, isActUnlocked, levelState, lockReason } from '../lib/unlock.mjs';
 import { allPlans, checkTradeoff, evaluatePlan, newTradeoffState, pickOption, validateTradeoffSpec } from '../lib/widgets/trade-off.mjs';
 import { checkSpot, newSpotState, toggleLine, validateSpotSpec } from '../lib/widgets/spot-it.mjs';
@@ -111,15 +110,12 @@ test('steps: 6.1 is a Trade-off step and a closing Choice step; 6.2 is a Trade-o
   assert.deepEqual(stepKinds('tail-sampling'), ['tradeoff', 'spot']);
 });
 
-test('lights: 6.1 lights the storefront (the root), 6.2 the Collector; each node and no edge', () => {
-  const lit = (done) => {
-    const s = nodeStates(LIVE, progressOf(done), NODES, EDGES);
-    return { nodes: NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id), edges: s.edges.filter((e) => e.lit).length };
-  };
-  assert.deepEqual(lit([]), { nodes: [], edges: 0 });
-  assert.deepEqual(lit(['head-sampling']), { nodes: ['storefront'], edges: 0 });
-  assert.deepEqual(lit(['tail-sampling']), { nodes: ['collector'], edges: 0 });
-  assert.deepEqual(lit(['head-sampling', 'tail-sampling']), { nodes: ['storefront', 'collector'], edges: 0 });
+test('lights: 6.1 lights the storefront (the root), 6.2 the Collector', () => {
+  const lit = (done) => litIds(LIVE, progressOf(done));
+  assert.deepEqual(lit([]), []);
+  assert.deepEqual(lit(['head-sampling']), ['storefront']);
+  assert.deepEqual(lit(['tail-sampling']), ['collector']);
+  assert.deepEqual(lit(['head-sampling', 'tail-sampling']), ['storefront', 'collector']);
 });
 
 // ---- cards --------------------------------------------------------------------------

@@ -16,9 +16,8 @@ import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { answer, budgetLeft, canAnswer, newIncident, openView, validateScenario } from '../lib/widgets/incident.mjs';
 import { liveRegistry } from '../app.mjs';
 import { expectedStarMax } from './helpers/stars.mjs';
-import { nodeStates } from '../lib/map.mjs';
+import { litIds } from './helpers/lights.mjs';
 import { isActUnlocked, levelState } from '../lib/unlock.mjs';
-import { EDGES, NODES } from '../hub/map-data.mjs';
 
 const LIVE = liveRegistry();
 const MAX_STARS = expectedStarMax(LIVE);
@@ -76,8 +75,7 @@ test('the-bill: lights Checkout (shared with 3.7), the boss waits for the act, a
   const lit = (done) => {
     const p = emptyProgress();
     for (const id of done) p.levels[id] = { stars: 3, at: null };
-    const s = nodeStates(LIVE, p, NODES, EDGES);
-    return NODES.filter((n) => s.nodes[n.id].lit).map((n) => n.id).sort();
+    return litIds(LIVE, p).sort();
   };
   assert.deepEqual(lit([ID]), ['checkout']);
   assert.deepEqual(lit(['red-and-use']), ['checkout']);
