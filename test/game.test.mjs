@@ -59,6 +59,7 @@ const EMPTY = buildRegistry([], { deck: [], nodeIds: [] });
 const GLOBE_MAP = {
   ACT_REGIONS: { a0: { region: 'Zero' }, a1: { region: 'One' } },
   LEVEL_COUNTRY: { x: 'XXX', y: 'YYY', z: 'ZZZ' },
+  COUNTRY_NAMES: { XXX: 'Xland' },
   actOf: (iso) => ({ XXX: 'a0', YYY: 'a0', AAA: 'a0', ZZZ: 'a1' })[iso] ?? null,
 };
 const DOTS = [[10, 0, 'XXX', ''], [12, 2, 'XXX', ''], [0, 20, 'YYY', ''], [5, 10, 'AAA', ''], [-30, 120, 'ZZZ', ''], [40, -60, 'QQQ', '']];
@@ -66,13 +67,14 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 /** A fake globe renderer: records mounts, updates and disposals; `result` decides what a mount gives. */
 function fakeGlobe(result = 'handle') {
-  const log = { mounts: [], updates: [], disposed: 0, handles: [] };
+  const log = { mounts: [], updates: [], disposed: 0, handles: [], ignites: [] };
   const mount = async (host, view) => {
     log.mounts.push({ host: host.className, dots: view.dots, states: [...view.states], actId: view.target?.actId ?? null, reduced: view.reduced, onFail: view.onFail });
     if (result === 'throw') throw new Error('three.js failed to load');
     if (result === null) return null;
     const handle = {
       update: (states, target) => log.updates.push({ states: [...states], actId: target?.actId ?? null }),
+      ignite: (view, states) => log.ignites.push({ view, states: [...states] }),
       dispose: () => log.disposed++,
     };
     log.handles.push(handle);
@@ -289,8 +291,9 @@ test('an Escape a widget already handled leaves the level open; an unhandled one
   assert.equal(game.overlayOpen, false, 'an unhandled Escape still closes the level');
 });
 
-test('focus returns to the level card after closing the level and after the reward', () => {
-  const { game, dom } = setup();
+test('focus returns to the level card after closing the level and after the reward of a replay', () => {
+  // y is already done, so its reward is a replay: a first completion focuses the map heading (#161).
+  const { game, dom } = setup({ initial: { [STORAGE_KEY]: v1({ y: { stars: 1, at: null } }) } });
   const focused = [];
   for (const id of ['x', 'y']) {
     const card = dom.document.createElement('div');
@@ -511,6 +514,122 @@ test('opening a level disposes the globe; finishing it mounts it again with the 
   assert.equal(log.mounts.length, 2, 'closing the reward keeps the same globe');
 });
 
+/** Spies for the hub's scroll and focus: what scrollIntoView and the map heading's focus were given. */
+function spyHub(dom) {
+  const spy = { scrolls: [], focuses: [] };
+  dom.document.querySelector('.map-panel').scrollIntoView = (o) => spy.scrolls.push(o);
+  dom.document.getElementById('map-title').focus = (o) => spy.focuses.push(o);
+  return spy;
+}
+
+test('Back to the map after a first completion turns the globe to the new country and ignites it', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game, dom } = setup({ globe: mount, reduceMotion: false });
+  const spy = spyHub(dom);
+  game.init();
+  await tick();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  await tick();
+  assert.equal(log.ignites.length, 0, 'nothing plays behind the reward card');
+  game.closeReward();
+  assert.equal(log.ignites.length, 1);
+  const { view, states } = log.ignites[0];
+  assert.deepEqual([...view.flare], [1, 1, 0, 0, 0, 0], "x's country XXX flares");
+  assert.equal(view.target.key, 'country:XXX', 'the globe turns to the country, not the act');
+  assert.deepEqual(states, [1, 1, 0, 0, 0, 0]);
+  assert.deepEqual(spy.scrolls, [{ behavior: 'smooth', block: 'start' }]);
+  assert.deepEqual(spy.focuses, [{ preventScroll: true }], 'focus goes to the map heading without a second scroll');
+  assert.equal(game.litNote, 'Xland is now lit: Level x.');
+});
+
+test('under reduced motion Back to the map scrolls without animation, and the globe is still told', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game, dom } = setup({ globe: mount, reduceMotion: true });
+  const spy = spyHub(dom);
+  game.init();
+  await tick();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  await tick();
+  game.closeReward();
+  assert.deepEqual(spy.scrolls, [{ behavior: 'auto', block: 'start' }]);
+  assert.equal(log.ignites.length, 1, 'the renderer decides to skip the effect');
+  assert.equal(log.mounts[0].reduced, true);
+});
+
+test('replaying a completed level scrolls and ignites nothing and sends focus back to the card', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game, dom } = setup({ globe: mount, initial: { [STORAGE_KEY]: v1({ x: { stars: 2, at: null } }) } });
+  const spy = spyHub(dom);
+  game.init();
+  await tick();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'again' });
+  await tick();
+  game.closeReward();
+  assert.equal(log.ignites.length, 0);
+  assert.deepEqual(spy.scrolls, []);
+  assert.deepEqual(spy.focuses, []);
+  assert.equal(game.litNote, '');
+});
+
+test('closing a level without finishing it does not scroll or ignite', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game, dom } = setup({ globe: mount });
+  const spy = spyHub(dom);
+  game.init();
+  await tick();
+  game.openLevel('x');
+  game.closeOverlay();
+  await tick();
+  assert.equal(log.ignites.length, 0);
+  assert.deepEqual(spy.scrolls, []);
+});
+
+test('opening a level mid-effect disposes the globe, clears the note and plays nothing more', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game } = setup({ globe: mount });
+  game.init();
+  await tick();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  await tick();
+  game.closeReward();
+  assert.equal(log.ignites.length, 1);
+  const live = log.disposed;
+  game.openLevel('y');
+  assert.equal(log.disposed, live + 1, 'the globe, and with it the effect, is released');
+  assert.equal(game.litNote, '');
+  await tick();
+  assert.equal(log.ignites.length, 1);
+});
+
+test('Back to the map before the globe has loaded plays the ignite once it arrives', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game } = setup({ globe: mount });
+  game.init();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  game.closeReward();
+  assert.equal(log.ignites.length, 0, 'no handle yet');
+  await tick();
+  await tick();
+  assert.equal(log.ignites.length, 1);
+  assert.equal(log.ignites[0].view.target.key, 'country:XXX');
+});
+
+test('without WebGL the text fallback names the newly lit country', () => {
+  const { game } = setup({});
+  game.init();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  game.closeReward();
+  assert.equal(game.globeFallback, true);
+  assert.equal(game.globeLines()[0], 'Xland is now lit: Level x.');
+  assert.equal(game.globeLines().length, 3, 'the act lines follow');
+});
+
 test('closing a level without finishing it mounts the globe again', async () => {
   const { mount, log } = fakeGlobe();
   const { game } = setup({ globe: mount });
@@ -657,6 +776,15 @@ test('index.html: the globe stage is a named image, with a legend and a text fal
   for (const el of [shell.querySelector('.map-panel'), ...shell.querySelectorAll('.map-panel *')]) {
     assert.ok(!el.hasAttribute('style') && !el.hasAttribute(':style'), 'no style on the map panel');
   }
+});
+
+test('index.html: the map heading can take focus and a polite live region carries the lit note', () => {
+  const heading = shell.getElementById('map-title');
+  assert.equal(heading.getAttribute('tabindex'), '-1');
+  const note = shell.querySelector('.map-panel [x-text="litNote"]');
+  assert.ok(note, 'a region shows litNote');
+  assert.equal(note.getAttribute('role'), 'status');
+  assert.ok(!note.hasAttribute('style'));
 });
 
 test('index.html: level cards keep the keyboard and screen-reader wiring', () => {
