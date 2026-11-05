@@ -250,7 +250,7 @@ test('T6 only lib/ui/*.mjs emits ui- classes (index.html is the one static excep
 // (a stale entry fails), and the last phase asserts LEGACY is empty and deletes the CSS.
 const RETIRED = [
   'back-btn', 'btn', 'bubble', 'build', 'build-btn', 'build-editing', 'build-group-title', 'build-layout',
-  'build-log', 'build-main', 'build-opt', 'build-pick', 'build-status', 'choice', 'choices', 'configure-inactive',
+  'build-log', 'build-logs', 'build-main', 'build-opt', 'build-pick', 'build-status', 'choice', 'choices', 'configure-inactive',
   'configure-input', 'configure-label', 'configure-more', 'configure-note', 'env-editor', 'env-label', 'env-note',
   'feedback', 'ghost', 'good', 'help-btn', 'help-chip', 'help-chips', 'help-chips-title', 'help-cost', 'help-count',
   'help-counts', 'help-h', 'help-hint-head', 'help-hint-row', 'help-hint-text', 'help-pips', 'help-rule',
@@ -346,11 +346,18 @@ const rowAlpha = (list, isRow) => Math.min(1, ...subjects(list)
 // verdict icon. Anything else inside a row may hold its words (.wf-txt, .wf-name, .wf-svc,
 // .wf-track with its .wf-bar-label), so a fade on it fades text.
 const NON_TEXT = ['wf-bar', 'wf-conn', 'wf-sw', 'wf-grip', 'wf-elbow', 'wf-grid', 'wf-mark'];
-/** The lowest opacity a rule puts on a possibly-text element inside the matched row (row as a non-last compound). */
-const innerAlpha = (list, isRow) => Math.min(1, ...subjects(list)
+/**
+ * The opacity possibly-text elements inside the matched row (row as a non-last compound) put on
+ * its words. Opacity stacks, so a .wf-txt fade inside a .wf-name fade draws at their product:
+ * this multiplies every such rule. Siblings that do not nest (.wf-txt and .wf-name side by side)
+ * are over-counted, so the result can be lower than any real word, never higher: a nested fade
+ * is never missed.
+ */
+const innerAlpha = (list, isRow) => subjects(list)
   .filter(({ cs }) => cs.slice(0, -1).some(isRow) && !cs.at(-1).classes.some((c) => NON_TEXT.includes(c)))
-  .flatMap(({ body }) => decls(body)).filter(([p]) => p === 'opacity').map(([, v]) => Number(v)));
-/** What the row's text is drawn at: the row's own fade times the lowest fade on a text-bearing child. */
+  .flatMap(({ body }) => decls(body)).filter(([p]) => p === 'opacity')
+  .reduce((a, [, v]) => a * Number(v), 1);
+/** What the row's text is drawn at: the row's own fade times the stacked fades on its text-bearing children. */
 const textAlpha = (list, isRow) => rowAlpha(list, isRow) * innerAlpha(list, isRow);
 /** Opacities put on a .wf-bar inside the matched row. */
 const barOpacities = (list, isRow) => subjects(list)
@@ -376,6 +383,8 @@ test('T13 harness: a row fade is found in any quote, value or ancestor form; a f
     assert.equal(textAlpha(rules(css), FADED_ROWS.other), 0.35, css);
   }
   assert.equal(textAlpha(rules('.wf-row[data-mark="overflow"] { opacity: .5 } .wf-row[data-mark="overflow"] .wf-txt { opacity: .5 }'), FADED_ROWS.overflow), 0.25);
+  // Nested fades stack: .9 on the text inside .9 on the name is drawn at .81, not the lower .9.
+  assert.equal(textAlpha(rules('.wf-row[data-other] .wf-txt { opacity: .9 } .wf-row[data-other] .wf-name { opacity: .9 }'), FADED_ROWS.other), 0.81);
   for (const css of ['.wf-row[data-other] .wf-bar, .wf-row[data-other] .wf-conn, .wf-row[data-other] .wf-sw, .wf-row[data-other] .wf-grip { opacity: .35 }',
     '.wf-row[data-other] .wf-elbow, .wf-row[data-other] .wf-mark { opacity: .35 }', '.wf-txt { opacity: .35 }', '.wf-row[data-mark="invalid"] .wf-txt { opacity: .3 }']) {
     assert.equal(textAlpha(rules(css), FADED_ROWS.other), 1, css);
