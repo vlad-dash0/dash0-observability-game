@@ -713,7 +713,9 @@ test('L3: a disposition must start with a verdict or name a commit or #N; every 
 // A fake `gh`: pages are returned whole only under --paginate --slurp, as gh does;
 // without --slurp gh concatenates pages (not valid JSON); without --paginate, page one.
 // Comments, reviews and threads are three GraphQL connections, told apart by the query.
-function fakeGh({ comments: c = [[]], reviews = [[]], threads = [[]], fail } = {}) {
+// The PR itself (its author) is one plain query, told apart by `author` at the PR level;
+// by default a trusted owner, `dev`.
+function fakeGh({ comments: c = [[]], reviews = [[]], threads = [[]], fail, prAuthor = { author: { login: 'dev' }, authorAssociation: 'OWNER' } } = {}) {
   const calls = [];
   const gh = async (args) => {
     calls.push(args);
@@ -721,6 +723,9 @@ function fakeGh({ comments: c = [[]], reviews = [[]], threads = [[]], fail } = {
     if (fail && fail.test(joined)) throw new Error('gh: HTTP 502');
     if (/repo view/.test(joined)) return 'acme/game\n';
     if (!args.includes('graphql')) throw new Error(`unexpected gh call: ${joined}`);
+    if (/pullRequest\(number: \$number\) \{ author/.test(joined)) {
+      return JSON.stringify({ data: { repository: { pullRequest: prAuthor } } });
+    }
     const key = /reviewThreads\(/.test(joined) ? 'reviewThreads' : /reviews\(/.test(joined) ? 'reviews' : 'comments';
     const src = { reviewThreads: threads, reviews, comments: c }[key];
     const pages = src.map((nodes, i) => ({
@@ -744,7 +749,7 @@ test('fetchPr reads every page of comments, reviews and threads, with edit and h
     comments: [[issueComment(0, 'review', { lastEditedAt: at(9), author: { login: 'ann' } })], [issueComment(2, 'dispositions-partial', { isMinimized: true })]],
     reviews: [[{ submittedAt: at(1), createdAt: at(1), lastEditedAt: null, isMinimized: false, url: 'r1', bodyHTML: '', authorAssociation: 'MEMBER' }],
       [{ submittedAt: null, createdAt: at(3), lastEditedAt: at(4), isMinimized: false, url: 'r2', bodyHTML: fx('combined'), authorAssociation: 'MEMBER' }]],
-    threads: [[{ isResolved: true, path: 'a', line: 1, comments: { nodes: [{ body: 'x', url: 't0', authorAssociation: 'OWNER' }] } }],
+    threads: [[{ isResolved: true, resolvedBy: { login: 'dev' }, path: 'a', line: 1, comments: { nodes: [{ body: 'x', url: 't0', authorAssociation: 'OWNER' }] } }],
       [{ isResolved: false, path: 'b', line: 2, comments: { nodes: [{ body: 'y', url: 't1', authorAssociation: 'OWNER' }] } }]],
   });
   const pr = await fetchPr({ repo: 'acme/game', pr: 7, gh });
@@ -917,5 +922,53 @@ test('trust: fetchPr asks for the author association of comments, reviews and th
   const { gh, calls } = fakeGh({ comments: [[issueComment(0, 'clean')]] });
   await fetchPr({ repo: 'acme/game', pr: 7, gh });
   const queries = calls.map((a) => a.find((x) => x.startsWith('query=')));
-  assert.equal(queries.filter((q) => /\bauthorAssociation\b/.test(q)).length, 3);
+  const connections = queries.filter((q) => /\(first: 100/.test(q));
+  assert.equal(connections.length, 3, 'comments, reviews and threads');
+  for (const q of connections) assert.match(q, /\bauthorAssociation\b/);
+});
+
+// --- trust: who resolved a thread (GitHub lets the PR's author resolve any thread) -----------
+
+const resolvedThread = (i, resolver, assoc = 'COLLABORATOR') => ({ ...thread(i, true, assoc), resolvedBy: resolver && { login: resolver } });
+
+test('trust: a fork PR author who resolves a collaborator\'s thread does not close it', async () => {
+  const { gh } = fakeGh({ comments: [[issueComment(0, 'clean')]], threads: [[resolvedThread(1, 'forker')]],
+    prAuthor: { author: { login: 'forker' }, authorAssociation: 'CONTRIBUTOR' } });
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 1);
+  assert.match(out.lines.join('\n'), /OPEN thread f1:1: .*resolved by forker, the PR's untrusted author/);
+});
+
+test('trust: a thread resolved by someone else, or by a trusted PR author, is resolved', async () => {
+  for (const [resolver, prAuthor] of [
+    ['maintainer', { author: { login: 'forker' }, authorAssociation: 'NONE' }],
+    ['dev', { author: { login: 'dev' }, authorAssociation: 'COLLABORATOR' }],
+  ]) {
+    const { gh } = fakeGh({ comments: [[issueComment(0, 'clean')]], threads: [[resolvedThread(1, resolver)]], prAuthor });
+    const out = sink();
+    assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 0, resolver);
+  }
+});
+
+test('trust: a resolved thread with no resolver, or a PR with no author association, is inconclusive', async () => {
+  const a = fakeGh({ comments: [[issueComment(0, 'clean')]], threads: [[resolvedThread(1, null)]] });
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh: a.gh, log: out.log }), 2);
+  assert.match(out.lines.join('\n'), /INCONCLUSIVE: .*t1: resolved, but no resolvedBy/);
+  const b = fakeGh({ comments: [[issueComment(0, 'clean')]], prAuthor: { author: { login: 'x' } } });
+  const out2 = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh: b.gh, log: out2.log }), 2);
+  assert.match(out2.lines.join('\n'), /INCONCLUSIVE: .*the PR: no author association/);
+  const c = fakeGh({ comments: [[issueComment(0, 'clean')]], prAuthor: { author: null, authorAssociation: 'OWNER' } });
+  const out3 = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh: c.gh, log: out3.log }), 2);
+  assert.match(out3.lines.join('\n'), /INCONCLUSIVE: .*the PR: no author login/);
+});
+
+test('trust: fetchPr asks who resolved each thread and who opened the PR', async () => {
+  const { gh, calls } = fakeGh({ comments: [[issueComment(0, 'clean')]] });
+  await fetchPr({ repo: 'acme/game', pr: 7, gh });
+  const queries = calls.map((a) => a.find((x) => x.startsWith('query=')));
+  assert.ok(queries.some((q) => /reviewThreads\(.*resolvedBy \{ login \}/s.test(q)));
+  assert.ok(queries.some((q) => /pullRequest\(number: \$number\) \{ author \{ login \} authorAssociation \}/.test(q)));
 });
