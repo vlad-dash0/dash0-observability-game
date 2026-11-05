@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseHTML } from 'linkedom';
-import { definedClasses, read, ROOT, rules, splitTop } from './helpers/css.mjs';
+import { decls, definedClasses, read, ROOT, rules, splitTop } from './helpers/css.mjs';
 import * as ui from '../lib/ui/index.mjs';
 
 const {
@@ -281,6 +281,36 @@ test('T10 every runtime state and tone value has its own rule in kit.css', () =>
     for (const v of values) {
       const head = `${base}[${attr}="${v}"]`;
       assert.ok(sels.some((s) => s.startsWith(head)), `kit.css has no ${head} rule`);
+    }
+  }
+});
+
+test('T10 each tone and coloured state is pinned by the declaration that renders it', () => {
+  const list = rules(read('styles/kit.css'));
+  /** Values of `prop` in every kit.css rule whose selector list contains exactly `sel`. */
+  const valuesOf = (sel, prop) => list.filter((r) => splitTop(r.selector).includes(sel))
+    .flatMap((r) => decls(r.body)).filter(([p]) => p === prop).map(([, v]) => v);
+  const token = (name) => `var(--color-${name})`;
+  const CHIP = { neutral: 'text-muted', success: 'success', error: 'error', hint: 'hint', attention: 'parent' };
+  // [enum, value -> [selector, property, expected value]]
+  const pins = [
+    [TONES, (v) => [`.ui-chip[data-tone="${v}"] .ui-chip-dot`, 'background', token(CHIP[v])]],
+    [DOTS_TONES, (v) => [`.ui-dots[data-tone="${v}"] i[data-on="true"]`, 'background', token(v)]],
+    // Neutral feedback has no colour: its cue is the glyph and its alt text.
+    [FEEDBACK_TONES, (v) => (v === 'neutral'
+      ? ['.ui-feedback[data-tone="neutral"] .ui-feedback-ico::before', 'content', '"i" / "Note"']
+      : [`.ui-feedback[data-tone="${v}"] .ui-feedback-ico`, 'color', token(v)])],
+    // States carried by colour: the marker and the border. locked and opened are carried by
+    // the dashed border and the muted title (the prefix check above covers their rules).
+    [['correct', 'wrong'], (v) => [`.ui-option[data-state="${v}"]::after`, 'color', token(v === 'correct' ? 'success' : 'error')]],
+    [['correct'], () => ['.ui-option[data-state="correct"]', 'border-color', token('success')]],
+  ];
+  assert.deepEqual(Object.keys(CHIP), [...TONES], 'every chip tone has a colour');
+  assert.ok(['correct', 'wrong'].every((s) => OPTION_STATES.includes(s)));
+  for (const [values, pin] of pins) {
+    for (const v of values) {
+      const [sel, prop, want] = pin(v);
+      assert.ok(valuesOf(sel, prop).includes(want), `kit.css: "${sel}" must set ${prop}: ${want}`);
     }
   }
 });
