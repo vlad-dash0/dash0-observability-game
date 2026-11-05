@@ -7,13 +7,14 @@ import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseHTML } from 'linkedom';
-import { definedClasses, read, ROOT } from './helpers/css.mjs';
+import { definedClasses, read, ROOT, rules, splitTop } from './helpers/css.mjs';
 import * as ui from '../lib/ui/index.mjs';
 
 const {
   actions, button, checkbox, chip, clearFeedback, codeBlock, dots, eyebrow, feedback, field, finishButton,
   helpChips, lesson, meter, nextButton, note, option, options, panel, prose, question, radio, setFeedback,
   sideColumn, split, stars, stats, step, stepHead, table,
+  BUTTON_VARIANTS, DOTS_TONES, FEEDBACK_TONES, OPTION_KINDS, OPTION_STATES, OPTIONS_LAYOUTS, PANEL_VARIANTS, TONES,
 } = ui;
 
 const BAD = '<b>"&';
@@ -147,6 +148,11 @@ test('stats and dots', () => {
     '<dl class="ui-stats"><div><dt>Spans</dt><dd>4</dd></div><div><dt>Window</dt><dd>-120 to 130 ms</dd></div></dl>');
   assert.equal(dots({ total: 3, on: 1, label: '1 of 3 clues found' }),
     '<span class="ui-dots" role="img" aria-label="1 of 3 clues found"><i data-on="true"></i><i data-on="false"></i><i data-on="false"></i></span>');
+  // Beside a text line that already says it (the hint pips): hidden from screen readers, hint tone.
+  assert.equal(dots({ total: 2, on: 1, decorative: true, tone: 'hint' }),
+    '<span class="ui-dots" aria-hidden="true" data-tone="hint"><i data-on="true"></i><i data-on="false"></i></span>');
+  assert.equal(dots({ total: 1, on: 0, label: 'x', tone: 'success' }),
+    '<span class="ui-dots" role="img" aria-label="x" data-tone="success"><i data-on="false"></i></span>');
 });
 
 test('side: help chips say on or off in words; stars; the column keeps the help-ladder ids', () => {
@@ -208,7 +214,21 @@ const CASES = [
   ['stars', null, null, () => stars(5, true)],
 ];
 
-const outputs = () => CASES.flatMap(([, t, h, plain]) => [t?.('x'), h?.('<i>x</i>'), plain?.()].filter((o) => o !== undefined));
+// Every static variant: each value of the exported enums and each boolean modifier, so a
+// variant class missing from kit.css is caught, not just the defaults.
+const VARIANTS = () => [
+  ...OPTION_KINDS.map((kind) => option({ attr: 'a', value: 'v', labelHtml: 'l', metaHtml: 'm', kind, ...(kind === 'radio' ? { name: 'n' } : {}) })),
+  ...OPTIONS_LAYOUTS.map((layout) => options({ layout, itemsHtml: '' })),
+  ...PANEL_VARIANTS.map((variant) => panel({ variant, headHtml: 'h', sections: ['s'] })),
+  ...BUTTON_VARIANTS.map((variant) => button({ label: 'l', variant, ...(variant === 'icon' ? { icon: 'x' } : {}) })),
+  ...TONES.map((tone) => chip({ text: 't', tone, dot: true, swatch: 0, dashed: true })),
+  ...DOTS_TONES.map((tone) => dots({ total: 2, on: 1, decorative: true, tone })),
+  step({ wide: true, bodyHtml: '' }), actions({ wide: true, buttonsHtml: '' }), feedback({ id: 'f', bar: true }),
+  field({ id: 'f', label: 'l', kind: 'code', noteHtml: 'n' }), field({ id: 'f', label: 'l' }),
+  radio({ name: 'r', value: 'v', labelHtml: 'l' }), checkbox({ labelHtml: 'l' }),
+];
+
+const outputs = () => CASES.flatMap(([, t, h, plain]) => [t?.('x'), h?.('<i>x</i>'), plain?.()].filter((o) => o !== undefined)).concat(VARIANTS());
 
 test('T10 every exported helper is covered by the contract table', () => {
   const exported = Object.keys(ui).filter((k) => typeof ui[k] === 'function' && !['setFeedback', 'clearFeedback'].includes(k)).sort();
@@ -233,13 +253,35 @@ test('T10 no style attribute and no on* handler in any helper output (CSP)', () 
   }
 });
 
-test('T10 every class a helper emits is a ui- class defined in styles/kit.css', () => {
+test('T10 every class a helper emits is a ui- class with its own rule in styles/kit.css', () => {
   const kit = definedClasses(['styles/kit.css']);
+  // Own rule: a compound that is exactly `.c` (not only `.c:disabled` or `.c[data-x]`), so a
+  // renamed base rule fails even when a state rule still mentions the class.
+  const own = new Set(rules(read('styles/kit.css')).flatMap((r) => splitTop(r.selector))
+    .flatMap((s) => s.split(/\s*[\s>+~]\s*/)).filter((c) => /^\.[\w-]+$/.test(c)).map((c) => c.slice(1)));
   const used = new Set(outputs().flatMap((o) => [...o.matchAll(/class="([^"]*)"/g)].flatMap((m) => m[1].split(/\s+/))));
-  assert.ok(used.size > 40, `expected the kit's classes, got ${used.size}`);
+  assert.ok(used.size > 70, `expected every variant class, got ${used.size}`);
   for (const c of used) {
     assert.ok(c.startsWith('ui-'), `helpers emit only ui- classes, got ${c}`);
     assert.ok(kit.has(c), `.${c} is emitted but kit.css does not define it`);
+    assert.ok(own.has(c), `.${c} is emitted but kit.css has no rule of its own for it`);
+  }
+});
+
+test('T10 every runtime state and tone value has its own rule in kit.css', () => {
+  const sels = rules(read('styles/kit.css')).flatMap((r) => splitTop(r.selector));
+  const groups = [
+    ['.ui-option', 'data-state', OPTION_STATES],
+    ['.ui-chip', 'data-tone', TONES],
+    ['.ui-feedback', 'data-tone', FEEDBACK_TONES],
+    ['.ui-dots', 'data-tone', DOTS_TONES],
+  ];
+  for (const [base, attr, values] of groups) {
+    assert.ok(values.length > 0, base);
+    for (const v of values) {
+      const head = `${base}[${attr}="${v}"]`;
+      assert.ok(sels.some((s) => s.startsWith(head)), `kit.css has no ${head} rule`);
+    }
   }
 });
 
@@ -304,6 +346,9 @@ const INVALID = [
   ['stats', () => stats([{ label: 'a' }])],
   ['dots', () => dots({ total: 3, on: 4, label: 'x' })],
   ['dots', () => dots({ total: 3, on: 1 })],
+  ['dots', () => dots({ total: 3, on: 1, decorative: true, label: 'x' })],
+  ['dots', () => dots({ total: 3, on: 1, decorative: 'yes' })],
+  ['dots', () => dots({ total: 3, on: 1, label: 'x', tone: 'error' })],
   ['helpChips', () => helpChips('h', [{ key: 'a b', label: 'x', on: true }])],
   ['helpChips', () => helpChips('h', [{ key: 'a', label: 'x', on: 'yes' }])],
   ['sideColumn', () => sideColumn({ id: 's', titleHtml: 't', counts: [{ key: 'hints', label: 'x' }] })],

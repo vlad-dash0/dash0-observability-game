@@ -100,7 +100,7 @@
   color: var(--color-text-muted); white-space: nowrap;
 }
 .ui-chip--dashed { border-style: dashed; }
-.ui-chip-dot { inline-size: 7px; block-size: 7px; border-radius: 50%; flex: none; background: var(--color-text-muted); }
+.ui-chip-dot { inline-size: 7px; block-size: 7px; border-radius: 50%; flex: none; }
 .ui-chip-swatch { inline-size: 8px; block-size: 8px; border-radius: 2px; flex: none; background: var(--color-text-muted); }
 .ui-chip-swatch[data-svc="0"] { background: var(--color-svc-0); }
 .ui-chip-swatch[data-svc="1"] { background: var(--color-svc-1); }
@@ -108,6 +108,7 @@
 .ui-chip-swatch[data-svc="3"] { background: var(--color-svc-3); }
 .ui-chip-swatch[data-svc="4"] { background: var(--color-svc-4); }
 .ui-chip-swatch[data-svc="5"] { background: var(--color-svc-5); }
+.ui-chip[data-tone="neutral"] .ui-chip-dot { background: var(--color-text-muted); }
 .ui-chip[data-tone="success"] { border-color: color-mix(in srgb, var(--color-success) 50%, transparent); color: var(--color-text); }
 .ui-chip[data-tone="success"] .ui-chip-dot { background: var(--color-success); }
 .ui-chip[data-tone="error"] { border-color: color-mix(in srgb, var(--color-error) 50%, transparent); color: var(--color-text); }
@@ -174,13 +175,16 @@
   position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
   font-weight: var(--weight-bold); font-size: 17px; line-height: 1;
 }
-.ui-option[data-state="correct"]::after { content: "\2713"; content: "\2713" / "correct"; color: var(--color-success); }
-.ui-option[data-state="wrong"]::after { content: "\2717"; content: "\2717" / "wrong"; color: var(--color-error); }
+.ui-option[data-state="correct"]::after { content: "\2713"; content: "\2713" / "Correct"; color: var(--color-success); }
+.ui-option[data-state="wrong"]::after { content: "\2717"; content: "\2717" / "Wrong"; color: var(--color-error); }
 .ui-option[data-state="locked"] { border-style: dashed; background: transparent; color: var(--color-text-muted); cursor: not-allowed; }
 .ui-option[data-state="opened"] { background: var(--color-surface-2); }
 .ui-option[data-state="opened"] .ui-option-label { color: var(--color-text-muted); }
 .ui-option[data-hinted] { outline: 2px solid var(--color-hint); outline-offset: 2px; }
+/* An answered card stays legible (no fade); a toggle that cannot be picked yet fades, its only
+   cue (palette rule 7). */
 .ui-option:disabled { cursor: default; }
+.ui-option--toggle:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
 
 /* ---------- Feedback (feedback.mjs) ---------- */
 /* One live region, three tones: the icon and its alt text say the tone, the border echoes it. */
@@ -193,7 +197,7 @@
 .ui-feedback:focus { outline: none; }
 .ui-feedback--bar { padding: 6px var(--space-3); font-size: 13.5px; }
 .ui-feedback-ico { flex: none; inline-size: 18px; text-align: center; font-weight: var(--weight-bold); color: var(--color-text-muted); }
-.ui-feedback-ico::before { content: "i"; content: "i" / "Note"; }
+.ui-feedback[data-tone="neutral"] .ui-feedback-ico::before { content: "i"; content: "i" / "Note"; }
 .ui-feedback-text { min-width: 0; }
 .ui-feedback[data-tone="success"] { border-color: color-mix(in srgb, var(--color-success) 50%, transparent); }
 .ui-feedback[data-tone="success"] .ui-feedback-ico { color: var(--color-success); }
@@ -261,7 +265,9 @@
 .ui-stats dd { margin: 0; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
 .ui-dots { display: inline-flex; gap: 5px; align-items: center; vertical-align: middle; }
 .ui-dots i { inline-size: 9px; block-size: 9px; border-radius: 50%; border: 1px solid var(--color-text-muted); }
-.ui-dots i[data-on="true"] { background: var(--color-success); border-color: var(--color-success); }
+.ui-dots i[data-on="true"], .ui-dots[data-tone="success"] i[data-on="true"] { background: var(--color-success); border-color: var(--color-success); }
+.ui-dots[data-tone="hint"] i { border-color: var(--color-hint); }
+.ui-dots[data-tone="hint"] i[data-on="true"] { background: var(--color-hint); }
 
 /* ---------- Side column (side.mjs) ---------- */
 /* The helps chips, then the column: the success card (the globe's night in both themes,

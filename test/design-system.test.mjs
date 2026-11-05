@@ -95,6 +95,8 @@ test('T4 no stylesheet but kit.css names a ui- class', () => {
     for (const r of sheetRules(f)) {
       const kit = classesInSelector(r.selector).filter((c) => c.startsWith('ui-'));
       assert.deepEqual(kit, [], `styles/${f} restyles a kit class in "${r.selector}"; kit CSS lives in kit.css`);
+      // Attribute selectors on class ([class^="ui-btn"], [class~="ui-chip"]) reach kit classes too.
+      assert.ok(!/\[class[^\]]*ui-/.test(r.selector), `styles/${f} targets a kit class by attribute in "${r.selector}"`);
     }
   }
 });
@@ -151,6 +153,17 @@ test('palette rule 5: kit.css puts no shadow or glow on anything, only inset rin
     }
   }
   assert.ok(rings > 0, 'the pressed option ring is an inset box-shadow');
+});
+
+test('palette rule 7: a disabled toggle option fades (its only cue); answered choice cards do not', () => {
+  const list = sheetRules('kit.css');
+  const declsOf = (sel) => list.filter((r) => splitTop(r.selector).includes(sel)).flatMap((r) => decls(r.body));
+  const toggle = Object.fromEntries(declsOf('.ui-option--toggle:disabled'));
+  assert.equal(toggle.opacity, 'var(--opacity-disabled)', '.ui-option--toggle:disabled fades');
+  assert.equal(toggle.cursor, 'not-allowed');
+  for (const sel of ['.ui-option:disabled', '.ui-option--choice:disabled']) {
+    assert.equal(declsOf(sel).some(([p]) => p === 'opacity'), false, `${sel} must not fade an answered card`);
+  }
 });
 
 // ---- T6 only lib/ui emits ui- classes ----------------------------------------------------

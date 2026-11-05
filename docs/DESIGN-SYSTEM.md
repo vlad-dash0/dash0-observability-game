@@ -9,6 +9,14 @@ Status: P1a (this foundation) is additive; nothing renders through the kit yet. 
 `lib/play.mjs`, `ctx.speech`, Choice, the help ladder and Build it onto it; P2 to P6 move the other
 widgets and the hand-written levels; P7 deletes the retired CSS.
 
+Owner decisions (#158, 2026-11-04), cited as D1 to D7 here and in the code: **D1** wrong answers
+stay purple (`--color-error`); red `--color-alert` is only for the firing banner. **D2** the primary
+button is a red pill, 14px/600, no glow, not full width. **D3** the hub changes only its buttons; the
+reward card keeps its glow. **D4** questions are centred in narrow steps, left-aligned in wide ones.
+**D5** a new component needs an entry here, reviewer approval and screenshots the owner sees.
+**D6** #57 and #59 fold into #160. **D7** a wrong answer uses the error tone; info-only messages are
+neutral.
+
 ## Files
 
 | File | Holds |
@@ -54,26 +62,31 @@ Text params are escaped; `*Html` params are trusted authored HTML (escape player
 and hooks must match `/^[A-Za-z][\w-]*$/`; any bad input throws a TypeError naming the helper. See
 each function's JSDoc for the exact markup.
 
-| Helper | Module | What |
+| Call | Module | What |
 | --- | --- | --- |
-| `step`, `split`, `actions` | layout | Step frame (narrow or wide), board plus side column, actions bar. |
-| `lesson` | text | The glow lesson card ("Lesson" eyebrow, glow top left, dot top right). |
-| `question`, `stepHead`, `eyebrow` | text | The step's question; "Step N" heading; mono label. |
-| `note`, `prose`, `codeBlock` | text | Muted small print; classless authored content; escaped code. |
-| `panel` | panel | Card with sections; `inset`, `alert`, `drop` (dashed means drop zone only). |
-| `chip` | chip | Mono pill; `data-tone` neutral, success, error, hint, attention; dot, swatch, dashed. |
-| `button`, `nextButton`, `finishButton` | button | Pill; `primary` (red, D2), `ghost`, `hint`, `icon`; Finish has `data-finish`. |
-| `option`, `options` | option | Selectable card (`choice`, `tile`, `hypothesis`, `toggle`, `line`, `radio`) and its group. |
-| `feedback`, `setFeedback`, `clearFeedback` | feedback | The one feedback region; tones neutral, success, error (D7). |
-| `meter` | meter | Cells (20 by default) plus a text line that is the accessible value. |
-| `field`, `radio`, `checkbox` | field | Labelled text or code input; custom radio and checkbox rows. |
-| `table` | table | Data table in a scroll wrap; same look inside `prose`. |
-| `stats`, `dots` | stats | Label/value row; progress dots with a spoken label. |
-| `helpChips`, `stars`, `sideColumn` | side | Helps row, five stars, the success, score and hints column. |
+| `step({wide, bodyHtml})`, `split({mainHtml, sideHtml})`, `actions({wide, buttonsHtml})` | layout | Step frame (narrow or wide), board plus side column (inside a wide step), actions bar. |
+| `lesson(bodyHtml)` | text | The glow lesson card ("Lesson" eyebrow, glow top left, dot top right). |
+| `question({id, html})`, `stepHead({step, titleHtml, noteHtml})`, `eyebrow(text)` | text | The step's question; "Step N" heading; mono label. |
+| `note(bodyHtml)`, `prose(bodyHtml)`, `codeBlock(text)` | text | Muted small print; classless authored content; escaped code. |
+| `panel({id, variant, headHtml, sections})` | panel | Card with sections; `inset`, `alert`, `drop` (dashed means drop zone only). |
+| `chip({text, tone, dot, swatch, dashed})` | chip | Mono pill; `data-tone` neutral, success, error, hint, attention. |
+| `button({id, label, variant, disabled, finish, type, icon})`, `nextButton(id)`, `finishButton(id)` | button | Pill; `primary` (red, D2), `ghost`, `hint`, `icon`; Finish has `data-finish`. |
+| `option({attr, value, labelHtml, metaHtml, kind, pressed, state, disabled, hinted, name})`, `options({id, labelledBy, layout, itemsHtml})` | option | Selectable card and its group (list, grid, wrap). |
+| `feedback({id, bar})`, `setFeedback(el, tone, bodyHtml)`, `clearFeedback(el)` | feedback | The one feedback region; tones neutral, success, error (D7). |
+| `meter({id, label, value, max, cells, unit, previewCells, over})` | meter | Cells (20 by default) plus a text line that is the accessible value. |
+| `field({id, label, kind, rows, value, readonly, noteHtml})`, `radio({...})`, `checkbox({...})` | field | Labelled text or code input; radio and checkbox rows (`id, name, value, labelHtml, checked, disabled`). |
+| `table({caption, head, rows, numeric})` | table | Data table in a scroll wrap; same look inside `prose`. |
+| `stats([{label, value}])`, `dots({total, on, label, decorative, tone})` | stats | Label/value row; dots, spoken by `label` or `decorative` (aria-hidden beside a text line). |
+| `helpChips(id, rows)`, `stars(n, done)`, `sideColumn({id, titleHtml, counts, hints, ruleHtml})` | side | Helps row, five stars, the success, score and hints column. |
+
+The allowed values are exported, so callers and tests never repeat them: `BUTTON_VARIANTS`,
+`PANEL_VARIANTS`, `TONES` (chip), `OPTION_KINDS`, `OPTION_STATES`, `OPTIONS_LAYOUTS`,
+`FEEDBACK_TONES`, `DOTS_TONES`.
 
 States are attributes, never extra classes: `aria-pressed` (selected), `data-state` (`correct`,
 `wrong`, `locked`, `opened`), `data-hinted`, `data-tone`, `disabled`, `hidden`. Hover, focus and
-disabled each have one rule in `kit.css`.
+disabled each have one rule in `kit.css`; besides it, a disabled toggle option fades (its only cue),
+while an answered choice card stays legible.
 
 ## Layout
 
@@ -129,7 +142,7 @@ screenshots at 375 and 1280px in both themes on every UI PR.
 
 ## Prototypes
 
-Outside the repo, under `~/dash0-observability-game-worktrees/_handover/`: `trace-proto/lesson.html`
-(variant C, the glow card), `trace-proto/incident-board.html` (buttons, chips, meter, tiles,
-hypotheses, feedback, side column), `trace-proto/on-call-trace-play.html` (Build it) and
-`design-system-plan.md` (the architect's plan, also on #158).
+In `docs/prototypes/` (index: `docs/prototypes/README.md`): `lesson.html` (variant C, the glow
+card), `incident-board.html` (buttons, chips, meter, tiles, hypotheses, feedback, side column) and
+`on-call-trace-play.html` (Build it). The architect's full plan is the "design-system-plan.md"
+comment on #158.
