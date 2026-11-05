@@ -59,9 +59,12 @@ plays levels synchronously, as R does).
 
 ### 2.2 Acts (`levels/index.mjs`)
 
-`export const ACTS = [{ id, no, name, sub, levels: Level[], boss: Level | null }]`.
+`export const ACTS = [{ id, no, name, sub, teaser?, levels: Level[], boss: Level | null }]`.
 `id` kebab, unique; `no` integer ≥0, strictly increasing (gaps allowed); `levels.length ≥ 1`.
 Acts unlock by array position, unless already entered (§3). Empty `ACTS` is valid.
+`teaser` is optional plain text, one line (the About dialog shows it; every live act in
+`levels/index.mjs` has one of at most 160 characters, `test/live-registry.test.mjs`); it
+builds to `''` when absent and must be a string otherwise. `hub/coming-soon.mjs` uses the same field.
 
 ### 2.3 Nuance card (`cards/deck.mjs`)
 
@@ -73,7 +76,7 @@ non-empty string or `null`. Checked by `validateDeck`.
 
 ```
 Registry = {
-  acts:   [{ id, no, name, sub, levelIds: string[], bossId: string|null }],
+  acts:   [{ id, no, name, sub, teaser, levelIds: string[], bossId: string|null }],
   levels: { [id]: Level },  // null-prototype; Level = §2.1 + defaults + actId + kind:'level'|'boss';
                             // `play` is a deep-frozen copy of the declared play, or null; `mechanics` derived for play levels
   order:  string[],         // per act: its levels, then its boss
