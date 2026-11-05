@@ -51,6 +51,7 @@ const COMBOS = [
 const SPOT = {
   id: 'cdn-spot',
   target: 'metric',
+  helps: { hints: true },
   lines: [
     { id: 'route', text: 'http_server_requests_total{http_route="/recommendations/{id}"}' },
     { id: 'url-path', text: 'http_server_requests_total{url_path="/recommendations/48211"}' },

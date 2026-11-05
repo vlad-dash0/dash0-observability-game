@@ -36,6 +36,7 @@
 const SPOT = {
   id: 'exm-spot',
   target: 'config',
+  helps: { hints: true },
   lines: [
     { id: 'pay-0914-00', text: '09:14:00 payments.charge.duration{route="/pay"} count=9 sum=2.9s exemplar: none' },
     {

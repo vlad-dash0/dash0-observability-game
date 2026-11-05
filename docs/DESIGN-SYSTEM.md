@@ -8,7 +8,8 @@ only they emit `ui-` classes, only `styles/kit.css` styles them, and colours com
 Status: P1b moved the step frame (`lib/play.mjs`), `ctx.speech`, Choice, the help ladder, Build it
 and the `index.html` buttons onto the kit; P2 (#143) moved the incident board (and added `fold`);
 P3a (#156) moved Sort it (kit markup and side column; its hint ladder followed in #156);
-P3b to P6 move the other widgets and the hand-written levels (until then `base.css` keeps their
+P3b (#160) moved Spot it (kit, hint ladder);
+P3b's other widgets to P6 move the other widgets and the hand-written levels (until then `base.css` keeps their
 wrappers narrow); P7 deletes the retired CSS.
 
 Owner decisions (#158, 2026-11-04), cited as D1 to D7 here and in the code: **D1** wrong answers
