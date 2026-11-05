@@ -91,11 +91,11 @@ while an answered choice card stays legible.
 ## Layout
 
 `.ui-step` caps a step at `--layout-narrow` (760px, centred); `.ui-step--wide` at `--layout-wide`
-(1320px). The step type decides which (`STEP_TYPES[*].wide` in `lib/play.mjs`; hand-written
-levels pass it); the level overlay is as wide as the widest step. Every step is the `level` container; a `.ui-split` inside it shows its side column
-(300px, sticky) from `@container level (min-width: 960px)` and stacks below. The 960 is a literal:
-custom properties do not work in container conditions. Questions are centred in narrow steps and
-left-aligned in wide ones (D4).
+(1320px). The step type decides which (`STEP_TYPES[*].wide` in `lib/play.mjs`; hand-written levels
+pass it); the level overlay is as wide as the widest step. Every step is the `level` container; a
+`.ui-split` inside it shows its side column (300px, sticky) from `@container level (min-width:
+960px)` and stacks below. The 960 is a literal: custom properties do not work in container
+conditions. Questions are centred in narrow steps and left-aligned in wide ones (D4).
 
 ## Authoring content
 
