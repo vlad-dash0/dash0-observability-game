@@ -358,10 +358,11 @@ test('9.1 step 1 is the Act 9 verdict Choice: holds, wrong, follow-up; exactly o
   assert.match(plain(V91.intro), /filter/);
 });
 
-test('9.1 step 1 labels give nothing away: the right one is not the longest, lengths within 10, no digits', () => {
+test('9.1 step 1 labels give nothing away: the right one is neither the longest nor the shortest, lengths within 10, no digits', () => {
   const lens = choices91.map((c) => plain(c.label).length);
   const right = choices91.find((c) => c.right);
   assert.equal(plain(right.label).length < Math.max(...lens), true, 'the right label is not the longest');
+  assert.equal(plain(right.label).length > Math.min(...lens), true, `the right label is not the shortest (${lens.join(', ')})`);
   assert.equal(Math.max(...lens) - Math.min(...lens) <= 10, true, `lengths ${lens.join(', ')}`);
   for (const c of choices91) assert.equal(/\d/.test(c.label), false, `no digit in ${c.key}`);
 });
@@ -426,13 +427,16 @@ test('9.1 step 2 every wrong drop explains itself', () => {
     for (const b of others) assert.match(plain(it.whyNot[b]), /^[A-Z][\s\S]*\.$/, `${it.id} whyNot.${b} is a capitalised sentence`);
     assert.match(plain(it.why), /^[A-Z][\s\S]*\.$/, `${it.id} why`);
   }
-  assert.equal(plain(sort91.items.find((it) => it.id === 'debug-logs').whyNot.tail).includes('samples traces only'), true);
+  const logsNotTail = plain(sort91.items.find((it) => it.id === 'debug-logs').whyNot.tail);
+  assert.match(logsNotTail, /works on traces/, 'the tail sampler handles traces');
+  assert.match(logsNotTail, /Log records never pass through it/, 'and log records never reach it');
 });
 
-test('9.1 sources: the Spec URLs, only allowed hosts, the LIVE-DEMO source line, no unsourced Dash0 claim, no pricing, no em dash', () => {
+test('9.1 sources: the Spec and Dash0 URLs, only allowed hosts, the LIVE-DEMO source line, every Dash0 sentence sourced, no pricing, no em dash', () => {
   for (const url of [
     'https://opentelemetry.io/docs/concepts/sampling/#tail-sampling',
     'https://opentelemetry.io/docs/collector/transforming-telemetry/',
+    'https://opentelemetry.io/docs/specs/semconv/resource/deployment-environment/',
   ]) assert.equal(SRC91.includes(url), true, url);
   assert.match(SRC91, /^\/\/ Spec: https:/m);
   const hosts = ['opentelemetry.io', 'www.w3.org', 'prometheus.io', 'www.dash0.com'];
@@ -443,10 +447,24 @@ test('9.1 sources: the Spec URLs, only allowed hosts, the LIVE-DEMO source line,
   assert.match(SRC91.split('\n').slice(0, 12).join('\n'), /docs\/LIVE-DEMO\.md/);
   assert.match(SRC91, /Facts used/);
   assert.match(SRC91, /Invented/);
-  // G2-c: the Dash0 sentence ships only once a reviewer reads it on a www.dash0.com page. Until then the copy names no Dash0
-  // feature; adding one needs a `// Dash0 docs:` line and this assertion changed with it.
+  // G2-c: every sentence of the copy that names Dash0 or one of its features is backed by the `// Dash0 docs:` line: each
+  // feature it names has its page there, and a sentence that names Dash0 names a feature (no bare "Dash0 does X").
+  const dash0Docs = SRC91.match(/^\/\/ Dash0 docs: (.*)$/m)?.[1] ?? '';
+  const DASH0_PAGES = {
+    'spam filter': 'https://www.dash0.com/docs/dash0/cost-control/spam-filters',
+    signalcontrol: 'https://www.dash0.com/docs/dash0/telemetry/signal-control/about-signal-control',
+  };
+  for (const url of Object.values(DASH0_PAGES)) assert.equal(dash0Docs.includes(url), true, `the Dash0 docs line has ${url}`);
   const copy = plain(JSON.stringify(level91.play));
-  assert.equal(/dash0|signalcontrol|spam filter/i.test(copy), false, 'no unsourced Dash0 claim in the copy');
+  const strings = [];
+  const walk = (v) => (typeof v === 'string' ? strings.push(plain(v)) : v && typeof v === 'object' && Object.values(v).forEach(walk));
+  walk(level91.play);
+  const sentences = strings.flatMap((t) => t.split(/(?<=[.?!])\s+/)).filter((s) => /dash0|signalcontrol|spam filter/i.test(s));
+  assert.equal(sentences.length > 0, true, 'the copy ties the lesson to Dash0');
+  for (const s of sentences) {
+    const named = Object.keys(DASH0_PAGES).filter((f) => s.toLowerCase().includes(f));
+    assert.equal(named.length > 0, true, `a Dash0 sentence names a sourced feature: ${s}`);
+  }
   assert.equal(/pric|\$|dollar|cost per|per GB|invoice|bill/i.test(copy), false, 'no pricing copy');
   assert.equal(SRC91.includes('—'), false, 'no em dash');
   for (const step of level91.play.steps) assert.equal(JSON.stringify(step).includes('<pre'), false, 'no YAML block');
@@ -454,7 +472,7 @@ test('9.1 sources: the Spec URLs, only allowed hosts, the LIVE-DEMO source line,
 
 // ---- the globe -----------------------------------------------------------------------------
 
-test('globe: 9.2 lights Australia, 9.1 lights New Zealand; Oceania completes with both', () => {
+test('globe: 9.2 lights Australia, 9.1 lights New Zealand; Oceania completes with both, in either order', () => {
   assert.equal(LEVEL_COUNTRY[ID92], 'AUS');
   assert.equal(LEVEL_COUNTRY[ID91], 'NZL');
   assert.equal(COUNTRY_NAMES.AUS, 'Australia');
@@ -467,4 +485,11 @@ test('globe: 9.2 lights Australia, 9.1 lights New Zealand; Oceania completes wit
   const second = freshlyLit(progressOf([ID92]), progressOf([ID92, ID91]), LIVE, map);
   assert.deepEqual(second, { countryIds: ['NZL'], regionIds: ['act-9'] });
   assert.equal(litText(second, level91, map), 'New Zealand is now lit: Filter, sampler, or both? Oceania is complete.', 'no "?." after the name');
+  // The other order: 9.1 first lights New Zealand alone, then 9.2 lights Australia and completes the region.
+  const nzFirst = freshlyLit(emptyProgress(), progressOf([ID91]), LIVE, map);
+  assert.deepEqual(nzFirst, { countryIds: ['NZL'], regionIds: [] }, '9.2 is still open, so the region is not');
+  assert.equal(litText(nzFirst, level91, map), 'New Zealand is now lit: Filter, sampler, or both?', 'no "?." and no region line');
+  const auSecond = freshlyLit(progressOf([ID91]), progressOf([ID91, ID92]), LIVE, map);
+  assert.deepEqual(auSecond, { countryIds: ['AUS'], regionIds: ['act-9'] });
+  assert.equal(litText(auSecond, level, map), 'Australia is now lit: The 34% error rate. Oceania is complete.');
 });
