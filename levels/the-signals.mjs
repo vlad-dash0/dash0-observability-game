@@ -57,7 +57,7 @@ const DATA = {
 const ASK = {
   id: 'sig-ask',
   helps: { hints: true },
-  hint: 'Ask which data you would need to answer it.',
+  hint: 'Ask whether the answer is a number over time, one event\'s exact contents, one request\'s path, or where code spends its time.',
   buckets: SIGNALS,
   items: [
     {
