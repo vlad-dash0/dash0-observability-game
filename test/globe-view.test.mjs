@@ -502,6 +502,39 @@ test('dispose frees everything once: geometry, materials, renderer and context, 
   assert.equal(dom.host.children.length, 0, 'the canvas is removed');
 });
 
+test('each colour role is read at its own settled value even when a class change on a reused element transitions (#169)', async () => {
+  // Under prefers-reduced-motion every element has a transition (styles/base.css), so changing
+  // a probe's class and reading getComputedStyle at once gives the transition's start value: the
+  // colour that element showed before. This fake does the same; only a new element reads true.
+  const roleColor = Object.fromEntries(COLOR_ROLES.map((role, i) => [role, `rgb(${10 * (i + 1)}, ${i + 1}, 0)`]));
+  const dom = recordingDom();
+  const shown = new Map();
+  dom.window.getComputedStyle = (el) => {
+    const settled = roleColor[el.className.split(' ')[1]] ?? '';
+    const color = shown.has(el) ? shown.get(el) : settled;
+    shown.set(el, settled);
+    return { color };
+  };
+  const drawn = [];
+  const { THREE } = recordingThree();
+  THREE.Color = class {
+    setRGB(r, g, b) {
+      drawn.push([r, g, b]);
+      return this;
+    }
+  };
+  THREE.Vector3 = class {
+    constructor(...rgb) {
+      drawn.push(rgb);
+    }
+  };
+  const handle = await mountGlobe(dom.host, { ...VIEW, window: dom.window, document: dom.document, importThree: async () => THREE });
+  const key = (rgb) => JSON.stringify(rgb);
+  assert.deepEqual(drawn.map(key).sort(), COLOR_ROLES.map((role) => key(parseColor(roleColor[role]))).sort());
+  assert.deepEqual(dom.host.children.map((c) => c.className), ['globe-canvas'], 'no probe left behind');
+  handle.dispose();
+});
+
 test('a failure part way through setup frees what was made, loses the context and gives null', async () => {
   for (const where of ['BufferGeometry', 'ShaderMaterial', 'Group']) {
     const { THREE, rec } = recordingThree(where);
