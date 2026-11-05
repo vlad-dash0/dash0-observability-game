@@ -14,6 +14,7 @@ Act 9 turns anonymised questions from real calls into "does this answer hold?" l
 
 - The source notes are held privately outside the repo. They are never linked, named, dated or described here, in a level, in a PR or in a commit.
 - What enters the repo: a paraphrased question, invented round figures, and public sources (dash0.com docs, OpenTelemetry specs).
+- The same rule holds for PR descriptions, issues and intake cards: the paraphrase only, never the source wording.
 - When unsure whether something may enter, it may not. Ask the owner.
 
 ## 3. Anonymisation rules
@@ -32,7 +33,7 @@ Question (paraphrased, one sentence):
 The confident answer the presenter gives:
 Why it is wrong, or when it holds:
 Concept taught (one):
-Widget for step 2 (existing only):
+Mechanic for step 2 (Trade-off, Sort it, Spot it, Query it or Build it; existing only):
 Dash0 specific (the passing setup):
 Public source for it (URL, read on dash0.com or confirmed by product):
 Invented figures (round, one table):
@@ -73,7 +74,7 @@ Decision (owner, 2026-11-05): Act 9 is the endgame, chained after the earlier ac
 - `levels/index.mjs` ACTS gets `{ id: 'act-9', no: 9, name: 'Live Demo', sub: 'Does that answer hold?', levels: [...], boss: null }`, after act-6. Act numbers may skip and a null boss is handled.
 - Act 9 opens when acts 0-6 are complete, or once entered (`lib/unlock.mjs`). `?mode=debug` opens it.
 - When Acts 7-8 land, they must come before act-9 in ACTS, and act-9 then re-locks for anyone who finished 0-6 without entering it. If an always-open side track is wanted instead (option B), that change must merge before the first Act 7 PR. Revisit then, not before.
-- Globe: `ACT_REGIONS['act-9']` is already Oceania. For each level add `LEVEL_COUNTRY[<id>] = 'AUS'` and `COUNTRY_NAMES.AUS` in `hub/globe-map.mjs`, and the AUS box in `test/globe-data.test.mjs`. Oceania has few countries with enough dots: check capacity before planning more than about 3 Act 9 levels.
+- Globe: `ACT_REGIONS['act-9']` is already Oceania, and the AUS dot box already exists (`test/globe-data.test.mjs`, `inBox('AUS', ...)`). A country can serve only one level (`countries are distinct` test), so each Act 9 level needs its own country in `hub/globe-map.mjs`: `LEVEL_COUNTRY[<id>]` plus `COUNTRY_NAMES.<ISO>` (once per country). Only AUS (391 dots), PNG (23) and NZL (13) reach `MIN_DOTS` (6), so plan at most 3 Act 9 levels. When a country is first mapped, `HOME` in `test/globe-data.test.mjs` needs one box for it (the test requires a box for exactly the mapped countries); AUS has none there yet.
 - No new card needed when the fact already has one (9.2 uses `spanmetrics-before-sampling`).
 - Citation host: `www.dash0.com` is allowed in SPEC_HOSTS (`test/content.test.mjs`, decided in #177).
 
@@ -83,6 +84,6 @@ Decision (owner, 2026-11-05): Act 9 is the endgame, chained after the earlier ac
 2. Anonymise (section 3). Get G1.
 3. Find the Dash0 page that backs the passing setup. Get G2. If there is none, the question is not an Act 9 level.
 4. Write the constants table, then the level from the template (section 5), plus its driver in `test/levels-play.test.mjs` (happy and sloppy runs).
-5. Register it (section 7): ACTS, globe country, globe test.
+5. Register it: the `act-9` ACTS entry once (in the first Act 9 level PR, §7); then, per level, its globe country and the globe test.
 6. One branch per level, PR to `main`, title `feat: ... (#N)`. Get G3 and G4 recorded in the PR.
 7. Tick the ledger line in #32.
