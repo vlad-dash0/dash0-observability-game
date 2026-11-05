@@ -40,7 +40,7 @@ const SPOT = {
   },
   explain:
     '<code>CheckoutErrors</code> compares a cumulative counter\'s value with 500. A counter only grows until the process restarts, so once it passes 500 the rule stays firing until a restart. ' +
-    '<code>CheckoutHighCpu</code> pages on a cause: checkout processes each using 0.9 of a CPU core may hurt no one, and when they do, the error and latency rules already fire. Page on symptoms users feel and keep causes on a dashboard. ' +
+    '<code>CheckoutHighCpu</code> pages on a cause: checkout processes using 0.9 of a CPU core on average may hurt no one, and when they do, the error and latency rules already fire. Page on symptoms users feel and keep causes on a dashboard. ' +
     '<code>SearchSlowP99Latency</code> has no <code>for</code> wait (<code>for: 0s</code>), so it fires on the first evaluation over the line, and a p99 over 1 minute crosses it and falls back often: the alert flaps. ' +
     'A <code>for</code> duration makes the condition hold that long before the alert fires.',
 };
