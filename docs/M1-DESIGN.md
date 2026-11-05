@@ -127,7 +127,7 @@ order, else null (Hint disabled, "Nothing to hint right now."). Tiers by `hintFo
 itemId, tier, {shuffle})`, all derived from `bucketOf`, each html a `<p>`: 1 the step's `hint` or
 `SORT_RULE`; 2 two candidate buckets in spec order, the right one and a decoy shuffled (through
 `ctx.shuffle`) from the buckets not yet tried for the item, outlined with `data-hinted` while that
-item is selected and remaining (reselecting it redraws them and its tier 2 text); 3 places the item
+item is the hint target (the selected item, else the first item still to sort), never on a bucket already tried; 3 places the item
 through `place` (a hint, never a mistake; the feedback is a neutral "Placed for you.", never
 "Right.").
 
@@ -137,11 +137,11 @@ for any item, every item's ladder starts past it. Tier 2 is offered only when it
 when the item's untried buckets number 3 or more (or it was already given); otherwise the next tier is
 the placement. The ladder is `[1, 2?, 3]`; the button reads "Hint `done+1` of `tiers.length`" and the
 side line "For X: `done` of `tiers.length` used", where `done` counts the rule once it was read for
-any item (so a 2-bucket board after the rule reads "Hint 2 of 2").
+any item (so a 2-bucket board after the rule reads "Hint 2 of 2"). With one bucket left and no hint for it, the side line reads "For X: only one bucket left" with no dots.
 With fewer than 3 untried buckets the view skips tier 2; with exactly one left untried (the right
 one) there is no hint at all: `next` is null, the button reads "No more hints" and is disabled. The
 hint panel always shows the hint target's own last hint (tier 2) and, when that item has none, shows the rule once it was read (else it is empty); selecting an item, a placement that moves the target, or a wrong try re-syncs it with the
-board's outlines. The outlines follow the same hint target as the panel. One exception: right after a tier 3 placement the panel keeps "Placed for you. ..." until the next selection, placement or try. The rule (tier 1) is paid once per board, not stored per item.
+board's outlines. One exception: right after a tier 3 placement the panel keeps "Placed for you. ..." until the next selection, placement or try. The rule (tier 1) is paid once per board, not stored per item.
 An item's total can therefore shrink mid-ladder ("Hint 2 of 3" becomes "Hint 2 of 2") when a wrong
 try leaves fewer than three untried buckets and tier 2 was not yet taken.
 Each click is one `ctx.hint()` and one hint on the score card; nothing happens after the last item.
