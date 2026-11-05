@@ -778,6 +778,7 @@ test('the outlines are per item: gone while another item is selected, back on re
   assert.deepEqual(counts, { mistakes: 0, hints: 2, done: 0 }, 'selecting costs nothing');
   click('[data-bucket="metric"]'); // the decoy: wrong, two untried left, but the tier 2 given stays counted
   assert.deepEqual(counts, { mistakes: 1, hints: 2, done: 0 });
+  assert.deepEqual(hintedBuckets(), ['log'], 'the tried decoy loses its outline; the right bucket keeps it');
   assert.equal(hintLabel(), 'Hint 3 of 3');
   assert.equal(tierLine(), 'For Stack trace text: 2 of 3 used');
 });
