@@ -4,9 +4,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   INGRESS_HOSTS,
+  INGRESS_PORTS,
   PRACTICE_HOSTS,
   REASONS,
+  TOKEN_PREFIX,
   checkDataset,
+  cspOrigin,
   checkToken,
   parseEndpoint,
 } from '../lib/dash0/ingress.mjs';
@@ -26,6 +29,10 @@ test('each wrong shape names its reason', () => {
     ['', 'empty'],
     ['   ', 'empty'],
     [`${HOST}:4317`, 'grpc-port'],
+    // Scheme-less with any other port: the mistake is the missing https://, not gRPC.
+    [`${HOST}:4318`, 'no-scheme'],
+    [`${HOST}:443`, 'no-scheme'],
+    [`${HOST}:4318/v1/traces`, 'no-scheme'],
     [`https://${HOST}:4317`, 'grpc-port'],
     [`http://${HOST}`, 'not-https'],
     [`https://u:p@${HOST}`, 'credentials'],
@@ -37,6 +44,12 @@ test('each wrong shape names its reason', () => {
     [`https://${HOST}:8443`, 'unexpected-port'],
     [`https://${HOST}/v1/traces`, 'signal-path'],
     [`https://${HOST}/v1/traces/`, 'signal-path'],
+    // Case and doubled slashes do not hide the signal path.
+    [`https://${HOST}/V1/Traces`, 'signal-path'],
+    [`https://${HOST}//v1/traces`, 'signal-path'],
+    [`https://${HOST}/v1//traces//`, 'signal-path'],
+    [`https://${HOST}/v1/tracesx`, 'unexpected-path'],
+    [`https://${HOST}/v1/metrics`, 'unexpected-path'],
     [`https://${HOST}/otlp`, 'unexpected-path'],
     ['not a url', 'malformed'],
     // Check order: the first failing check names the reason.
@@ -49,6 +62,32 @@ test('each wrong shape names its reason', () => {
   }
   // Every reason the validators return has teaching copy.
   for (const [, reason] of rows) assert.equal(typeof REASONS[reason], 'string', reason);
+  // The no-scheme copy names https://, and the gRPC copy is not reused for it.
+  assert.match(REASONS['no-scheme'], /https:\/\//);
+  assert.notEqual(REASONS['no-scheme'], REASONS['grpc-port']);
+});
+
+test('the port check uses the effective port: no port is 443', () => {
+  const p4318 = { hosts: [HOST], ports: [4318] };
+  assert.deepEqual(parseEndpoint(`https://${HOST}`, p4318), { ok: false, reason: 'unexpected-port' });
+  assert.deepEqual(parseEndpoint(`https://${HOST}:443`, p4318), { ok: false, reason: 'unexpected-port' });
+  assert.deepEqual(parseEndpoint(`https://${HOST}:4318/`, p4318), {
+    ok: true, base: `https://${HOST}:4318`, tracesUrl: `https://${HOST}:4318/v1/traces`, host: HOST,
+  });
+  // The default list is 443: a no-port URL and an explicit :443 both pass, and both normalise.
+  assert.deepEqual(INGRESS_PORTS, [443]);
+  assert.equal(parseEndpoint(`https://${HOST}`, opts).ok, true);
+  assert.equal(parseEndpoint(`https://${HOST}:443`, opts).base, `https://${HOST}`);
+  assert.deepEqual(parseEndpoint(`https://${HOST}:4318`, opts), { ok: false, reason: 'unexpected-port' });
+});
+
+test('cspOrigin renders the CSP origin, with the port only when it is not 443', () => {
+  assert.equal(cspOrigin(HOST), `https://${HOST}`);
+  assert.equal(cspOrigin(HOST, 443), `https://${HOST}`);
+  assert.equal(cspOrigin(HOST, 4318), `https://${HOST}:4318`);
+  // It matches what parseEndpoint calls the base, so the CSP and the request agree.
+  assert.equal(cspOrigin(HOST, 4318), parseEndpoint(`https://${HOST}:4318`, { hosts: [HOST], ports: [4318] }).base);
+  assert.equal(cspOrigin(HOST, 443), parseEndpoint(`https://${HOST}:443`, opts).base);
 });
 
 test('the shipped allowlist is empty and frozen, so no live host validates yet; practice hosts never resolve', () => {
@@ -87,7 +126,11 @@ test('checkToken reasons, and no result ever contains the input', () => {
     [`auth_${SECRET}é`, { ok: false, reason: 'characters' }],
     ['', { ok: false, reason: 'empty' }],
     [undefined, { ok: false, reason: 'empty' }],
-    ['Zq9s', { ok: false, reason: 'length' }],
+    ['auth_Z', { ok: false, reason: 'length' }],
+    // The shipped prefix is auth_: a token without it is not a Dash0 token.
+    [SECRET, { ok: false, reason: 'prefix' }],
+    [`Auth_${SECRET}`, { ok: false, reason: 'prefix' }],
+    [`xauth_${SECRET}`, { ok: false, reason: 'prefix' }],
   ];
   for (const [raw, want] of rows) {
     const r = checkToken(raw);
@@ -96,7 +139,9 @@ test('checkToken reasons, and no result ever contains the input', () => {
     assert.ok(!text.includes('Zq9s'), `result for ${JSON.stringify(raw)} echoes the token`);
     if (raw) assert.ok(!text.includes(JSON.stringify(raw).slice(1, -1)));
   }
+  assert.equal(TOKEN_PREFIX, 'auth_');
   // The prefix check runs only when a prefix is set.
+  assert.deepEqual(checkToken(SECRET, { prefix: null }), { ok: true });
   assert.deepEqual(checkToken(SECRET, { prefix: 'auth_' }), { ok: false, reason: 'prefix' });
   assert.deepEqual(checkToken(`auth_${SECRET}`, { prefix: 'auth_' }), { ok: true });
 });

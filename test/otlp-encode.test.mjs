@@ -2,7 +2,7 @@
 // https://opentelemetry.io/docs/specs/otlp/ (JSON Protobuf Encoding).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { encodeTraces, msToUnixNano } from '../lib/otlp/encode.mjs';
+import { SERVICE_VERSION, encodeTraces, msToUnixNano } from '../lib/otlp/encode.mjs';
 
 const SESSION = 's-7k2m9q';
 const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
@@ -41,6 +41,10 @@ test('encodeTraces puts spans under one resource with service.name and stamps se
   assert.deepEqual(attr(resource, 'service.name'), [{ stringValue: 'oncall-game' }]);
   assert.deepEqual(attr(resource, 'telemetry.sdk.name'), [{ stringValue: 'oncall-game-otlp' }]);
   assert.deepEqual(attr(resource, 'telemetry.sdk.language'), [{ stringValue: 'webjs' }]);
+  // semconv lists telemetry.sdk.version in the same required group as name and language.
+  assert.equal(typeof SERVICE_VERSION, 'string');
+  assert.match(SERVICE_VERSION, /^\d+\.\d+\.\d+/);
+  assert.deepEqual(attr(resource, 'telemetry.sdk.version'), [{ stringValue: SERVICE_VERSION }]);
   assert.deepEqual(attr(resource, 'session.id'), [], 'the session is a span attribute, not a resource one');
   const spans = spansOf(req);
   assert.deepEqual(spans.map((s) => s.name), ['level.complete', 'storage.write']);
@@ -96,6 +100,20 @@ test('int attributes are intValue strings, bools boolValue, kind and status enum
   assert.equal(r.status, undefined);
   const [d] = spansOf(encodeTraces([{ ...root, attributes: { ratio: 0.25 } }], { sessionId: SESSION }));
   assert.deepEqual(attr(d.attributes, 'ratio'), [{ doubleValue: 0.25 }]);
+});
+
+test('intValue only for safe integers and bigints: an unsafe number throws, a bigint is exact', () => {
+  const enc = (v) => attr(spansOf(encodeTraces([{ ...root, attributes: { n: v } }], { sessionId: SESSION }))[0].attributes, 'n');
+  assert.deepEqual(enc(Number.MAX_SAFE_INTEGER), [{ intValue: '9007199254740991' }]);
+  assert.deepEqual(enc(-Number.MAX_SAFE_INTEGER), [{ intValue: '-9007199254740991' }]);
+  assert.deepEqual(enc(0), [{ intValue: '0' }]);
+  // 1e21 would print as "1e+21", and 2**53+1 has already lost its last digit.
+  for (const v of [1e21, 2 ** 53 + 1, 2 ** 53, -(2 ** 53)]) {
+    assert.throws(() => enc(v), RangeError, String(v));
+  }
+  // A bigint beyond 2**53 (and the int64 edge) is encoded digit for digit.
+  assert.deepEqual(enc(2n ** 53n + 1n), [{ intValue: '9007199254740993' }]);
+  assert.deepEqual(enc(9223372036854775807n), [{ intValue: '9223372036854775807' }]);
 });
 
 test('events encode name, time and attributes', () => {

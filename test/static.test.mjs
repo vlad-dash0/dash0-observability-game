@@ -8,7 +8,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseHTML } from 'linkedom';
 import { headersFor, ignoreMatcher } from '../tools/serve.mjs';
-import { INGRESS_HOSTS } from '../lib/dash0/ingress.mjs';
+import { INGRESS_HOSTS, INGRESS_PORTS, cspOrigin } from '../lib/dash0/ingress.mjs';
 import { definedClasses } from './helpers/css.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -26,8 +26,10 @@ const M0_CSP =
   "default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self'; img-src 'self' data:; " +
   "font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; " +
   "frame-ancestors 'none'; object-src 'none'";
-const cspFor = (hosts) =>
-  M0_CSP.replace("connect-src 'self';", `connect-src ${["'self'", ...hosts.map((h) => `https://${h}`)].join(' ')};`);
+// One origin per host and port, rendered by the validator's own cspOrigin (443 implicit).
+const originsFor = (hosts, ports = INGRESS_PORTS) => hosts.flatMap((h) => ports.map((p) => cspOrigin(h, p)));
+const cspFor = (hosts, ports = INGRESS_PORTS) =>
+  M0_CSP.replace("connect-src 'self';", `connect-src ${["'self'", ...originsFor(hosts, ports)].join(' ')};`);
 const CSP = cspFor(INGRESS_HOSTS);
 
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
@@ -124,11 +126,14 @@ test('vercel.json CSP equals the design, with no unsafe-inline and no framing', 
 // I4 (docs/DASH0-LAB.md): the validator's host set is exactly connect-src minus 'self'.
 test("vercel.json connect-src is 'self' plus exactly the INGRESS_HOSTS origins", () => {
   const d = directives(headerRule('/(.*)')['Content-Security-Policy']);
-  assert.deepEqual(d['connect-src'], ["'self'", ...INGRESS_HOSTS.map((h) => `https://${h}`)]);
+  assert.deepEqual(d['connect-src'], ["'self'", ...originsFor(INGRESS_HOSTS)]);
   assert.ok(Object.isFrozen(INGRESS_HOSTS), 'INGRESS_HOSTS is frozen');
   // The derivation: the M0 policy for an empty list, one origin per host otherwise.
   assert.equal(cspFor([]), M0_CSP);
   assert.match(cspFor(['a.example', 'b.example']), /; connect-src 'self' https:\/\/a\.example https:\/\/b\.example; base-uri/);
+  // A non-443 ingress port is part of the origin, or the browser blocks the request.
+  assert.match(cspFor(['a.example'], [4318]), /; connect-src 'self' https:\/\/a\.example:4318; base-uri/);
+  assert.match(cspFor(['a.example'], [443]), /; connect-src 'self' https:\/\/a\.example; base-uri/);
 });
 
 test('vercel.json keeps the hardening headers and the vendor cache rule', () => {

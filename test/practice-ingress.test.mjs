@@ -30,15 +30,27 @@ test('one row per practice rule, end to end through sendTraces', async () => {
   const rows = [
     ['the shown token', {}, { kind: 'accepted' }],
     ['the shown token, a dataset', { dataset: 'prod' }, { kind: 'accepted' }],
-    ['a wrong token', { token: 'practice_ingest_7Hq3' }, { kind: 'rejected', status: 401, auth: true, message: 'Unknown token' }],
-    ['no token', { token: '' }, { kind: 'rejected', status: 401, auth: true, message: 'Missing or malformed Authorization' }],
-    ['the read-only token', { token: READ_ONLY }, { kind: 'rejected', status: 403, auth: true, message: 'This token cannot ingest' }],
+    ['a wrong token', { token: 'practice_ingest_7Hq3' }, { kind: 'rejected', status: 401, auth: true }],
+    ['no token', { token: '' }, { kind: 'rejected', status: 401, auth: true }],
+    ['the read-only token', { token: READ_ONLY }, { kind: 'rejected', status: 403, auth: true }],
     ['the wrong signal path', { tracesUrl: `https://${PRACTICE_HOSTS[0]}/v1/metrics` }, { kind: 'rejected', status: 404, auth: false, message: 'Not found' }],
     ['a body that is not JSON', { body: 'resourceSpans' }, { kind: 'rejected', status: 400, auth: false, message: 'Body is not valid JSON' }],
     ['JSON that is not an OTLP request', { body: { spans: [] } }, { kind: 'rejected', status: 400, auth: false, message: 'Body is not an OTLP traces request' }],
     ['a foreign host', { tracesUrl: 'https://ingress.eu-west-1.aws.dash0.com/v1/traces' }, { kind: 'unreachable', cause: 'network' }],
   ];
   for (const [what, over, want] of rows) assert.deepEqual(await send(over), want, what);
+});
+
+test('the practice ingress still says why on 401 and 403, but the classifier never surfaces it', async () => {
+  const fetch = practice();
+  const init = (token) => ({ method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(BODY) });
+  for (const [token, status, text] of [['practice_ingest_7Hq3', 401, 'Unknown token'], [READ_ONLY, 403, 'This token cannot ingest']]) {
+    const r = await fetch(endpoint.tracesUrl, init(token));
+    assert.equal(r.status, status);
+    assert.equal(JSON.parse(await r.text()).message, text, 'the fake does send a reason');
+    const again = await fetch(endpoint.tracesUrl, init(token));
+    assert.deepEqual(await classifyResponse(again, { token }), { kind: 'rejected', status, auth: true });
+  }
 });
 
 test('a wrong content type is 415 and a non-POST is 405, through the same classifier', async () => {
