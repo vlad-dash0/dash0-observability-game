@@ -253,7 +253,7 @@ Method — the wake handler, the band, build-ahead, collision guard, compaction 
   [Phase 8] PR & review cycle, in the orchestrator
 ```
 
-**The roster** ([`agents/` in the repo](https://github.com/vlad-ko/claude-wizard/tree/main/agents), installed to `.claude/agents/`): `architect`, `backend-expert`, `frontend-expert`, `qa-engineer`, `doc-librarian`, `issue-maintainer`, `backlog-manager`, `pr-checkin`, `pr-manager`, `resource-manager`, `accountability-lead`, `report-maker`. The persona-lens TEMPLATE is [`reference/domain-user-lens.template.md`](reference/domain-user-lens.template.md) — instantiate it once per user persona into `.claude/agents/<persona>-lens.md` before lenses are used. Sequence and guardrails: [`reference/ensemble-dispatch.md`](reference/ensemble-dispatch.md).
+**The roster** ([`agents/` in the repo](https://github.com/vlad-ko/claude-wizard/tree/main/agents), installed to `.claude/agents/`): `architect`, `backend-expert`, `frontend-expert`, `qa-engineer`, `doc-librarian`, `issue-maintainer`, `backlog-manager`, `pr-checkin`, `pr-manager`, `resource-manager`, `accountability-lead`, `report-maker`, `level-design-reviewer`, `content-fact-checker`, `browser-verifier`, `ui-copy-lens` (project-specific reviewers, routed per [`reference/game-review-routing.md`](reference/game-review-routing.md)). The persona-lens TEMPLATE is [`reference/domain-user-lens.template.md`](reference/domain-user-lens.template.md) — instantiate it once per user persona into `.claude/agents/<persona>-lens.md` before lenses are used. Sequence and guardrails: [`reference/ensemble-dispatch.md`](reference/ensemble-dispatch.md).
 
 ---
 
