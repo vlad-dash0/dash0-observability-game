@@ -177,7 +177,20 @@ test('tier 3 for a parent that sits below the span: lift it out first, to its ow
   setParent(spec, deep, B, A); // B's answer parent A is below C too
   const d = hintFor(spec, deep, C, 3, { placed: all, e: escapeHtml });
   assert.deepEqual(d.apply.lift, { id: B, to: null });
-  assert.equal(text(d.html).startsWith('Placed for you. POST (storefront) sat below it, so it moves out first, to the root. '), true);
+  assert.equal(text(d.html).startsWith('Placed for you. POST (storefront) sat below it, so it moves out first, to the root, and is not where it belongs yet: POST (storefront) is a root now, yet another span of trace 4bf92f35 was already running when it started.'), true);
+});
+
+test('tier 2 for a parent that sits below the span: the text says it has to move out first, since the board refuses it now', () => {
+  const spec = b1Spec();
+  const all = new Set([A, B, C, D, E]);
+  const st = newBuildState(spec);
+  setParent(spec, st, B, C);
+  const h = hintFor(spec, st, C, 2, { placed: all, e: escapeHtml });
+  assert.deepEqual(h.cands, [A, B]);
+  assert.equal(moveMarks(spec, st, C, { placed: all, helps: {} })[B].mark, 'invalid', 'the board refuses B for C');
+  assert.equal(text(h.html), 'It is one of these two, outlined on the board: POST /checkout (storefront) or POST (storefront). POST (storefront) sits below it now, so it has to move out first.');
+  setParent(spec, st, B, A);
+  assert.equal(text(hintFor(spec, st, C, 2, { placed: all, e: escapeHtml }).html), 'It is one of these two, outlined on the board: POST /checkout (storefront) or POST (storefront).', 'no such line when both are free');
 });
 
 test('hint tiers for a kind and for a record follow the same three steps', () => {

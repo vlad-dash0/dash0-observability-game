@@ -12,6 +12,8 @@ import { recordFocus } from './helpers/focus.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { newBuildState, setParent } from '../lib/widgets/build-it.mjs';
 import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
+import { checkBuild } from '../lib/widgets/build-it.mjs';
+import { noteFor } from '../lib/widgets/build-it-help.mjs';
 import { A, B, C, D, E, b1Spec } from './fixtures/build-b1.mjs';
 import { S1, S2, S3, S4, T2, logsSpec } from './fixtures/build-logs.mjs';
 
@@ -514,6 +516,42 @@ test('tier 3 when the answer parent sits below the hinted span: it is lifted out
   assert.deepEqual([instant.counts.hints, instant.counts.mistakes], [3, 1]);
   assert.equal(label(C).endsWith('parent POST (storefront), right'), true, 'C under B, and checkBuild finds nothing wrong with it');
   assert.equal(label(B).endsWith('parent POST /checkout (storefront), right'), true);
+});
+
+test('tier 3 lift in instant mode: the status names the lift; a lift that leaves the lifted span wrong says so, and costs nothing', () => {
+  const triple = (spec) => {
+    click('#b1-hint');
+    click('#b1-hint');
+    click('#b1-hint');
+    return spec;
+  };
+  // Lifted to its own answer parent: the status carries the lift before the verdict.
+  const up = setup(withHelps({ ...ALL, queue: false }));
+  up.mount();
+  drag(B, C);
+  click(`[data-span="${C}"]`);
+  triple();
+  assert.equal(status(), 'POST (storefront) moves out first, under POST /checkout (storefront); POST /checkout (api-gateway) sits under POST (storefront). Right.');
+
+  // Lifted to the root because its own answer parent (A) is below C too: B ends wrong.
+  const deep = setup(withHelps({ ...ALL, queue: false }));
+  deep.mount();
+  drag(D, C);
+  drag(A, D); // wrong: A is a root in the answer
+  drag(B, A);
+  assert.equal(deep.counts.mistakes, 1);
+  assert.equal(label(B).endsWith('parent POST /checkout (storefront), right'), true, 'B is right before the hint');
+  click(`[data-span="${C}"]`);
+  triple();
+  assert.deepEqual([deep.counts.hints, deep.counts.mistakes], [3, 1], 'the lift is not charged');
+  assert.equal(label(B).endsWith('root, not right yet'), true, 'B is wrong after the lift');
+  assert.equal(label(C).endsWith('parent POST (storefront), right'), true);
+  const st = newBuildState(b1Spec());
+  setParent(b1Spec(), st, B, null);
+  const textOf = (html) => html.replace(/<[^>]+>/g, '').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+  const why = textOf(noteFor(b1Spec(), st, checkBuild(b1Spec(), st).issues.find((i) => i.spanId === B), escapeHtml));
+  assert.equal(status(), `POST (storefront) moves out first, to the root, and is not where it belongs yet: ${why} Then POST /checkout (api-gateway) sits under POST (storefront). Right.`);
+  assert.equal(q('#b1-hint-text').textContent.includes(`POST (storefront) sat below it, so it moves out first, to the root, and is not where it belongs yet: ${why}`), true, 'the hint panel says so too');
 });
 
 test('hints stop at three per span; with no hints on the level there is no button', () => {

@@ -158,10 +158,13 @@ View `lib/widgets/build-it-view.mjs` (redesigned in #146 from the owner-approved
   once from `checkBuild`'s issue for that span (a tick, or a specific note), no Check button.
   Hints: three tiers per span or record (the rule, or the spec's authored `hint`; two
   candidates outlined; set for you with a reason), derived from the answer (`answerFor`) and
-  `checkBuild`. Tier 3 for a parent always leaves the span under its answer parent: when that
-  parent sits below the span, it moves out first (to its own answer parent if that is placed
-  and outside the span's subtree, else to the root), through `setParent`, graded by
-  `checkBuild` and never charged; the hint and the status say so. No `helps`: Check, and hints only when the spec has a `hint`. Ladder: 2.1 all;
+  `checkBuild`. A hint never contradicts the board: a tier-2 parent candidate that sits below
+  the span (the board refuses it) is named as having to move out first. Tier 3 for a parent
+  always leaves the span under its answer parent: when that parent sits below the span, it
+  moves out first (to its own answer parent if that is placed and outside the span's subtree,
+  else to the root), through `setParent`, graded by `checkBuild` and never charged; the hint
+  and the status say so, and when the lifted span lands wrong they add its note ("is not where
+  it belongs yet: ..."). No `helps`: Check, and hints only when the spec has a `hint`. Ladder: 2.1 all;
   2.2 tint, instant, hints (the guide needs parent editing); 2.4 Check and hints; 2.6 none;
   4.2 (logs mode, no edit) the default: Check and three-tier hints with its authored hint as tier 1.
 - **Notes.** Each `checkBuild` code maps to a short, specific note that never names the
