@@ -1,6 +1,6 @@
 // Level copy rules (docs/M1-DESIGN.md §1, §7): every level file names its spec in a
 // `// Spec: <https URL>` line, level and card copy has no em dash, and every spec URL,
-// in a level file or on a card, points at opentelemetry.io, www.w3.org or prometheus.io.
+// in a level file or on a card, points at opentelemetry.io, www.w3.org, prometheus.io or www.dash0.com (the last for Dash0 product claims).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -14,7 +14,7 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 const LEVEL_FILES = readdirSync(join(ROOT, 'levels'))
   .filter((f) => f.endsWith('.mjs') && f !== 'index.mjs')
   .sort();
-const SPEC_HOSTS = ['opentelemetry.io', 'www.w3.org', 'prometheus.io'];
+const SPEC_HOSTS = ['opentelemetry.io', 'www.w3.org', 'prometheus.io', 'www.dash0.com'];
 
 // M0's level 1.2 predates the rule: its Spec line cites docs/FOUNDATION.md. Remove it
 // from this list when that file gains an https Spec line (the last test below insists).
@@ -35,7 +35,7 @@ test('the level files are the registered levels (nothing scanned is unregistered
   assert.deepEqual(ids, [...liveRegistry().order].sort());
 });
 
-test('every level file has a `// Spec: <https URL>` line on opentelemetry.io, www.w3.org or prometheus.io', () => {
+test('every level file has a `// Spec: <https URL>` line on opentelemetry.io, www.w3.org, prometheus.io or www.dash0.com', () => {
   for (const f of LEVEL_FILES) {
     if (NO_SPEC_URL_YET.includes(f)) continue;
     const urls = specUrls(read(`levels/${f}`));
@@ -54,9 +54,18 @@ test('no em dash in level files or cards', () => {
   }
 });
 
-test('every card specUrl is on opentelemetry.io, www.w3.org or prometheus.io', () => {
+test('every card specUrl is on opentelemetry.io, www.w3.org, prometheus.io or www.dash0.com', () => {
   for (const c of DECK) {
     assert.equal(SPEC_HOSTS.includes(hostOf(c.specUrl)), true, `${c.id}: ${c.specUrl}`);
+  }
+});
+
+test('a Dash0 docs Spec line is accepted and lookalike hosts are not', () => {
+  const src = '// Spec: https://www.dash0.com/docs/dash0/telemetry/logging/patterns\n';
+  const [url] = specUrls(src);
+  assert.equal(SPEC_HOSTS.includes(hostOf(url)), true);
+  for (const bad of ['https://www.dash0.com.evil.example/', 'https://dash0.com.example/', 'https://evil.example/www.dash0.com/']) {
+    assert.equal(SPEC_HOSTS.includes(hostOf(bad)), false, bad);
   }
 });
 

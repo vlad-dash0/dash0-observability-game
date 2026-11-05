@@ -12,8 +12,8 @@
 // Spec: https://opentelemetry.io/docs/specs/otel/metrics/sdk/#cardinality-limits
 // Spec: https://opentelemetry.io/docs/specs/semconv/http/http-metrics/
 // Spec: https://prometheus.io/docs/practices/instrumentation/#do-not-overuse-labels
-// Dash0 docs (not an allowed Spec host): https://www.dash0.com/docs/dash0/telemetry/metrics/identify-high-cardinality-metrics
-// Dash0 docs (not an allowed Spec host): https://www.dash0.com/docs/dash0/cost-control/spam-filters
+// Dash0 docs: https://www.dash0.com/docs/dash0/telemetry/metrics/identify-high-cardinality-metrics
+// Dash0 docs: https://www.dash0.com/docs/dash0/cost-control/spam-filters
 //
 // Facts used, each from the pages above (read 2026-11-01, OTel specification 1.62.0): the number of unique
 // combinations of attributes is called cardinality; SDKs SHOULD support being configured with a cardinality

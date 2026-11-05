@@ -5,7 +5,7 @@
 // metering. The drivers are volume, cardinality, retention and sampling, taught without a price.
 // Spec: docs/OUTLINE.md §4 Act 6.
 // Spec: https://opentelemetry.io/docs/concepts/sampling/ , https://prometheus.io/docs/practices/instrumentation/#do-not-overuse-labels
-// Docs (Dash0, not an allowed Spec host): https://www.dash0.com/pricing , https://www.dash0.com/docs/dash0/cost-control , https://www.dash0.com/docs/dash0/cost-control/spam-filters , https://www.dash0.com/docs/dash0/cost-control/install-forecast
+// Docs (Dash0): https://www.dash0.com/pricing , https://www.dash0.com/docs/dash0/cost-control , https://www.dash0.com/docs/dash0/cost-control/spam-filters , https://www.dash0.com/docs/dash0/cost-control/install-forecast
 //
 // Every number here is illustrative and invented for Kettle & Co: the units are not a price list and
 // the three models are generic, not a description of any one vendor. The one product claim is

@@ -6,7 +6,7 @@
 // Spec: https://opentelemetry.io/docs/concepts/resources/#resource-detectors , https://opentelemetry.io/docs/specs/otel/resource/sdk/#resource-detector
 // Spec: https://opentelemetry.io/docs/platforms/kubernetes/collector/components/#kubernetes-attributes-processor , https://opentelemetry.io/docs/collector/components/processor/ , https://opentelemetry.io/docs/collector/configuration/#processors
 // Spec: https://opentelemetry.io/docs/specs/semconv/resource/k8s/#pod
-// Dash0 docs (not an allowed Spec host): https://www.dash0.com/docs/dash0/monitoring/kubernetes/dash0-operator/auto-instrumentation
+// Dash0 docs: https://www.dash0.com/docs/dash0/monitoring/kubernetes/dash0-operator/auto-instrumentation
 //
 // The configure step grades the config through COLLECTOR_SCHEMA (docs/M1-DESIGN.md §4.8), which
 // does not model component settings, so the step grades the wiring (defined, the Collector would
