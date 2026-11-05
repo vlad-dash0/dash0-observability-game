@@ -31,7 +31,7 @@ const SCENARIO = {
       'No runbook, no team and no dashboard uses that name, so the page went to the default on-call. ' +
       'Find who owns it and why it has that name before the error budget runs out.</p>',
   },
-  budget: { startPct: 100, burnPctPerMin: 5 },
+  budget: { startPct: 100, burnPctPerMin: 4 },
   views: [
     {
       id: 'alert-resource',

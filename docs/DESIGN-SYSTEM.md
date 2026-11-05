@@ -6,8 +6,9 @@ only they emit `ui-` classes, only `styles/kit.css` styles them, and colours com
 `styles/tokens.css`. `test/design-system.test.mjs` and `test/ui.test.mjs` enforce it.
 
 Status: P1b moved the step frame (`lib/play.mjs`), `ctx.speech`, Choice, the help ladder, Build it
-and the `index.html` buttons onto the kit; P2 to P6 move the other widgets and the hand-written
-levels (until then `base.css` keeps their wrappers narrow); P7 deletes the retired CSS.
+and the `index.html` buttons onto the kit; P2 (#143) moved the incident board (and added `fold`);
+P3 to P6 move the other widgets and the hand-written levels (until then `base.css` keeps their
+wrappers narrow); P7 deletes the retired CSS.
 
 Owner decisions (#158, 2026-11-04), cited as D1 to D7 here and in the code: **D1** wrong answers
 stay purple (`--color-error`); red `--color-alert` is only for the firing banner. **D2** the primary
@@ -74,6 +75,7 @@ each function's JSDoc for the exact markup.
 | `option({attr, value, labelHtml, metaHtml, kind, pressed, state, disabled, hinted, name})`, `options({id, labelledBy, layout, itemsHtml})` | option | Selectable card and its group (list, grid, wrap). |
 | `feedback({id, bar})`, `setFeedback(el, tone, bodyHtml)`, `clearFeedback(el)` | feedback | The one feedback region; tones neutral, success, error (D7). |
 | `meter({id, label, value, max, cells, unit, previewCells, over})` | meter | Cells (20 by default) plus a text line that is the accessible value. |
+| `fold({value, titleHtml, metaHtml, bodyHtml, open, fresh})` | fold | Evidence card that folds to one line: a native `<details>` (caret, an h4 title that takes focus by script, optional meta chips) around its body. `open` starts it open, `fresh` marks the newest (`data-fresh`). Approved by the owner on #143 (2026-11-05), D5 sign-off from that PR's screenshots. |
 | `field({id, label, kind, rows, value, readonly, noteHtml})`, `radio({...})`, `checkbox({...})` | field | Labelled text or code input; radio and checkbox rows (`id, name, value, labelHtml, checked, disabled`). |
 | `table({caption, head, rows, numeric})` | table | Data table in a scroll wrap; same look inside `prose`. |
 | `stats([{label, value}])`, `dots({total, on, label, decorative, tone})` | stats | Label/value row; dots, spoken by `label` or `decorative` (aria-hidden beside a text line). |
@@ -82,6 +84,11 @@ each function's JSDoc for the exact markup.
 The allowed values are exported, so callers and tests never repeat them: `BUTTON_VARIANTS`,
 `PANEL_VARIANTS`, `TONES` (chip), `OPTION_KINDS`, `OPTION_STATES`, `OPTIONS_LAYOUTS`,
 `FEEDBACK_TONES`, `DOTS_TONES`.
+
+A widget that redraws part of its board in place wraps that part in a `[data-region]` div inside a
+panel section (`kit.css` gives it the section's grid); it never adds a class of its own. The
+incident board (`lib/widgets/incident-view.mjs`) is the reference: one typed `boardView(s, st, ui)`
+feeds every template, and each template is only kit helpers.
 
 States are attributes, never extra classes: `aria-pressed` (selected), `data-state` (`correct`,
 `wrong`, `locked`, `opened`), `data-hinted`, `data-tone`, `disabled`, `hidden`. Hover, focus and

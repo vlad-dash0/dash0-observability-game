@@ -6,7 +6,7 @@
 // checkout-is-slow.
 // Spec: https://opentelemetry.io/docs/concepts/signals/traces/ , https://opentelemetry.io/docs/specs/semconv/database/database-spans/
 import { escapeHtml } from '../lib/lesson-kit.mjs';
-import { renderIncident, mountIncident } from '../lib/widgets/incident-view.mjs';
+import { incidentLesson, renderIncident, mountIncident } from '../lib/widgets/incident-view.mjs';
 import { newIncident } from '../lib/widgets/incident.mjs';
 import { compareAttribute } from '../lib/widgets/triage.mjs';
 
@@ -157,7 +157,7 @@ export default {
   run(ctx) {
     ctx.renderStep(
       `<div class="lesson-intro">${ctx.speech(
-        'Checkout is slow and the error budget is burning. Every look costs minutes. Open what you need, then name the cause.',
+        incidentLesson('Checkout is slow and the error budget is burning. Every look costs minutes. Open what you need, then name the cause.'),
       )}</div>
       <div class="lesson-stage">${renderIncident(SCENARIO, newIncident(SCENARIO), { escapeHtml: ctx.escapeHtml })}</div>`,
       '<button class="btn" id="cis-finish" data-finish disabled>Finish</button>',

@@ -32,7 +32,7 @@ const SCENARIO = {
       '<p>PAGE 03:07: orders is logging about 1,240 errors a minute, 60 times its normal rate, and 14% of order requests fail. ' +
       'It began at 03:02. The alert names no cause. Find it before the error budget runs out.</p>',
   },
-  budget: { startPct: 100, burnPctPerMin: 5 },
+  budget: { startPct: 100, burnPctPerMin: 4 },
   views: [
     {
       id: 'error-patterns',

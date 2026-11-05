@@ -40,7 +40,9 @@ playable end to end. M1b = P10–P11 (incident engine + Act 2 boss "Checkout is 
 | wrong choice costs one mistake; focus to next enabled choice (wrapping) | `mountChoice` (`lib/widgets/choice.mjs`); 1.2 rewired onto it in P1 |
 | wrong sort placement costs one mistake; repeating it is free | `mountSort` |
 | Build it: a failed check costs one mistake unless identical to the last failed one; with instant feedback a wrong drop or edit costs one (an unchanged repeat is free); each hint tier costs one hint | `mountBuild` (1.2 keeps its own copy of the check rule; follow-up issue extracts it) |
-| incident budget left | `budgetLeft(s, st)` only; meter value and text both formatted from it |
+| incident budget left | `budgetLeft(s, st)` only; the minutes-left headline, the meter's spent line and cells are all formatted from it |
+| incident clues found / answerable | `cluesFound(s, st)` and `canAnswer(s, st)` only (`clueIds` says which views are clues); the counter, the lock line, the cause states and tier 3 read them |
+| incident penalties | `penalise(kind)` in `mountIncident` only: ctx.mistake() and the side column's tally together |
 | service-map edges from span kinds | `serviceEdges` |
 | attribute share slow vs baseline | `compareAttribute` (`lib/widgets/triage.mjs`); empty set → `null`, never 0% |
 | node lit / pulse | `lib/map.mjs` (unchanged) |
@@ -242,30 +244,67 @@ Logs mode view (#113 phase B), same `renderBuild` / `mountBuild`, span mode unch
 - **Driver.** `solve` selects each record and sets it explicitly; slips `check`, `orphan`,
   `hint`; `first()` is `log:<first record id>`.
 
-### 4.3 Incident engine (P10, M1b)
+### 4.3 Incident engine (P10, M1b; the board on the kit, #143)
 Core `lib/widgets/incident.mjs`:
 ```
 Scenario = { id, alert: {title, html}, budget: {startPct 1..100, burnPctPerMin > 0},
   views: [{id, label, costMin, html, kind: clue|herring|neutral}],
-  hypotheses: [{id, label, right, why}], answerAfterViews }   // answerAfterViews = clue views to open first
-validateScenario(s) → string[]   // unique ids; exactly one right; all clues affordable; answerAfterViews 0..clues
+  hypotheses: [{id, label, right, why}], answerAfterViews,   // answerAfterViews = clue views to open first
+  hint? }                                                    // optional text: the board's first hint tier
+validateScenario(s) → string[]   // unique ids; exactly one right; all clues affordable; answerAfterViews 0..clues; hint non-empty text
 newIncident(s) → {opened: [], minutes: 0, wrong: [], solved: false}
 budgetLeft(s, st) → max(0, startPct - minutes * burnPctPerMin)       // the ONLY budget expression
+clueIds(s) → ids of the clue views, in scenario order                // the ONLY place a view's kind is read as a clue
+cluesFound(s, st) → distinct opened clue views, uncapped             // the ONLY clue count
 openView(s, st, id) → {state, outcome: opened|repeat|unknown|closed, herring, exhaustedNow}
-canAnswer(s, st)   // the ONE unlock rule: not solved and >= answerAfterViews CLUE-kind views opened;
+canAnswer(s, st)   // the ONE unlock rule: not solved and cluesFound >= answerAfterViews;
                    // neutral and herring opens never count (#120)
 answer(s, st, id) → right|wrong|repeat|locked|unknown|closed
 ```
-View: alert, `<meter min=0 max=100 value=…>` + `Error budget: N% left (M min in).`, view
-buttons `Label (N min)`, opened panels with `tabindex="-1"` headings, hypothesis buttons
-disabled until `canAnswer` (enough clues opened). While not `canAnswer` and not solved, a plain-text line
-`<p class="incident-locked-hint" id="<id>-locked-hint">Look for more evidence before naming the cause.</p>`
-sits above the hypotheses; it is derived from the same `canAnswer` result (no second statement of the unlock rule),
-is the same text every time (never names the clue views or counts what remains), and is absent when unlocked,
-when solved, and when a hypothesis is merely disabled because it was answered wrong. The hypotheses sit in
-`role=group aria-label="Hypotheses"` with `aria-describedby` pointing at that line (only while it exists). It is
-not a live region: `#<id>-feedback` stays the only one. Mistakes: first open of a herring, a wrong hypothesis (repeat free),
-`exhaustedNow` exactly once.
+Every incident boss burns 25 minutes (`startPct: 100`, `burnPctPerMin: 4`); a scenario may use any rate.
+
+Hints, `lib/widgets/incident-help.mjs` (pure): `hintFor(s, st, tier)` → `{html, views, hypothesis}`. Tier 1 is
+the scenario's `hint` (authored HTML) or one generic rule that names no view; tier 2 names two clue views
+(from `clueIds`), the unopened ones first, and outlines the unopened (`views`); tier 3 names the right cause,
+outlines it (`hypothesis`) and says how many clues unlock it only while it is locked. A hint never changes
+the state. Each tier costs one `ctx.hint()`.
+
+View `lib/widgets/incident-view.mjs`, all of it kit helpers (`lib/ui`, no class of its own), rendered inside a
+wide step as a kit split (board, side column). `boardView(s, st, ui)` is the one typed contract every template
+renders (`ui`: preview, fresh, hintViews, hintCause): the alert, the budget, the tiles, the Spent-on row, the
+evidence log, the clue counter, the lock line and the causes. No `data-kind` reaches the markup.
+- **Alert:** a kit alert panel with a "Firing" eyebrow, the title as its h3 and the alert html.
+- **Budget:** the headline is minutes LEFT (`18 min left.`, `Budget spent.` once `budgetLeft` is 0) and counts
+  down with each look; the kit meter under it reads `S of T min spent` with one cell per minute (rounded up,
+  at most 100: a longer budget scales). Hovering or focusing a tile previews its cost (`This look: N min.`,
+  preview cells; an opened tile previews nothing); handlers are properties, never inline. Minutes are
+  `budgetLeft / burnPctPerMin` shown to one decimal. No timer anywhere (I2). Once any view is opened a
+  "Spent on" row has one chip per view in the order opened (`Label N min`).
+- **Step 1, Investigate:** tiles (kit option, tile kind) with a cost chip; an opened tile says "opened", and
+  only an opened herring also says "misleading" (the engine already tells the player on that open); clue and
+  neutral tiles look the same once opened. Opens speak in `#<id>-status`.
+- **Evidence:** the newest opened view's card is on top and open, older cards fold (kit fold, one line each:
+  title, cost, "misleading" on a herring); a repeat open reopens its card. Only an open redraws the log, so a
+  card the player opened by hand stays open through a hint.
+- **Step 2, Unlock the causes:** `Clues found: F of N` with N dots, F capped at N (a third clue never shows;
+  absent when N is 0), and the lock line `#<id>-lock`: locked (`Locked until you find N clues in Step 1 (F of N
+  so far)...`, which now shows the count, reversing the earlier rule that the line never counted), open, solved.
+  It is plain text, not a live region; the causes group (`role=group`, `aria-describedby` the line) always
+  points at it. The line is derived from `canAnswer` alone.
+- **Step 3, Name the cause:** causes (kit option, hypothesis kind) are `data-state=locked` while `canAnswer`
+  is false, with `aria-disabled` and still focusable: a pick then says why in `#<id>-feedback`, at no cost.
+  A wrong cause is `data-state=wrong` ("ruled out"), stays clickable and a repeat pick is free. The right one
+  is `correct`; solving disables the tiles and causes.
+- **Side column:** the kit sideColumn: wrong picks, misleading views, budget run out, hints, five stars from
+  `boardStars` (every one of those is one penalty), three hint tiers, and the success card.
+Penalties, all through the one `penalise(kind)` (ctx.mistake() and the tally the side column shows, so the two
+agree): the first open of a herring, `exhaustedNow` exactly once, a wrong pick. A repeat open, a repeat wrong
+pick and a locked pick are free. D7 tones: a free open is neutral, a costly open error, the open that unlocks
+the causes success; a wrong pick error, the right one success. Focus: an open moves to its card's heading
+(`tabindex=-1`), a wrong pick to the next cause, a locked pick stays, and solving moves to the success card's
+heading; `onComplete()` only enables Finish. The incident step type is wide and its lesson card is the boss's
+scenario line plus the generic "How this board works" list (`ol[aria-label]`, the same on every board, naming
+no view and no cause).
 
 ### 4.4 Spot it (M2, #5)
 Core `lib/widgets/spot-it.mjs`, view `lib/widgets/spot-it-view.mjs`; step type `spot`, mechanic `spot`.
