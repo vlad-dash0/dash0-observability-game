@@ -129,7 +129,7 @@ const ANSWERS = {
     'tradeoff ts-budget: policies=errors-slow-baseline wait=wait-30s',
     'spot ts-spot: traces',
   ],
-  'the-34-percent-error-rate': ['choice ser-verdict: wrong', 'tradeoff ser-plan: setup=errors-metrics-before'],
+  'the-34-percent-error-rate': ['choice ser-verdict: wrong', 'tradeoff ser-plan: sampler=errors-10pct rate=red-before'],
   'errors-tripled': [
     'incident errors-tripled: rate-vs-lb,error-count,collector-diff > metrics-after-sampling',
     'choice eto-ratio: counted-after-sampling',

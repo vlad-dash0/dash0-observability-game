@@ -85,6 +85,7 @@ test('adding act-9 re-locks nothing in acts 0-6: every level has the state it ha
     idsOf('act-0'),
     [...idsOf('act-0'), ...idsOf('act-1'), 'spans-and-traces'],
     all.filter((id) => id !== 'errors-tripled'),
+    all.filter((id) => !idsOf('act-6').includes(id)), // acts 0-5 complete, act 6 not entered: its levels are open only through the act before
     all,
     [...all, ID],
     ['head-sampling'],
@@ -137,14 +138,30 @@ test('step 1 copy: the intro has the 34% claim, the show has 1,000 requests, 10%
   assert.match(plain(choices.find((c) => c.key === 'follow-up').why), /bias comes from the policy, not from noise/);
 });
 
+test('step 1 labels give nothing away: the right one is not the longest, lengths within 10, no more numbers than the others, no 5%', () => {
+  const lens = choices.map((c) => c.label.length);
+  const numbers = (t) => (t.match(/\d[\d,.]*/g) ?? []).length;
+  const right = choices.find((c) => c.right);
+  const others = choices.filter((c) => !c.right);
+  assert.equal(right.label.length < Math.max(...lens), true, 'the right label is not the longest');
+  assert.equal(Math.max(...lens) - Math.min(...lens) <= 10, true, `lengths ${lens.join(', ')}`);
+  for (const c of others) assert.equal(numbers(right.label) <= numbers(c.label), true, `numbers in ${c.key}`);
+  assert.equal(right.label.includes('50 / 1,000'), false, 'the second sum is not in the label');
+  assert.equal(right.label.includes('5%'), false, 'the true rate is in the why, not the label');
+  assert.equal(plain(right.why).includes('5%'), true);
+});
+
 // ---- step 2: the trade-off ---------------------------------------------------------------
 
-test('step 2 is a valid Trade-off whose only passing plan is errors-metrics-before', () => {
+test('step 2 is a valid two-knob Trade-off whose only passing plan is every error plus 10% with RED before sampling', () => {
   assert.equal(PLAN_STEP.qid, 'ser-q-plan');
   assert.deepEqual(validateTradeoffSpec(spec), []);
   assert.equal(spec.unit, 'spans/s sent to the backend');
   assert.equal(spec.cap, 200);
-  assert.deepEqual(spec.knobs.map((k) => k.id), ['setup']);
+  assert.deepEqual(spec.knobs.map((k) => [k.id, k.label, k.options.length]), [
+    ['sampler', 'What tail sampling keeps', 3],
+    ['rate', 'Where the error rate is computed', 3],
+  ]);
   assert.deepEqual(spec.needs.map((x) => [x.id, x.label]), [
     ['every-error', 'every failed trace'],
     ['baseline', 'a sample of healthy traces'],
@@ -154,16 +171,45 @@ test('step 2 is a valid Trade-off whose only passing plan is errors-metrics-befo
     const r = evaluatePlan(spec, p);
     return r.over === 0 && r.lost.length === 0;
   });
-  assert.deepEqual(passing, [{ setup: 'errors-metrics-before' }]);
-  assert.deepEqual(spec.answer, { setup: 'errors-metrics-before' });
+  assert.deepEqual(passing, [{ sampler: 'errors-10pct', rate: 'red-before' }]);
+  assert.deepEqual(spec.answer, { sampler: 'errors-10pct', rate: 'red-before' });
 });
 
-test('step 2 plans: send-all is over by 800, uniform loses every-error, errors-stored loses true-rate, the answer fits', () => {
-  const ev = (setup) => evaluatePlan(spec, { setup });
-  assert.deepEqual(ev('send-all'), { complete: true, total: 1000, over: 800, lost: [] });
-  assert.deepEqual(ev('uniform'), { complete: true, total: 100, over: 0, lost: ['every-error'] });
-  assert.deepEqual(ev('errors-stored'), { complete: true, total: 145, over: 0, lost: ['true-rate'] });
-  assert.deepEqual(ev('errors-metrics-before'), { complete: true, total: 145, over: 0, lost: [] });
+test('step 2 plans: all nine, each fails for its own reason (over the cap, or a need lost), one passes', () => {
+  const healthy = 1000 - 50;
+  const stored10 = 50 + healthy * 0.1; // 145
+  const stored30 = 50 + healthy * 0.3; // 335
+  const dropped = healthy - healthy * 0.1; // 855
+  const random10 = 1000 * 0.1; // 100
+  assert.deepEqual([stored10, stored30, dropped, stored10 + dropped], [145, 335, 855, 1000]);
+  const sampler = { 'errors-10pct': stored10, 'errors-30pct': stored30, 'random-10pct': random10 };
+  const rate = { 'stored-spans': 0, 'red-before': 0, 'all-spans': dropped };
+  const lostOf = { 'errors-10pct': [], 'errors-30pct': [], 'random-10pct': ['every-error'] };
+  const rateLost = { 'stored-spans': ['true-rate'], 'red-before': [], 'all-spans': [] };
+  const plans = allPlans(spec);
+  assert.equal(plans.length, 9);
+  let passing = 0;
+  for (const p of plans) {
+    const total = sampler[p.sampler] + rate[p.rate];
+    const lost = [...lostOf[p.sampler], ...rateLost[p.rate]];
+    assert.deepEqual(evaluatePlan(spec, p), { complete: true, total, over: Math.max(0, total - 200), lost }, `${p.sampler} + ${p.rate}`);
+    if (total <= 200 && lost.length === 0) passing += 1;
+  }
+  assert.equal(passing, 1);
+  const ev = (sampler_, rate_) => evaluatePlan(spec, { sampler: sampler_, rate: rate_ });
+  assert.equal(ev('errors-30pct', 'red-before').over, 135, '30% breaks the cap');
+  assert.equal(ev('errors-10pct', 'all-spans').over, 800, 'sending the dropped spans breaks the cap');
+  assert.deepEqual(ev('random-10pct', 'red-before').lost, ['every-error']);
+  assert.deepEqual(ev('errors-10pct', 'stored-spans').lost, ['true-rate']);
+  assert.deepEqual(ev('errors-10pct', 'red-before'), { complete: true, total: 145, over: 0, lost: [] });
+});
+
+test('step 2: the answer is not the last option of either knob, so position gives nothing away', () => {
+  for (const k of spec.knobs) {
+    const ids = k.options.map((o) => o.id);
+    assert.notEqual(ids.at(-1), spec.answer[k.id], k.id);
+    assert.equal(ids.includes(spec.answer[k.id]), true, k.id);
+  }
 });
 
 test('the explanation ties to Dash0 truthfully: before-sampling RED, SignalControl, dash0redmetrics on 100% of spans, 6.2 for the Collector fix', () => {
@@ -182,9 +228,12 @@ test('the figures: 950 healthy, 95 kept, 145 stored, 50 / 145 is 34%, 50 / 1,000
   assert.equal(stored, 145);
   assert.equal(Math.round((50 / stored) * 100), 34);
   assert.equal((50 / 1000) * 100, 5);
-  assert.equal(spec.knobs[0].options.find((o) => o.id === 'errors-stored').cost, stored);
-  assert.equal(spec.knobs[0].options.find((o) => o.id === 'uniform').cost, 1000 / 10);
-  const all = [copyOf(VERDICT_STEP), ...choices.map((c) => plain(`${c.label} ${c.why}`)), plain(spec.explain), ...spec.knobs[0].options.map((o) => plain(o.label))].join(' ');
+  const opt = (k, id) => spec.knobs.find((x) => x.id === k).options.find((o) => o.id === id);
+  assert.equal(opt('sampler', 'errors-10pct').cost, stored);
+  assert.equal(opt('sampler', 'random-10pct').cost, 1000 / 10);
+  assert.equal(opt('sampler', 'errors-30pct').cost, 50 + healthy * 0.3);
+  assert.equal(opt('rate', 'all-spans').cost, healthy - keptHealthy);
+  const all = [copyOf(VERDICT_STEP), ...choices.map((c) => plain(`${c.label} ${c.why}`)), plain(spec.explain), ...spec.knobs.flatMap((k) => k.options.map((o) => plain(o.label)))].join(' ');
   assert.equal(all.includes('50 / 145 = 34%'), true);
   assert.equal(all.includes('50 / 1,000 = 5%'), true);
   assert.equal(plain(PLAN_STEP.intro).includes('200'), true);
@@ -212,7 +261,7 @@ test('sources: the Spec and Dash0 URLs, only allowed hosts, the LIVE-DEMO source
   assert.match(SRC, /Invented/);
   const copy = plain(JSON.stringify(level.play));
   assert.equal(/pric|\$|dollar|cost per|per GB|invoice|bill/i.test(copy.replace(/spans\/s sent/g, '')), false, 'no pricing copy');
-  assert.equal(SRC.includes('—'), false);
+  assert.equal(SRC.includes('\u2014'), false);
 });
 
 // ---- the globe -----------------------------------------------------------------------------
