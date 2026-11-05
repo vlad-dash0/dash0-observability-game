@@ -99,7 +99,8 @@ buckets: [{id, labelHtml, enabled, hinted, placed: [{id, labelHtml}]}]}` (pool i
 in spec order, a bucket enabled only for the selected item and when untried; placed plus left
 equals total). `renderSort(spec, state, {selected, order, escapeHtml, labelledBy?})` renders it in
 a wide step: a kit split with the board and the side column (score card with a wrong-placement
-count, success card with its swirl; no hints yet). Items are toggle options (`data-item` +
+count, success card with its swirl, and the hint tools when the step's helps turn hints on; a chips
+row `Helps: Instant feedback on, Hints on|off` above the board). Items are toggle options (`data-item` +
 `aria-pressed`, no answer attribute) in a named group (`role="group" aria-label="Items to sort"`,
 `aria-describedby="ID-instr"`); buckets are drop panels (`[data-drop]` holding the `data-bucket`
 button and the `[data-bucket-list]` of placed items); a kit stats line reads "Sorted N of M";
@@ -115,6 +116,37 @@ answer) / `You already tried <bucket> for <label>.` (a repeat; free, neutral) / 
 first.` (neutral). Focus: first remaining item → its first untried bucket → after wrong, next
 untried bucket → after right, next remaining item → after the last, `onComplete()` runs and the
 success card's heading takes focus.
+
+Help ladder (#156), pure in `lib/widgets/sort-it-help.mjs`. A sort step may declare
+`helps: {hints: boolean}` (default `{hints: false}`; instant feedback is always on) and, only with
+hints on, an authored `hint` line (HTML). `sortHelps(spec)`, `validateSortHelps(spec)` (unknown or
+non-boolean helps key, `hint: not non-empty text`, `hint: shown only when helps.hints is on`; play.mjs
+also rejects unknown keys with a did-you-mean). The hint target, `hintTarget(spec, state,
+{order, selected})`: the selected item if still remaining, else the first remaining in display
+order, else null (Hint disabled, "Nothing to hint right now."). Tiers by `hintFor(spec, state,
+itemId, tier, {shuffle})`, all derived from `bucketOf`, each html a `<p>`: 1 the step's `hint` or
+`SORT_RULE`; 2 two candidate buckets in spec order, the right one and a decoy shuffled (through
+`ctx.shuffle`) from the buckets not yet tried for the item, outlined with `data-hinted` while that
+item is the hint target (the selected item, else the first item still to sort), never on a bucket already tried; 3 places the item
+through `place` (a hint, never a mistake; the feedback is a neutral "Placed for you.", never
+"Right.").
+
+Which tier a click gives is decided at click time by `hintLadder(spec, state, itemId, {ruleShown,
+taken})`, still with no second grading path. Tier 1 is charged once per board: after it was shown
+for any item, every item's ladder starts past it. Tier 2 is offered only when it narrows, that is
+when the item's untried buckets number 3 or more (or it was already given); otherwise the next tier is
+the placement. The ladder is `[1, 2?, 3]`; the button reads "Hint `done+1` of `tiers.length`" and the
+side line "For X: `done` of `tiers.length` used", where `done` counts the rule once it was read for
+any item (so a 2-bucket board after the rule reads "Hint 2 of 2"). With one bucket left and no hint for it, the side line reads "For X: only one bucket left" with no dots.
+With fewer than 3 untried buckets the view skips tier 2; with exactly one left untried (the right
+one) there is no hint at all: `next` is null, the button reads "No more hints" and is disabled. The
+hint panel always shows the hint target's own last hint (tier 2) and, when that item has none, shows the rule once it was read (else it is empty); selecting an item, a placement that moves the target, or a wrong try re-syncs it with the
+board's outlines. One exception: right after a tier 3 placement the panel keeps "Placed for you. ..." until the next selection, placement or try. The rule (tier 1) is paid once per board, not stored per item.
+An item's total can therefore shrink mid-ladder ("Hint 2 of 3" becomes "Hint 2 of 2") when a wrong
+try leaves fewer than three untried buckets and tier 2 was not yet taken.
+Each click is one `ctx.hint()` and one hint on the score card; nothing happens after the last item.
+Ladder: 0.1 and 0.2 hints on (both sorts), 0.3, 1.1 and 2.3 hints on, 2.5, 2.7, 3.1, 4.1 and 5.6
+hints off.
 
 ### 4.2 Build it, trace waterfall (P5)
 Core `lib/widgets/trace.mjs`:

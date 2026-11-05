@@ -9,6 +9,7 @@ import { newSortState } from '../lib/widgets/sort-it.mjs';
 // Step 1. Items interleave the buckets so their order gives nothing away.
 const SORT = {
   id: 'mvo-sort',
+  helps: { hints: true },
   buckets: [
     { id: 'known', label: 'Known question' },
     { id: 'new', label: 'New question' },

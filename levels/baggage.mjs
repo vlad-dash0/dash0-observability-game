@@ -10,6 +10,7 @@ import { newSortState } from '../lib/widgets/sort-it.mjs';
 // Step 1. Items interleave the buckets so their order gives nothing away.
 const SORT = {
   id: 'bag-sort',
+  helps: { hints: false },
   buckets: [
     { id: 'ok', label: 'Fine in baggage' },
     { id: 'never', label: 'Never in baggage' },

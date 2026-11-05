@@ -27,6 +27,7 @@
 // likely to be confused with.
 const SORT = {
   id: 'sl-sort',
+  helps: { hints: false },
   buckets: [
     { id: 'body', label: 'Body' },
     { id: 'attributes', label: 'Attributes' },

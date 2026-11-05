@@ -7,6 +7,7 @@
 // Step 1. Items interleave the buckets so their order gives nothing away.
 const SORT = {
   id: 'avm-sort',
+  helps: { hints: false },
   buckets: [
     { id: 'auto', label: 'Automatic' },
     { id: 'manual', label: 'Manual' },

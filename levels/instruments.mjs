@@ -9,6 +9,7 @@
 // Step 1. Two measurements per instrument, interleaved so their order gives nothing away.
 const SORT = {
   id: 'instr-sort',
+  helps: { hints: false },
   buckets: [
     { id: 'counter', label: 'Counter' },
     { id: 'up-down-counter', label: 'UpDownCounter' },

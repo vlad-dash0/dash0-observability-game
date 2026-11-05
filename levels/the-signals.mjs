@@ -16,6 +16,7 @@ const SIGNALS = [
 // Step 1: telemetry. Items do not follow the bucket order.
 const DATA = {
   id: 'sig-data',
+  helps: { hints: true },
   buckets: SIGNALS,
   items: [
     {
@@ -54,6 +55,7 @@ const DATA = {
 // Step 2: questions, each best answered by one signal.
 const ASK = {
   id: 'sig-ask',
+  helps: { hints: true },
   buckets: SIGNALS,
   items: [
     {
