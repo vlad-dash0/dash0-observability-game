@@ -213,6 +213,57 @@ test('an echoed token in any form (verbatim, URL-encoded, JSON-escaped, an 8+ ch
   });
 });
 
+// The same search runs on a normalised haystack: case, whitespace, HTML entities, \u escapes
+// and base64 of the token or of "Bearer " + token cannot get a message past it.
+test('a token echoed in a normalised form (case, whitespace, entities, \\u escapes, base64) drops the message', async () => {
+  const TK = 'auth_Q7xKw9ZrLm4Kp2Vb8Nd3';
+  const b64 = (s) => Buffer.from(s).toString('base64');
+  const chunk = (s, n, sep) => s.match(new RegExp(`.{1,${n}}`, 'g')).join(sep);
+  const entities = [...TK].map((c) => `&#${c.charCodeAt(0)};`).join('');
+  const hexEntities = [...TK].map((c) => `&#x${c.charCodeAt(0).toString(16)};`).join('');
+  const uEscaped = [...TK].map((c) => `\\u00${c.charCodeAt(0).toString(16)}`).join('');
+  const forms = [
+    ['upper-cased', `saw ${TK.toUpperCase()} here`],
+    ['lower-cased', `saw ${TK.toLowerCase()} here`],
+    ['split in 4-character pieces by spaces', chunk(TK, 4, ' ')],
+    ['split in 7-character pieces by newlines', chunk(TK, 7, '\n')],
+    ['split in 4-character pieces by newlines', JSON.stringify({ message: chunk(TK, 4, '\n') })],
+    ['\\u-escaped JSON without a message key', `{"error":{"detail":"${uEscaped}"}}`],
+    ['decimal entities', `saw ${entities}`],
+    ['hex entities', `saw ${hexEntities}`],
+    ['entity-escaped quote around the token', `&quot;${TK}&quot; &amp; more`],
+    ['base64 of the token', `x ${b64(TK)} y`],
+    ['base64 of Bearer + token', `x ${b64(`Bearer ${TK}`)} y`],
+    ['base64 of the token, wrapped', chunk(b64(TK), 6, '\n')],
+  ];
+  // The three byte alignments: the token sits at offset 0, 1 and 2 inside a longer base64 string.
+  for (const pad of ['', 'a', 'ab']) {
+    forms.push([`base64 of the token at alignment ${pad.length}`, `h ${b64(pad + TK)} t`]);
+    forms.push([`base64 of Bearer + token at alignment ${pad.length}`, `h ${b64(`${pad}Bearer ${TK}`)} t`]);
+    forms.push([`base64 of the token at alignment ${pad.length}, mid-string`, `h ${b64(`${pad}${TK}zz`)} t`]);
+  }
+  for (const status of [400, 500, 502]) {
+    for (const [what, body] of forms) {
+      const out = await classifyResponse(res(status, body), { token: TK });
+      assert.deepEqual(out, { kind: 'rejected', status, auth: false }, `${status} ${what}: ${JSON.stringify(out)}`);
+    }
+  }
+  // \u escapes live in the JSON text itself, so this one is written into the raw body.
+  const rawPartial = `{"partialSuccess":{"rejectedSpans":1,"errorMessage":"${uEscaped}"}}`;
+  assert.deepEqual(await classifyResponse(res(200, rawPartial), { token: TK }), { kind: 'rejected', status: 200, auth: false }, 'partial \\u-escaped');
+  for (const [what, em] of forms.filter(([w]) => !w.startsWith('\\u'))) {
+    const partial = JSON.stringify({ partialSuccess: { rejectedSpans: 1, errorMessage: em } });
+    assert.deepEqual(await classifyResponse(res(200, partial), { token: TK }), { kind: 'rejected', status: 200, auth: false }, `partial ${what}`);
+  }
+  // Clean messages still pass, and so does a 7-character run of the token.
+  const seven = TK.slice(8, 15);
+  for (const msg of ['span too old', `near ${seven} miss`]) {
+    assert.deepEqual(await classifyResponse(res(400, msg), { token: TK }), { kind: 'rejected', status: 400, auth: false, message: msg });
+    const partial = JSON.stringify({ partialSuccess: { rejectedSpans: 1, errorMessage: msg } });
+    assert.deepEqual(await classifyResponse(res(200, partial), { token: TK }), { kind: 'rejected', status: 200, auth: false, message: msg });
+  }
+});
+
 // A body read that fails is the connection failing, not an empty (accepted) body.
 test('a body read that throws is unreachable: timeout when the timer fired, aborted when the caller aborted, network otherwise', { timeout: 5000 }, async () => {
   const bodyHangs = (init, onRead) => ({

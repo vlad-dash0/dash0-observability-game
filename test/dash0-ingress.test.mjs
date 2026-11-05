@@ -29,6 +29,10 @@ test('each wrong shape names its reason', () => {
     ['', 'empty'],
     ['   ', 'empty'],
     [`${HOST}:4317`, 'grpc-port'],
+    [HOST, 'no-scheme'],
+    [`${HOST}/v1/traces`, 'no-scheme'],
+    [`${HOST}:443/v1/traces`, 'no-scheme'],
+    ['pasteme', 'malformed'],
     // Scheme-less with any other port: the mistake is the missing https://, not gRPC.
     [`${HOST}:4318`, 'no-scheme'],
     [`${HOST}:443`, 'no-scheme'],
