@@ -3,16 +3,21 @@
 // by what they take: a filter processor, a tail sampler, or both (Sort it). The answer is wrong: a filter judges one span at a
 // time, so it keeps the failed spans and drops the healthy spans of the same trace. The presenter has no name and no affiliation.
 // Source: an anonymised call question (docs/LIVE-DEMO.md). Nothing below identifies a customer, a person or a product.
-// Spec: https://opentelemetry.io/docs/concepts/sampling/#tail-sampling , https://opentelemetry.io/docs/collector/transforming-telemetry/
+// Spec: https://opentelemetry.io/docs/concepts/sampling/#tail-sampling , https://opentelemetry.io/docs/collector/transforming-telemetry/ ,
+// https://opentelemetry.io/docs/specs/semconv/resource/deployment-environment/
 // Docs (GitHub READMEs, not an allowed Spec host): the tailsamplingprocessor README and the filterprocessor README in
-// https://github.com/open-telemetry/opentelemetry-collector-contrib
+// https://github.com/open-telemetry/opentelemetry-collector-contrib (v0.164.0)
+// Dash0 docs: https://www.dash0.com/docs/dash0/cost-control/spam-filters , https://www.dash0.com/docs/dash0/telemetry/signal-control/about-signal-control
 //
 // Facts used (read on the pages above, 2026-11-05): the filter processor evaluates its conditions on each span, span event, log
 // record or data point alone. Tail sampling decides on all or most of the spans of a trace. Its policies include status_code,
 // latency (earliest start to latest end), string_attribute (resource and span attributes) and span_count. The sampler keeps or
 // drops whole traces, and traces only. deployment.environment.name is a resource attribute.
 //
-// Invented for the game: the trace table below and the scenario, and the nine goals. No Dash0 claim is made. No YAML. No pricing.
+// Dash0 (read 2026-11-05): spam filters drop spans, logs, metrics and web events at ingestion; SignalControl is a rule-based pipeline
+// that filters, converts, samples and aggregates signals before storage. The finish text claims no whole-trace decision for it.
+//
+// Invented for the game: the trace table below and the scenario, and the nine goals. No YAML. No pricing.
 
 // One failed checkout trace as it reaches the Collector: span, service, status.
 const TRACE = [
@@ -27,6 +32,8 @@ const TRACE = [
 const SPANS = TRACE.length;
 const ERRORS = TRACE.filter(([, , status]) => status === 'Error').length;
 const DROPPED = SPANS - ERRORS;
+const HEALTHY = TRACE.filter(([, , status]) => status === 'Unset').map(([span]) => `<code>${span}</code>`);
+const HEALTHY_LIST = `${HEALTHY.slice(0, -1).join(', ')} and ${HEALTHY.at(-1)}`;
 
 const ROWS = TRACE.map(([span, service, status]) => `<tr><td>${span}</td><td>${service}</td><td>${status}</td></tr>`).join('');
 
@@ -34,12 +41,12 @@ const ROWS = TRACE.map(([span, service, status]) => `<tr><td>${span}</td><td>${s
 const VERDICT = [
   {
     key: 'holds',
-    label: 'It holds: the filter keeps every span with status Error, so every trace with an error is still kept',
-    why: `The filter does keep every span with status Error, but only those spans. It judges one span at a time, so it drops the ${DROPPED} healthy spans of the same trace: the cart read, the stock reservation and its update, and the payment-method lookup that show what led up to the failure.`,
+    label: 'It holds: the filter keeps every span with status Error, so every trace with an error is still kept in full',
+    why: `The filter does keep every span with status Error, but only those spans. It judges one span at a time, so it drops the ${DROPPED} healthy spans of the same trace: ${HEALTHY_LIST}, which show what led up to the failure.`,
   },
   {
     key: 'wrong',
-    label: 'It is wrong: the filter judges each span alone, so it keeps the failed spans, not their traces',
+    label: 'It is wrong: the filter judges each span alone, so it keeps the failed spans, not their whole traces',
     right: true,
     why:
       `A filter processor checks each span against its condition on its own and never sees the rest of the trace. Of the ${SPANS} spans in this failed checkout it keeps the ${ERRORS} with status Error and drops the other ${DROPPED}, so the backend gets pieces of the trace, not the trace. ` +
@@ -54,7 +61,7 @@ const VERDICT = [
   },
 ];
 
-// Step 2: nine goals, three buckets. Sizes 3 / 4 / 2 (tail, filter, both). Labels must not give the bucket away
+// Step 2: nine goals, three buckets. Sizes 4 / 3 / 2 (tail, filter, both). Labels must not give the bucket away
 // (test/sort-tells.test.mjs).
 const SORT = {
   id: 'fos-sort',
@@ -67,7 +74,7 @@ const SORT = {
   items: [
     {
       id: 'errors-whole',
-      label: 'Keep only the traces that have an error, with all their spans',
+      label: 'Keep only the traces holding an error, every span intact',
       bucket: 'tail',
       why: 'Whether a trace has an error is known only once its spans are in. A <code>status_code</code> policy decides on the whole trace and keeps every span of it.',
       whyNot: {
@@ -77,9 +84,9 @@ const SORT = {
     },
     {
       id: 'healthz',
-      label: 'Drop the spans of the <code>/healthz</code> probe',
+      label: 'Drop the probe traces that hit <code>/healthz</code>',
       bucket: 'filter',
-      why: 'A probe request is a small trace of its own, and every one of its spans carries the <code>/healthz</code> path, so each span can be judged and dropped alone.',
+      why: 'The probe answers from the service itself, so each probe is a one-span trace that carries the <code>/healthz</code> path. That span can be judged and dropped alone.',
       whyNot: {
         tail: 'A tail sampler could drop those traces, but it would hold each one for the whole decision wait to learn what any one of its spans already says.',
         both: 'Nothing here keeps a trace by what the rest of it holds, so there is no work for a sampler.',
@@ -87,7 +94,7 @@ const SORT = {
     },
     {
       id: 'slow-no-cache',
-      label: 'Keep only the slow traces, minus their cache-lookup spans',
+      label: 'Keep only the slow traces, minus the cache-lookup spans',
       bucket: 'both',
       why: "Which traces are slow is the sampler's decision, made on whole traces. Dropping the cache-lookup spans inside the kept ones is the filter's: a tail sampler keeps or drops a trace whole, never part of it.",
       whyNot: {
@@ -107,17 +114,17 @@ const SORT = {
     },
     {
       id: 'debug-logs',
-      label: 'Drop the debug-level log records from checkout',
+      label: 'Keep every checkout log record except the debug-level ones',
       bucket: 'filter',
       why: 'Each log record carries its own severity, so a filter can drop it alone.',
       whyNot: {
-        tail: 'A tail sampler groups spans by trace ID and samples traces only. Log records never pass through it.',
+        tail: 'The tail sampling processor works on traces. Log records never pass through it.',
         both: 'Log records never pass through a tail sampler, so only the filter does anything here.',
       },
     },
     {
       id: 'many-spans',
-      label: 'Keep only the traces with more than 50 spans',
+      label: 'Hold on to any trace with more than 50 spans',
       bucket: 'tail',
       why: 'How many spans a trace has is a fact about the trace, not about any one span. A <code>span_count</code> policy counts them before it decides.',
       whyNot: {
@@ -127,9 +134,9 @@ const SORT = {
     },
     {
       id: 'production-only',
-      label: 'Keep only the spans from production, none from the load test',
+      label: 'Keep only the traces from production, none from the load test',
       bucket: 'filter',
-      why: 'The environment is a resource attribute, so every span from the load test carries it. Dropping span by span drops those traces whole anyway.',
+      why: 'The environment (<code>deployment.environment.name</code>) is a resource attribute, so every span from the load test carries it. Dropping span by span drops those traces whole anyway.',
       whyNot: {
         tail: 'It would work, but every span already says where it came from, so holding each trace for the decision wait buys nothing.',
         both: 'One attribute on every span decides it, so the filter alone is enough.',
@@ -137,9 +144,9 @@ const SORT = {
     },
     {
       id: 'via-payments',
-      label: 'Keep only the traces that pass through payments, whole',
+      label: 'Every trace that touches payments must arrive complete',
       bucket: 'tail',
-      why: 'Only the payments spans name payments, so the decision needs the whole trace: a <code>string_attribute</code> policy on <code>service.name</code> keeps every span of a trace in which any span matches.',
+      why: 'Only the payments spans name payments, so the decision needs the whole trace: a <code>string_attribute</code> policy on <code>service.name</code> keeps the whole trace when one of its spans matches.',
       whyNot: {
         filter: 'A filter on <code>service.name</code> keeps the payments spans and drops the storefront and checkout spans of the same trace.',
         both: 'Nothing has to go from inside the kept traces, so the sampler alone does it.',
@@ -147,7 +154,7 @@ const SORT = {
     },
     {
       id: 'errors-no-keepalive',
-      label: 'Keep only the failed traces, minus their keep-alive <code>SELECT 1</code> spans',
+      label: 'Keep only the failed traces, and strip the keep-alive <code>SELECT 1</code> spans that ride along',
       bucket: 'both',
       why: "Keeping only the failed traces is a decision on the whole trace, the sampler's. Dropping the <code>SELECT 1</code> spans is one span at a time, the filter's.",
       whyNot: {
@@ -175,7 +182,7 @@ export default {
       {
         intro:
           'On a call, a customer asks: "We only want to keep the traces that have an error. Can a filter in our Collector do that?" ' +
-          'The presenter answers straight away: "Yes. Add a filter processor that drops every span whose status is not Error. What reaches the backend is exactly your traces with errors."',
+          'The presenter answers: "Yes. Add a filter processor that drops every span whose status is not Error. What reaches the backend is exactly your traces with errors."',
         show:
           '<p>Here is one failed checkout trace as it reaches the Collector, before the filter:</p>' +
           `<table><caption>One failed checkout trace, ${SPANS} spans</caption><thead><tr><th scope="col">Span</th><th scope="col">Service</th><th scope="col">Status</th></tr></thead><tbody>${ROWS}</tbody></table>`,
@@ -195,6 +202,7 @@ export default {
     ],
     finish:
       'You did not take the yes on trust: a filter judges one span or record at a time, so it can drop the probe, the debug logs and the load test, but it cannot keep a trace because one of its spans failed. ' +
-      'That takes a tail sampler, and dropping spans inside a kept trace takes both.',
+      'That takes a tail sampler, and dropping spans inside a kept trace takes both. ' +
+      "Dash0 has both kinds of tool: spam filters drop matching telemetry at ingestion, record by record, and SignalControl's sampling stage samples traces before they are stored.",
   },
 };

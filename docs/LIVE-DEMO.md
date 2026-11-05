@@ -50,6 +50,7 @@ A declarative level (DECLARATIVE-LEVELS.md §2) with two steps.
 - Step 2 is one existing mechanic step (Trade-off, Sort it, Spot it, Query it, Configure it, Build it) that proves the verdict with numbers.
 - All numbers come from one constants table at the top of the level file. Copy, tests and widget data read from it.
 - No Collector YAML unless a test validates it. No pricing copy without G3.
+- Act 9 needs at least one level whose right verdict is `holds` or `follow-up` before more `wrong` levels are added, and presenters are confident, not hasty: no copy that hints at haste ("straight away") or a tell in the label lengths.
 - Normal scoring, no bonus stars. `scoreStars` only subtracts and tops out at `MAX_STARS`, so "catching the wrong answer" means not losing a star. A bonus would need a scoring change, which is out of scope.
 
 Worked example: 9.2 "The 34% error rate" (#32 ledger, #177 design). At 1,000 requests a second with 50 errors, tail sampling keeps every error plus 10% of the rest, so 50 of 145 stored spans are errors: 34%, while the request error rate is 5%. The right verdict is `wrong` (the ratio is over kept spans); step 2 is a Trade-off whose answer computes RED before sampling.
@@ -75,7 +76,7 @@ Decision (owner, 2026-11-05): Act 9 is the endgame, chained after the earlier ac
 - Act 9 opens when acts 0-6 are complete, or once entered (`lib/unlock.mjs`). `?mode=debug` opens it.
 - When Acts 7-8 land, they must come before act-9 in ACTS, and act-9 then re-locks for anyone who finished 0-6 without entering it. If an always-open side track is wanted instead (option B), that change must merge before the first Act 7 PR. Revisit then, not before.
 - Globe: `ACT_REGIONS['act-9']` is already Oceania. `test/globe-data.test.mjs:97` has an `inBox('AUS', ...)` dot-placement check; the separate `HOME` table (about line 156) gets an AUS box only when AUS is first mapped to a level. A country can serve only one level (the `countries are distinct across the whole game and exist in the data` test, `test/globe-data.test.mjs:38`), so each Act 9 level needs its own country in `hub/globe-map.mjs`: `LEVEL_COUNTRY[<id>]` plus `COUNTRY_NAMES.<ISO>` (once per country). Only AUS (391 dots), PNG (23) and NZL (13) reach `MIN_DOTS` (6), so plan at most 3 Act 9 levels. Epic #32's ledger plans 8 levels plus a boss, so the globe capacity is an open owner decision to settle before a fourth Act 9 level (widen the region, change the one-country rule, or cap the act): [#32 comment](https://github.com/vlad-dash0/dash0-observability-game/issues/32#issuecomment-6663168538). When a country is first mapped, `HOME` in `test/globe-data.test.mjs` needs one box for it (the test requires a box for exactly the mapped countries).
-- Act 9 levels so far: 9.1 "Filter, sampler, or both?" (`filter-or-sampler`, NZL, hints off, no Dash0 claim in the copy) and 9.2 (AUS). PNG stays free for the next one.
+- Act 9 levels so far: 9.1 "Filter, sampler, or both?" (`filter-or-sampler`, NZL, hints off, the finish text names Dash0 spam filters and SignalControl sampling) and 9.2 (AUS). PNG stays free for the next one.
 - No new card needed when the fact already has one (9.2 uses `spanmetrics-before-sampling`).
 - Citation host: `www.dash0.com` is allowed in SPEC_HOSTS (`test/content.test.mjs`, decided in #177).
 
