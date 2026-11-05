@@ -68,5 +68,6 @@ package files out (keep its lines to the forms `tools/serve.mjs` parses).
 
 ## Wizard workflow
 The wizard skill (`/wizard`) lives at `.claude/skills/wizard`, its agent roster at `.claude/agents`. Rules in this file override the skill's generic defaults.
-- Each agent pins its default model in frontmatter (opus only for architect and qa-engineer, cheaper tiers elsewhere); a dispatch may override per task with a stated reason.
+- Each agent pins its default model in frontmatter (opus only for architect, qa-engineer and level-design-reviewer, cheaper tiers elsewhere); a dispatch may override per task with a stated reason.
 - Claude may merge at the full merge-ready bar (merge commit only), overriding the skill's and pr-manager's human-merges default.
+- PR review is split per head and routed by the diff: `.claude/skills/wizard/reference/game-review-routing.md`.
