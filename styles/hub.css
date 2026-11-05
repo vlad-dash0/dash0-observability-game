@@ -65,6 +65,9 @@
   color: var(--color-text-muted); margin: 22px 6px 10px;
 }
 
+/* The map heading takes focus after Back to the map; it is not interactive, so no outline. */
+#map-title:focus { outline: none; }
+
 /* ---------- World map: the globe (lib/globe-render.mjs) ---------- */
 /* A night panel in both themes: the lights need a dark sky. The stage is square and capped,
    so the hub keeps its levels near the top; the canvas fills it (no style attributes). */

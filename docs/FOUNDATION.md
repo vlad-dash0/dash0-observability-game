@@ -159,6 +159,23 @@ disposes it while a level covers the hub and on `pagehide`, and shows the text f
 three.js, the colours or WebGL are unavailable. Level `lights` stay level data, validated
 against `hub/map-data.mjs` `NODE_IDS`, and are no longer drawn.
 
+Ignite (#161). Pure, `lib/globe-ignite.mjs`: `freshlyLit(prev, next, registry, map)` gives
+`{countryIds, regionIds}` (a level's country on its first completion only, never on a replay;
+an act's region, as act ids, when its boss is newly completed or the act becomes complete),
+`litText` ("Germany is now lit: The signals.", a boss names its region, `COUNTRY_NAMES` in
+`hub/globe-map.mjs` has a name per level country), `igniteView` (per-dot flare and region-wave
+distance, the ring's start point and the camera target facing the country's dot centroid, else
+the region centre) and `igniteFrame(elapsed)` (the 1.5 s timeline). `createGame` remembers what
+a completion lit and plays it when the reward card closes ("Back to the map"): scroll to the
+map (smooth unless reduced motion), focus the map heading (`tabindex="-1"`, no outline), set
+`litNote` (a polite live region, and the first line of the no-WebGL text), and call the
+renderer's `ignite(view, states)`. A replay and a plain close do none of this. The renderer
+turns to the target, waits until it nearly faces it, then plays the flare (country dots mix
+toward white above the lit colour and settle), a ring over the sphere (a lazily made sphere
+shader, registered in the release registry) and a gentle wave across the region, from frame
+time `dt`. Reduced motion: no effect, the globe faces the country at once. Opening a level
+disposes the globe, which cancels the effect.
+
 ## 3. Invariants
 
 Registry (`validateRegistry` reports all at once): act and level ids unique across all acts
