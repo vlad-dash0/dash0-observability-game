@@ -9,14 +9,45 @@ import { recordFocus } from './helpers/focus.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { helpChips, sideColumn } from '../lib/ui/index.mjs';
 import * as ladder from '../lib/widgets/help-ladder.mjs';
-import { hintCost, mountSide, RULE, starsLabel, validateHelps } from '../lib/widgets/help-ladder.mjs';
+import { hintCost, ladderText, LADDER, mountSide, PENALTY, RULE, ruleText, starsLabel, validateHelps } from '../lib/widgets/help-ladder.mjs';
+import { RULE as SORT_RULE, PENALTY as SORT_PENALTY } from '../lib/widgets/sort-it-view.mjs';
+import { RULE as SPOT_RULE, PENALTY as SPOT_PENALTY } from '../lib/widgets/spot-it-view.mjs';
+import { RULE as INCIDENT_RULE, PENALTY as INCIDENT_PENALTY } from '../lib/widgets/incident-view.mjs';
 
 /** The column as Build it renders it: one count (`wrong`, labelled by score()), the star rule. */
 const sideHtml = (id, { hints, title }) =>
   sideColumn({ id, titleHtml: title, counts: [{ key: 'wrong', label: '' }], hints, ruleHtml: RULE });
 
 test('help-ladder keeps the behaviour; the markup lives in the kit (lib/ui/side.mjs)', () => {
-  assert.deepEqual(Object.keys(ladder).sort(), ['HINT_TIERS', 'RULE', 'boardStars', 'hintCost', 'mountSide', 'starsLabel', 'validateHelps']);
+  assert.deepEqual(Object.keys(ladder).sort(), ['HINT_TIERS', 'LADDER', 'PENALTY', 'RULE', 'boardStars', 'hintCost', 'ladderText', 'mountSide', 'ruleText', 'starsLabel', 'validateHelps']);
+});
+
+test('LADDER is generated from scoreStars', () => {
+  assert.equal(LADDER, '0 penalties give 5 stars, 1 gives 4, 2 gives 3, 3 or 4 give 2, more give 1.');
+  // A different rule: the generator reads the rule it is given.
+  assert.equal(ladderText((p) => (p <= 1 ? 5 - p : 1)), '0 penalties give 5 stars, 1 gives 4, more give 1.');
+});
+
+// Pinned verbatim: these are what the player reads beside the board today.
+const LADDER_TEXT = '0 penalties give 5 stars, 1 gives 4, 2 gives 3, 3 or 4 give 2, more give 1.';
+test('the side-column RULEs are unchanged and composed from PENALTY and LADDER', () => {
+  assert.equal(
+    RULE,
+    `Stars count this board only: a wrong drop, a failed Check, a wrong pick, a hint. ${LADDER_TEXT} Retrying is free.`,
+  );
+  assert.equal(SORT_RULE, `Stars count this board only: a wrong placement, a hint. ${LADDER_TEXT} Retrying is free.`);
+  assert.equal(
+    SPOT_RULE,
+    `Stars count this board only: a failed Check, a hint. ${LADDER_TEXT} Picking lines, and checking the same picks again, are free.`,
+  );
+  assert.equal(
+    INCIDENT_RULE,
+    `Stars count this board only: a misleading view, running out of budget, a wrong pick, a hint. ${LADDER_TEXT} Retrying is free.`,
+  );
+  for (const [rule, penalty] of [[RULE, PENALTY], [SORT_RULE, SORT_PENALTY], [SPOT_RULE, SPOT_PENALTY], [INCIDENT_RULE, INCIDENT_PENALTY]]) {
+    assert.equal(rule, ruleText(penalty));
+    assert.equal(Object.isFrozen(penalty), true);
+  }
 });
 
 const KEYS = ['queue', 'hints'];

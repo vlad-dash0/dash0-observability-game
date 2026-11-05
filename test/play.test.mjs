@@ -257,6 +257,30 @@ test('a declared mechanics list that equals the derived one is accepted', () => 
   assert.deepEqual([...build(lv).levels[ID].mechanics], ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query', 'configure']);
 });
 
+const FIXTURE_WIDGETS = ['choice', 'sort', 'build', 'incident', 'spot', 'tradeoff', 'query', 'configure'];
+
+test('validatePlay returns widgets alongside mechanics: every step type, choice too, first appearance', () => {
+  const lv = playFixture();
+  const [choice, sort, , , , , query] = lv.play.steps;
+  const sort2 = structuredClone(sort);
+  sort2.sort.id = 'fx-sort-again';
+  const steps = [sort, choice, sort2, query];
+  const got = validatePlay({ ...lv.play, steps });
+  assert.deepEqual(got.errors, []);
+  assert.deepEqual(got.widgets, ['sort', 'choice', 'query']);
+  assert.deepEqual(got.mechanics, ['sort', 'query']);
+  assert.deepEqual(validatePlay(lv.play).widgets, FIXTURE_WIDGETS);
+  assert.deepEqual(validatePlay(null).widgets, []);
+});
+
+test('a play level derives its widgets; a declared list must equal them', () => {
+  assert.deepEqual([...FX.widgets], FIXTURE_WIDGETS);
+  assert.deepEqual([...build({ ...playFixture(), widgets: FIXTURE_WIDGETS }).levels[ID].widgets], FIXTURE_WIDGETS);
+  assert.deepEqual(errorsOf({ ...playFixture(), widgets: ['sort', 'choice'] }), [
+    `${AT}: declares widgets ["sort","choice"] but its steps give ${JSON.stringify(FIXTURE_WIDGETS)}; fix or remove widgets`,
+  ]);
+});
+
 test('registry errors for run and play together, no kit, differing mechanics, a function', () => {
   assert.deepEqual(errorsOf({ ...playFixture(), run() {} }), [`${AT}: declares both run and play; use one`]);
   assert.deepEqual(errorsOf(playFixture(), { play: undefined }), [`${AT}: play needs the step kit (buildRegistry option "play")`]);

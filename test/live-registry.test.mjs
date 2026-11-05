@@ -8,6 +8,7 @@ import { DECK } from '../cards/deck.mjs';
 import { NODE_IDS } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
 import { runPlay, validatePlay } from '../lib/play.mjs';
+import { WIDGETS } from '../lib/registry.mjs';
 
 const nodeIds = NODE_IDS;
 
@@ -139,4 +140,46 @@ test('lights ids: the §2.7 ids, unique (levels name them in `lights`; the globe
     'payment-provider', 'payments', 'postgres', 'recommendations', 'redis', 'shipping', 'storefront',
   ]);
   assert.equal(new Set(nodeIds).size, nodeIds.length, 'ids are unique');
+});
+
+// What each hand-written level plays, in the order its run() plays it (verified against the
+// mount calls). Not derived: `mechanics` has no choice and is wrong for these two.
+const HAND_WRITTEN_WIDGETS = {
+  'monitoring-vs-observability': ['sort', 'choice'],
+  'the-signals': ['sort', 'choice'],
+  'why-opentelemetry': ['sort', 'choice'],
+  'the-pager': [],
+  'naming-your-service': ['choice', 'configure'],
+  'spans-and-traces': ['choice', 'build'],
+  'span-kinds': ['build', 'choice'],
+  'status-and-errors': ['sort', 'choice'],
+  'context-propagation': ['choice', 'build'],
+  'baggage': ['sort', 'choice'],
+  'events-and-links': ['choice', 'build'],
+  'checkout-is-slow': ['incident'],
+};
+// Declares a mechanic its board is not (custom, unscored, unwinnable), so no help is offered.
+const NOT_A_WIDGET = { 'the-pager': 'a custom board, not the incident widget; its intro explains it' };
+
+test('hand-written levels declare their widgets', () => {
+  const reg = liveRegistry();
+  const hand = reg.order.filter((id) => !reg.levels[id].play);
+  assert.deepEqual(Object.fromEntries(hand.map((id) => [id, [...reg.levels[id].widgets]])), HAND_WRITTEN_WIDGETS);
+  for (const id of hand) {
+    const lv = reg.levels[id];
+    if (id in NOT_A_WIDGET) continue;
+    assert.deepEqual([...lv.widgets].filter((w) => w !== 'choice').sort(), [...lv.mechanics].sort(), id);
+  }
+});
+
+test('every play level has widgets, all known; non-choice ones equal its mechanics', () => {
+  const reg = liveRegistry();
+  const plays = reg.order.filter((id) => reg.levels[id].play);
+  assert.ok(plays.length > 0);
+  for (const id of plays) {
+    const lv = reg.levels[id];
+    assert.ok(lv.widgets.length > 0, id);
+    assert.ok(lv.widgets.every((w) => WIDGETS.includes(w)), id);
+    assert.deepEqual([...lv.widgets].filter((w) => w !== 'choice').sort(), [...lv.mechanics].sort(), id);
+  }
 });
