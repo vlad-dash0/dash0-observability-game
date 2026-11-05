@@ -237,3 +237,27 @@ test('every action in every workflow is pinned to a commit sha', () => {
     }
   }
 });
+
+// A run that fails part way must not leave an earlier verdict standing on the head commit.
+test('report posts pending first, with gh only, before any checkout or install', () => {
+  const job = FINDINGS.jobs.report;
+  const [first] = job.steps;
+  assert.equal(first.id, 'head');
+  assert.equal(first.uses, undefined, 'no action before the pending post');
+  assert.match(first.run, /gh api "repos\/\$REPO\/pulls\/\$PR"/);
+  assert.match(first.run, /\^\[0-9a-f\]\{40\}\$/, 'checks the head sha');
+  assert.match(first.run, /\[ "\$state" = open \]/, 'a closed PR gets no status');
+  assert.match(first.run, /-f state=pending/);
+  assert.match(first.run, /statuses\/\$sha"/);
+  assert.match(first.run, /echo "sha=\$sha" >> "\$GITHUB_OUTPUT"/);
+  assert.equal(job.env.CONTEXT, CONTEXT, 'the shell steps post the same context as the tool');
+});
+
+test('report posts error on the head when any later step fails', () => {
+  const last = FINDINGS.jobs.report.steps.at(-1);
+  assert.equal(last.if, "failure() && steps.head.outputs.sha != ''");
+  assert.match(last.run, /statuses\/\$SHA"/);
+  assert.match(last.run, /-f state=error/);
+  assert.match(last.run, /-f "context=\$CONTEXT"/);
+  assert.equal(last.env.SHA, '${{ steps.head.outputs.sha }}');
+});

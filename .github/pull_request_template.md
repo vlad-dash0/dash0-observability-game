@@ -17,7 +17,8 @@ REVIEW COMMENTS: post findings and dispositions as PR comments in these formats.
 findings, 2 inconclusive. Merge needs `All checks` green and the `PR findings` status
 green: CI runs this same script on every push, comment, review and resolved thread and
 posts its verdict on the head commit (pending while the PR is a draft). Hiding a comment
-fires no event: re-run it then (Actions, PR findings, Run workflow, the PR number).
+fires no event, and a failed PR findings run may leave the status out of date: re-run it
+then (Actions, PR findings, Run workflow, the PR number).
 
 1. Findings, one comment per review round. The heading names the reviewed commit:
 

@@ -61,7 +61,9 @@ package files out (keep its lines to the forms `tools/serve.mjs` parses).
   canonical findings check: `.github/workflows/pr-findings.yml` runs `tools/pr-findings.mjs`
   on every push, comment, review and thread change and posts its verdict on the PR head
   (pending on a draft); `node tools/pr-findings.mjs <PR>` is the same script locally, for
-  the details (review comment formats: `.github/pull_request_template.md`).
+  the details (review comment formats: `.github/pull_request_template.md`). A failed PR
+  findings run, or a hidden comment, can leave the status out of date: re-run the workflow
+  (Actions, PR findings, Run workflow, the PR number) before merging.
 - PR bodies carry no full-suite test count: CI shows it.
 
 ## Wizard workflow

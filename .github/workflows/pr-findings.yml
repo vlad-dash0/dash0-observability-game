@@ -65,7 +65,31 @@ jobs:
       issues: read
       pull-requests: read
       statuses: write
+    env:
+      CONTEXT: PR findings # tools/pr-findings-status.mjs CONTEXT (the test checks they match)
+      PR: ${{ matrix.pr }}
+      REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
+      # Pending first, with gh only, so a run that fails anywhere after this (checkout,
+      # install, the detector) never leaves an earlier verdict standing on the head.
+      - id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Retried: until the head is known, a failure can't be posted on it.
+          out=
+          for wait in 5 15 0; do
+            out=$(gh api "repos/$REPO/pulls/$PR" --jq '.state + " " + .head.sha') && break
+            sleep "$wait"
+          done
+          [ -n "$out" ] || { echo "PR #$PR: could not read the PR; the status is unchanged, re-run"; exit 1; }
+          read -r state sha <<< "$out"
+          [ "$state" = open ] || { echo "PR #$PR is $state: no status posted"; exit 0; }
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "PR #$PR: no usable head sha: $sha"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          gh api -X POST "repos/$REPO/statuses/$sha" -f state=pending -f "context=$CONTEXT" \
+            -f "description=Evaluating review comments" -f "target_url=$RUN_URL" > /dev/null
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.repository.default_branch }}
@@ -77,5 +101,12 @@ jobs:
       - run: npm ci --ignore-scripts
       - env:
           GH_TOKEN: ${{ github.token }}
-          PR: ${{ matrix.pr }}
         run: node tools/pr-findings-status.mjs report "$PR"
+      # Any failure once the head is known: say so on the head, never leave a verdict.
+      - if: failure() && steps.head.outputs.sha != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.head.outputs.sha }}
+        run: |
+          gh api -X POST "repos/$REPO/statuses/$SHA" -f state=error -f "context=$CONTEXT" \
+            -f "description=The PR findings run failed: re-run it" -f "target_url=$RUN_URL" > /dev/null
