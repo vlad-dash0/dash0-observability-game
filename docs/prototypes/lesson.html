@@ -1,0 +1,170 @@
+<title>Lesson Text Styles</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: three stacked level mock-ups, each with a label line and its CSS beneath. Tokens mirror the game's tokens.css (dark first). */
+:root{
+  color-scheme:dark;
+  --bg:#101010; --surface:#212121; --surface-2:#2c2c2c; --border:#424242;
+  --text:#ffffff; --muted:#9e9e9e; --lesson:#d9d6d1; --head:#f2f0ed;
+  --amber:#f3b35f; --eyebrow:rgba(243,179,95,.78); --rule:rgba(243,179,95,.7);
+  --glow:rgba(243,179,95,.13); --dot:rgba(243,179,95,.28);
+  --code-bg:#101010; --code-fg:#f3b35f; --chip-line:#2c2c2c;
+  --font-sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  color-scheme:light;
+  --bg:#ffffff; --surface:#f5f5f5; --surface-2:#ebebeb; --border:#9e9e9e;
+  --text:#101010; --muted:#555352; --lesson:#3a3836; --head:#101010;
+  --amber:#a8650f; --eyebrow:#a8650f; --rule:rgba(168,101,15,.75);
+  --glow:rgba(168,101,15,.11); --dot:rgba(168,101,15,.28);
+  --code-bg:#ebebeb; --code-fg:#7a4a08; --chip-line:#d6d6d6;
+}}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#ffffff; --surface:#f5f5f5; --surface-2:#ebebeb; --border:#9e9e9e;
+  --text:#101010; --muted:#555352; --lesson:#3a3836; --head:#101010;
+  --amber:#a8650f; --eyebrow:#a8650f; --rule:rgba(168,101,15,.75);
+  --glow:rgba(168,101,15,.11); --dot:rgba(168,101,15,.28);
+  --code-bg:#ebebeb; --code-fg:#7a4a08; --chip-line:#d6d6d6;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--font-sans);margin:0;
+  padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+main{max-width:760px;margin:0 auto;display:grid;gap:44px}
+header h1{font-size:22px;margin:0 0 6px}
+header p{margin:0;color:var(--muted);font-size:14px;line-height:1.5}
+.variant{display:grid;gap:14px;min-width:0}
+.vhead{display:flex;gap:12px;align-items:baseline}
+.vtag{font-family:var(--font-mono);font-weight:700;font-size:13px;color:var(--bg);background:var(--amber);border-radius:6px;padding:2px 8px}
+.vname{font-weight:700;font-size:16px}
+.vline{color:var(--muted);font-size:14px;margin:0;line-height:1.5}
+.stage{border:1px solid var(--chip-line);border-radius:14px;padding:22px 16px;min-width:0}
+.level{max-width:420px;margin:0 auto}
+/* shared, as in the game today */
+h3.q{font-weight:700;font-size:19px;margin:0 0 14px;text-align:center}
+.choices{display:grid;gap:10px}
+.choice{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 15px;font-weight:700;font-size:16px;line-height:1.35}
+.lesson code,.lesson-code{font-family:var(--font-mono)}
+.lesson+.lesson{margin-top:14px}
+.second{margin-top:30px;padding-top:22px;border-top:1px dashed var(--chip-line)}
+.second small{display:block;font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+pre{margin:0;background:var(--surface);border:1px solid var(--chip-line);border-radius:10px;padding:14px;overflow-x:auto;font-family:var(--font-mono);font-size:12px;line-height:1.55;color:var(--lesson)}
+
+/* ===== A. Editorial ===== */
+.a .lesson{font-size:18px;line-height:1.6;font-weight:400;color:var(--lesson);margin:0 0 24px}
+.a .lesson::before{content:"LESSON";display:block;font-family:var(--font-mono);font-size:11px;font-weight:400;letter-spacing:.14em;color:var(--eyebrow);margin-bottom:10px}
+.a .lesson code{font-size:.8em;background:var(--code-bg);color:var(--code-fg);border-radius:6px;padding:2px 6px}
+.a .lesson+.lesson::before{display:none}
+
+/* ===== B. Accent rule ===== */
+.b .lesson{font-size:18px;line-height:1.6;font-weight:400;color:var(--lesson);margin:0 0 24px;padding-left:16px;border-left:2px solid var(--rule)}
+.b .lesson::before{content:"LESSON";display:block;font-family:var(--font-mono);font-size:11px;font-weight:400;letter-spacing:.14em;color:var(--eyebrow);margin-bottom:10px}
+.b .lesson code{font-size:.8em;background:var(--code-bg);color:var(--code-fg);border-radius:6px;padding:2px 6px}
+
+/* ===== C. Glow card ===== */
+.c .lesson{position:relative;overflow:hidden;font-size:18px;line-height:1.6;font-weight:400;color:var(--lesson);margin:0 0 24px;padding:18px 18px 20px;border-radius:16px;
+  background:
+    radial-gradient(circle at 1.5px 1.5px,var(--dot) 1px,transparent 1.5px) top right/14px 14px no-repeat,
+    radial-gradient(120% 110% at 0% 0%,var(--glow),transparent 62%),
+    var(--surface)}
+.c .lesson::before{content:"LESSON";display:block;font-family:var(--font-mono);font-size:11px;font-weight:400;letter-spacing:.14em;color:var(--eyebrow);margin-bottom:10px}
+.c .lesson code{font-size:.8em;background:var(--code-bg);color:var(--code-fg);border-radius:6px;padding:2px 6px}
+</style>
+
+<main>
+<header>
+  <h1>Lesson text: three styles</h1>
+  <p>Level 0.1 as it would render, with the choice cards styled as today so the contrast is visible. All three use 18px, weight 400, line-height 1.6 and slightly softer-than-white text. Follows the system theme; light tokens included.</p>
+</header>
+
+<!--A-->
+<section class="variant a">
+  <div class="vhead"><span class="vtag">A</span><span class="vname">Editorial</span></div>
+  <p class="vline">Removes the card entirely; the lesson is open text with a small amber LESSON eyebrow.</p>
+  <div class="stage"><div class="level">
+    <p class="lesson">Monitoring answers the known questions. Observability is being able to answer the new ones from the telemetry your system already sends, without shipping new code.</p>
+    <h3 class="q">What makes the second kind answerable?</h3>
+    <div class="choices"><div class="choice">More alerts</div><div class="choice">Keeping data for longer</div><div class="choice">Telemetry with many attributes you can slice after the fact</div><div class="choice">More dashboards</div></div>
+    <div class="second"><small>Longer example with a code chip</small>
+    <p class="lesson">Every span carries a <code>service.name</code> attribute, so you can group a slow request by the service that handled it, then drop to the single trace that explains the delay.</p></div>
+  </div></div>
+<pre>.bubble{
+  background:none;border:0;border-radius:0;padding:0;
+  font-size:18px;line-height:1.6;font-weight:400;
+  color:var(--color-lesson); /* new: dark #d9d6d1, light #3a3836 */
+  margin-bottom:24px;
+}
+.bubble::before{
+  content:"LESSON";display:block;margin-bottom:10px;
+  font:400 11px/1 var(--font-mono);letter-spacing:.14em;
+  color:var(--color-lesson-eyebrow); /* dark rgba(243,179,95,.78), light #a8650f */
+}
+.bubble code{
+  font-family:var(--font-mono);font-size:.8em;
+  background:var(--color-code-bg);color:var(--color-lesson-code); /* dark #f3b35f, light #7a4a08 */
+  border-radius:6px;padding:2px 6px;
+}</pre>
+</section>
+
+<!--B-->
+<section class="variant b">
+  <div class="vhead"><span class="vtag">B</span><span class="vname">Accent rule</span></div>
+  <p class="vline">Same open text as A, with a 2px amber rule on the left and 16px padding to mark it as the teaching voice.</p>
+  <div class="stage"><div class="level">
+    <p class="lesson">Monitoring answers the known questions. Observability is being able to answer the new ones from the telemetry your system already sends, without shipping new code.</p>
+    <h3 class="q">What makes the second kind answerable?</h3>
+    <div class="choices"><div class="choice">More alerts</div><div class="choice">Keeping data for longer</div><div class="choice">Telemetry with many attributes you can slice after the fact</div><div class="choice">More dashboards</div></div>
+    <div class="second"><small>Longer example with a code chip</small>
+    <p class="lesson">Every span carries a <code>service.name</code> attribute, so you can group a slow request by the service that handled it, then drop to the single trace that explains the delay.</p></div>
+  </div></div>
+<pre>.bubble{
+  background:none;border:0;border-radius:0;
+  padding:0 0 0 16px;border-left:2px solid var(--color-lesson-rule); /* dark rgba(243,179,95,.7), light rgba(168,101,15,.75) */
+  font-size:18px;line-height:1.6;font-weight:400;
+  color:var(--color-lesson);margin-bottom:24px;
+}
+.bubble::before{
+  content:"LESSON";display:block;margin-bottom:10px;
+  font:400 11px/1 var(--font-mono);letter-spacing:.14em;
+  color:var(--color-lesson-eyebrow);
+}
+.bubble code{
+  font-family:var(--font-mono);font-size:.8em;
+  background:var(--color-code-bg);color:var(--color-lesson-code);
+  border-radius:6px;padding:2px 6px;
+}</pre>
+</section>
+
+<!--C-->
+<section class="variant c">
+  <div class="vhead"><span class="vtag">C</span><span class="vname">Glow card</span></div>
+  <p class="vline">Keeps a card, drops the chat-bubble shape and border, and adds a soft amber glow in the top-left plus a faint dot in the top-right, after the Dash0 empty state.</p>
+  <div class="stage"><div class="level">
+    <p class="lesson">Monitoring answers the known questions. Observability is being able to answer the new ones from the telemetry your system already sends, without shipping new code.</p>
+    <h3 class="q">What makes the second kind answerable?</h3>
+    <div class="choices"><div class="choice">More alerts</div><div class="choice">Keeping data for longer</div><div class="choice">Telemetry with many attributes you can slice after the fact</div><div class="choice">More dashboards</div></div>
+    <div class="second"><small>Longer example with a code chip</small>
+    <p class="lesson">Every span carries a <code>service.name</code> attribute, so you can group a slow request by the service that handled it, then drop to the single trace that explains the delay.</p></div>
+  </div></div>
+<pre>.bubble{
+  position:relative;overflow:hidden;border:0;border-radius:16px;
+  padding:18px 18px 20px;margin-bottom:24px;
+  font-size:18px;line-height:1.6;font-weight:400;color:var(--color-lesson);
+  background:
+    radial-gradient(circle at 1.5px 1.5px,var(--color-lesson-dot) 1px,transparent 1.5px) top right/14px 14px no-repeat, /* dark rgba(243,179,95,.28), light rgba(168,101,15,.28) */
+    radial-gradient(120% 110% at 0% 0%,var(--color-lesson-glow),transparent 62%), /* dark rgba(243,179,95,.13), light rgba(168,101,15,.11) */
+    var(--color-surface);
+}
+.bubble::before{
+  content:"LESSON";display:block;margin-bottom:10px;
+  font:400 11px/1 var(--font-mono);letter-spacing:.14em;
+  color:var(--color-lesson-eyebrow);
+}
+.bubble code{
+  font-family:var(--font-mono);font-size:.8em;
+  background:var(--color-code-bg);color:var(--color-lesson-code);
+  border-radius:6px;padding:2px 6px;
+}</pre>
+</section>
+</main>

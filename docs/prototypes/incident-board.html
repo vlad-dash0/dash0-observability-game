@@ -1,0 +1,723 @@
+<title>Who Is Talking Incident Board</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Martian+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: lesson column (header, page banner, intro, board: budget, Step 1 tiles, evidence log, Step 2 unlock band, Step 3) beside a ~300px sticky column (result, score, hints). Dark-first, tokens from the approved trace prototype. */
+:root {
+  --bg: #101010; --surface: #212121; --surface-2: #2c2c2c; --line: #424242;
+  --fg: #f2f0ed; --muted: #a3a09c; --faint: #6b6966;
+  --amber: #f3b35f; --error: #f8494d; --good: #a8fbbe; --info: #fd8c66; --focus: #fd6f40; --hint: #c9b6ff;
+  --spent: oklch(0.52 0.06 70); --left: oklch(0.62 0.05 150);
+  --btn-bg: #f8494d; --btn-fg: #101010;
+  --lesson: #d9d6d1; --eyebrow: rgba(243, 179, 95, 0.78); --glow: rgba(243, 179, 95, 0.13); --dot: rgba(243, 179, 95, 0.28); --code-bg: #101010; --code-fg: #f3b35f;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Martian Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius-sm: 10px; --radius: 14px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #ffffff; --surface: #f5f5f5; --surface-2: #ebebeb; --line: #c9c9c9;
+    --fg: #101010; --muted: #555352; --faint: #8a8885;
+    --amber: #a8650f; --error: #d42a2e; --good: #2f7a46; --info: #b34a22; --focus: #101010; --hint: #6a4fc2;
+    --spent: oklch(0.72 0.07 70); --left: oklch(0.62 0.06 150);
+    --btn-bg: #f8494d; --btn-fg: #101010;
+    --lesson: #3a3836; --eyebrow: #a8650f; --glow: rgba(168, 101, 15, 0.11); --dot: rgba(168, 101, 15, 0.28); --code-bg: #ebebeb; --code-fg: #7a4a08;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #ffffff; --surface: #f5f5f5; --surface-2: #ebebeb; --line: #c9c9c9;
+  --fg: #101010; --muted: #555352; --faint: #8a8885;
+  --amber: #a8650f; --error: #d42a2e; --good: #2f7a46; --info: #b34a22; --focus: #101010; --hint: #6a4fc2;
+  --spent: oklch(0.72 0.07 70); --left: oklch(0.62 0.06 150);
+  --btn-bg: #f8494d; --btn-fg: #101010;
+  --lesson: #3a3836; --eyebrow: #a8650f; --glow: rgba(168, 101, 15, 0.11); --dot: rgba(168, 101, 15, 0.28); --code-bg: #ebebeb; --code-fg: #7a4a08;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-sans); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 1340px; margin: 0 auto; display: grid; gap: 20px 24px; grid-template-columns: minmax(0, 1fr) 300px; }
+.main { display: grid; gap: 20px; min-width: 0; align-content: start; }
+.side { position: sticky; top: max(16px, env(safe-area-inset-top, 0px)); align-self: start; min-width: 0; }
+@media (max-width: 1000px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); max-width: 980px; }
+  .side { position: static; }
+}
+.top { display: grid; gap: 8px; }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+h1 { margin: 0; font-size: clamp(24px, 4vw, 32px); line-height: 1.15; font-weight: 600; text-wrap: balance; overflow-wrap: anywhere; }
+h2 { margin: 0; font-size: 18px; font-weight: 600; text-wrap: balance; }
+h3 { margin: 0; font-size: 15px; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; overflow-wrap: anywhere; }
+.lesson {
+  position: relative; overflow: hidden; border: 0; border-radius: 16px; padding: 18px 18px 20px; display: grid; gap: 12px;
+  font-size: 18px; line-height: 1.6; font-weight: 400; color: var(--lesson);
+  background:
+    radial-gradient(circle at 1.5px 1.5px, var(--dot) 1px, transparent 1.5px) top right / 14px 14px no-repeat,
+    radial-gradient(120% 110% at 0% 0%, var(--glow), transparent 62%),
+    var(--surface);
+}
+.lesson::before { content: "LESSON"; display: block; font: 400 11px/1 var(--font-mono); letter-spacing: 0.14em; color: var(--eyebrow); margin-bottom: -2px; }
+.lesson code { font-family: var(--font-mono); font-size: 0.8em; background: var(--code-bg); color: var(--code-fg); border-radius: 6px; padding: 2px 6px; }
+.lesson .scenario { font-weight: 600; color: var(--fg); }
+.lesson ol { margin: 0; padding-left: 1.4em; display: grid; gap: 6px; max-width: 70ch; }
+.lesson ol b { font-weight: 600; color: var(--fg); }
+.lesson .foot { font-size: 15px; color: var(--muted); }
+@media (max-width: 520px) { .lesson { font-size: 16px; } }
+
+/* page banner */
+.page { border: 1px solid color-mix(in srgb, var(--error) 40%, var(--line)); border-radius: var(--radius); background: color-mix(in srgb, var(--error) 5%, var(--surface)); padding: 14px 16px; display: grid; gap: 10px; }
+.page-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.firing { display: inline-flex; align-items: center; gap: 7px; font: 600 11px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--error); border: 1px solid color-mix(in srgb, var(--error) 50%, transparent); border-radius: 999px; padding: 2px 10px; }
+.firing i { width: 7px; height: 7px; border-radius: 50%; background: var(--error); }
+.page-time { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.svc-chip { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--line); background: var(--surface-2); border-radius: 6px; padding: 2px 8px; overflow-wrap: anywhere; }
+.svc-chip i { width: 8px; height: 8px; border-radius: 2px; background: var(--faint); flex: none; }
+.page-stats { display: flex; flex-wrap: wrap; gap: 4px 22px; margin: 0; }
+.page-stats div { display: grid; gap: 1px; }
+.page-stats dt { font-size: 11px; color: var(--muted); }
+.page-stats dd { margin: 0; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ask { font-size: 15px; font-weight: 600; }
+
+/* board */
+.board { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.sec { padding: 16px; display: grid; gap: 12px; }
+.sec + .sec { border-top: 1px solid var(--line); }
+.sec-h { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+.step { font: 600 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.sec-h p { font-size: 13.5px; color: var(--muted); }
+
+.budget { display: grid; gap: 8px; }
+.budget-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; align-items: baseline; }
+.budget-top strong { font-family: var(--font-mono); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.budget-top span { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cells { display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 3px; }
+.cells i { height: 14px; border-radius: 3px; background: color-mix(in srgb, var(--left) 55%, transparent); transition: background-color 0.25s; }
+.cells i.spent { background: color-mix(in srgb, var(--line) 60%, transparent); }
+.cells i.preview { background: transparent; box-shadow: inset 0 0 0 1px var(--amber); }
+.cells i.over { box-shadow: inset 0 0 0 1px var(--error); background: transparent; }
+.budget-scale { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 10.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.spentlist { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--muted); align-items: center; }
+.spentlist:empty { display: none; }
+
+.progress { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.dots { display: inline-flex; gap: 5px; }
+.dots i { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--muted); }
+.dots i.on { background: var(--good); border-color: var(--good); }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.tile {
+  display: grid; gap: 10px; align-content: space-between; text-align: left; font: inherit; color: var(--fg); cursor: pointer;
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 12px 10px; min-height: 92px;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.tile:hover:not(:disabled) { border-color: var(--muted); }
+.tile:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.tile .t { font-weight: 600; font-size: 14px; line-height: 1.35; }
+.tile .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tile.opened { background: var(--surface-2); border-style: solid; }
+.tile.opened .t { color: var(--muted); }
+.tile.hinted { outline: 2px solid var(--hint); outline-offset: 2px; }
+.tile:disabled { cursor: default; opacity: 0.7; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 10.5px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chip.cost { color: var(--fg); }
+.chip.open { border-style: dashed; }
+.chip.mis { color: var(--error); border-color: color-mix(in srgb, var(--error) 45%, transparent); }
+.chip.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); }
+
+/* feedback lines: neutral, error, good */
+.fb { font-size: 13.5px; display: flex; gap: 10px; align-items: flex-start; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); color: var(--fg); }
+.fb:empty { display: none; }
+.fb:focus { outline: none; }
+.fb .ico { flex: none; width: 18px; height: 18px; display: grid; place-items: center; margin-top: 1px; color: var(--muted); }
+.fb.err { border-color: color-mix(in srgb, var(--error) 50%, transparent); }
+.fb.err .ico { color: var(--error); }
+.fb.ok { border-color: color-mix(in srgb, var(--good) 50%, transparent); }
+.fb.ok .ico { color: var(--good); }
+.fb b { font-weight: 600; }
+
+/* evidence log */
+.log { display: grid; gap: 10px; }
+.log-empty { font-size: 13.5px; color: var(--faint); border: 1px dashed var(--line); border-radius: var(--radius-sm); padding: 12px; }
+.card { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); min-width: 0; }
+.card.fresh { border-color: color-mix(in srgb, var(--amber) 55%, var(--line)); }
+.card summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; padding: 10px 12px; border-radius: var(--radius-sm); }
+.card summary::-webkit-details-marker { display: none; }
+.card summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.card summary h3 { flex: 1 1 180px; min-width: 0; }
+.card summary h3:focus { outline: none; }
+.caret { width: 14px; height: 14px; color: var(--muted); transition: transform 0.15s; flex: none; }
+.card[open] .caret { transform: rotate(90deg); }
+.when { font-family: var(--font-mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.body { padding: 0 12px 12px; display: grid; gap: 10px; font-size: 14px; min-width: 0; }
+.body p { max-width: 72ch; }
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+.body table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.body caption { text-align: left; font-size: 11px; color: var(--muted); padding: 7px 10px 0; caption-side: top; }
+.body th { text-align: left; font-weight: 600; font-size: 11px; color: var(--muted); padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.body td { padding: 5px 10px; border-top: 1px solid color-mix(in srgb, var(--line) 50%, transparent); font-family: var(--font-mono); font-size: 11.5px; white-space: nowrap; vertical-align: top; }
+.body td code { font-size: 1em; }
+.body pre { margin: 0; overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.6; }
+.body pre .del { color: var(--error); }
+
+/* Step 2 */
+.lock { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: var(--muted); }
+.lock svg { flex: none; margin-top: 2px; }
+.lock.open { color: var(--fg); }
+.hyps { display: grid; gap: 8px; }
+.hyp {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; text-align: left; width: 100%;
+  font: inherit; font-size: 14px; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 12px 14px; cursor: pointer; transition: border-color 0.15s;
+}
+.hyp:hover { border-color: var(--muted); }
+.hyp:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.hyp[aria-disabled="true"] { cursor: not-allowed; }
+.hyp.locked { color: var(--muted); border-style: dashed; background: transparent; }
+.hyp.locked:hover { border-color: var(--line); }
+.hyp.wrong { color: var(--faint); background: transparent; }
+.hyp.wrong .lbl { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--faint) 70%, transparent); }
+.hyp.right { border-color: color-mix(in srgb, var(--good) 55%, transparent); background: color-mix(in srgb, var(--good) 6%, var(--bg)); }
+.hyp.hinted { outline: 2px solid var(--hint); outline-offset: 2px; }
+.hyp .state { display: inline-flex; gap: 6px; align-items: center; font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+
+/* right column */
+.hintcol { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 10px; }
+.hc-h { margin: 0; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.hc-row { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.tier { font-size: 12.5px; color: var(--muted); }
+.tier .pips { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: middle; }
+.tier .pips i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--hint); display: inline-block; }
+.tier .pips i.on { background: var(--hint); }
+.hinttext { border-left: 2px solid var(--hint); padding: 2px 0 2px 12px; font-size: 14px; display: grid; gap: 6px; }
+.hinttext:empty { display: none; }
+.hinttext:focus { outline: none; }
+.hinttext .lvl { font-family: var(--font-mono); font-size: 10.5px; color: var(--hint); letter-spacing: 0.05em; text-transform: uppercase; }
+.cost { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); }
+.score { padding: 0 0 12px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.counts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; font-family: var(--font-mono); font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.counts b { font-size: 16px; display: block; font-weight: 600; color: var(--fg); }
+.stars { display: flex; gap: 3px; color: var(--amber); }
+.stars svg { width: 14px; height: 14px; }
+.stars path { fill: none; stroke: currentColor; stroke-width: 1.1; stroke-linejoin: round; }
+.stars .poss { color: color-mix(in srgb, var(--amber) 55%, transparent); }
+.stars .off { color: color-mix(in srgb, var(--line) 70%, transparent); }
+.stars .off path { stroke-dasharray: 1.6 1.4; }
+.stars .earned path { fill: currentColor; }
+.rule { font-size: 11.5px; color: var(--muted); }
+.win { display: grid; background: #0c0c0c; color: #e9e6e1; border-radius: var(--radius); overflow: hidden; margin-bottom: 4px; }
+.swirl { aspect-ratio: 1 / 1; width: 100%; max-width: 200px; justify-self: center; background: radial-gradient(circle at 50% 52%, rgba(214, 150, 60, 0.3) 0%, rgba(160, 100, 30, 0.12) 32%, rgba(12, 12, 12, 0) 62%), #0c0c0c; }
+.swirl canvas { display: block; width: 100%; height: 100%; }
+.win-txt { padding: 0 14px 14px; display: grid; }
+.win-txt strong { font-size: 18px; font-weight: 600; }
+.win-txt strong:focus { outline: none; }
+.win-txt strong + p { margin-top: 10px; }
+.win-txt p + p { margin-top: 12px; }
+.win-txt p { color: #b8b3ac; font-size: 14px; }
+.win-txt code { color: #e9e6e1; }
+
+.btn { font: 600 14px var(--font-sans); border-radius: 999px; padding: 9px 20px; cursor: pointer; border: 1px solid transparent; }
+.btn.ghost-btn { background: transparent; color: var(--fg); border-color: var(--line); }
+.btn.hint-btn { background: transparent; color: var(--hint); border-color: color-mix(in srgb, var(--hint) 55%, transparent); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn:focus-visible, .linkbtn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--fg); text-decoration: underline; cursor: pointer; font: inherit; }
+.notes { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 18px; }
+.notes ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; color: var(--muted); max-width: 84ch; }
+.notes b { color: var(--fg); font-weight: 600; }
+
+@media (max-width: 520px) {
+  .sec { padding: 14px 12px; }
+  .tiles { grid-template-columns: minmax(0, 1fr); }
+  .tile { min-height: 0; }
+  .cells { gap: 2px; }
+  .hyp { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+  <div class="main">
+    <header class="top">
+      <p class="eyebrow">Act 1 boss · Who is talking? · incident board prototype v2</p>
+      <h1>Who is <code>unknown_service:node</code>?</h1>
+    </header>
+
+    <section class="page" aria-labelledby="page-h">
+      <div class="page-row">
+        <span class="firing"><i aria-hidden="true"></i>Firing</span>
+        <span class="page-time">PAGE 14:20</span>
+        <h2 id="page-h" style="font-size:15px">Error rate</h2>
+        <span class="svc-chip"><i aria-hidden="true"></i>unknown_service:node</span>
+      </div>
+      <dl class="page-stats">
+        <div><dt>Failing spans</dt><dd>8%</dd></div>
+        <div><dt>Since</dt><dd>14:11</dd></div>
+        <div><dt>Runbook</dt><dd>none</dd></div>
+        <div><dt>Routed to</dt><dd>default on-call</dd></div>
+      </dl>
+      <p>No runbook, no team and no dashboard uses that name, so the page went to the default on-call.</p>
+      <p class="ask">Find who owns it and why it has that name before the error budget runs out.</p>
+    </section>
+
+    <div class="lesson">
+      <!-- per-boss: the scenario line -->
+      <p class="scenario">An alert fired for a service nobody recognises. Find out who owns it and why it has that name.</p>
+      <!-- generic: reads the same for every incident boss -->
+      <ol aria-label="How this board works">
+        <li><b>Investigate.</b> Each evidence view costs minutes of error budget; the chip on each tile shows how many. Some views hold real clues, some show nothing useful, and a few will lead you astray.</li>
+        <li><b>Unlock the causes.</b> The possible causes stay locked until you have found enough real clues. The counter shows your progress.</li>
+        <li><b>Name the cause.</b> Pick the one the evidence supports.</li>
+      </ol>
+      <p class="foot">Misleading views, wrong picks and running out of budget each cost a star. Stuck? Hints on the right cost a star each.</p>
+    </div>
+
+    <div class="board">
+      <div class="sec budget" aria-labelledby="budget-h">
+        <div class="budget-top">
+          <h2 class="step" id="budget-h">Error budget</h2>
+          <strong id="b-left">20 min left</strong>
+          <span id="b-spent">0 min spent</span>
+        </div>
+        <div class="cells" id="cells" role="meter" aria-labelledby="budget-h" aria-valuemin="0" aria-valuemax="20" aria-valuenow="20"></div>
+        <div class="budget-scale" aria-hidden="true"><span>14:20</span><span>budget gone 14:40</span></div>
+        <div class="spentlist" id="spentlist"></div>
+      </div>
+
+      <section class="sec" aria-labelledby="s1-h">
+        <div class="sec-h">
+          <h2 class="step" id="s1-h">Step 1: Investigate</h2>
+          <p>Open evidence. Each look costs the minutes on its chip.</p>
+          <span class="progress" id="prog1"></span>
+        </div>
+        <div class="tiles" id="tiles"></div>
+        <div class="fb" id="fb1" role="status" aria-live="polite" tabindex="-1"></div>
+      </section>
+
+      <section class="sec" aria-labelledby="log-h">
+        <div class="sec-h">
+          <h2 class="step" id="log-h">Evidence</h2>
+          <p>Newest on top. Older cards fold; open any to compare.</p>
+        </div>
+        <div class="log" id="log"></div>
+      </section>
+
+      <section class="sec" aria-labelledby="su-h">
+        <div class="sec-h">
+          <h2 class="step" id="su-h">Step 2: Unlock the causes</h2>
+          <span class="progress" id="prog2"></span>
+        </div>
+        <p class="lock" id="lock"></p>
+      </section>
+
+      <section class="sec" aria-labelledby="s2-h" id="step2">
+        <div class="sec-h">
+          <h2 class="step" id="s2-h">Step 3: Name the cause</h2>
+        </div>
+        <div class="hyps" id="hyps" role="group" aria-labelledby="s2-h" aria-describedby="lock"></div>
+        <div class="fb" id="fb2" role="status" aria-live="polite" tabindex="-1"></div>
+      </section>
+    </div>
+
+    <section class="notes" aria-labelledby="n-h">
+      <h2 id="n-h">Prototype notes</h2>
+      <ul>
+        <li><b>Same rules:</b> the scenario, budget, views and hypotheses come from <code>levels/who-is-talking.mjs</code>; <code>openView</code>, <code>canAnswer</code>, <code>answer</code> and <code>budgetLeft</code> are ported from <code>lib/widgets/incident.mjs</code>. The one addition is <code>cluesOpened</code>, which <code>canAnswer</code> now uses, so "Clues found" and the lock read the same count (as #143 asks).</li>
+        <li><b>Penalties</b> as in <code>incident-view.mjs</code>: first open of a misleading view, the open that spends the last of the budget, a wrong pick. Repeats are free. Stars use <code>lib/scoring.mjs</code> (penalties plus hints, 5 stars max).</li>
+        <li><b>What a tile reveals:</b> only "misleading", because the engine already says so on that open. Clue and neutral views look the same once opened, though "Clues found" ticks up on a clue, as #143 decided. The count caps at 2, the number needed, so it does not reveal that a third clue exists.</li>
+        <li><b>Copy:</b> panels are the level's text, trimmed per #143 (evidence plus one line of reading). Hint copy and the tile and banner labels are new and need review.</li>
+        <li><b>Not verified:</b> nobody has seen this in a browser, on a phone or with a screen reader. The follow-up fix question (step 2 of the level) is not in this prototype.</li>
+        <li>To see the success state without solving: <button class="linkbtn" id="solve" type="button">fill in the answer</button> (not scored). <button class="linkbtn" id="reset" type="button">Start over</button>.</li>
+      </ul>
+    </section>
+  </div>
+
+  <aside class="side" aria-label="Result, score and hints">
+    <div class="hintcol">
+      <div class="win" id="win" hidden>
+        <div class="swirl" id="swirl" role="img" aria-label="Golden dots swirl once and settle."></div>
+        <div class="win-txt">
+          <strong tabindex="-1" id="wintxt">Incident resolved</strong>
+          <p id="winline"></p>
+          <p>The 5.2.0 deploy dropped <code>OTEL_SERVICE_NAME</code>, so the SDK fell back to <code>unknown_service:node</code>. Next, the review asks which change restores the name.</p>
+        </div>
+      </div>
+      <div class="score" aria-live="off">
+        <div class="counts">
+          <span><b id="c-wrong">0</b>wrong picks</span>
+          <span><b id="c-herr">0</b>misleading views</span>
+          <span><b id="c-budget">0</b>budget run out</span>
+          <span><b id="c-hints">0</b>hints</span>
+        </div>
+        <div class="stars" id="stars" role="img" aria-label=""></div>
+        <p class="rule">Penalties are wrong picks, misleading views, running out of budget and hints: 0 gives 5 stars, 1 gives 4, 2 gives 3, 3 to 4 give 2, more give 1.</p>
+      </div>
+      <h2 class="hc-h">Hints</h2>
+      <div class="hc-row">
+        <button class="btn hint-btn" id="hint" type="button">Hint 1 of 3</button>
+        <span class="cost" id="cost">costs 1 star</span>
+      </div>
+      <p class="tier" id="tier"></p>
+      <div class="hinttext" id="hinttext" tabindex="-1"></div>
+    </div>
+  </aside>
+</div>
+
+<script type="module">
+/* ---------- scenario (levels/who-is-talking.mjs; panel copy trimmed per #143) ---------- */
+const tbl = (rows) => '<div class="tbl"><table><caption>Resource attributes</caption><thead><tr><th scope="col">Attribute</th><th scope="col">Value</th></tr></thead><tbody>' +
+  rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('') + '</tbody></table></div>';
+const SCENARIO = {
+  id: 'who-is-talking',
+  budget: { startPct: 100, burnPctPerMin: 5 },
+  views: [
+    { id: 'alert-resource', label: "Resource of the alert's spans", costMin: 4, kind: 'clue',
+      html: '<p>The resource on a span from the alerting service:</p>' + tbl([
+        ['service.name', 'unknown_service:node'], ['process.executable.name', 'node'], ['telemetry.sdk.language', 'nodejs'],
+        ['service.namespace', 'comms'], ['service.version', '5.2.0'], ['deployment.environment.name', 'production'],
+        ['k8s.namespace.name', 'comms'], ['k8s.deployment.name', 'notifications'], ['k8s.pod.name', 'notifications-7c5d8f6b9-q4m2x']]) +
+        '<p>The name has the fallback shape <code>unknown_service:</code> plus <code>process.executable.name</code>. The <code>k8s.*</code> attributes come from the Collector\'s <code>k8sattributes</code> processor and still name the deployment: <code>notifications</code>.</p>' },
+    { id: 'deploy-history', label: 'Deploys of notifications', costMin: 4, kind: 'clue',
+      html: '<p>notifications 5.2.0 rolled out at 14:09, replacing 5.1.3 (last Tuesday). Changelog: "tidy container env". Env diff:</p>' +
+        '<pre><span class="del">- OTEL_SERVICE_NAME=notifications</span>\n~ OTEL_RESOURCE_ATTRIBUTES: service.version=5.1.3 -> service.version=5.2.0</pre>' +
+        '<p>No other deployment changed in that window.</p>' },
+    { id: 'pod-env', label: 'Env of a running pod', costMin: 4, kind: 'clue',
+      html: '<p>Pod <code>notifications-7c5d8f6b9-q4m2x</code>, command <code>node dist/server.js</code>, env:</p>' +
+        '<pre>NODE_ENV=production\nOTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318\nOTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=production,service.namespace=comms,service.version=5.2.0</pre>' +
+        '<p><code>OTEL_SERVICE_NAME</code> is not set, and <code>service.name</code> is not in <code>OTEL_RESOURCE_ATTRIBUTES</code> either.</p>' },
+    { id: 'collector-restart', label: 'Collector restarts', costMin: 3, kind: 'neutral',
+      html: '<p>The gateway Collector restarted once, at 14:03, for a node upgrade. Config unchanged, no data dropped. Every other service kept its name.</p>' },
+    { id: 'message-volume', label: 'Notification volume', costMin: 2, kind: 'neutral',
+      html: '<p>The notifications topic carries 120 messages a second, the same as yesterday at 14:00. No spike.</p>' },
+    { id: 'pod-health', label: 'Pod health', costMin: 2, kind: 'neutral',
+      html: '<p>All three replicas of the deployment that owns this pod are ready, with no restarts since the rollout finished at 14:12.</p>' },
+    { id: 'catalog-rename', label: 'Renamed services', costMin: 4, kind: 'herring',
+      html: '<p>The only rename in the last day: <code>catalog</code> became <code>catalog-api</code> at 14:05, on purpose. It reports normally under its new name. <code>unknown_service:node</code> is a separate entry with no history.</p>' },
+    { id: 'k8s-warnings', label: 'Collector k8sattributes warnings', costMin: 3, kind: 'herring',
+      html: '<p>The Collector logs <code>pod association failed</code> about 40 times a day, for a batch job that sends no pod identity, and has for a month. The alerting service\'s spans were associated with their pod.</p>' },
+  ],
+  hypotheses: [
+    { id: 'name-dropped', label: 'The 5.2.0 deploy removed OTEL_SERVICE_NAME, so the SDK fell back to unknown_service:node', right: true,
+      why: 'The resource has no service.name, only the fallback unknown_service:node, built from process.executable.name node. The deploy at 14:09 removed OTEL_SERVICE_NAME, the running pod does not have it, and the first spans under the new name arrived at 14:11. The k8s attributes from the Collector were never the problem: they are what led you to the owner, the notifications deployment.' },
+    { id: 'new-service', label: 'A new service nobody told us about is running in the cluster', right: false,
+      why: 'The pod belongs to the notifications deployment, which has been deployed for a long time (5.1.3 last Tuesday). It is an old service that lost its name, not a new one.' },
+    { id: 'detector-broken', label: 'The Kubernetes resource attributes are broken', right: false,
+      why: 'They are all there: k8s.deployment.name, k8s.namespace.name and k8s.pod.name identify the pod. What is missing is service.name, and the deploy diff shows the variable that sets it was removed.' },
+    { id: 'collector-renamed', label: 'The Collector restart renamed the service', right: false,
+      why: 'The restart was at 14:03 with an unchanged config, before the 14:09 deploy, and no other service changed name. A Collector would have to have been configured to rewrite service.name; nothing says it was.' },
+  ],
+  answerAfterViews: 2,
+};
+
+/* ---------- engine (port of lib/widgets/incident.mjs) ---------- */
+const newIncident = () => ({ opened: [], minutes: 0, wrong: [], solved: false });
+const budgetLeft = (s, st) => Math.max(0, s.budget.startPct - st.minutes * s.budget.burnPctPerMin);
+function openView(s, st, id) {
+  const none = { state: st, herring: false, exhaustedNow: false };
+  if (st.solved) return { ...none, outcome: 'closed' };
+  const view = s.views.find((v) => v.id === id);
+  if (!view) return { ...none, outcome: 'unknown' };
+  if (st.opened.includes(id)) return { ...none, outcome: 'repeat' };
+  const state = { ...st, opened: [...st.opened, id], minutes: st.minutes + view.costMin };
+  return { state, outcome: 'opened', herring: view.kind === 'herring', exhaustedNow: budgetLeft(s, st) > 0 && budgetLeft(s, state) === 0 };
+}
+/** Clue views opened: the one count behind both canAnswer and "Clues found" (#143). */
+const cluesOpened = (s, st) => st.opened.filter((id) => s.views.find((v) => v.id === id)?.kind === 'clue').length;
+const canAnswer = (s, st) => !st.solved && cluesOpened(s, st) >= s.answerAfterViews;
+function answer(s, st, id) {
+  if (st.solved) return { state: st, outcome: 'closed' };
+  if (!canAnswer(s, st)) return { state: st, outcome: 'locked' };
+  const h = s.hypotheses.find((x) => x.id === id);
+  if (!h) return { state: st, outcome: 'unknown' };
+  if (st.wrong.includes(id)) return { state: st, outcome: 'repeat' };
+  if (h.right) return { state: { ...st, solved: true }, outcome: 'right' };
+  return { state: { ...st, wrong: [...st.wrong, id] }, outcome: 'wrong' };
+}
+
+/* ---------- view ---------- */
+const S = SCENARIO;
+const TOTAL = S.budget.startPct / S.budget.burnPctPerMin;   // 20 minutes
+const NEED = S.answerAfterViews;
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const viewOf = (id) => S.views.find((v) => v.id === id);
+const clock = (min) => { const t = 14 * 60 + 20 + min; return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+const ICON_NOTE = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5.6" stroke="currentColor" stroke-width="1.4"/><path d="M7 4v3.6M7 9.8v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+const ICON_OK = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5 5.5 10.5 11.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_ERR = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+const ICON_LOCK = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><rect x="2.5" y="6.2" width="9" height="6.3" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M4.6 6.2V4.6a2.4 2.4 0 0 1 4.8 0v1.6" stroke="currentColor" stroke-width="1.3"/></svg>';
+const ICON_OPEN = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><rect x="2.5" y="6.2" width="9" height="6.3" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M4.6 6.2V4.6a2.4 2.4 0 0 1 4.6-1" stroke="currentColor" stroke-width="1.3"/></svg>';
+const CARET = '<svg class="caret" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M5 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const STAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.2 10 5.6l4.8.5-3.6 3.2 1 4.7L8 11.6 3.8 14l1-4.7L1.2 6.1 6 5.6Z"/></svg>';
+
+let st, herrings, wrongPicks, budgetOut, hintsUsed, hintTier, hintViews, hintHyp, openedAt, freshId, preview, shortcut;
+
+function say(el, kind, html) {
+  el.className = 'fb' + (kind ? ' ' + kind : '');
+  el.innerHTML = html ? `<span class="ico">${kind === 'ok' ? ICON_OK : kind === 'err' ? ICON_ERR : ICON_NOTE}</span><span>${html}</span>` : '';
+}
+
+function drawBudget() {
+  const left = budgetLeft(S, st) / S.budget.burnPctPerMin;   // minutes, from the one budget expression
+  const spent = st.minutes, over = Math.max(0, spent - TOTAL);
+  const pv = preview && !st.opened.includes(preview) && !st.solved ? viewOf(preview).costMin : 0;
+  $('cells').innerHTML = Array.from({ length: TOTAL }, (_, i) => {
+    const used = i < Math.min(spent, TOTAL);
+    const pre = !used && i < Math.min(spent + pv, TOTAL);
+    return `<i class="${used ? 'spent' : ''}${pre ? ' preview' : ''}"></i>`;
+  }).join('');
+  $('cells').setAttribute('aria-valuenow', String(left));
+  $('cells').setAttribute('aria-valuetext', `${left} of ${TOTAL} minutes left`);
+  $('b-left').textContent = left > 0 ? `${left} min left` : 'Budget spent';
+  $('b-spent').textContent = `${spent} min spent${over ? `, ${over} over` : ''}${pv ? ` · this look: ${pv} min` : ''}`;
+  $('spentlist').innerHTML = st.opened.length
+    ? '<span>Spent on:</span>' + st.opened.map((id) => `<span class="chip">${esc(viewOf(id).label)} ${viewOf(id).costMin}m</span>`).join('')
+    : '';
+}
+
+function progressHtml() {
+  const n = Math.min(cluesOpened(S, st), NEED);
+  return `<span class="dots" aria-hidden="true">${Array.from({ length: NEED }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</span>Clues found: ${n} of ${NEED}`;
+}
+
+function drawTiles() {
+  $('tiles').innerHTML = S.views.map((v) => {
+    const opened = st.opened.includes(v.id);
+    const tags = opened
+      ? `<span class="chip open">opened ${clock(openedAt[v.id])}</span>${v.kind === 'herring' ? '<span class="chip mis">misleading</span>' : ''}`
+      : '';
+    const label = `${v.label}, ${v.costMin} minutes${opened ? ', opened' + (v.kind === 'herring' ? ', misleading' : '') + '. Shows its card' : ''}`;
+    return `<button class="tile${opened ? ' opened' : ''}${hintViews.has(v.id) ? ' hinted' : ''}" type="button" data-view="${v.id}" aria-label="${esc(label)}"${st.solved ? ' disabled' : ''}>
+      <span class="t">${esc(v.label)}</span>
+      <span class="meta"><span class="chip cost">${v.costMin} min</span>${tags}</span></button>`;
+  }).join('');
+  $('prog1').innerHTML = progressHtml();
+}
+
+function drawLog() {
+  const order = [...st.opened].reverse();
+  if (!order.length) { $('log').innerHTML = '<p class="log-empty">Nothing opened yet. Pick a view in Step 1 and its evidence lands here.</p>'; return; }
+  const wasOpen = new Set([...$('log').querySelectorAll('details[open]')].map((d) => d.dataset.card));
+  $('log').innerHTML = order.map((id) => {
+    const v = viewOf(id), open = id === freshId || (freshId === null && wasOpen.has(id));
+    return `<details class="card${id === freshId ? ' fresh' : ''}" data-card="${id}"${open ? ' open' : ''}>
+      <summary>${CARET}<h3 tabindex="-1" data-heading="${id}">${esc(v.label)}</h3>
+        <span class="when">${clock(openedAt[id])} · ${v.costMin} min</span>${v.kind === 'herring' ? '<span class="chip mis">misleading</span>' : ''}</summary>
+      <div class="body">${v.html}</div></details>`;
+  }).join('');
+}
+
+function drawHyps() {
+  const ok = canAnswer(S, st), n = Math.min(cluesOpened(S, st), NEED);
+  $('prog2').innerHTML = progressHtml();
+  const lock = $('lock');
+  lock.className = 'lock' + (ok || st.solved ? ' open' : '');
+  lock.innerHTML = st.solved ? `${ICON_OK}<span>Solved.</span>`
+    : ok ? `${ICON_OPEN}<span>Unlocked. Pick the cause the evidence supports. A wrong pick costs a star.</span>`
+    : `${ICON_LOCK}<span>Locked until you find ${NEED} clues in Step 1 (${n} of ${NEED} so far). A clue is a view that helps explain the alert.</span>`;
+  $('hyps').innerHTML = S.hypotheses.map((h) => {
+    const wrong = st.wrong.includes(h.id), right = st.solved && h.right;
+    const cls = right ? 'right' : wrong ? 'wrong' : !ok ? 'locked' : '';
+    const stateTxt = right ? `${ICON_OK}the cause` : wrong ? `${ICON_ERR}ruled out` : !ok && !st.solved ? `${ICON_LOCK}locked` : '';
+    const dis = !ok || wrong || st.solved;
+    return `<button class="hyp ${cls}${hintHyp === h.id && !st.solved ? ' hinted' : ''}" type="button" data-hyp="${h.id}"${dis ? ' aria-disabled="true"' : ''}>
+      <span class="lbl">${esc(h.label)}</span><span class="state">${stateTxt}</span></button>`;
+  }).join('');
+}
+
+function draw() { drawBudget(); drawTiles(); drawLog(); drawHyps(); score(); hintUI(); }
+
+function score() {
+  $('c-wrong').textContent = wrongPicks; $('c-herr').textContent = herrings; $('c-budget').textContent = budgetOut; $('c-hints').textContent = hintsUsed;
+  const p = wrongPicks + herrings + budgetOut + hintsUsed;
+  const n = p <= 2 ? 5 - p : p <= 4 ? 2 : 1;   // lib/scoring.mjs
+  $('stars').innerHTML = [1, 2, 3, 4, 5].map((i) => `<span class="${i > n ? 'off' : st.solved ? 'earned' : 'poss'}">${STAR}</span>`).join('');
+  $('stars').setAttribute('aria-label', st.solved ? `${n} of 5 stars` : `${n} of 5 stars still possible`);
+  return { n, p };
+}
+
+/* Step 1 */
+function open(id) {
+  const r = openView(S, st, id);
+  const v = viewOf(id);
+  if (r.outcome === 'repeat') {
+    const card = $('log').querySelector(`[data-card="${id}"]`);
+    card.open = true;
+    say($('fb1'), '', `<b>${esc(v.label)}</b> is already open. No extra time.`);
+    card.querySelector('h3').focus({ preventScroll: true });
+    card.scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
+    return;
+  }
+  if (r.outcome !== 'opened') return;
+  openedAt[id] = st.minutes;   // start time of the look, minutes after the page
+  st = r.state;
+  if (r.herring) herrings++;
+  if (r.exhaustedNow) budgetOut++;
+  hintViews.delete(id);
+  const before = cluesOpened(S, { ...st, opened: st.opened.slice(0, -1) });
+  const unlockedNow = before < NEED && cluesOpened(S, st) >= NEED;
+  if (r.herring && r.exhaustedNow) say($('fb1'), 'err', `<b>${esc(v.label)}</b> was misleading, and the error budget is spent. Each costs a star.`);
+  else if (r.herring) say($('fb1'), 'err', `<b>${esc(v.label)}</b> was misleading: it does not explain the alert. That costs a star.`);
+  else if (r.exhaustedNow) say($('fb1'), 'err', 'The error budget is spent, which costs a star. You can keep investigating.');
+  else if (unlockedNow) say($('fb1'), 'ok', `Opened <b>${esc(v.label)}</b>. That is ${NEED} clues: the causes in Step 3 are unlocked below.`);
+  else say($('fb1'), '', `Opened <b>${esc(v.label)}</b> (${v.costMin} min). Its card is at the top of Evidence.`);
+  freshId = id;
+  preview = null;
+  draw();
+  freshId = null;
+  const h = $('log').querySelector(`[data-heading="${id}"]`);
+  h.focus({ preventScroll: true });
+  h.closest('details').scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
+}
+$('tiles').addEventListener('click', (e) => { const b = e.target.closest('[data-view]'); if (b && !b.disabled) open(b.dataset.view); });
+const setPreview = (id) => { if (preview !== id) { preview = id; drawBudget(); } };
+$('tiles').addEventListener('pointerover', (e) => setPreview(e.target.closest('[data-view]')?.dataset.view ?? null));
+$('tiles').addEventListener('pointerleave', () => setPreview(null));
+$('tiles').addEventListener('focusin', (e) => setPreview(e.target.closest('[data-view]')?.dataset.view ?? null));
+$('tiles').addEventListener('focusout', () => setPreview(null));
+
+/* Step 2 */
+function pick(id) {
+  const r = answer(S, st, id);
+  const h = S.hypotheses.find((x) => x.id === id);
+  if (r.outcome === 'locked') {
+    const n = cluesOpened(S, st);
+    say($('fb2'), '', `Not yet. Find ${NEED} clues in Step 1 first: you have ${n} of ${NEED}. Picking now costs nothing.`);
+    return;
+  }
+  if (r.outcome === 'repeat') { say($('fb2'), '', 'You already ruled that one out. No extra cost.'); return; }
+  if (r.outcome === 'closed' || r.outcome === 'unknown') return;
+  st = r.state;
+  if (r.outcome === 'right') return finish(h);
+  wrongPicks++;
+  if (hintHyp === id) hintHyp = null;
+  say($('fb2'), 'err', `Not quite. <b>${esc(h.label)}</b> is not the cause. ${esc(h.why)}`);
+  draw();
+  const at = S.hypotheses.findIndex((x) => x.id === id);
+  const next = [...S.hypotheses.slice(at + 1), ...S.hypotheses.slice(0, at)].find((x) => !st.wrong.includes(x.id));
+  $('hyps').querySelector(`[data-hyp="${next.id}"]`).focus();
+}
+$('hyps').addEventListener('click', (e) => { const b = e.target.closest('[data-hyp]'); if (b) pick(b.dataset.hyp); });
+
+/* hints: tier 1 the kind of evidence, tier 2 two views worth opening, tier 3 the cause's evidence */
+function hintUI() {
+  const btn = $('hint'), t = hintTier;
+  btn.disabled = st.solved || t >= 3;
+  btn.textContent = st.solved ? 'Solved' : t >= 3 ? 'No more hints' : `Hint ${t + 1} of 3`;
+  $('cost').hidden = btn.disabled;
+  $('tier').innerHTML = `${t} of 3 used<span class="pips" aria-hidden="true">${[1, 2, 3].map((i) => `<i class="${i <= t ? 'on' : ''}"></i>`).join('')}</span>`;
+}
+$('hint').addEventListener('click', () => {
+  if (st.solved || hintTier >= 3) return;
+  const t = ++hintTier; hintsUsed++;
+  const box = $('hinttext');
+  const head = `<span class="lvl">Hint ${t} of 3</span>`;
+  if (t === 1) {
+    box.innerHTML = head + '<p><code>unknown_service:</code> is the name an SDK reports when nothing sets one. Look at what the telemetry says about itself and at what changed just before 14:11, not at load or health.</p>';
+  } else if (t === 2) {
+    const clues = S.views.filter((v) => v.kind === 'clue');
+    const pickTwo = [...clues.filter((v) => !st.opened.includes(v.id)), ...clues.filter((v) => st.opened.includes(v.id))].slice(0, 2);
+    hintViews = new Set(pickTwo.filter((v) => !st.opened.includes(v.id)).map((v) => v.id));
+    box.innerHTML = head + `<p>Worth opening: <b>${esc(pickTwo[0].label)}</b> and <b>${esc(pickTwo[1].label)}</b>${hintViews.size ? ' (outlined in Step 1)' : ' (you have both)'}.</p>`;
+  } else {
+    hintViews = new Set();
+    hintHyp = S.hypotheses.find((h) => h.right).id;
+    box.innerHTML = head + '<p>The deploy diff at 14:09 removes <code>OTEL_SERVICE_NAME</code>, and the running pod has neither it nor <code>service.name</code> in <code>OTEL_RESOURCE_ATTRIBUTES</code>. The cause that matches is outlined in Step 3.</p>';
+  }
+  draw();
+  box.focus();
+});
+
+function finish(h) {
+  hintViews = new Set(); hintHyp = null;
+  say($('fb2'), 'ok', `Right. ${esc(h.why)}`);
+  draw();
+  const { n, p } = score();
+  $('winline').textContent = shortcut ? 'Answer filled in (not scored).'
+    : `${n} of 5 stars: ${wrongPicks} wrong ${wrongPicks === 1 ? 'pick' : 'picks'}, ${herrings} misleading, ${hintsUsed} ${hintsUsed === 1 ? 'hint' : 'hints'}${budgetOut ? ', budget run out' : ''}. ${st.minutes} min used.`;
+  $('win').hidden = false;
+  playSwirl();
+  $('wintxt').focus({ preventScroll: true });
+  $('win').scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
+}
+
+function reset() {
+  st = newIncident(S); herrings = 0; wrongPicks = 0; budgetOut = 0; hintsUsed = 0; hintTier = 0;
+  hintViews = new Set(); hintHyp = null; openedAt = {}; freshId = null; preview = null; shortcut = false;
+  $('hinttext').innerHTML = ''; $('win').hidden = true;
+  say($('fb1'), '', ''); say($('fb2'), '', '');
+  $('log').innerHTML = '';
+  draw();
+}
+$('reset').addEventListener('click', () => { reset(); $('tiles').querySelector('[data-view]').focus(); });
+$('solve').addEventListener('click', () => {
+  reset(); shortcut = true;
+  for (const v of S.views.filter((x) => x.kind === 'clue')) { openedAt[v.id] = st.minutes; st = openView(S, st, v.id).state; }
+  const right = S.hypotheses.find((x) => x.right);
+  st = answer(S, st, right.id).state;
+  finish(right);
+});
+reset();
+
+/* ---------- success swirl (three.js 0.180.0, as in the trace prototype) ---------- */
+let swirl = null;
+async function playSwirl() {
+  try { if (!swirl) swirl = await makeSwirl(); swirl.play(); } catch (e) { /* the text still says Incident resolved */ }
+}
+async function makeSwirl() {
+  const THREE = await import('https://cdnjs.cloudflare.com/ajax/libs/three.js/0.180.0/three.module.min.js');
+  const el = $('swirl');
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); renderer.setClearColor(0, 0);
+  el.append(renderer.domElement);
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(35, 1, 0.1, 50);
+  camera.position.set(0, 0, 3.4);
+  const size = () => { const w = el.clientWidth || 200; renderer.setSize(w, w, false); };
+  size(); new ResizeObserver(size).observe(el);
+  const n = 640, GA = Math.PI * (3 - Math.sqrt(5));
+  const pos = new Float32Array(n * 3), rr = new Float32Array(n), ang = new Float32Array(n);
+  for (let i = 0; i < n; i++) { rr[i] = Math.sqrt((i + 0.5) / n); ang[i] = i * GA; }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('aR', new THREE.BufferAttribute(rr, 1));
+  const u = { uPR: { value: renderer.getPixelRatio() }, uFade: { value: 1 } };
+  const pts = new THREE.Points(geo, new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: u,
+    vertexShader: `attribute float aR; uniform float uPR; uniform float uFade; varying float vA;
+      void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); vA = smoothstep(0.05,0.85,aR) * uFade;
+        gl_PointSize = (1.4 + 5.2 * aR * aR) * uPR * (3.4 / -mv.z); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `varying float vA; void main(){ float d = length(gl_PointCoord-0.5)*2.0; if(d>1.0) discard;
+        gl_FragColor = vec4(vec3(1.0,0.76,0.40) * vA * smoothstep(1.0,0.35,d), 1.0); }`,
+  }));
+  pts.rotation.x = -0.5; scene.add(pts);
+  const ease = (x) => 1 - Math.pow(1 - x, 3), DUR = 2.6;
+  function layout(p) {
+    const e = ease(p), spin = (1 - e) * Math.PI * 2, spread = 1 + (1 - e) * 0.55;
+    for (let i = 0; i < n; i++) {
+      const a = ang[i] + spin * (0.6 + 0.4 * rr[i]), r = rr[i] * spread;
+      pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = Math.sin(a) * r; pos[i * 3 + 2] = (1 - e) * (rr[i] - 0.5) * 0.6;
+    }
+    geo.attributes.position.needsUpdate = true; u.uFade.value = Math.min(1, 0.15 + p * 1.6);
+  }
+  return {
+    play() {
+      if (reduced) { layout(1); renderer.render(scene, camera); return; }
+      const t0 = performance.now();
+      renderer.setAnimationLoop(() => {
+        const p = Math.min(1, (performance.now() - t0) / (DUR * 1000));
+        layout(p); renderer.render(scene, camera);
+        if (p >= 1) renderer.setAnimationLoop(null);
+      });
+    },
+  };
+}
+</script>
