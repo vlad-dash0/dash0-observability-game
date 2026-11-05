@@ -9,7 +9,8 @@
 // only the recognised content is allowed, outside one any text naming a review form is an
 // error, and a disposition counts only in a positive form. The PR body is not read.
 // Prints each finding that has no disposition and who posted each dispositions comment;
-// minimized (hidden) comments are skipped and listed.
+// minimized (hidden) comments are skipped and listed. Only comments and threads by the
+// repo's owner, members and collaborators are read; anyone else's are ignored and listed.
 // Usage: node tools/pr-findings.mjs <pr-number> [--repo owner/name]
 // Exit: 0 PASS, 1 open findings, 2 inconclusive (API error, no review, unparseable).
 // Needs `npm ci` (linkedom, a devDependency); the gh call is injected so the parser and
@@ -492,8 +493,8 @@ const lastWritten = (c) => (c.edited == null ? time(c.at) : Math.max(time(c.at),
  * Decide from comments ({ at, edited?, minimized?, author?, url, html }) and review threads
  * ({ isResolved, where, url, body }). Returns { exit, open, errors, skipped, dispositions,
  * reviews, findings }; `dispositions` lists each dispositions comment's sha, author and
- * url so who cleared which findings is visible (any commenter may: see the trust note in
- * .github/pull_request_template.md). Any error, or no review at all, is inconclusive: the open list may then be
+ * url so who cleared which findings is visible (fetchPr passes only trusted authors' comments:
+ * see the trust note in .github/pull_request_template.md). Any error, or no review at all, is inconclusive: the open list may then be
  * incomplete, so it never reads as PASS. Minimized comments are skipped (the override for
  * a comment the parser must not read) and returned in `skipped` so the bypass is visible.
  */
@@ -566,10 +567,21 @@ export function defaultGh(args) {
 }
 
 const NODES = {
-  comments: 'createdAt lastEditedAt isMinimized url bodyHTML author { login }',
-  reviews: 'submittedAt createdAt lastEditedAt isMinimized url bodyHTML author { login }',
-  reviewThreads: 'isResolved path line comments(first: 1) { nodes { body url } }',
+  comments: 'createdAt lastEditedAt isMinimized url bodyHTML author { login } authorAssociation',
+  reviews: 'submittedAt createdAt lastEditedAt isMinimized url bodyHTML author { login } authorAssociation',
+  reviewThreads: 'isResolved path line comments(first: 1) { nodes { body url author { login } authorAssociation } }',
 };
+
+// The repo is public: only comments (and threads, by their first comment) from people with
+// write access to it count for the verdict. Anyone else's are ignored, and listed, so they
+// can neither clear a finding nor block a merge: an ignored review never makes the result
+// inconclusive. A node with no association is a response the detector cannot read: error.
+export const TRUSTED = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+function trusted(node, url) {
+  const assoc = node?.authorAssociation;
+  if (typeof assoc !== 'string' || !assoc) throw new Error(`${url}: no author association`);
+  return TRUSTED.has(assoc);
+}
 const query = (key) => `query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
   repository(owner: $owner, name: $name) { pullRequest(number: $number) {
     ${key}(first: 100, after: $endCursor) { pageInfo { hasNextPage endCursor } nodes { ${NODES[key]} } }
@@ -598,25 +610,37 @@ async function connection(gh, repo, pr, key) {
 }
 
 /**
- * Every issue comment, non-empty review body and review thread on the PR. A missing
- * bodyHTML is passed on as is (not as ''), so the parser reports it.
+ * Every issue comment, non-empty review body and review thread on the PR from a trusted
+ * author (TRUSTED); the rest are returned in `ignored` ({ kind, url, author, association }).
+ * A missing bodyHTML is passed on as is (not as ''), so the parser reports it.
  */
 export async function fetchPr({ repo, pr, gh = defaultGh }) {
   const [issueComments, reviews, threads] = await Promise.all(
     ['comments', 'reviews', 'reviewThreads'].map((key) => connection(gh, repo, pr, key)));
+  const ignored = [];
+  const keep = (kind, node, url, author) => {
+    if (trusted(node, url)) return true;
+    ignored.push({ kind, url, author: author ?? '(unknown)', association: node.authorAssociation });
+    return false;
+  };
   const comment = (at, c) => ({ at, edited: c.lastEditedAt ?? null, minimized: c.isMinimized === true, author: c.author?.login ?? '(unknown)', url: c.url, html: c.bodyHTML });
+  const bodies = [
+    ...issueComments.map((c) => [c, c.createdAt]),
+    ...reviews.filter((r) => typeof r.bodyHTML !== 'string' || r.bodyHTML.trim())
+      .map((r) => [r, r.submittedAt ?? r.createdAt]),
+  ];
   return {
-    comments: [
-      ...issueComments.map((c) => comment(c.createdAt, c)),
-      ...reviews.filter((r) => typeof r.bodyHTML !== 'string' || r.bodyHTML.trim())
-        .map((r) => comment(r.submittedAt ?? r.createdAt, r)),
-    ],
-    threads: threads.map((t) => ({
+    comments: bodies.filter(([c]) => keep('comment', c, c.url, c.author?.login)).map(([c, at]) => comment(at, c)),
+    threads: threads.filter((t) => {
+      const first = t.comments?.nodes?.[0];
+      return keep('thread', first, first?.url ?? `${t.path}:${t.line ?? '?'}`, first?.author?.login);
+    }).map((t) => ({
       isResolved: t.isResolved === true,
       where: `${t.path}:${t.line ?? '?'}`,
       url: t.comments?.nodes?.[0]?.url ?? '',
       body: t.comments?.nodes?.[0]?.body ?? '',
     })),
+    ignored,
   };
 }
 
@@ -628,16 +652,20 @@ const oneLine = (s, n = 120) => {
 /** Fetch, decide and print. Returns the exit code; never throws. */
 export async function run({ repo, pr, gh = defaultGh, log = console.log }) {
   let result;
+  let ignored;
   try {
     if (!/^\d+$/.test(String(pr))) throw new Error(`not a PR number: ${pr}`);
     const slug = repo ?? (await gh(['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'])).trim();
     if (!/^[\w.-]+\/[\w.-]+$/.test(slug)) throw new Error(`not an owner/name repo: ${slug}`);
     log(`PR ${slug}#${pr}`);
-    result = evaluate(await fetchPr({ repo: slug, pr, gh }));
+    const fetched = await fetchPr({ repo: slug, pr, gh });
+    ignored = fetched.ignored;
+    result = evaluate(fetched);
   } catch (err) {
     log(`INCONCLUSIVE: ${err.message}`);
     return EXIT.INCONCLUSIVE;
   }
+  for (const i of ignored) log(`IGNORED untrusted ${i.kind} by ${i.author} (${i.association}): ${i.url}`);
   for (const s of result.skipped) log(`SKIPPED minimized comment by ${s.author}: ${s.url}`);
   for (const d of result.dispositions) log(`DISPOSITIONS for ${d.sha} by ${d.author}: ${d.url}`);
   for (const f of result.open) {

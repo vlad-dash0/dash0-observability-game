@@ -141,8 +141,12 @@ its author, so the bypass shows in the output. Minimizing removes the whole comm
 from the audit: its findings and its dispositions no longer count. To fix a malformed
 review or dispositions comment (e.g. one with a lead-in line), edit it or post a
 corrected one; minimize only what must not count at all.
-Trust: the detector does not check who posts dispositions; anyone who can comment can
-clear findings. That holds only because this repo is private and only collaborators can
-comment. Each dispositions comment is printed as DISPOSITIONS for <sha> by <login> so
-who cleared what is visible; revisit (enforce an author list) if the repo opens up.
+Trust: the repo is public, so anyone can comment. The detector reads only comments,
+review bodies and review threads whose author is the repo's owner, a member or a
+collaborator (GitHub's author association OWNER, MEMBER or COLLABORATOR). Everyone
+else's are ignored and printed as IGNORED untrusted <comment|thread> by <login>: they
+can neither clear a finding nor block a merge (an ignored malformed or NOT CLEAN
+comment is not inconclusive). A review from an outside reviewer therefore does not
+count: a collaborator posts it. Each counted dispositions comment is still printed as
+DISPOSITIONS for <sha> by <login>, so who cleared what is visible.
 -->
