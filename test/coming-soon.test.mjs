@@ -1,6 +1,7 @@
-// Acts 7 and 8 as "coming soon" on the live data (#177 P7). They live in hub/coming-soon.mjs,
-// never in levels/index.mjs ACTS, so the registry, unlock, progress, stars and cards cannot see
-// them; only the hub's act list and the globe read them.
+// Act 8 as "coming soon" on the live data (#177 P7; Act 7 left the list when 7.1 shipped). It lives
+// in hub/coming-soon.mjs, never in levels/index.mjs ACTS, so the registry, unlock, progress, stars
+// and cards cannot see it; only the hub's act list and the globe read it. The mechanism itself, for
+// any list, is also covered by fixtures in test/game.test.mjs and test/globe-view.test.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -18,7 +19,7 @@ import { STORAGE_KEY } from '../lib/storage.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const HTML = readFileSync(join(ROOT, 'index.html'), 'utf8');
-const SOON_IDS = ['act-7', 'act-8'];
+const SOON_IDS = COMING_SOON.map((s) => s.id);
 
 function liveGame(extra = {}) {
   const store = fakeStorage();
@@ -36,15 +37,9 @@ function liveGame(extra = {}) {
   return { game, store };
 }
 
-test('Acts 7 and 8 from the outline, data only', () => {
+test('Act 8 from the outline, data only; act-7 is playable now', () => {
+  assert.deepEqual(SOON_IDS, ['act-8']);
   assert.deepEqual(COMING_SOON, [
-    {
-      id: 'act-7',
-      no: 7,
-      name: 'Alerting and SLOs',
-      sub: 'Wake me only when it matters',
-      teaser: 'Good alerts, SLOs and error budgets, burn-rate alerts and synthetic checks.',
-    },
     {
       id: 'act-8',
       no: 8,
@@ -74,7 +69,7 @@ test('Never in the registry', () => {
 });
 
 test('Each has its own region with dots and no level country', () => {
-  assert.equal(ACT_REGIONS['act-7'].region, 'East Asia');
+  assert.equal(ACT_REGIONS['act-7'].region, 'East Asia', 'act-7 keeps its region now it is playable');
   assert.equal(ACT_REGIONS['act-8'].region, 'Southeast Asia');
   for (const id of SOON_IDS) {
     assert.ok(DOTS.filter((d) => actOfCountry(d[2], d[3]) === id).length > 0, `${id} has dots on the globe`);
@@ -104,8 +99,11 @@ test('The live hub lists them in act order, unplayable even in debug, changing n
   assert.equal(game.acts.filter((a) => a.soon).length, COMING_SOON.length, 'no registry act is soon');
   const nos = game.acts.map((a) => a.no);
   assert.equal(nos.every((n, i) => i === 0 || n > nos[i - 1]), true, `act numbers increase: ${nos}`);
-  assert.equal(game.levelState('act-7'), 'locked');
-  assert.equal(game.openLevel('act-7'), false);
+  assert.equal(game.levelState('act-8'), 'locked');
+  assert.equal(game.openLevel('act-8'), false);
+  const act7 = game.acts.find((a) => a.id === 'act-7');
+  assert.equal(act7.soon, false, 'act-7 is a playable act on the hub');
+  assert.deepEqual([...act7.ids], ['good-alerts']);
   assert.equal(game.nudgeId, null);
   assert.equal(game.overlayOpen, false);
   assert.equal(store.data.has(STORAGE_KEY), false);
@@ -128,7 +126,7 @@ test('Live globe: soon regions dimmed, not counted, not targeted', () => {
   });
   assert.ok(soonDots > 0);
   const label = game.mapLabel();
-  assert.equal(label, `World map: 0 of ${live.order.length} levels done. Coming soon: East Asia, Southeast Asia.`);
+  assert.equal(label, `World map: 0 of ${live.order.length} levels done. Coming soon: Southeast Asia.`);
   const p = emptyProgress();
   for (const id of live.order) p.levels[id] = { stars: 3, at: null };
   assert.equal(globeTarget(live, p, DOTS).actId, live.acts[live.acts.length - 1].id);
