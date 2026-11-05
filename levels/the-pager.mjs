@@ -2,7 +2,7 @@
 // every look the player takes finds no data and burns a quarter of the error budget,
 // until they escalate or the budget hits 0. Part 2: the same four questions, each answered
 // from a small instrumented view. It cannot be won and is not scored: it is the reason to
-// instrument. The budget is in percent of the error budget (not minutes), in fixed 25% steps: a kit meter of 4 cells, the percent left as the headline, a Spent on chip per look; not the incident engine (§4.3). Spec: docs/M1-DESIGN.md §6 Boss the-pager.
+// The budget is a percent of the error budget, not minutes, in fixed 25% steps. The screen shows a kit meter of 4 cells, the percent left as the headline, and a Spent on chip per look. It is not the incident engine (§4.3). Spec: docs/M1-DESIGN.md §6 Boss the-pager.
 // Spec: https://opentelemetry.io/docs/concepts/observability-primer/#what-is-observability
 
 import { chip, meter } from '../lib/ui/index.mjs';

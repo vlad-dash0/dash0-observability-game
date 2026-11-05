@@ -31,7 +31,7 @@ Evidence:
 | 2.4 context-propagation | hop and root lists built from data with `escapeHtml`; `CONTENT.steps[0].hops/roots` pinned | `context-propagation.mjs:125-144`; `act-2.test.mjs:480-488` | can migrate with `show` (those two tests become string checks); optional, last |
 | 2.6 events-and-links | an authored list of three short stories | `events-and-links.mjs:133`, `:140` | fits, via `show` |
 | 1.2 naming-your-service | env editor, Check and hint written inline, with its own `lastFailed` (M1-DESIGN §2); choice id `nys` used twice | `naming-your-service.mjs:145-189`, `:107`, `:201` | stays `run(ctx)` by decision on #3: a configure step exists now, but 1.2 is an env editor, not YAML |
-| the-pager | not a widget: looks, a plain-text budget, Escalate | `the-pager.mjs:57-98` | stays `run(ctx)` |
+| the-pager | not a widget: looks, a budget (headline, kit meter, Spent on chips), Escalate | `the-pager.mjs` (`CONTENT`, `budgetText`, `meterHtml`, `spentHtml`) | stays `run(ctx)` |
 | checkout-is-slow | a plain Scenario plus 17 lines of standard wiring | `checkout-is-slow.mjs:40-136`, `:157-173` | fits: one `incident` step; optional |
 
 ## 2. The declarative level
