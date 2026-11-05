@@ -59,6 +59,8 @@ Dash0 pages for 9.2, both read on dash0.com on 2026-11-05:
 - SignalControl sample traces: https://www.dash0.com/docs/dash0/telemetry/signal-control/sample-traces
 - SignalControl Edge, `dash0redmetrics` in the pre-sampling pipeline: https://www.dash0.com/docs/dash0/telemetry/signal-control/edge/about-signalcontrol-edge
 
+Each level's finish names where Dash0 handles the concept, with a sentence cited from a Dash0 docs page. 9.2's Dash0 close is still owed (tracked on #32).
+
 Open product question, not claimed anywhere in the copy: what `dash0.spans.red` shows when spans are sampled in the customer's own Collector before sending.
 
 ## 6. Sign-off gates

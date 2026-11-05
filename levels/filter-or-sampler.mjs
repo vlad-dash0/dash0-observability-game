@@ -74,7 +74,7 @@ const SORT = {
   items: [
     {
       id: 'errors-whole',
-      label: 'Keep only the traces holding an error, every span intact',
+      label: 'Keep only the traces with an error in them, every span intact',
       bucket: 'tail',
       why: 'Whether a trace has an error is known only once its spans are in. A <code>status_code</code> policy decides on the whole trace and keeps every span of it.',
       whyNot: {
@@ -84,7 +84,7 @@ const SORT = {
     },
     {
       id: 'healthz',
-      label: 'Drop the probe traces that hit <code>/healthz</code>',
+      label: 'Drop the probe traces that hit <code>/healthz</code> (one span each)',
       bucket: 'filter',
       why: 'The probe answers from the service itself, so each probe is a one-span trace that carries the <code>/healthz</code> path. That span can be judged and dropped alone.',
       whyNot: {
@@ -124,7 +124,7 @@ const SORT = {
     },
     {
       id: 'many-spans',
-      label: 'Hold on to any trace with more than 50 spans',
+      label: 'Keep only the traces with more than 50 spans',
       bucket: 'tail',
       why: 'How many spans a trace has is a fact about the trace, not about any one span. A <code>span_count</code> policy counts them before it decides.',
       whyNot: {
@@ -144,7 +144,7 @@ const SORT = {
     },
     {
       id: 'via-payments',
-      label: 'Every trace that touches payments must arrive complete',
+      label: 'Of all traffic, only traces that touch payments, each arriving complete',
       bucket: 'tail',
       why: 'Only the payments spans name payments, so the decision needs the whole trace: a <code>string_attribute</code> policy on <code>service.name</code> keeps the whole trace when one of its spans matches.',
       whyNot: {
