@@ -134,13 +134,15 @@ test('step 1 oracle: an independent reading flags exactly the faults, each for o
   assert.equal(spec.lines.filter((l) => l.text.includes('_total{')).length >= 4, true, 'counters appear in good rules too');
 });
 
-test('step 1 whyNot on exactly the four good rules; explain names the three lessons', () => {
+test('step 1 whyNot on exactly the four good rules; explain names the three problems and leaves the fix to step 2', () => {
   assert.deepEqual(Object.keys(spec.whyNot).sort(), ['checkout-slow', 'error-ratio', 'payments-increase', 'queue-age']);
   for (const [id, t] of Object.entries(spec.whyNot)) assert.match(plain(t), /\S[\s\S]*\.$/, `${id} ends a sentence`);
   assert.match(plain(spec.whyNot['queue-age']), /gauge/);
   assert.match(plain(spec.whyNot['payments-increase']), /increase\(\)/);
   const e = plain(spec.explain);
-  for (const s of ['rate()', 'increase()', 'for: 0s', 'never resolves', 'symptoms', 'cause', 'flaps']) assert.equal(e.includes(s), true, s);
+  for (const s of ['stays firing until a restart', 'for: 0s', 'symptoms', 'cause', 'flaps']) assert.equal(e.includes(s), true, s);
+  // The fix for the bare counter is step 2's Choice: the step-1 explain must not give it away.
+  for (const s of ['rate()', 'increase()']) assert.equal(e.includes(s), false, `explain does not name ${s}`);
   // The explain names each faulty rule by the exact alert name the board shows.
   const nameOf = (id) => /^alert: (\S+) /.exec(spec.lines.find((l) => l.id === id).text)[1];
   for (const id of spec.faults) assert.equal(spec.explain.includes(`<code>${nameOf(id)}</code>`), true, `explain names ${nameOf(id)}`);
@@ -177,12 +179,9 @@ test('sources: the four prometheus.io pages, a Spec line, a cited Dash0 page for
   assert.match(SRC, /Invented/);
   const hosts = ['opentelemetry.io', 'prometheus.io', 'www.dash0.com'];
   for (const url of SRC.match(/https:\/\/[^\s,)]+/g)) assert.equal(hosts.includes(new URL(url).host), true, url);
-  // G2-a: a Dash0 sentence ships only with a www.dash0.com check-rules page cited; without one, no Dash0 in the copy.
+  // G2-a: the copy's Dash0 sentence ships with a www.dash0.com check-rules page cited (#16).
   const copy = plain(JSON.stringify(level.play));
-  const dash0Line = /^\/\/ Dash0 docs: https:\/\/www\.dash0\.com\/\S*check-rules/m.test(SRC);
-  if (dash0Line) assert.match(copy, /Dash0/, 'the cited Dash0 page backs a sentence in the copy');
-  else assert.doesNotMatch(copy, /Dash0/, 'no Dash0 claim in the copy without a cited page');
-  assert.equal(dash0Line, true, 'a Dash0 check-rules page is cited (#16 / G2-a)');
+  assert.deepEqual([/^\/\/ Dash0 docs: https:\/\/www\.dash0\.com\/\S*check-rules/m.test(SRC), /Dash0/.test(copy)], [true, true], 'a Dash0 check-rules page is cited, and it backs a Dash0 sentence in the copy (#16 / G2-a)');
   assert.doesNotMatch(copy, /Prometheus-compatible|carry over as they are/, 'not claimed: rule files carry over to Dash0 as they are');
   assert.equal(SRC.includes('—'), false, 'no em dash');
 });

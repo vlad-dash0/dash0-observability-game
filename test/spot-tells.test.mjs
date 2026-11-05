@@ -1,7 +1,7 @@
 // Blind strategies must not win any Spot it board (#190). Each rule below ignores what the lines
 // mean: it scores every line by something it can count or read off the text (length, digits,
-// words, commas, quotes, `=` signs, distinct label keys, or a numeric field such as `count=`),
-// picks the lines with the most or the fewest, first or after skipping one or two, and plays
+// words, commas, quotes, `=` signs, distinct label keys, the length of a labelled field such as
+// `expr:`, or a numeric field such as `count=`), picks the lines with the most or the fewest, first or after skipping one or two, and plays
 // that through the real checkSpot. If it solves a board first time or after one wrong Check,
 // the player earns stars without reading. (Position rules: test/spot-ladder.test.mjs.) Specs
 // come from the live registry, so a new Spot board is covered without editing this file.
@@ -139,16 +139,64 @@ const NAMED_FIELDS = ['count', 'sum'];
 // Not read: an exemplar's `value=` is there or `exemplar: none` is, and that presence is what 3.6 teaches.
 const SKIPPED_FIELDS = ['value'];
 
+/** The text after the first `{`, `=` or `:` of a line with no labelled field, read as one segment. */
+const FALLBACK_SEGMENT = 'text after the first brace, equals sign or colon';
+
 /**
- * The rule table for one board: name -> score (higher ranks first). Each text measure and each
- * numeric field on the board, read for the most and for the fewest; a line without the field
- * scores MISSING and ranks last both ways.
+ * The labelled fields of a line, `key: value`, as { key: value length }: `alert: X expr: Y for: 5m`
+ * gives the lengths of `X`, `Y` and `5m`. A key starts the line or follows a space, ends in `:`
+ * and a space (so `09:14:00` is none), and sits outside every bracket and quote (so `{n: 2}` is
+ * none); its value runs to the next key, trimmed. A key seen twice on a line sums its values. A
+ * line with no key gives one segment, FALLBACK_SEGMENT, when it has a `{`, `=` or `:`.
+ */
+function segments(text) {
+  const keys = [];
+  let depth = 0;
+  let quoted = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === '"') quoted = !quoted;
+    if (quoted) continue;
+    if ('{[('.includes(ch)) depth += 1;
+    if ('}])'.includes(ch)) depth = Math.max(0, depth - 1);
+    if (depth > 0 || (i > 0 && text[i - 1] !== ' ')) continue;
+    const m = /^([A-Za-z_][\w./-]*):(?: |$)/.exec(text.slice(i));
+    if (m) keys.push({ key: m[1], start: i, end: i + m[0].length });
+  }
+  const out = {};
+  if (keys.length === 0) {
+    const at = text.search(/[{=:]/);
+    if (at >= 0) out[FALLBACK_SEGMENT] = text.slice(at + 1).trim().length;
+    return out;
+  }
+  keys.forEach(({ key, end }, n) => {
+    out[key] = (out[key] ?? 0) + text.slice(end, keys[n + 1]?.start ?? text.length).trim().length;
+  });
+  return out;
+}
+
+// Not read: `exemplar:` is `none` or a list of exemplars, and which lines have one is what 3.6 teaches.
+const SKIPPED_SEGMENTS = ['exemplar'];
+
+/**
+ * The rule table for one board: name -> score (higher ranks first). Each text measure, each
+ * labelled field's length found on two lines or more, and each numeric field on the board, read
+ * for the most and for the fewest; a line without the field scores MISSING and ranks last both ways.
  */
 function scoresFor(spec) {
   const scores = {};
   for (const [name, f] of Object.entries(MEASURES)) {
     scores[`most ${name}`] = (l) => f(l.text);
     scores[`fewest ${name}`] = (l) => -f(l.text);
+  }
+  const keyLines = new Map();
+  for (const l of spec.lines) for (const k of Object.keys(segments(l.text))) keyLines.set(k, (keyLines.get(k) ?? 0) + 1);
+  for (const [key, n] of keyLines) {
+    if (n < 2 || SKIPPED_SEGMENTS.includes(key)) continue;
+    const read = (l) => segments(l.text)[key];
+    const name = key === FALLBACK_SEGMENT ? FALLBACK_SEGMENT : `\`${key}:\``;
+    scores[`longest ${name}`] = (l) => (read(l) === undefined ? MISSING : read(l));
+    scores[`shortest ${name}`] = (l) => (read(l) === undefined ? MISSING : -read(l));
   }
   const present = new Set(spec.lines.flatMap((l) => Object.keys(fields(l.text))).filter((n) => !SKIPPED_FIELDS.includes(n)));
   for (const name of [...NAMED_FIELDS.filter((n) => present.has(n)), ...[...present].filter((n) => !NAMED_FIELDS.includes(n)).sort()]) {
@@ -209,6 +257,16 @@ const KNOWN = {
     'most commas, skipping 2',
     'fewest commas, skipping 1',
     'fewest commas, skipping 2',
+    // Field lengths (the first three with no skip: its answer has the longest pipeline lists).
+    'longest `processors:`',
+    'longest `exporters:`',
+    'shortest `receivers:`',
+    'longest `processors:`, skipping 1',
+    'longest `receivers:`, skipping 1',
+    'shortest `processors:`, skipping 1',
+    'shortest `processors:`, skipping 2',
+    'shortest `exporters:`, skipping 1',
+    'shortest `exporters:`, skipping 2',
   ],
 };
 
@@ -240,6 +298,16 @@ test('the rules see every Spot board, read its fields, each board is solved by i
   const line = 'x{route="/a/{id}", az="eu-1", n: 2} count=12 sum=3.5s exemplar: value=250ms trace_id=ab12 span_id=00f0c7 build_id="2411" p95_s=0.61';
   assert.equal(labelKeys(line), 3, 'route, az, n; {id} inside a quoted value is no key');
   assert.deepEqual(fields(line), { count: 12, sum: 3.5, value: 0.25, p95_s: 0.61 });
+  // Labelled fields: each value's length up to the next key; none inside brackets or quotes, none in a clock time.
+  assert.deepEqual(segments('alert: Ab expr: f{job="a: b", n: 2}[5m] > 1 for: 10m'), { alert: 2, expr: 27, for: 3 });
+  assert.deepEqual(segments('09:14:00 m{a="b"} exemplar: v=1 x exemplar: none'), { exemplar: 9 }, 'a repeated key sums: "v=1 x" and "none"');
+  assert.deepEqual(segments('traces/edge: processors: [a, b: c]'), { 'traces/edge': 0, processors: 9 });
+  assert.deepEqual(segments('m_total{service="x"}'), { [FALLBACK_SEGMENT]: 12 }, 'no key: the text after the first {');
+  assert.deepEqual(segments('f(span.attributes)'), {}, 'no key and no { = or :: no segment');
+  // A field on two lines or more is read; one on a single line is not; exemplar: is skipped.
+  const seg = scoresFor({ id: 's', lines: [{ id: 'a', text: 'k: xx j: y exemplar: none' }, { id: 'b', text: 'k: x exemplar: v' }, { id: 'c', text: 'no key' }] });
+  assert.deepEqual(Object.keys(seg).filter((n) => n.includes('`')), ['most `=` signs', 'fewest `=` signs', 'longest `k:`', 'shortest `k:`']);
+  assert.deepEqual(rankings({ lines: [{ id: 'a', text: 'k: xx j: y' }, { id: 'b', text: 'k: x' }, { id: 'c', text: 'no key' }] }, seg['shortest `k:`']), [['b', 'a', 'c']]);
   // A missing field ranks last for the highest and for the lowest alike.
   const spec = { id: 'f', lines: [{ id: 'none', text: 'no fields' }, { id: 'lo', text: 'count=1' }, { id: 'hi', text: 'count=9 value=2s' }] };
   const scores = scoresFor(spec);
