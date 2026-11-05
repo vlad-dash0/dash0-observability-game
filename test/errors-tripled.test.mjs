@@ -114,7 +114,6 @@ test('errors-tripled: lights the Collector (shared with 5.x and 6.2), and the bo
   for (const id of [...earlier, ...act]) all.levels[id] = { stars: 3, at: null };
   assert.equal(levelState(ID, all, LIVE), 'open');
   assert.equal(LIVE.order[LIVE.order.indexOf(act[act.length - 1]) + 1], ID);
-  assert.equal(LIVE.order[LIVE.order.length - 1], ID, 'the act-6 boss is the last level');
 });
 
 test('errors-tripled: star totals count the boss (the derived scored-level max), and a 3-star boss is 3 of them', () => {

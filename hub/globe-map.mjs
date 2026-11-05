@@ -72,6 +72,8 @@ export const LEVEL_COUNTRY = Object.freeze({
   'head-sampling': 'IND',
   'tail-sampling': 'IRN',
   'what-costs-money': 'PAK',
+  // act-9 Oceania
+  'the-34-percent-error-rate': 'AUS',
 });
 
 // ADM0_A3 code -> display name, for every country in LEVEL_COUNTRY (the ignite announcement,
@@ -84,6 +86,7 @@ export const COUNTRY_NAMES = Object.freeze({
   DZA: 'Algeria', COD: 'the Democratic Republic of the Congo', ZAF: 'South Africa',
   KAZ: 'Kazakhstan', SAU: 'Saudi Arabia', TUR: 'Turkey', UZB: 'Uzbekistan', TKM: 'Turkmenistan', IRQ: 'Iraq',
   IND: 'India', IRN: 'Iran', PAK: 'Pakistan',
+  AUS: 'Australia',
 });
 
 /** The act id whose region a country (ADM0_A3 code, Natural Earth SUBREGION) is in, else null. */
