@@ -7,6 +7,7 @@ import { ACTS } from '../levels/index.mjs';
 import { DECK } from '../cards/deck.mjs';
 import { NODE_IDS } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
+import { COMING_SOON } from '../hub/coming-soon.mjs';
 import { runPlay, validatePlay } from '../lib/play.mjs';
 
 const nodeIds = NODE_IDS;
@@ -139,4 +140,13 @@ test('lights ids: the §2.7 ids, unique (levels name them in `lights`; the globe
     'payment-provider', 'payments', 'postgres', 'recommendations', 'redis', 'shipping', 'storefront',
   ]);
   assert.equal(new Set(nodeIds).size, nodeIds.length, 'ids are unique');
+});
+
+test('every act, live and coming soon, has a one-line plain-text teaser', () => {
+  for (const act of [...ACTS, ...COMING_SOON]) {
+    assert.equal(typeof act.teaser, 'string', `${act.id} teaser is a string`);
+    assert.ok(act.teaser.trim().length > 0, `${act.id} teaser is not blank`);
+    assert.ok(act.teaser.length <= 160, `${act.id} teaser is ${act.teaser.length} characters`);
+    assert.ok(!act.teaser.includes('<'), `${act.id} teaser is plain text`);
+  }
 });
