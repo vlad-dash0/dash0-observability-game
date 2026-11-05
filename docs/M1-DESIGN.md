@@ -137,8 +137,12 @@ for any item, every item's ladder starts past it. Tier 2 is offered only when it
 when the item's untried buckets number 3 or more (or it was already given); otherwise the next tier is
 the placement. The ladder is `[1, 2?, 3]`; the button reads "Hint `done+1` of `tiers.length`" and the
 side line "For X: `done` of `tiers.length` used", where `done` counts the rule once it was read for
-any item (so a 2-bucket board after the rule reads "Hint 2 of 2"). The old "Only X is left to
-try" tier 2 line is gone: with fewer than 3 untried buckets the view skips tier 2.
+any item (so a 2-bucket board after the rule reads "Hint 2 of 2").
+With fewer than 3 untried buckets the view skips tier 2; with exactly one left untried (the right
+one) there is no hint at all: `next` is null, the button reads "No more hints" and is disabled. The
+hint panel always shows the hint target's own last hint (tier 2) and is cleared when that item has
+none; selecting an item, a placement that moves the target, or a wrong try re-syncs it with the
+board's outlines. The rule (tier 1) is not per item: it shows on the click, then a re-sync clears it.
 An item's total can therefore shrink mid-ladder ("Hint 2 of 3" becomes "Hint 2 of 2") when a wrong
 try leaves fewer than three untried buckets and tier 2 was not yet taken.
 Each click is one `ctx.hint()` and one hint on the score card; nothing happens after the last item.
