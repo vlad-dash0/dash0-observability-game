@@ -31,32 +31,32 @@
 // them: time, route, count and sum of the window, and the point's exemplar field. Five windows of
 // /pay show a spike at 09:14:30 to 09:15:00; a scheduler-run job and a series that has a trace id and span id as
 // labels are on the list too. The faults are the three points whose exemplar field holds a value,
-// a trace_id and a span_id (in a decoy, the same ids sit in a series label, so the longest lines are not the answers). `whyNot` is shown for a picked point that has none. The text never says why
+// a trace_id and a span_id (in a decoy, other ids sit in a series label, and some points without an exemplar carry extra labels, so length does not tell the answers apart). `whyNot` is shown for a picked point that has none. The text never says why
 // a point has none; step 2 asks.
 const SPOT = {
   id: 'exm-spot',
   target: 'config',
   helps: { hints: true },
-  hint: 'Read each point\'s exemplar field, not its count or sum: a link needs a trace_id and a span_id in that field.',
+  hint: 'An exemplar is not part of the series and does not come with a big number: ask where a point would carry one.',
   lines: [
-    { id: 'pay-0914-00', text: '09:14:00 payments.charge.duration{route="/pay"} count=9 sum=2.9s exemplar: none' },
+    { id: 'pay-0914-00', text: '09:14:00 payments.charge.duration{route="/pay"} count=9 sum=2.9s min_s=0.21 max_s=0.64 avg_s=0.3 median_s=0.3 p5_s=0.2 p95_s=0.61 p99_s=0.63 exemplar: none' },
     {
       id: 'pay-0914-15',
-      text: '09:14:15 payments.charge.duration{route="/pay"} count=11 sum=3.6s exemplar: value=0.28s trace_id=0af7651916cd43dd8448eb211c80319c span_id=b7ad6b7169203331',
+      text: '09:14:15 payments.charge.duration{route="/pay"} count=11 sum=3.6s exemplar: value=0.28s trace_id=ae926589c1fd4adc8eeaeb2bfcb0d19c span_id=b7adcbfe6920dc31',
     },
-    { id: 'refund-batch', text: '09:14:30 payments.charge.duration{route="/refund-batch"} count=3 sum=17.4s exemplar: none' },
+    { id: 'refund-batch', text: '09:14:30 payments.charge.duration{route="/refund-batch", cloud_region="eu-west-1", instance_id="10.244.7.2", build_id="2411"} count=3 sum=17.4s exemplar: none' },
     {
       id: 'pay-0914-30',
-      text: '09:14:30 payments.charge.duration{route="/pay"} count=10 sum=47.3s exemplar: value=6.12s trace_id=4bf92f3577b34da6a3ce929d0e0e4736 span_id=00f067aa0ba902b7',
+      text: '09:14:30 payments.charge.duration{route="/pay"} count=100 sum=147.3s exemplar: value=6.12s trace_id=ecddaaffc7bfdda6a3ce9f9dcebec436 span_id=00f0c7aa0bacf2b7',
     },
     {
       id: 'pay-label',
-      text: '09:14:45 payments.charge.duration{route="/pay", trace_id="4bf92f3577b34da6a3ce929d0e0e4736", span_id="00f067aa0ba902b7", env="prod"} count=1 sum=5.4s exemplar: none',
+      text: '09:14:45 payments.charge.duration{route="/pay", trace_id="7d1e0b6a94c2f35880ad41c6be92f07d", span_id="c4a1e5d27b903f68", az="eu-1"} count=1 sum=5.4s exemplar: none',
     },
-    { id: 'pay-0914-45', text: '09:14:45 payments.charge.duration{route="/pay"} count=9 sum=41.8s exemplar: none' },
+    { id: 'pay-0914-45', text: '09:14:45 payments.charge.duration{route="/pay", cloud_region="eu-west-1", instance_id="10.244.103.117:9464", build_id="20241102"} count=9 sum=41.8s exemplar: none' },
     {
       id: 'pay-0915-00',
-      text: '09:15:00 payments.charge.duration{route="/pay"} count=12 sum=52.9s exemplar: value=5.47s trace_id=5b8efff798038103d269b633813fc60c span_id=eee19b7ec3c1b174',
+      text: '09:15:00 payments.charge.duration{route="/pay"} count=124 sum=152.9s exemplar: value=5.4731s trace_id=fccad9972863abf3deeabec3b1afc60c span_id=eeeb9b7ec3cfb174',
     },
     { id: 'pay-0915-15', text: '09:15:15 payments.charge.duration{route="/pay"} count=10 sum=3.1s exemplar: none' },
   ],

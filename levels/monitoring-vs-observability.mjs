@@ -10,7 +10,7 @@ import { newSortState } from '../lib/widgets/sort-it.mjs';
 const SORT = {
   id: 'mvo-sort',
   helps: { hints: true },
-  hint: 'Could someone have written this question down, with its threshold, before anything went wrong?',
+  hint: 'Ask whether someone could have written this question down, with its threshold, before anything went wrong.',
   buckets: [
     { id: 'known', label: 'Known question' },
     { id: 'new', label: 'New question' },

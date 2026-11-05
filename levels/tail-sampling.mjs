@@ -142,7 +142,7 @@ const SPOT = {
   helps: { hints: false },
   lines: [
     { id: 'metrics-spans', text: 'metrics/spans: receivers: [span_metrics] processors: [batch] exporters: [otlp_grpc/dash0]' },
-    { id: 'logs', text: 'logs: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp_grpc/dash0]' },
+    { id: 'logs', text: 'logs: receivers: [otlp] processors: [memory_limiter, k8sattributes, resource, redaction, batch] exporters: [otlp_grpc/dash0]' },
     { id: 'connector-def', text: 'connectors: span_metrics:' },
     { id: 'traces', text: 'traces: receivers: [otlp] processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0, span_metrics]' },
     { id: 'sampler-def', text: 'processors: tail_sampling: decision_wait: 30s policies: [{name: errors, type: status_code, status_code: {status_codes: [ERROR]}}, {name: slow, type: latency, latency: {threshold_ms: 2000}}, {name: baseline, type: probabilistic, probabilistic: {sampling_percentage: 5}}]' },
@@ -150,7 +150,7 @@ const SPOT = {
   faults: ['traces'],
   whyNot: {
     'metrics-spans': 'This is the receiving end of the connector, a metrics pipeline: a connector has to be received somewhere, or the Collector will not start. What the connector gives it depends on the traces pipeline that lists it, and that is where to look.',
-    logs: 'A logs pipeline: the connector is not in it and there is no sampler, so nothing here touches the span metrics.',
+    logs: 'A logs pipeline with its own processors: the connector is not in it and there is no sampler, so nothing here touches the span metrics.',
     'connector-def': 'This only defines the connector. Defining a component does not decide what it receives: that is decided by the pipelines that list it.',
     'sampler-def': 'This only defines the sampler and its wait. What it does to the span metrics depends on which pipeline lists it next to the connector.',
   },

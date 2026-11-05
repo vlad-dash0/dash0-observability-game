@@ -57,17 +57,19 @@ const SPOT = {
     { id: 'route', text: 'http_server_requests_total{http_route="/recommendations/{id}"}' },
     { id: 'method', text: 'http_server_requests_total{http_request_method="POST"}' },
     { id: 'url-path', text: 'http_server_requests_total{url_path="/recommendations/48211"}' },
+    { id: 'node', text: 'http_server_requests_total{k8s_node_name="ip-10-142-203-117"}' },
     { id: 'user-id', text: 'http_server_requests_total{user_id="u-31402"}' },
     { id: 'status', text: 'http_server_requests_total{http_response_status_code="503"}' },
-    { id: 'request-id', text: 'http_server_requests_total{request_id="9f3c0e2a-77b1"}' },
-    { id: 'tier', text: 'http_server_requests_total{customer_tier="member"}' },
+    { id: 'request-id', text: 'http_server_requests_total{request_id="deadbeefcafe"}' },
+    { id: 'region', text: 'http_server_requests_total{cloud_region="eu-west-1"}' },
   ],
   faults: ['url-path', 'user-id', 'request-id'],
   whyNot: {
     route: 'A route template: the dynamic segments are placeholders, so every request to the route carries the same value. The semantic conventions require <code>http.route</code> to be low-cardinality for this reason.',
     method: 'A short list of values. The semantic conventions map a method the instrumentation does not know to <code>_OTHER</code>, so this cannot grow without bound.',
     status: 'It looks like a number, but a status code is one of a short list of values. What makes an attribute high-cardinality is how many different values it takes, not what they look like.',
-    tier: `A set you control: ${VALUES.tier} tiers, and a new customer joins one of them.`,
+    node: 'A node name looks like an unbounded id, but a cluster has a short list of nodes, and a new node is rare. What makes an attribute high-cardinality is how many different values it takes, not how many digits it has.',
+    region: 'A cloud provider has a short, published list of regions, and a company uses a handful of them. The list of values is short and stays short.',
   },
   explain:
     'The URL path, the user id and the request id each take a new value for every URL, user or request, so each new one is a new series. ' +

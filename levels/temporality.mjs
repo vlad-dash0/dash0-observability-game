@@ -12,7 +12,7 @@ const SPOT = {
   id: 'temp-spot',
   target: 'metric',
   helps: { hints: true },
-  hint: 'Ask of each series whether the backend gets a running total from it as it is, and whether that instrument has a temporality at all.',
+  hint: 'Ask of each series whether it is a running total, a change since the last report, or has no temporality at all.',
   lines: [
     { id: 'orders-placed', text: 'orders_placed_total{service="orders", temporality="cumulative"}' },
     { id: 'emails-sent', text: 'emails_sent_total{service="notifications", temporality="delta"}' },
