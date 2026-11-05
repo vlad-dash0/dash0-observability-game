@@ -435,14 +435,19 @@ test('T14 kit.css sets color to a tone token only on markers (::before/::after, 
 
 // ---- Prose evidence scrolls inside its card (#143) ---------------------------------------
 
-test('prose tables and code scroll sideways inside the block, and the prose column can shrink', () => {
+test('prose tables scroll in the kit wrap, regions and the prose column can shrink', () => {
   const kit = sheetRules('kit.css');
   const props = (sel) => Object.fromEntries(kit.filter((r) => splitTop(r.selector).includes(sel)).flatMap((r) => decls(r.body)));
-  const table = props('.ui-prose table');
-  assert.equal(table['overflow-x'], 'auto', 'a wide evidence table scrolls instead of being clipped by the card');
-  assert.equal(table['max-inline-size'], '100%');
+  assert.equal(props('.ui-table-wrap')['overflow-x'], 'auto', 'a wide evidence table scrolls instead of being clipped by the card');
+  assert.equal(props('.ui-table-wrap')['max-width'], '100%');
+  assert.notEqual(props('.ui-prose table').display, 'block', 'the table stays display: table at full width; prose() wraps it');
+  assert.equal(props('.ui-prose table')['inline-size'], '100%');
   assert.equal(props('.ui-prose')['grid-template-columns'], 'minmax(0, 1fr)', 'a grid item would otherwise grow to the table width');
   assert.equal(props('.ui-prose')['min-width'], '0');
   assert.equal(props('.ui-prose pre')['overflow-x'], 'auto');
   assert.equal(props('.ui-prose pre')['max-inline-size'], '100%');
+  for (const sel of ['.ui-panel-sec > [data-region]', '.ui-panel-sec', '.ui-meter']) {
+    assert.equal(props(sel)['grid-template-columns'], 'minmax(0, 1fr)', `${sel}: an implicit auto column grows to min-content and clips at 320px`);
+  }
+  assert.equal(props('.ui-meter-cells')['grid-auto-columns'], 'minmax(0, 1fr)');
 });

@@ -87,10 +87,11 @@
   display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: center;
   padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border);
 }
-.ui-panel-sec { display: grid; gap: var(--space-3); padding: var(--space-4); min-width: 0; }
+.ui-panel-sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); padding: var(--space-4); min-width: 0; }
 .ui-panel-sec + .ui-panel-sec { border-top: 1px solid var(--color-border); }
-/* A region a widget redraws in place (the incident board's tiles, evidence log, causes). */
-.ui-panel-sec > [data-region] { display: grid; gap: var(--space-3); min-width: 0; align-content: start; }
+/* A region a widget redraws in place (the incident board's tiles, evidence log, causes). The column
+   is minmax(0, 1fr): an implicit auto column grows to min-content and the panel clips it at 320px. */
+.ui-panel-sec > [data-region] { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); min-width: 0; align-content: start; }
 .ui-panel-head h3 { font-size: var(--text-base); font-weight: var(--weight-semibold); }
 .ui-panel--inset { background: var(--color-bg); border-radius: var(--radius-sm); }
 .ui-panel--alert { border-color: color-mix(in srgb, var(--color-alert) 55%, var(--color-border)); }
@@ -215,14 +216,14 @@
 .ui-feedback[data-tone="error"] .ui-feedback-ico::before { content: "\2717"; content: "\2717" / "Wrong"; }
 
 /* ---------- Meter (meter.mjs) ---------- */
-.ui-meter { display: grid; gap: var(--space-2); }
+.ui-meter { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); min-width: 0; }
 .ui-meter-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--space-1) var(--space-4); }
 .ui-meter-label {
   font-family: var(--font-mono); font-size: 11px; font-weight: var(--weight-semibold); letter-spacing: .08em;
   text-transform: uppercase; color: var(--color-text-muted);
 }
 .ui-meter-value { font-family: var(--font-mono); font-size: 13px; font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
-.ui-meter-cells { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; }
+.ui-meter-cells { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; min-width: 0; }
 .ui-meter-cells i { block-size: 14px; border-radius: 3px; background: var(--color-meter-left); }
 .ui-meter-cells i[data-cell="spent"] { background: color-mix(in srgb, var(--color-border) 60%, transparent); }
 .ui-meter-cells i[data-cell="preview"] { background: transparent; box-shadow: inset 0 0 0 1px var(--color-parent); }
@@ -277,9 +278,8 @@
 /* ---------- Table (table.mjs; the same look inside prose) ---------- */
 .ui-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: 8px; }
 .ui-table, .ui-prose table { border-collapse: collapse; inline-size: 100%; font-size: var(--text-sm); }
-/* A prose table is the evidence a card shows; it scrolls sideways inside its block instead of
-   being clipped by the card. The prose grid column is minmax(0, 1fr) so it can shrink. */
-.ui-prose table { display: block; overflow-x: auto; max-inline-size: 100%; }
+/* prose() wraps each table in .ui-table-wrap, which scrolls sideways inside the card; the table
+   itself stays display: table at full width. The wrap's border replaces the table's own. */
 .ui-table caption, .ui-prose caption { caption-side: top; text-align: left; font-size: 11px; color: var(--color-text-muted); padding: 7px 10px 0; }
 .ui-table th, .ui-prose th {
   text-align: left; font-size: 11px; font-weight: var(--weight-semibold); color: var(--color-text-muted);

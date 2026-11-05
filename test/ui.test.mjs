@@ -42,6 +42,9 @@ test('text: lesson, question, eyebrow, stepHead, note, prose, codeBlock', () => 
     '<div class="ui-step-head"><p class="ui-eyebrow">Step 1</p><h3 class="ui-step-title">T</h3><p class="ui-step-note">n</p></div>');
   assert.equal(note('Costs <b>2</b> min'), '<p class="ui-note">Costs <b>2</b> min</p>');
   assert.equal(prose('<ul><li>a</li></ul>'), '<div class="ui-prose"><ul><li>a</li></ul></div>');
+  assert.equal(prose('<p>x</p><table><tr><td>1</td></tr></table><pre>t</pre><table class="k"><tr><td>2</td></tr></table>'),
+    '<div class="ui-prose"><p>x</p><div class="ui-table-wrap"><table><tr><td>1</td></tr></table></div><pre>t</pre>' +
+    '<div class="ui-table-wrap"><table class="k"><tr><td>2</td></tr></table></div></div>', 'each table sits in the kit scroller; nothing else is wrapped');
   assert.equal(codeBlock('a < b && "c"'), '<pre class="ui-code"><code>a &lt; b &amp;&amp; &quot;c&quot;</code></pre>');
 });
 
