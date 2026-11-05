@@ -57,6 +57,8 @@ function playAll(level, during = () => {}, run = start(level)) {
 }
 
 const stars = (level) => (level.scored ? 5 : 0);
+/** The step types with a side column (a wide split and a success card). */
+const SIDE = ['sort', 'build', 'incident', 'spot'];
 
 for (const level of LEVELS) {
   const steps = stepsOf(level);
@@ -97,8 +99,8 @@ for (const level of LEVELS) {
       if (i > 0) click(advanceId(level, i - 1));
       assert.equal(focus.names()[before], driver.first(spec), `step ${i + 1} starts here`);
       for (const sel of driver.solve(spec)) click(sel);
-      // A solved Build it step or incident board focuses its success heading (#146, #143); its Next is enabled.
-      const handOff = key === 'build' || key === 'incident' ? `#${spec.id}-win-title` : advanceId(level, i);
+      // A solved Build it step, incident board, Sort it or Spot it step focuses its success heading (#146, #143, #156, #160); its Next is enabled.
+      const handOff = SIDE.includes(key) ? `#${spec.id}-win-title` : advanceId(level, i);
       assert.equal(focus.last(), handOff, `step ${i + 1} hands off to its button`);
       assert.equal(q(advanceId(level, i)).disabled, false, `step ${i + 1} opens its button`);
     });
@@ -162,12 +164,12 @@ test('code is plain text: an <img onerror> in it renders escaped', () => {
 
 // ---- T12 (#158): the step frame comes from the kit; the step type decides its width -------
 
-test('P2 T12 every step type says whether its step is wide; Build it and the incident board are the wide ones', () => {
+test('P3 T12 every step type says whether its step is wide; Sort it, Build it, the incident board and Spot it are the wide ones', () => {
   for (const [key, type] of Object.entries(STEP_TYPES)) assert.equal(typeof type.wide, 'boolean', `${key}.wide`);
-  assert.deepEqual(Object.keys(STEP_TYPES).filter((k) => STEP_TYPES[k].wide), ['build', 'incident']);
+  assert.deepEqual(Object.keys(STEP_TYPES).filter((k) => STEP_TYPES[k].wide), SIDE);
 });
 
-test('T12 each step renders one kit step, wide by its type: a build step holds the board and its side column', () => {
+test('T12 each step renders one kit step, wide by its type: a sort, build, incident or spot step holds the board and its side column', () => {
   const seen = [];
   playAll(FX, (i, { key }) => {
     const wide = STEP_TYPES[key].wide;
@@ -177,12 +179,12 @@ test('T12 each step renders one kit step, wide by its type: a build step holds t
     assert.equal(qa('.ui-actions--wide').length, wide ? 1 : 0, `step ${i + 1} (${key}) actions width`);
     assert.equal(qa('.ui-step .ui-lesson').length, 1, `step ${i + 1} (${key}) opens with the lesson card`);
     assert.equal(qa('.ui-step .ui-question').length, FX.play.steps[i].question == null ? 0 : 1, `step ${i + 1} (${key}) question`);
-    if (key === 'build' || key === 'incident') {
+    if (SIDE.includes(key)) {
       assert.equal(qa('.ui-step--wide .ui-split').length, 1, `${key}: the board and side column split inside the wide step`);
       assert.equal(qa('.ui-split-side [id$="-win"]').length, 1, `${key}: the side column holds the success card`);
     }
   });
-  assert.deepEqual(['build', 'incident', 'choice'].every((k) => seen.includes(k)), true);
+  assert.deepEqual(['sort', 'build', 'incident', 'spot', 'choice'].every((k) => seen.includes(k)), true);
 });
 
 const HOW = 'ol[aria-label="How this board works"]';
@@ -372,6 +374,20 @@ test('validatePlay names each configure step problem, with the step and widget i
   }
 });
 
+test('a spot step may declare its helps and a hint; a misspelt helps key, or a hint with hints off, is named', () => {
+  assert.deepEqual(problems((p) => { Object.assign(p.steps[4].spot, { helps: { hints: true }, hint: 'Ask which value set is unbounded.' }); }), []);
+  assert.deepEqual(problems((p) => { p.steps[4].spot.helps = { hints: false }; }), []);
+  const cases = [
+    [(p) => { p.steps[4].spot.helpz = { hints: true }; }, 'step 5 (spot "fx-spot"): unknown key "helpz" on spec (did you mean "helps"?)'],
+    [(p) => { p.steps[4].spot.hint = 'Never shown.'; }, 'step 5 (spot "fx-spot"): hint: shown only when helps.hints is on'],
+    [(p) => { p.steps[4].spot.helps = { hints: 'yes' }; }, 'step 5 (spot "fx-spot"): helps: "hints" is not true or false'],
+  ];
+  for (const [edit, want] of cases) {
+    const got = problems(edit);
+    assert.deepEqual(got, [want], want);
+  }
+});
+
 test('a configure step may leave out the target and the hint', () => {
   assert.deepEqual(problems((p) => { delete p.steps[7].configure.target; delete p.steps[7].configure.hint; }), []);
 });
@@ -482,4 +498,15 @@ test('#146 a build step may declare its helps and a closing line; bad helps are 
   assert.deepEqual(problems((p) => { p.steps[2].build.helps = { hints: true, instant: true }; p.steps[2].build.closing = 'Done.'; }), []);
   assert.deepEqual(problems((p) => { p.steps[2].build.helps = { hints: 'yes' }; }), ['step 3 (build "fx-tree"): helps: "hints" is not true or false']);
   assert.deepEqual(problems((p) => { p.steps[2].build.closing = ''; }), ['step 3 (build "fx-tree"): closing: not non-empty text']);
+});
+
+test('#156 a sort step may declare its helps and a hint; a typo is named with a did-you-mean; bad helps are refused with the widget\'s message', () => {
+  assert.deepEqual(problems((p) => { p.steps[1].sort.helps = { hints: true }; p.steps[1].sort.hint = 'Ask what shape the data has.'; }), []);
+  assert.deepEqual(problems((p) => { p.steps[1].sort.helps = { hints: false }; }), []);
+  assert.deepEqual(problems((p) => { p.steps[1].sort.helpz = { hints: true }; }),
+    ['step 2 (sort "fx-sort"): unknown key "helpz" on spec (did you mean "helps"?)']);
+  assert.deepEqual(problems((p) => { p.steps[1].sort.hnit = 'x'; }),
+    ['step 2 (sort "fx-sort"): unknown key "hnit" on spec (did you mean "hint"?)']);
+  assert.deepEqual(problems((p) => { p.steps[1].sort.helps = { hints: 'yes' }; }), ['step 2 (sort "fx-sort"): helps: "hints" is not true or false']);
+  assert.deepEqual(problems((p) => { p.steps[1].sort.hint = 'Never shown.'; }), ['step 2 (sort "fx-sort"): hint: shown only when helps.hints is on']);
 });

@@ -282,8 +282,6 @@ const LEGACY = {
   'levels/why-opentelemetry.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'lib/widgets/configure-it-view.mjs': ['btn', 'configure-inactive', 'configure-input', 'configure-label', 'configure-more', 'configure-note', 'feedback', 'ghost', 'info', 'show', 'small'],
   'lib/widgets/query-it-view.mjs': ['btn', 'feedback', 'ghost', 'info', 'query-data', 'query-input', 'query-label', 'query-note', 'show', 'small'],
-  'lib/widgets/sort-it-view.mjs': ['feedback', 'show', 'sort-bucket-btn', 'sort-hint', 'sort-item'],
-  'lib/widgets/spot-it-view.mjs': ['btn', 'feedback', 'show', 'spot-line'],
   'lib/widgets/trade-off-view.mjs': ['btn', 'feedback', 'show', 'tradeoff-keeps', 'tradeoff-option'],
 };
 

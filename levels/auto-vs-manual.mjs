@@ -7,6 +7,7 @@
 // Step 1. Label wording must not give the bucket away (test/sort-tells.test.mjs).
 const SORT = {
   id: 'avm-sort',
+  helps: { hints: false },
   buckets: [
     { id: 'auto', label: 'Automatic' },
     { id: 'manual', label: 'Manual' },

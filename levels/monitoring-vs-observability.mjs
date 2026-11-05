@@ -9,6 +9,7 @@ import { newSortState } from '../lib/widgets/sort-it.mjs';
 // Step 1. Label wording must not give the bucket away (test/sort-tells.test.mjs).
 const SORT = {
   id: 'mvo-sort',
+  helps: { hints: true },
   buckets: [
     { id: 'known', label: 'Known question' },
     { id: 'new', label: 'New question' },

@@ -9,6 +9,7 @@
 // Step 1. Two measurements per instrument. Label wording must not give the bucket away (test/sort-tells.test.mjs).
 const SORT = {
   id: 'instr-sort',
+  helps: { hints: false },
   buckets: [
     { id: 'counter', label: 'Counter' },
     { id: 'up-down-counter', label: 'UpDownCounter' },

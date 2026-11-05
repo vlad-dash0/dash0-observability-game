@@ -10,6 +10,7 @@ import { newSortState } from '../lib/widgets/sort-it.mjs';
 // Step 1. Label wording must not give the bucket away (test/sort-tells.test.mjs).
 const SORT = {
   id: 'bag-sort',
+  helps: { hints: false },
   buckets: [
     { id: 'ok', label: 'Fine in baggage' },
     { id: 'never', label: 'Never in baggage' },

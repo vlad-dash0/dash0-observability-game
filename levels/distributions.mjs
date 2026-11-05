@@ -48,6 +48,7 @@ const BUCKETS = [
 // Step 2: nine components, interleaved. `whyNot` has one line for each of the other three buckets.
 const SORT = {
   id: 'dist-sort',
+  helps: { hints: false },
   buckets: BUCKETS,
   items: [
     {

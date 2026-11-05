@@ -106,20 +106,6 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
   border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
 
-/* ---------- Spot it (lib/widgets/spot-it-view.mjs) ---------- */
-/* Lines are monospace toggle buttons; pressed is a thicker text-coloured border (not colour
-   alone). Same text/surface pairs as Sort it, so test/theme.test.mjs's contrast checks cover them. */
-.spot-lines { list-style: none; display: flex; flex-direction: column; gap: 6px; margin: 4px 0 14px; }
-.spot-line {
-  display: block; width: 100%; text-align: left; border: 1.5px solid var(--color-border);
-  background: var(--color-surface); color: var(--color-text); border-radius: var(--radius-sm);
-  padding: 9px 13px; cursor: pointer; transition: all .15s; overflow-wrap: anywhere;
-}
-.spot-line code { font-size: 13.5px; background: none; padding: 0; }
-.spot-line:hover:not(:disabled) { border-color: var(--color-accent); }
-.spot-line[aria-pressed="true"] { border: 3px solid var(--color-text); background: var(--color-surface-2); padding: 7.5px 11.5px; }
-.spot-line:disabled { cursor: default; }
-
 /* ---------- Trade-off (lib/widgets/trade-off-view.mjs) ---------- */
 /* Knobs are fieldsets of radio rows (cost and what each keeps spelled out in text, never colour
    alone); the live total is bold text. Same text/surface pairs as Spot it, so the contrast
@@ -161,43 +147,6 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .configure-stage code { font-size: 13.5px; }
 .configure-reasons, .configure-errors { margin: 4px 0 0 20px; padding: 0; overflow-wrap: anywhere; }
 .configure-kind { font-family: var(--font-mono); font-size: 12.5px; color: var(--color-text-muted); }
-
-/* ---------- Sort it (lib/widgets/sort-it-view.mjs) ---------- */
-/* Labels may hold long <code> names: items, bucket buttons and placed items wrap anywhere
-   (as does .feedback above, which quotes them), so no Sort it label overflows at 320px.
-   .choice is not covered. Only existing text/background pairs (text on surface and surface-2, muted text on
-   surface), so test/theme.test.mjs's contrast checks cover them in both themes. */
-.sort-hint { color: var(--color-text-muted); font-size: 13.5px; margin: 0 0 8px; }
-.sort-pool { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; min-height: 8px; }
-.sort-item {
-  border: 1.5px solid var(--color-border); background: var(--color-surface); color: var(--color-text);
-  border-radius: var(--radius-sm); padding: 10px 13.5px; font-family: inherit; font-size: 14.5px;
-  font-weight: 600; cursor: grab; transition: all .15s; max-width: 100%; overflow-wrap: anywhere;
-}
-.sort-item:hover { border-color: var(--color-accent); }
-/* Selected: a thicker text-coloured border (not colour alone) on the raised surface;
-   the extra border comes out of the padding so the chip does not grow. */
-.sort-item[aria-pressed="true"] {
-  border: 3px solid var(--color-text); background: var(--color-surface-2); padding: 8.5px 12px;
-}
-.sort-buckets { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
-.sort-bucket {
-  background: var(--color-surface); border: 1.5px dashed var(--color-border);
-  border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 8px;
-}
-.sort-bucket-btn {
-  width: 100%; border: 1.5px solid var(--color-border); background: var(--color-surface-2); color: var(--color-text);
-  border-radius: var(--radius-sm); padding: 10px; font-family: inherit; font-size: 15px; font-weight: 700;
-  cursor: pointer; transition: all .15s; max-width: 100%; overflow-wrap: anywhere;
-}
-.sort-bucket-btn:hover:not(:disabled) { border-color: var(--color-accent); }
-.sort-bucket-btn:disabled { opacity: .4; cursor: not-allowed; }
-.sort-placed { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-.sort-placed li {
-  color: var(--color-text-muted); font-size: 13.5px; font-weight: 600; padding: 0 4px;
-  max-width: 100%; overflow-wrap: anywhere;
-}
-.sort-placed li::before { content: "\2713 "; content: "\2713 " / ""; color: var(--color-success); }
 
 /* The Build it waterfall's own rules (.wf-*) live in styles/widgets.css, its layout in kit.css (#158). */
 
@@ -296,7 +245,7 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
    centred; a Build it board or an incident board takes the wide one. Last, so it wins over the components' own
    side margins; the stage's gap replaces the question's bottom margin. */
 .lesson-stage > * { inline-size: 100%; max-inline-size: var(--layout-narrow); margin-inline: auto; }
-.lesson-stage > [data-build], .lesson-stage > [data-incident] { max-inline-size: var(--layout-wide); }
+.lesson-stage > [data-build], .lesson-stage > [data-incident], .lesson-stage > [data-sort] { max-inline-size: var(--layout-wide); }
 .lesson-stage > h3.q { margin-bottom: 2px; }
 
 @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }

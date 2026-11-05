@@ -36,15 +36,21 @@
 const SPOT = {
   id: 'exm-spot',
   target: 'config',
+  helps: { hints: true },
   lines: [
     { id: 'pay-0914-00', text: '09:14:00 payments.charge.duration{route="/pay"} count=9 sum=2.9s exemplar: none' },
     {
       id: 'pay-0914-15',
       text: '09:14:15 payments.charge.duration{route="/pay"} count=11 sum=3.6s exemplar: value=0.28s trace_id=0af7651916cd43dd8448eb211c80319c span_id=b7ad6b7169203331',
     },
+    { id: 'refund-batch', text: '09:14:30 payments.charge.duration{route="/refund-batch"} count=3 sum=17.4s exemplar: none' },
     {
       id: 'pay-0914-30',
       text: '09:14:30 payments.charge.duration{route="/pay"} count=10 sum=47.3s exemplar: value=6.12s trace_id=4bf92f3577b34da6a3ce929d0e0e4736 span_id=00f067aa0ba902b7',
+    },
+    {
+      id: 'pay-label',
+      text: '09:14:45 payments.charge.duration{route="/pay", trace_id="4bf92f3577b34da6a3ce929d0e0e4736"} count=1 sum=5.4s exemplar: none',
     },
     { id: 'pay-0914-45', text: '09:14:45 payments.charge.duration{route="/pay"} count=9 sum=41.8s exemplar: none' },
     {
@@ -52,11 +58,6 @@ const SPOT = {
       text: '09:15:00 payments.charge.duration{route="/pay"} count=12 sum=52.9s exemplar: value=5.47s trace_id=5b8efff798038103d269b633813fc60c span_id=eee19b7ec3c1b174',
     },
     { id: 'pay-0915-15', text: '09:15:15 payments.charge.duration{route="/pay"} count=10 sum=3.1s exemplar: none' },
-    { id: 'refund-batch', text: '09:14:30 payments.charge.duration{route="/refund-batch"} count=3 sum=17.4s exemplar: none' },
-    {
-      id: 'pay-label',
-      text: '09:14:45 payments.charge.duration{route="/pay", trace_id="4bf92f3577b34da6a3ce929d0e0e4736"} count=1 sum=5.4s exemplar: none',
-    },
   ],
   faults: ['pay-0914-15', 'pay-0914-30', 'pay-0915-00'],
   whyNot: {
@@ -69,8 +70,8 @@ const SPOT = {
   explain:
     'Three points carry an exemplar: one measurement recorded in that window, with its value, the <code>trace_id</code> and the ' +
     '<code>span_id</code> of the span it was recorded in. The value is one measurement, not the point\'s sum, and an exemplar can sit on an ' +
-    'ordinary point as well as on the spike: the point at 09:14:15 has one, and the spike point at 09:14:45 has none. The ' +
-    'trace id in the label of the last point does not link anything, and the scheduled job has no exemplar either.',
+    'ordinary point as well as on the spike: the point at 09:14:15 has one, and the spike point at 09:14:45 with count=9 has none. The ' +
+    'trace id in a series label does not link anything, and the scheduled job has no exemplar either.',
 };
 
 // Step 2: why the other points have none. `why` follows "Right." or "Not quite.".

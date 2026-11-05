@@ -91,20 +91,62 @@ remaining(spec, state) → itemIds not yet right, spec order
 untried(spec, state, itemId) → bucketIds not yet tried, spec order
 isComplete(spec, state) → boolean
 ```
-View `lib/widgets/sort-it-view.mjs`: `renderSort(spec, state, {selected, escapeHtml,
-labelledBy?})` (item buttons `data-item` + `aria-pressed`; bucket buttons `data-bucket`,
-disabled when tried for the selected item or nothing selected; `[data-bucket-list]` of placed
-items; `#ID-feedback`; `labelledBy`, a plain-token heading id, makes the widget a labelled group).
-Above the board every Sort it step shows one plain-text instruction, `<p class="sort-hint"
-id="ID-hint">` ("Drag each item into the right bucket, or pick an item and then a bucket."),
-the same on every step, not a live region; the item pool (`.sort-pool`) is a named group
-(`role="group" aria-label="Items to sort"`) carrying `aria-describedby="ID-hint"`.
-`mountSort(ctx, spec, {onComplete})`: tap-to-place (item then bucket; keyboard-native); drag is
-an enhancement calling the same path. Only `'wrong'` costs a mistake. Feedback: `Right. <label>
-goes in <bucket>. <why>` / `Not quite. <label> is not <bucket>. <whyNot?>` (doesn't reveal the
-answer) / `You already tried <bucket> for <label>.` (a repeat; free) / `Pick an item first.`
-Focus: first remaining item → its first untried bucket → after wrong, next untried bucket →
-after right, next remaining item → `onComplete()`'s return.
+`bucketOf(spec, itemId)` → the item's answer bucket id (undefined if unknown): the one reader of
+an answer; `place` grades with it and stays the only grader.
+View `lib/widgets/sort-it-view.mjs` (the UI kit, #156): one typed `sortView(spec, state,
+{order, selected, hinted})` → `{id, total, left, done, pool: [{id, labelHtml, pressed, hinted}],
+buckets: [{id, labelHtml, enabled, hinted, placed: [{id, labelHtml}]}]}` (pool in `order`, buckets
+in spec order, a bucket enabled only for the selected item and when untried; placed plus left
+equals total). `renderSort(spec, state, {selected, order, escapeHtml, labelledBy?})` renders it in
+a wide step: a kit split with the board and the side column (score card with a wrong-placement
+count, success card with its swirl, and the hint tools when the step's helps turn hints on; a chips
+row `Helps: Instant feedback on, Hints on|off` above the board). Items are toggle options (`data-item` +
+`aria-pressed`, no answer attribute) in a named group (`role="group" aria-label="Items to sort"`,
+`aria-describedby="ID-instr"`); buckets are drop panels (`[data-drop]` holding the `data-bucket`
+button and the `[data-bucket-list]` of placed items); a kit stats line reads "Sorted N of M";
+`#ID-feedback` is the kit feedback region; the plain-text instruction ("Drag each item into the
+right bucket, or pick an item and then a bucket.") is `<p class="sort-instr" id="ID-instr">`.
+`labelledBy`, a plain-token heading id, makes the widget a labelled group.
+`mountSort(ctx, spec, {onComplete, swirl?})`: the pool order is shuffled once per mount through
+`ctx.shuffle`; tap-to-place (item then bucket; keyboard-native); drag is an enhancement calling
+the same path. Only `'wrong'` costs a mistake (`ctx.mistake()` and the score card's count in one
+branch); nothing counts after the last item. Feedback (D7): `Right. <label> goes in <bucket>.
+<why>` (success) / `Not quite. <label> is not <bucket>. <whyNot?>` (error; doesn't reveal the
+answer) / `You already tried <bucket> for <label>.` (a repeat; free, neutral) / `Pick an item
+first.` (neutral). Focus: first remaining item → its first untried bucket → after wrong, next
+untried bucket → after right, next remaining item → after the last, `onComplete()` runs and the
+success card's heading takes focus.
+
+Help ladder (#156), pure in `lib/widgets/sort-it-help.mjs`. A sort step may declare
+`helps: {hints: boolean}` (default `{hints: false}`; instant feedback is always on) and, only with
+hints on, an authored `hint` line (HTML). `sortHelps(spec)`, `validateSortHelps(spec)` (unknown or
+non-boolean helps key, `hint: not non-empty text`, `hint: shown only when helps.hints is on`; play.mjs
+also rejects unknown keys with a did-you-mean). The hint target, `hintTarget(spec, state,
+{order, selected})`: the selected item if still remaining, else the first remaining in display
+order, else null (Hint disabled, "Nothing to hint right now."). Tiers by `hintFor(spec, state,
+itemId, tier, {shuffle})`, all derived from `bucketOf`, each html a `<p>`: 1 the step's `hint` or
+`SORT_RULE`; 2 two candidate buckets in spec order, the right one and a decoy shuffled (through
+`ctx.shuffle`) from the buckets not yet tried for the item, outlined with `data-hinted` while that
+item is the hint target (the selected item, else the first item still to sort), never on a bucket already tried; 3 places the item
+through `place` (a hint, never a mistake; the feedback is a neutral "Placed for you.", never
+"Right.").
+
+Which tier a click gives is decided at click time by `hintLadder(spec, state, itemId, {ruleShown,
+taken})`, still with no second grading path. Tier 1 is charged once per board: after it was shown
+for any item, every item's ladder starts past it. Tier 2 is offered only when it narrows, that is
+when the item's untried buckets number 3 or more (or it was already given); otherwise the next tier is
+the placement. The ladder is `[1, 2?, 3]`; the button reads "Hint `done+1` of `tiers.length`" and the
+side line "For X: `done` of `tiers.length` used", where `done` counts the rule once it was read for
+any item (so a 2-bucket board after the rule reads "Hint 2 of 2"). With one bucket left and no hint for it, the side line reads "For X: only one bucket left" with no dots.
+With fewer than 3 untried buckets the view skips tier 2; with exactly one left untried (the right
+one) there is no hint at all: `next` is null, the button reads "No more hints" and is disabled. The
+hint panel always shows the hint target's own last hint (tier 2) and, when that item has none, shows the rule once it was read (else it is empty); selecting an item, a placement that moves the target, or a wrong try re-syncs it with the
+board's outlines. One exception: right after a tier 3 placement the panel keeps "Placed for you. ..." until the next selection, placement or try. The rule (tier 1) is paid once per board, not stored per item.
+An item's total can therefore shrink mid-ladder ("Hint 2 of 3" becomes "Hint 2 of 2") when a wrong
+try leaves fewer than three untried buckets and tier 2 was not yet taken.
+Each click is one `ctx.hint()` and one hint on the score card; nothing happens after the last item.
+Ladder: 0.1 and 0.2 hints on (both sorts), 0.3, 1.1 and 2.3 hints on, 2.5, 2.7, 3.1, 4.1 and 5.6
+hints off.
 
 ### 4.2 Build it, trace waterfall (P5)
 Core `lib/widgets/trace.mjs`:
@@ -178,7 +220,7 @@ View `lib/widgets/build-it-view.mjs` (redesigned in #146 from the owner-approved
   time: N problems.`). Each hint tier costs one `ctx.hint()`. Retrying is free; Reset puts the
   board back and keeps what was paid.
 - **Right column** (markup: `sideColumn` and `helpChips` in `lib/ui/side.mjs`; behaviour:
-  `lib/widgets/help-ladder.mjs`, shared so Sort it can adopt it, #156): about
+  `lib/widgets/help-ladder.mjs`, shared; Sort it adopted it in #156): about
   300px and sticky beside the board from about 960px of widget width (a container query), else
   stacked under it: the success card (hidden until success; heading focused, no focus ring;
   stars line; the spec's `closing`), the score card (wrong drops or failed Checks, hints, five
@@ -314,17 +356,19 @@ no view and no cause).
 Core `lib/widgets/spot-it.mjs`, view `lib/widgets/spot-it-view.mjs`; step type `spot`, mechanic `spot`.
 ```
 SpotSpec = { id, target: 'config'|'span'|'metric', lines: [{id, text}] (2..12),
-  faults: [lineId] (>=1, fewer than all lines), whyNot?: {[lineId]: html}, explain: html }
+  faults: [lineId] (>=1, fewer than all lines), whyNot?: {[lineId]: html}, explain: html,
+  helps?: {hints: boolean}, hint?: html }   // hint (tier 1 text; inline HTML, wrapped in <p>) only when helps.hints is on
   config: any text per line; span: `key=value` per attribute; metric: `name{labels}` per series
 validateSpotSpec(spec) → string[]   // kebab ids, unique, faults/whyNot name real lines, whyNot never on a fault
 newSpotState(spec) → {selected: [], tried: [], solved: false}
 toggleLine(spec, st, id) → {state, outcome: selected|unselected|unknown|solved}
 checkSpot(spec, st) → {state, outcome: right|wrong|repeat|empty|solved, extra, missing}
 ```
-- **Interaction:** each line is a real `<button aria-pressed>` whose name is its text, rendered escaped in `<code>` (monospace); `explain` and `whyNot` are trusted authored HTML. Toggling is free and updates in place. `#ID-check` grades the whole selection.
-- **Outcomes:** `right` = the selection is exactly the fault set (order irrelevant): `Right. <explain>`, lines and Check lock, `onComplete()`. Anything else is one mistake (I1) in `mountSpot` only: `Not quite. N of your picks is/are not a fault.` plus the `whyNot` of each picked non-fault, or `Everything you picked is a fault, but there is more.` when nothing extra was picked. The faults are never named or counted. The same wrong selection again is free (`Same as last time: ...`); Check with nothing selected is free.
+- **Interaction:** each line is a kit `line` option (a real `<button aria-pressed>` whose name is its text, rendered escaped in `<code>`); `explain` and `whyNot` are trusted authored HTML. The step is wide: a kit split with the board (`#ID-instr`, the lines, Check, feedback) and the side column (success card, score card with `#ID-wrong` failed Checks and hints, hint tools). Toggling is free and updates in place. `#ID-check` grades the whole selection. The view is `spotView(spec, state, {hinted})` -> `{id, target, locked, lines: [{id, text, pressed, hinted, correct}]}`; `correct` is a picked line once solved.
+- **Hints (`lib/widgets/spot-it-help.mjs`, `helps.hints`, default off; Sort it's ladder):** three tiers, each one `ctx.hint()` and one hint on the card, never a mistake, derived only from `checkSpot`'s `extra` and `missing` (the module never reads `faults`). Tier 1: `spec.hint` or the generic rule. Tier 2 outlines a pair in spec order, picked through `ctx.shuffle` so it never leaks: an unpicked fault and an unpicked non-fault decoy (a picked line is never the decoy); with only wrong picks, one wrong pick and one right pick; with nothing wrong or missing, nothing and "Your picks are already the answer." Tier 3 picks exactly the fault set through `toggleLine` and runs the same Check (neutral "Picked for you."). Outlines stay until success. Hint stays enabled whatever the picks, until success or three tiers. Levels 3.2, 3.5 and 3.6 turn hints on.
+- **Outcomes:** `right` = the selection is exactly the fault set (order irrelevant): `Right. <explain>`, lines and Check lock, `onComplete()`. Tones (D7): right `success`, wrong `error`, empty and repeat `neutral`. On success focus goes to the success card's heading and nothing counts afterwards. Anything else is one mistake (I1) in `mountSpot` only (one `penalise()` for `ctx.mistake()` and `#ID-wrong`): `Not quite. N of your picks does/do not match the question.` plus the `whyNot` of each picked non-fault, or `Not quite. Everything you picked matches the question, but there is more.` when nothing extra was picked. The faults are never named or counted. The same wrong selection again is free (`Same as last time: ...`); Check with nothing selected is free.
 - **Solvability (I7):** `validateSpotSpec` guarantees the fault set is a non-empty proper subset of real lines, so the reference path (select the faults, Check) always passes; the generated step driver plays exactly that.
-- **A11y and focus:** feedback is `role=status aria-live=polite tabindex=-1`; with `labelledBy` the widget is a labelled group. Focus: first line on mount, stays on the toggled line, feedback after a Check that does not finish, `onComplete()`'s return after the last. No timers (I2).
+- **A11y and focus:** feedback is `role=status aria-live=polite tabindex=-1`; with `labelledBy` the widget is a labelled group. Focus: first line on mount, stays on the toggled line, feedback after a Check that does not finish, the success card's heading after the last (`onComplete()` only enables Finish). No timers (I2).
 
 ### 4.5 Trade-off (M2, #7)
 Core `lib/widgets/trade-off.mjs`, view `lib/widgets/trade-off-view.mjs`; step type `tradeoff`, mechanic `tradeoff`.

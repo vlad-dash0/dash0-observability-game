@@ -307,6 +307,11 @@ test('focus walk: each step starts on its first control, moves on, and ends on F
         const firstItem = qa('[data-item]')[0].dataset.item;
         assert.equal(focus.last(), `item:${firstItem}`, `${id} step ${i + 1} starts on its first item`);
         sortStep(step);
+        // A solved Sort it step focuses its success heading (#156); its Next or Finish is open.
+        assert.equal(focus.last(), `#${step.sort}-win-title`, `${id} step ${i + 1} announces the success card`);
+        assert.equal(q(last ? `#${prefix}-finish` : `#${prefix}-next`).disabled, false);
+        if (!last) click(`#${prefix}-next`);
+        return;
       } else {
         assert.equal(focus.last().startsWith(first), true, `${id} step ${i + 1} starts on a choice`);
         click(`[data-pick="${step.right}"]`);

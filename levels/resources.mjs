@@ -11,6 +11,7 @@
 // Step 1. Four resource attributes and four signal attributes. Label wording must not give the bucket away (test/sort-tells.test.mjs).
 const SORT = {
   id: 'res-sort',
+  helps: { hints: true },
   buckets: [
     { id: 'resource', label: 'Resource attribute' },
     { id: 'signal', label: 'Signal attribute' },

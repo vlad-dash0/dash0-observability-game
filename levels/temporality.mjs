@@ -11,6 +11,7 @@
 const SPOT = {
   id: 'temp-spot',
   target: 'metric',
+  helps: { hints: true },
   lines: [
     { id: 'orders-placed', text: 'orders_placed_total{service="orders", temporality="cumulative"}' },
     { id: 'emails-sent', text: 'emails_sent_total{service="notifications", temporality="delta"}' },

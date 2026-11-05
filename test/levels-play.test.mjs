@@ -473,14 +473,12 @@ function playLevel(level, play) {
 
 const DEFINED = definedClasses();
 // Classes levels render that no stylesheet defines yet, each owned by a later phase of #158:
-// P3 #156 (Sort it), P4 #159 (Query it, Configure it),
-// P5 #160 (Trade-off, Spot it). Sorted; only shrinks: a phase deletes its own, and an entry
+// P4 #159 (Query it, Configure it),
+// P5 #160 (Trade-off). Sorted; only shrinks: a phase deletes its own, and an entry
 // no level renders any more fails ("stale"). P7 asserts it is empty.
 const UNDEFINED_ALLOW = [
   'configure', 'configure-flow', 'configure-name', 'configure-pipeline-head', // P4 #159
   'query', 'query-result', // P4 #159
-  'sort', 'sort-board', // P3 #156
-  'spot', // P5 #160
   'tradeoff', 'tradeoff-label', 'tradeoff-model', 'tradeoff-need-head', // P5 #160
 ];
 const undefinedSeen = new Set();
