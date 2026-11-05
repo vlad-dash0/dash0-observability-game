@@ -3,7 +3,9 @@
 > Project-specific, loaded on demand: pointed to from the "Wizard workflow" section of this
 > repo's `CLAUDE.md`. Owner decision 2026-11-05. It holds who reviews a PR head, the brief
 > they share, and how their tables become the one posted review comment. The comment format
-> itself is `.github/pull_request_template.md`; the merge gate is `node tools/pr-findings.mjs <PR>`.
+> itself is `.github/pull_request_template.md`; the merge gate is the Git section of `CLAUDE.md`
+> (`All checks` green and the `PR findings` commit status green; CI runs `tools/pr-findings.mjs`,
+> and only OWNER, MEMBER and COLLABORATOR comments count).
 
 ## Why split
 
@@ -71,8 +73,9 @@ When every dispatched reviewer has returned, the orchestrator posts **one** revi
      one paragraph naming the lanes that ran. The paragraph must not use the reserved words the
      template lists (a CLEAN review that says "not clean" is inconclusive).
    - Otherwise: `## Review of <sha>: NOT CLEAN` and **one** table `| # | Severity | Finding |`.
-4. Run `node tools/pr-findings.mjs <PR>` and confirm it reads the comment (exit 1 with the
-   findings listed, or 0 when CLEAN), not 2.
+4. Run `node tools/pr-findings.mjs <PR>` (the same script CI runs for the `PR findings`
+   status) and confirm it reads the comment (exit 1 with the findings listed, or 0 when
+   CLEAN), not 2. The status on the head is what gates the merge; this local run shows why.
 
 **Editing a posted review makes its dispositions stale**: the detector ignores dispositions
 written before the edit. After any edit, post (or edit in) fresh dispositions for every finding
