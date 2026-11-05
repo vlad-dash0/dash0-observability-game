@@ -14,21 +14,21 @@ Every Dash0 fact not yet confirmed is marked `VERIFY (#195)` in code and listed 
 `INGRESS_HOSTS` in `lib/dash0/ingress.mjs` is the single authority: the validator's allowlist and, enforced by `test/static.test.mjs`, the `vercel.json` `connect-src` origins minus `'self'`. It ships `[]` (CSP unchanged, live mode "not open yet"). `PRACTICE_HOSTS` (a reserved `.invalid` host) belongs to the simulated ingress and is never a CSP origin.
 
 ## Endpoint check: `parseEndpoint(raw, {hosts, ports, allowLocal})`
-Returns `{ok:true, base, tracesUrl, host}` or `{ok:false, reason}`. Reasons, in check order: `empty`, `grpc-port` (scheme-less `host:port`, or port 4317), `malformed`, `not-https`, `credentials`, `query`, `fragment`, `unknown-host` (exact match, lookalikes fail), `unexpected-port`, `signal-path` (already ends in `/v1/traces`; the field is the base and the game appends the path), `unexpected-path` (any other path). A trailing slash is normalised and never yields `//v1`. `allowLocal` (debug mode only) also accepts `http://localhost:<port>`.
+Returns `{ok:true, base, tracesUrl, host}` or `{ok:false, reason}`. Reasons, in check order: `empty`, `grpc-port` (scheme-less `host:4317`, or port 4317), `no-scheme` (scheme-less `host:port` on any other port), `malformed`, `not-https`, `credentials`, `query`, `fragment`, `unknown-host` (exact match, lookalikes fail), `unexpected-port` (the effective port, `443` when none is written, must be in `ports`; `cspOrigin(host, port)` renders a non-443 port as `https://host:port`), `signal-path` (already ends in `/v1/traces`, case-insensitive, repeated slashes collapsed; the field is the base and the game appends the path), `unexpected-path` (any other path). A trailing slash is normalised and never yields `//v1`. `allowLocal` (debug mode only) also accepts `http://localhost:<port>`.
 
 ## Token and dataset
-`checkToken(raw)` returns `{ok}` or a reason: `empty`, `bearer-prefix`, `whitespace`, `characters`, `prefix` (only while a verified `TOKEN_PREFIX` is set), `length`. `checkDataset(raw)`: empty means the default dataset (`dataset: null`, header omitted), else a slug or `format`. No result ever contains the input. `REASONS` maps each reason to its teaching copy, so validator and level feedback cannot disagree.
+`checkToken(raw)` returns `{ok}` or a reason: `empty`, `bearer-prefix`, `whitespace`, `characters`, `prefix` (`auth_`, https://www.dash0.com/docs/dash0/miscellaneous/glossary/auth-tokens), `length`. `checkDataset(raw)`: empty means the default dataset (`dataset: null`, header omitted), else a slug or `format`. No result ever contains the input. `REASONS` maps each reason to its teaching copy, so validator and level feedback cannot disagree.
 
 ## Encoder: `lib/otlp/encode.mjs`
-`encodeTraces(drafts, {sessionId})` builds one `ExportTraceServiceRequest`: one resource (`service.name=oncall-game`, `service.version`, `telemetry.sdk.name=oncall-game-otlp`, `telemetry.sdk.language=webjs`), one scope. Per https://opentelemetry.io/docs/specs/otlp/ (JSON encoding): ids lowercase hex (32 and 16 chars), `*TimeUnixNano` decimal strings computed with BigInt, int attributes `intValue` strings, enums as integers. The encoder stamps `session.id` on every span in one place; a draft cannot override it. Bad ids, timestamps, attribute types or an empty list throw.
+`encodeTraces(drafts, {sessionId})` builds one `ExportTraceServiceRequest`: one resource (`service.name=oncall-game`, `service.version`, `telemetry.sdk.name=oncall-game-otlp`, `telemetry.sdk.language=webjs`, `telemetry.sdk.version`), one scope. Per https://opentelemetry.io/docs/specs/otlp/ (JSON encoding): ids lowercase hex (32 and 16 chars), `*TimeUnixNano` decimal strings computed with BigInt, int attributes `intValue` strings (safe integers and bigint only; anything else throws), enums as integers. The encoder stamps `session.id` on every span in one place; a draft cannot override it. Bad ids, timestamps, attribute types or an empty list throw.
 
 Draft: `{traceId, spanId, parentSpanId?, name, kind? (default internal), startMs, endMs, attributes?, events?: [{name, timeMs, attributes?}], status?: {code: 'ok'|'error', message?}}`. An unset status is omitted.
 
 ## Sender: `lib/otlp/send.mjs`
 `sendTraces({fetch, tracesUrl, token, dataset, body, signal, setTimeout, clearTimeout, timeoutMs})` POSTs with `Authorization: Bearer`, JSON content type, `Dash0-Dataset` only when a dataset is given, `credentials:'omit'`, `redirect:'error'`, `referrerPolicy:'no-referrer'`, `cache:'no-store'`; 10 s timeout. `classifyResponse` is the only place a response becomes an outcome:
-- `accepted`: 2xx with `partialSuccess.rejectedSpans` absent or 0 (an empty body is fine).
-- `rejected {status, auth, message?}`: `auth` is true for 401/403; other 4xx/5xx and a 2xx with rejected spans are `auth:false`. `message` is capped at 200 characters with the token replaced by `[token]`.
-- `unreachable {cause}`: `network` (fetch threw: DNS, CORS, CSP, or an error response without CORS headers, which a browser cannot tell apart), `timeout`, `opaque` (no usable status), `aborted` (the caller's signal).
+- `accepted`: 2xx with `partialSuccess.rejectedSpans` absent or 0 (an empty body is fine). A 2xx body that is not a JSON object is `rejected` 'Unreadable response body'.
+- `rejected {status, auth, message?}`: `auth` is true for 401/403; other 4xx/5xx and a 2xx with rejected spans are `auth:false`. `message` is never set on 401/403. Otherwise it is dropped whole if it contains the token or any 8+ character run of it (raw, URL-encoded or JSON-escaped), else capped at 200 characters with the token replaced by `[token]`.
+- `unreachable {cause}`: `network` (fetch threw: DNS, CORS, CSP, or an error response without CORS headers, which a browser cannot tell apart), `timeout`, `opaque` (no usable status), `aborted` (the caller's signal). A body that cannot be read is `unreachable` with the cause that fired (`timeout`, `aborted`) or `network`. `sendTraces` throws a TypeError if `setTimeout`/`clearTimeout` are not injected.
 Absence is never success. Thrown error text is never passed through.
 
 ## Practice ingress: `lib/otlp/practice-ingress.mjs`
@@ -48,7 +48,7 @@ Merge order: P1, P2, P4, P3, P5, P6.
 
 ## Owner inputs (VERIFY)
 1. Does the OTLP/HTTP ingress answer browser CORS preflights for `Authorization`, `Content-Type` and `Dash0-Dataset`, including on 401/403? If not, the relay is needed.
-2. Token prefix, scope names (ingest-only, dataset-limited), where tokens are created, whether 401/403 mean what the game teaches.
-3. Region and ingress host list, OTLP/HTTP port (443 or 4318), JSON body acceptance, the dataset header name.
+2. Scope names (ingest-only, dataset-limited), where tokens are created (the `auth_` prefix and `Dash0-Dataset` header are confirmed in the Dash0 docs), whether 401/403 mean what the game teaches.
+3. Region and ingress host list, OTLP/HTTP port (443 or 4318), JSON body acceptance, the dataset identifier rules (the game's regex is its own check).
 4. Trace explorer view name, how to filter by `session.id`, deep-link format.
 5. A test org with an ingest-only token for the live QA run (never committed).
