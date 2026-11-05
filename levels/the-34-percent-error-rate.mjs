@@ -28,6 +28,9 @@ const KEPT_HEALTHY = Math.round((HEALTHY * KEEP_PCT) / 100);
 const STORED = ERRORS + KEPT_HEALTHY;
 const UNIFORM = Math.round((REQUESTS * KEEP_PCT) / 100);
 const UNIFORM_ERRORS = Math.round((ERRORS * KEEP_PCT) / 100); // failed traces a uniform sample keeps each second
+const DECOY_PCT = 18; // a dearer random policy that still fits the cap
+const DECOY = Math.round((REQUESTS * DECOY_PCT) / 100);
+const DECOY_ERRORS = Math.round((ERRORS * DECOY_PCT) / 100);
 const STORED_PCT = Math.round((ERRORS / STORED) * 100);
 const TRUE_PCT = Math.round((ERRORS / REQUESTS) * 100);
 
@@ -60,8 +63,8 @@ const VERDICT = [
   },
 ];
 
-// Step 2: the setup. Two knobs: three sampling policies (the answer last) and two places to compute the rate (the answer first).
-// Six plans, one passes. Costs are spans a second sent to the backend. Every whyNot text says only what its option does, so it holds
+// Step 2: the setup. Two knobs: four sampling policies (the answer last) and two places to compute the rate (the answer first).
+// Eight plans, one passes. Costs are spans a second sent to the backend. Every whyNot is a whole sentence that names its own option, so it holds
 // with either option of the other knob.
 const PLAN = {
   id: 'ser-plan',
@@ -83,6 +86,12 @@ const PLAN = {
           label: `Keep every trace: ${n(REQUESTS)} spans/s`,
           cost: REQUESTS,
           keeps: ['every-error', 'true-rate'],
+        },
+        {
+          id: 'probabilistic-18pct',
+          label: `A probabilistic policy at ${DECOY_PCT}% of all traces: about ${n(DECOY)} spans/s, chosen at random`,
+          cost: DECOY,
+          keeps: ['true-rate'],
         },
         {
           id: 'errors-10pct',
@@ -116,14 +125,14 @@ const PLAN = {
   ],
   answer: { sampler: 'errors-10pct', rate: 'red-before' },
   whyNot: {
-    'sampler:probabilistic-10pct':
-      `keeps an honest ratio, but only about ${UNIFORM_ERRORS} of the ${ERRORS} failed traces each second, so most failures can't be opened`,
-    'sampler:keep-all': `sends every span, ${n(REQUESTS)} spans/s, ${TIMES_OVER} times the cap of ${CAP}`,
-    'rate:stored-spans': `with a policy that keeps every error, the kept spans read ${WRONG_SUM}, a share of kept spans, not of requests`,
+    'sampler:probabilistic-10pct': `This policy keeps an honest ratio, but only about ${UNIFORM_ERRORS} of the ${ERRORS} failed traces a second, so most failures can't be opened.`,
+    'sampler:probabilistic-18pct': `This policy keeps an honest ratio, but only about ${DECOY_ERRORS} of the ${ERRORS} failed traces a second, so most failures can't be opened.`,
+    'sampler:keep-all': `Keeping every trace sends ${n(REQUESTS)} spans/s, ${TIMES_OVER} times the cap of ${CAP}.`,
+    'rate:stored-spans': `The rate from the spans the backend keeps is a share of kept spans. With every error kept and ${KEEP_PCT}% of the rest, that reads ${WRONG_SUM}, not ${TRUE_PCT}%.`,
   },
   explain:
     `The plan sends ${n(STORED)} of ${CAP} spans/s: all ${ERRORS} errors and ${KEPT_HEALTHY} of the ${n(HEALTHY)} healthy traces. The rate comes from RED metrics computed before sampling, from all ${n(REQUESTS)} requests, so it reads ${TRUE_SUM}; those metrics are data points, not spans, so they add nothing to the spans sent. ` +
-    `Computed from the stored spans it would read ${WRONG_SUM}. Sampling and the rate answer different questions: sampling decides which traces you keep to look at, the rate must count everything. ` +
+    `Computed from the kept spans it would read ${WRONG_SUM}. Sampling and the rate answer different questions: sampling decides which traces you keep to look at, the rate must count everything. ` +
     'Dash0 computes RED metrics before sampling when it samples your traces (SignalControl), and at the edge the <code>dash0redmetrics</code> connector runs in the pre-sampling pipeline, on 100% of spans. ' +
     'If you sample in your own Collector, the pipeline fix is the one in 6.2: compute span metrics before the sampler. ' +
     'These figures come from one authored table, not a measurement.',
@@ -161,7 +170,7 @@ export default {
       {
         intro:
           `The honest answer needs a setup that keeps the failed traces you want to open and an error rate that matches the requests. ` +
-          `A sampling policy decides which traces are kept, whether it picks at random or keeps the errors first. The backend takes ${CAP} spans a second.`,
+          `A sampling policy decides which traces are kept: a random share of all of them, every trace, or every error plus a share of the rest. The backend takes ${CAP} spans a second.`,
         question: 'Pick the setup: keep what the team needs and stay within the cap.',
         qid: 'ser-q-plan',
         tradeoff: PLAN,

@@ -159,7 +159,7 @@ test('step 2 is a valid two-knob Trade-off whose only passing plan is every erro
   assert.equal(spec.unit, 'spans/s sent to the backend');
   assert.equal(spec.cap, 200);
   assert.deepEqual(spec.knobs.map((k) => [k.id, k.label, k.options.map((o) => o.id)]), [
-    ['sampler', 'Sampling policy', ['probabilistic-10pct', 'keep-all', 'errors-10pct']],
+    ['sampler', 'Sampling policy', ['probabilistic-10pct', 'keep-all', 'probabilistic-18pct', 'errors-10pct']],
     ['rate', 'Where the error rate is computed', ['red-before', 'stored-spans']],
   ]);
   assert.deepEqual(spec.needs.map((x) => [x.id, x.label]), [
@@ -174,31 +174,59 @@ test('step 2 is a valid two-knob Trade-off whose only passing plan is every erro
   assert.deepEqual(spec.answer, { sampler: 'errors-10pct', rate: 'red-before' });
 });
 
-test('step 2 plans: all six against an independent oracle, each fails for its own reason, one passes', () => {
-  const healthy = 1000 - 50;
-  const stored = 50 + healthy * 0.1; // 145
-  assert.equal(stored, 145);
+test('step 2 plans: all eight against an independent oracle, each fails for its own reason, one passes', () => {
   const policy = {
     'probabilistic-10pct': { cost: 1000 * 0.1, keeps: ['true-rate'] },
     'keep-all': { cost: 1000, keeps: ['every-error', 'true-rate'] },
-    'errors-10pct': { cost: stored, keeps: ['every-error'] },
+    'probabilistic-18pct': { cost: 1000 * 0.18, keeps: ['true-rate'] },
+    'errors-10pct': { cost: 50 + (1000 - 50) * 0.1, keeps: ['every-error'] },
   };
   const where = { 'red-before': { cost: 0, keeps: ['true-rate'] }, 'stored-spans': { cost: 0, keeps: [] } };
+  assert.equal(policy['errors-10pct'].cost, 145);
+  assert.equal(policy['probabilistic-18pct'].cost, 180);
   const plans = allPlans(spec);
-  assert.equal(plans.length, 6);
-  const reasons = [];
+  assert.equal(plans.length, 8);
+  const table = [];
   for (const p of plans) {
     const total = policy[p.sampler].cost + where[p.rate].cost;
     const kept = [...policy[p.sampler].keeps, ...where[p.rate].keeps];
     const lost = ['every-error', 'true-rate'].filter((x) => !kept.includes(x));
     assert.deepEqual(evaluatePlan(spec, p), { complete: true, total, over: Math.max(0, total - 200), lost }, `${p.sampler} + ${p.rate}`);
-    reasons.push(total > 200 ? 'cap' : lost.length ? `lost ${lost.join()}` : 'pass');
+    table.push([p.sampler, p.rate, total > 200 ? 'cap' : lost.length ? `lost ${lost.join()}` : 'pass']);
   }
-  assert.deepEqual(reasons, ['lost every-error', 'lost every-error', 'cap', 'cap', 'pass', 'lost true-rate']);
+  assert.deepEqual(table, [
+    ['probabilistic-10pct', 'red-before', 'lost every-error'],
+    ['probabilistic-10pct', 'stored-spans', 'lost every-error'],
+    ['keep-all', 'red-before', 'cap'],
+    ['keep-all', 'stored-spans', 'cap'],
+    ['probabilistic-18pct', 'red-before', 'lost every-error'],
+    ['probabilistic-18pct', 'stored-spans', 'lost every-error'],
+    ['errors-10pct', 'red-before', 'pass'],
+    ['errors-10pct', 'stored-spans', 'lost true-rate'],
+  ]);
   const ev = (sampler_, rate_) => evaluatePlan(spec, { sampler: sampler_, rate: rate_ });
   assert.equal(ev('keep-all', 'red-before').over, 800, 'keeping everything breaks the cap');
   assert.deepEqual(ev('keep-all', 'red-before').lost, [], 'and loses nothing, so only the cap rules it out');
   assert.deepEqual(ev('errors-10pct', 'red-before'), { complete: true, total: 145, over: 0, lost: [] });
+});
+
+test('step 2 shortcuts fail: dearest in cap, most Keeps in cap (dearer tie-break), greedy per knob (dearer tie-break)', () => {
+  const pick = (knob, choose) => {
+    const opts = spec.knobs.find((k) => k.id === knob).options.filter((o) => o.cost <= spec.cap);
+    return choose(opts).id;
+  };
+  const dearest = (opts) => opts.reduce((a, b) => (b.cost >= a.cost ? b : a));
+  const mostKeeps = (opts) => opts.reduce((a, b) => ((b.keeps ?? []).length > (a.keeps ?? []).length || ((b.keeps ?? []).length === (a.keeps ?? []).length && b.cost >= a.cost) ? b : a));
+  const passes = (plan) => {
+    const r = evaluatePlan(spec, plan);
+    return r.over === 0 && r.lost.length === 0;
+  };
+  assert.equal(passes({ sampler: pick('sampler', dearest), rate: pick('rate', dearest) }), false, 'dearest in cap');
+  assert.equal(passes({ sampler: pick('sampler', mostKeeps), rate: pick('rate', mostKeeps) }), false, 'most Keeps in cap, dearer tie-break');
+  // greedy: per knob, the option that alone loses the fewest needs, dearer on a tie, within the cap
+  const lostAlone = (o) => spec.needs.filter((x) => !(o.keeps ?? []).includes(x.id)).length;
+  const greedy = (opts) => opts.reduce((a, b) => (lostAlone(b) < lostAlone(a) || (lostAlone(b) === lostAlone(a) && b.cost >= a.cost) ? b : a));
+  assert.equal(passes({ sampler: pick('sampler', greedy), rate: pick('rate', greedy) }), false, 'greedy per knob, dearer tie-break');
 });
 
 test('step 2: position gives nothing away (answer last in sampler, first in rate) and the cap decides (keep-all keeps more than the answer)', () => {
@@ -212,13 +240,25 @@ test('step 2: position gives nothing away (answer last in sampler, first in rate
   assert.equal(notDominated.some((o) => o.id === 'keep-all' && o.cost > best.cost && o.keeps.length > best.keeps.length), true);
 });
 
-test('step 2 whyNot: only the three wrong options, each true for either pairing (no total that depends on the other knob)', () => {
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['rate:stored-spans', 'sampler:keep-all', 'sampler:probabilistic-10pct']);
-  assert.equal(spec.whyNot['sampler:probabilistic-10pct'], "keeps an honest ratio, but only about 5 of the 50 failed traces each second, so most failures can't be opened");
-  assert.equal(spec.whyNot['sampler:keep-all'], 'sends every span, 1,000 spans/s, five times the cap of 200');
-  assert.equal(spec.whyNot['rate:stored-spans'], 'with a policy that keeps every error, the kept spans read 50 / 145 = 34%, a share of kept spans, not of requests');
-  for (const t of Object.values(spec.whyNot)) {
-    for (const bad of ['1,190', '955', '1,000 spans/s against', 'against a cap']) assert.equal(t.includes(bad), false, bad);
+test('step 2 whyNot: only the four wrong options, each a whole capitalised sentence, each line true for either pairing', () => {
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['rate:stored-spans', 'sampler:keep-all', 'sampler:probabilistic-10pct', 'sampler:probabilistic-18pct']);
+  assert.equal(spec.whyNot['sampler:probabilistic-10pct'], "This policy keeps an honest ratio, but only about 5 of the 50 failed traces a second, so most failures can't be opened.");
+  assert.equal(spec.whyNot['sampler:probabilistic-18pct'], "This policy keeps an honest ratio, but only about 9 of the 50 failed traces a second, so most failures can't be opened.");
+  assert.equal(spec.whyNot['sampler:keep-all'], 'Keeping every trace sends 1,000 spans/s, five times the cap of 200.');
+  assert.equal(spec.whyNot['rate:stored-spans'], 'The rate from the spans the backend keeps is a share of kept spans. With every error kept and 10% of the rest, that reads 50 / 145 = 34%, not 5%.');
+  for (const [key, t] of Object.entries(spec.whyNot)) {
+    assert.match(t, /^[A-Z][\s\S]*\.$/, `${key} is a capitalised sentence`);
+    for (const bad of ['1,190', '955', '1,000 spans/s against', 'against a cap', 'stored spans']) assert.equal(t.includes(bad), false, bad);
+  }
+  // each line's numbers, checked against every pairing: they are about its own option, never the other knob
+  const ev = (sampler_, rate_) => evaluatePlan(spec, { sampler: sampler_, rate: rate_ });
+  for (const rate_ of ['red-before', 'stored-spans']) {
+    assert.equal(ev('keep-all', rate_).total, 1000, 'keep-all line: 1,000 spans/s under either rate option');
+    assert.equal(Math.round(50 * 0.1), 5);
+    assert.equal(Math.round(50 * 0.18), 9);
+  }
+  for (const s_ of ['probabilistic-10pct', 'keep-all', 'probabilistic-18pct', 'errors-10pct']) {
+    assert.equal(ev(s_, 'red-before').total, ev(s_, 'stored-spans').total, `${s_}: the rate knob adds no spans`);
   }
 });
 
