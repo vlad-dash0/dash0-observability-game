@@ -12,7 +12,7 @@ import { runPlay, validatePlay } from '../lib/play.mjs';
 const nodeIds = NODE_IDS;
 
 // Extended on purpose with each level PR (docs/M1-DESIGN.md §5): Act 0 (P3) plays before Act 1;
-// its boss, the pager (P4), comes after its levels; Act 2 (P6: 2.1, 2.2) plays after Act 1; its boss, checkout-is-slow (P11), comes last; Act 3 (M3 P1: 3.1, 3.2; M3 P2: 3.3, 3.4; M3 P3: 3.5, 3.7; M3 P12: its boss the-bill) plays after Act 2; Act 1 (M3 P4: 1.1 before 1.2, 1.3 after it; M3 P11: its boss who-is-talking); Act 4 (M3 P5: 4.1, 4.2; M3 P6: 4.3 and its boss the-3am-errors) plays after Act 3; Act 5 (M3 P7: 5.1, 5.2; M3 P8: 5.3, 5.4; M3 P9: 5.5, 5.6; M3 P13: its boss silence) plays after Act 4; Act 6 (M4 P1: 6.1, 6.2; M4 P3: its boss errors-tripled) plays after Act 5; Act 7 (#177 P2 of the beta levels: 7.1) plays after Act 6; Act 9 (#177 P5: 9.2) plays after Act 7.
+// its boss, the pager (P4), comes after its levels; Act 2 (P6: 2.1, 2.2) plays after Act 1; its boss, checkout-is-slow (P11), comes last; Act 3 (M3 P1: 3.1, 3.2; M3 P2: 3.3, 3.4; M3 P3: 3.5, 3.7; M3 P12: its boss the-bill) plays after Act 2; Act 1 (M3 P4: 1.1 before 1.2, 1.3 after it; M3 P11: its boss who-is-talking); Act 4 (M3 P5: 4.1, 4.2; M3 P6: 4.3 and its boss the-3am-errors) plays after Act 3; Act 5 (M3 P7: 5.1, 5.2; M3 P8: 5.3, 5.4; M3 P9: 5.5, 5.6; M3 P13: its boss silence) plays after Act 4; Act 6 (M4 P1: 6.1, 6.2; M4 P3: its boss errors-tripled) plays after Act 5; Act 7 (#177 P2 of the beta levels: 7.1) plays after Act 6; Act 9 (#177 P5: 9.2; #32: 9.1 before it) plays after Act 7.
 const EXPECTED_ORDER = [
   'monitoring-vs-observability',
   'the-signals',
@@ -54,6 +54,7 @@ const EXPECTED_ORDER = [
   'what-costs-money',
   'errors-tripled',
   'good-alerts',
+  'filter-or-sampler',
   'the-34-percent-error-rate',
 ];
 
@@ -135,7 +136,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
       no: 9,
       name: 'Live Demo',
       sub: 'Does that answer hold?',
-      levelIds: ['the-34-percent-error-rate'],
+      levelIds: ['filter-or-sampler', 'the-34-percent-error-rate'],
       bossId: null,
     },
   ]);

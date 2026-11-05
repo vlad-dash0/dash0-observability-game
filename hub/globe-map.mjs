@@ -75,6 +75,7 @@ export const LEVEL_COUNTRY = Object.freeze({
   // act-7 East Asia
   'good-alerts': 'JPN',
   // act-9 Oceania
+  'filter-or-sampler': 'NZL',
   'the-34-percent-error-rate': 'AUS',
 });
 
@@ -89,7 +90,7 @@ export const COUNTRY_NAMES = Object.freeze({
   KAZ: 'Kazakhstan', SAU: 'Saudi Arabia', TUR: 'Turkey', UZB: 'Uzbekistan', TKM: 'Turkmenistan', IRQ: 'Iraq',
   IND: 'India', IRN: 'Iran', PAK: 'Pakistan',
   JPN: 'Japan',
-  AUS: 'Australia',
+  AUS: 'Australia', NZL: 'New Zealand',
 });
 
 /** The act id whose region a country (ADM0_A3 code, Natural Earth SUBREGION) is in, else null. */

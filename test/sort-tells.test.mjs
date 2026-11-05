@@ -80,6 +80,44 @@ function bestByToken(spec) {
 }
 
 /**
+ * Fewest wrong placements any two-token decision list gets on a spec with three or more buckets:
+ * "label has token A -> bucket X, else label has token B -> bucket Y, else bucket Z", over every
+ * ordered pair of tokens found in two or more labels (A = B is the one-token rule) and every
+ * assignment of buckets to X, Y and Z (repeats allowed, so "A -> X, else Y" is in it too).
+ * Two-bucket boards keep their own token test above.
+ */
+function bestByTokenList(spec) {
+  const ids = spec.buckets.map((b) => b.id);
+  const sets = spec.items.map(tokens);
+  const counts = new Map();
+  for (const s of sets) for (const t of s) counts.set(t, (counts.get(t) ?? 0) + 1);
+  const shared = [...counts].filter(([, n]) => n >= 2).map(([t]) => t);
+  // With no shared token the list is just "everything to Z".
+  let best = { wrong: Infinity, rule: null };
+  for (const z of ids) {
+    const wrong = mistakes(spec, () => z);
+    if (wrong < best.wrong) best = { wrong, rule: `everything -> ${z}` };
+  }
+  for (const a of shared) {
+    for (const b of shared) {
+      for (const x of ids) {
+        for (const y of ids) {
+          for (const z of ids) {
+            let wrong = 0;
+            for (let i = 0; i < spec.items.length && wrong < best.wrong; i++) {
+              const pick = sets[i].has(a) ? x : sets[i].has(b) ? y : z;
+              if (pick !== spec.items[i].bucket) wrong++;
+            }
+            if (wrong < best.wrong) best = { wrong, rule: `"${a}" -> ${x}, else "${b}" -> ${y}, else ${z}` };
+          }
+        }
+      }
+    }
+  }
+  return best;
+}
+
+/**
  * All-caps words of a label, case kept (CPU, SERVER, UTC): 2+ letters or digits with at least one
  * letter, none lower-case. `tokens` lower-cases everything, so it cannot see these tells.
  */
@@ -215,6 +253,17 @@ test('Sort it: "a word or a % shared by labels goes to one bucket" never earns 4
     const { wrong, token } = bestByToken(spec);
     assert.equal(wrong >= MIN_WRONG, true, `${level} ${spec.id}: the token "${token}" alone gets ${wrong} wrong`);
   }
+});
+
+test('Sort it: "word A to one bucket, else word B to another, else the third" never earns 4 stars (3+ buckets)', async () => {
+  let boards = 0;
+  for (const { level, spec } of await allSortSpecs()) {
+    if (spec.buckets.length < 3) continue;
+    boards++;
+    const { wrong, rule } = bestByTokenList(spec);
+    assert.equal(wrong >= MIN_WRONG, true, `${level} ${spec.id}: the rule ${rule} gets ${wrong} wrong`);
+  }
+  assert.equal(boards > 0, true, 'no Sort it board with three or more buckets to check');
 });
 
 test('Sort it: "the labels with an all-caps word go in one bucket" never earns 4 stars', async () => {
