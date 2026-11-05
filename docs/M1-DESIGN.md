@@ -141,7 +141,7 @@ any item (so a 2-bucket board after the rule reads "Hint 2 of 2").
 With fewer than 3 untried buckets the view skips tier 2; with exactly one left untried (the right
 one) there is no hint at all: `next` is null, the button reads "No more hints" and is disabled. The
 hint panel always shows the hint target's own last hint (tier 2) and, when that item has none, shows the rule once it was read (else it is empty); selecting an item, a placement that moves the target, or a wrong try re-syncs it with the
-board's outlines. The rule (tier 1) is paid once per board, not stored per item.
+board's outlines. The outlines follow the same hint target as the panel. One exception: right after a tier 3 placement the panel keeps "Placed for you. ..." until the next selection, placement or try. The rule (tier 1) is paid once per board, not stored per item.
 An item's total can therefore shrink mid-ladder ("Hint 2 of 3" becomes "Hint 2 of 2") when a wrong
 try leaves fewer than three untried buckets and tier 2 was not yet taken.
 Each click is one `ctx.hint()` and one hint on the score card; nothing happens after the last item.
