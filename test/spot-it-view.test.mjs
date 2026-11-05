@@ -472,6 +472,20 @@ test('no player-facing Spot string says "fault" or "belong"; the instruction, th
   click('#bomb-hint');
   assert.match(hintText(), /every line that matches the question, and nothing else/);
   assert.doesNotMatch(board(), WORDS, 'after the tier 3 hint');
+
+  // The plural wrong Check and the single-line tier 2 (no decoy left), on a third board.
+  const third = setup(withHints());
+  third.mount();
+  pickAll('s1', 's3'); // both non-faults
+  check();
+  assert.equal(feedback(), 'Not quite. 2 of your picks do not match the question. A route is a small, fixed set.');
+  assert.doesNotMatch(board(), WORDS, 'after a wrong Check with two wrong picks');
+  click('[data-line="s2"]'); // every non-fault picked, s4 the one fault left: no decoy to pair it with
+  click('#bomb-hint');
+  click('#bomb-hint');
+  assert.equal(qa('#bomb-hint-text p').at(-1)?.textContent,'http_requests_total{trace_id="4bf9"} matches the question and is not picked yet.');
+  assert.deepEqual(hintedLines(), ['s4']);
+  assert.doesNotMatch(board(), WORDS, 'after the tier 2 hint, one line missing and no decoy left');
 });
 
 
