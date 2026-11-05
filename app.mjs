@@ -9,6 +9,7 @@
 // markup must not use Alpine attributes (x-*, @*, :*). test/levels-play.test.mjs checks.
 import { DECK } from './cards/deck.mjs';
 import { DOTS } from './hub/globe-data.mjs';
+import { GAME_SUMMARY } from './hub/about.mjs';
 import { COMING_SOON } from './hub/coming-soon.mjs';
 import { ACT_REGIONS, actOfCountry, COUNTRY_NAMES, LEVEL_COUNTRY } from './hub/globe-map.mjs';
 import { NODE_IDS } from './hub/map-data.mjs';
@@ -131,15 +132,17 @@ export function createGame(deps) {
         id: a.id,
         no: a.no,
         name: a.name,
+        title: `Act ${a.no}: ${a.name}`,
         sub: a.sub,
         ids: [...a.levelIds, ...(a.bossId ? [a.bossId] : [])],
         soon: false,
-        teaser: '',
+        teaser: a.teaser,
       })),
       ...comingSoon.map((a) => ({
         id: a.id,
         no: a.no,
         name: a.name,
+        title: `Act ${a.no}: ${a.name}`,
         sub: a.sub,
         ids: [],
         soon: true,
@@ -151,6 +154,8 @@ export function createGame(deps) {
     currentLevelId: null,
     nudgeId: null,
     rewardOpen: false,
+    aboutOpen: false,
+    aboutSummary: GAME_SUMMARY,
     rewardTitle: '',
     rewardText: '',
     rewardStars: null,
@@ -300,12 +305,37 @@ export function createGame(deps) {
       return this.theme === 'light' ? 'Switch to the dark theme' : 'Switch to the light theme';
     },
 
+    // ---------- dialogs ----------
+    // The one answer to "is a dialog open": the hub goes inert and openLevel / openAbout
+    // refuse while it is true.
+    dialogOpen() {
+      return this.overlayOpen || this.rewardOpen || this.aboutOpen;
+    },
+    hubInert() {
+      return this.dialogOpen();
+    },
+    // The About dialog: the game summary and one entry per act (live and coming soon), from act data.
+    aboutActs() {
+      return this.acts.map((a) => ({ id: a.id, title: a.title, sub: a.sub, teaser: a.teaser, soon: a.soon }));
+    },
+    openAbout() {
+      if (this.dialogOpen()) return false;
+      this.aboutOpen = true;
+      this.focusSoon('#about-title');
+      return true;
+    },
+    closeAbout() {
+      if (!this.aboutOpen) return;
+      this.aboutOpen = false;
+      this.focusSoon('#about-open');
+    },
+
     // ---------- levels ----------
     // A locked card wiggles and names what unlocks it (R's nudge) instead of doing nothing.
     // Refused while a level or the reward is open: the hub is inert then, and a stray
     // Enter must never abort a run. Close the level first (closeOverlay).
     openLevel(id) {
-      if (this.overlayOpen || this.rewardOpen) return false;
+      if (this.dialogOpen()) return false;
       if (this.levelState(id) === 'locked') {
         if (Object.hasOwn(registry.levels, id)) this.nudge(id);
         return false;
@@ -438,13 +468,17 @@ export function createGame(deps) {
       this.refreshGlobe();
     },
 
-    // One window-level Escape handler: closes the reward, else the level, but never the
+    // One window-level Escape handler: closes the reward, else the About dialog, else the level, but never the
     // level while the player is typing in it. A widget that handled the Escape (it called
     // preventDefault, e.g. Build it cancelling a pick) owns it.
     onEscape(e) {
       if (e?.defaultPrevented) return;
       if (this.rewardOpen) {
         this.closeReward();
+        return;
+      }
+      if (this.aboutOpen) {
+        this.closeAbout();
         return;
       }
       if (!this.overlayOpen) return;
