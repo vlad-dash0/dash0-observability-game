@@ -1,6 +1,6 @@
 // Level 9.2: The 34% error rate. Act 9 "Live Demo" (docs/LIVE-DEMO.md). The player hears a confident answer to a customer, "yes, 34% of
 // checkout requests fail, the numbers come from the spans", and says whether it holds (Choice), then picks the setup that keeps
-// every error, a healthy sample and a true error rate inside a cap on what is sent to the backend (Trade-off). The answer is
+// every error and a true error rate inside a cap on what is sent to the backend (Trade-off). The answer is
 // wrong: with tail sampling that keeps every error plus a share of the rest, the ratio of errors to kept spans is not the ratio
 // of errors to requests. The presenter has no name and no affiliation.
 // Source: an anonymised call question (docs/LIVE-DEMO.md). Nothing below identifies a customer, a person or a product.
@@ -22,17 +22,16 @@
 const REQUESTS = 1000; // a second, at the load balancer
 const ERRORS = 50; // a second, failed requests
 const KEEP_PCT = 10; // the probabilistic policy keeps this share of the traces that did not fail
-const KEEP_PCT_HIGH = 30; // the looser policy of the trade-off keeps this share instead
 const CAP = 200; // spans a second the backend takes
 const HEALTHY = REQUESTS - ERRORS;
 const KEPT_HEALTHY = Math.round((HEALTHY * KEEP_PCT) / 100);
 const STORED = ERRORS + KEPT_HEALTHY;
-const STORED_HIGH = ERRORS + Math.round((HEALTHY * KEEP_PCT_HIGH) / 100);
 const UNIFORM = Math.round((REQUESTS * KEEP_PCT) / 100);
-const DROPPED = HEALTHY - KEPT_HEALTHY; // healthy spans the policy drops; sending them too is how "all spans" computes the rate
+const UNIFORM_ERRORS = Math.round((ERRORS * KEEP_PCT) / 100); // failed traces a uniform sample keeps each second
 const STORED_PCT = Math.round((ERRORS / STORED) * 100);
 const TRUE_PCT = Math.round((ERRORS / REQUESTS) * 100);
 
+const TIMES_OVER = { 2: 'two', 3: 'three', 4: 'four', 5: 'five', 10: 'ten' }[REQUESTS / CAP] ?? String(REQUESTS / CAP); // keep-all against the cap
 const n = (x) => x.toLocaleString('en-US');
 const WRONG_SUM = `${ERRORS} / ${STORED} = ${STORED_PCT}%`;
 const TRUE_SUM = `${ERRORS} / ${n(REQUESTS)} = ${TRUE_PCT}%`;
@@ -61,7 +60,9 @@ const VERDICT = [
   },
 ];
 
-// Step 2: the setup. Two knobs, three options each: nine plans, one of which passes. Costs are spans a second sent to the backend.
+// Step 2: the setup. Two knobs: three sampling policies (the answer last) and two places to compute the rate (the answer first).
+// Six plans, one passes. Costs are spans a second sent to the backend. Every whyNot text says only what its option does, so it holds
+// with either option of the other knob.
 const PLAN = {
   id: 'ser-plan',
   unit: 'spans/s sent to the backend',
@@ -69,25 +70,25 @@ const PLAN = {
   knobs: [
     {
       id: 'sampler',
-      label: 'What tail sampling keeps',
+      label: 'Sampling policy',
       options: [
         {
-          id: 'errors-30pct',
-          label: `Every error plus ${KEEP_PCT_HIGH}% of the rest: ${n(STORED_HIGH)} spans/s`,
-          cost: STORED_HIGH,
-          keeps: ['every-error', 'baseline'],
+          id: 'probabilistic-10pct',
+          label: `A probabilistic policy at ${KEEP_PCT}% of all traces: about ${n(UNIFORM)} spans/s, chosen at random`,
+          cost: UNIFORM,
+          keeps: ['true-rate'],
+        },
+        {
+          id: 'keep-all',
+          label: `Keep every trace: ${n(REQUESTS)} spans/s`,
+          cost: REQUESTS,
+          keeps: ['every-error', 'true-rate'],
         },
         {
           id: 'errors-10pct',
           label: `Every error plus ${KEEP_PCT}% of the rest: ${n(STORED)} spans/s`,
           cost: STORED,
-          keeps: ['every-error', 'baseline'],
-        },
-        {
-          id: 'random-10pct',
-          label: `A random ${KEEP_PCT}% of all traces: about ${n(UNIFORM)} spans/s`,
-          cost: UNIFORM,
-          keeps: ['baseline'],
+          keeps: ['every-error'],
         },
       ],
     },
@@ -96,41 +97,32 @@ const PLAN = {
       label: 'Where the error rate is computed',
       options: [
         {
-          id: 'stored-spans',
-          label: 'From the spans the backend stores: no extra spans',
-          cost: 0,
-        },
-        {
           id: 'red-before',
-          label: 'From RED metrics computed before sampling: no extra spans, the metrics are data points',
+          label: 'From RED metrics computed before sampling: data points, no extra spans',
           cost: 0,
           keeps: ['true-rate'],
         },
         {
-          id: 'all-spans',
-          label: `From all spans, by also sending the dropped healthy ones: ${n(DROPPED)} more spans/s`,
-          cost: DROPPED,
-          keeps: ['true-rate'],
+          id: 'stored-spans',
+          label: 'From the spans the backend keeps: no extra spans',
+          cost: 0,
         },
       ],
     },
   ],
   needs: [
     { id: 'every-error', label: 'every failed trace' },
-    { id: 'baseline', label: 'a sample of healthy traces' },
     { id: 'true-rate', label: 'an error rate that matches the requests' },
   ],
   answer: { sampler: 'errors-10pct', rate: 'red-before' },
   whyNot: {
-    'sampler:errors-30pct': `Keeping ${KEEP_PCT_HIGH}% of the healthy traces sends ${n(STORED_HIGH)} spans/s, ${n(STORED_HIGH - CAP)} over the ${CAP} the backend takes. ${KEEP_PCT}% is enough for a baseline.`,
-    'sampler:random-10pct':
-      `A random ${KEEP_PCT}% thins errors and healthy traces alike, so it keeps only about ${n(Math.round((ERRORS * KEEP_PCT) / 100))} of the ${ERRORS} failed traces a second. ` +
-      'Most of the failures you would want to open are gone.',
-    'rate:stored-spans': `The rate is computed from what was kept: ${WRONG_SUM}, not ${TRUE_SUM}. This is the number the presenter quoted.`,
-    'rate:all-spans': `It gets the rate right, but sending the ${n(DROPPED)} dropped healthy spans as well undoes the sampling: ${n(STORED + DROPPED)} spans/s against a cap of ${CAP}.`,
+    'sampler:probabilistic-10pct':
+      `keeps an honest ratio, but only about ${UNIFORM_ERRORS} of the ${ERRORS} failed traces each second, so most failures can't be opened`,
+    'sampler:keep-all': `sends every span, ${n(REQUESTS)} spans/s, ${TIMES_OVER} times the cap of ${CAP}`,
+    'rate:stored-spans': `with a policy that keeps every error, the kept spans read ${WRONG_SUM}, a share of kept spans, not of requests`,
   },
   explain:
-    `The plan sends ${n(STORED)} of ${CAP} spans/s: all ${ERRORS} errors and ${KEPT_HEALTHY} of the ${n(HEALTHY)} healthy requests. The rate comes from RED metrics computed before sampling, from all ${n(REQUESTS)} requests, so it reads ${TRUE_SUM}; those metrics are data points, not spans, so they add nothing to the spans sent. ` +
+    `The plan sends ${n(STORED)} of ${CAP} spans/s: all ${ERRORS} errors and ${KEPT_HEALTHY} of the ${n(HEALTHY)} healthy traces. The rate comes from RED metrics computed before sampling, from all ${n(REQUESTS)} requests, so it reads ${TRUE_SUM}; those metrics are data points, not spans, so they add nothing to the spans sent. ` +
     `Computed from the stored spans it would read ${WRONG_SUM}. Sampling and the rate answer different questions: sampling decides which traces you keep to look at, the rate must count everything. ` +
     'Dash0 computes RED metrics before sampling when it samples your traces (SignalControl), and at the edge the <code>dash0redmetrics</code> connector runs in the pre-sampling pipeline, on 100% of spans. ' +
     'If you sample in your own Collector, the pipeline fix is the one in 6.2: compute span metrics before the sampler. ' +
@@ -168,8 +160,8 @@ export default {
       },
       {
         intro:
-          `The honest answer needs a setup that keeps the failed traces you want to open, a healthy sample to compare with, and an error rate that matches the requests. ` +
-          `The backend takes ${CAP} spans a second.`,
+          `The honest answer needs a setup that keeps the failed traces you want to open and an error rate that matches the requests. ` +
+          `A sampling policy decides which traces are kept, whether it picks at random or keeps the errors first. The backend takes ${CAP} spans a second.`,
         question: 'Pick the setup: keep what the team needs and stay within the cap.',
         qid: 'ser-q-plan',
         tradeoff: PLAN,
