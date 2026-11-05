@@ -56,3 +56,8 @@ package files out (keep its lines to the forms `tools/serve.mjs` parses).
 - One branch per issue, PR to `main`, conventional-commit titles (`feat: ... (#N)`).
 - No AI-attribution trailers (`Co-Authored-By`, "Generated with") in commits or PRs.
 - Merge gate: `All checks` green and `node tools/pr-findings.mjs <PR>` exits 0 (review comment formats: `.github/pull_request_template.md`).
+
+## Wizard workflow
+The wizard skill (`/wizard`) lives at `.claude/skills/wizard`, its agent roster at `.claude/agents`. Rules in this file override the skill's generic defaults.
+- Each agent pins its default model in frontmatter (opus only for architect and qa-engineer, cheaper tiers elsewhere); a dispatch may override per task with a stated reason.
+- Claude may merge at the full merge-ready bar (merge commit only), overriding the skill's and pr-manager's human-merges default.
