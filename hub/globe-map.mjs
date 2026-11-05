@@ -72,6 +72,8 @@ export const LEVEL_COUNTRY = Object.freeze({
   'head-sampling': 'IND',
   'tail-sampling': 'IRN',
   'what-costs-money': 'PAK',
+  // act-7 East Asia
+  'good-alerts': 'JPN',
   // act-9 Oceania
   'the-34-percent-error-rate': 'AUS',
 });
@@ -86,6 +88,7 @@ export const COUNTRY_NAMES = Object.freeze({
   DZA: 'Algeria', COD: 'the Democratic Republic of the Congo', ZAF: 'South Africa',
   KAZ: 'Kazakhstan', SAU: 'Saudi Arabia', TUR: 'Turkey', UZB: 'Uzbekistan', TKM: 'Turkmenistan', IRQ: 'Iraq',
   IND: 'India', IRN: 'Iran', PAK: 'Pakistan',
+  JPN: 'Japan',
   AUS: 'Australia',
 });
 
