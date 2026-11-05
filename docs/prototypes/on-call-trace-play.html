@@ -1,0 +1,938 @@
+<title>Spans and Traces Build It</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Martian+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one lesson column. Speech, then the trace board (meta, instruction, root zone, placed tree, arriving queue), then hint + score. Dark-first. */
+:root {
+  --bg: #101010; --surface: #212121; --surface-2: #2c2c2c; --line: #424242;
+  --fg: #f2f0ed; --muted: #a3a09c; --faint: #6b6966;
+  --select: #ffffff; --parent: #f3b35f; --error: #f8494d;
+  --drop: #a8fbbe; --drop-tint: rgba(168, 251, 190, 0.08); --band: rgba(243, 179, 95, 0.09); --band-edge: rgba(243, 179, 95, 0.45);
+  --good: #a8fbbe; --info: #fd8c66; --focus: #fd6f40; --hint: #c9b6ff;
+  --tint-0: oklch(0.34 0.025 85); --tint-0-edge: oklch(0.52 0.035 85); --tint-1: oklch(0.34 0.03 340); --tint-1-edge: oklch(0.54 0.045 340);
+  --svc-storefront: oklch(0.43 0.045 250); --svc-api-gateway: oklch(0.45 0.045 190);
+  --bar-fg: #f2f0ed; --shadow: rgba(0, 0, 0, 0.55);
+  --btn-bg: #f8494d; --btn-fg: #101010;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Martian Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius-sm: 10px; --radius: 14px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #ffffff; --surface: #f5f5f5; --surface-2: #ebebeb; --line: #c9c9c9;
+    --fg: #101010; --muted: #555352; --faint: #8a8885;
+    --select: #101010; --parent: #a8650f; --error: #d42a2e;
+    --drop: #2f7a46; --drop-tint: rgba(47, 122, 70, 0.08); --band: rgba(168, 101, 15, 0.08); --band-edge: rgba(168, 101, 15, 0.45);
+    --good: #2f7a46; --info: #b34a22; --focus: #101010; --hint: #6a4fc2;
+    --tint-0: oklch(0.93 0.025 85); --tint-0-edge: oklch(0.72 0.04 85); --tint-1: oklch(0.93 0.03 340); --tint-1-edge: oklch(0.7 0.05 340);
+    --svc-storefront: oklch(0.87 0.035 250); --svc-api-gateway: oklch(0.88 0.035 190);
+    --bar-fg: #101010; --shadow: rgba(16, 16, 16, 0.18);
+    --btn-bg: #f8494d; --btn-fg: #101010;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #ffffff; --surface: #f5f5f5; --surface-2: #ebebeb; --line: #c9c9c9;
+  --fg: #101010; --muted: #555352; --faint: #8a8885;
+  --select: #101010; --parent: #a8650f; --error: #d42a2e;
+  --drop: #2f7a46; --drop-tint: rgba(47, 122, 70, 0.08); --band: rgba(168, 101, 15, 0.08); --band-edge: rgba(168, 101, 15, 0.45);
+  --good: #2f7a46; --info: #b34a22; --focus: #101010; --hint: #6a4fc2;
+    --tint-0: oklch(0.93 0.025 85); --tint-0-edge: oklch(0.72 0.04 85); --tint-1: oklch(0.93 0.03 340); --tint-1-edge: oklch(0.7 0.05 340);
+  --svc-storefront: oklch(0.87 0.035 250); --svc-api-gateway: oklch(0.88 0.035 190);
+  --bar-fg: #101010; --shadow: rgba(16, 16, 16, 0.18);
+  --btn-bg: #f8494d; --btn-fg: #101010;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-sans); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 1320px; margin: 0 auto; display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr) 300px; column-gap: 24px; }
+.wrap > * { grid-column: 1; min-width: 0; }
+.wrap > .hintcol { grid-column: 2; grid-row: 4 / 6; align-self: start; position: sticky; top: max(16px, env(safe-area-inset-top, 0px)); }
+.hintcol { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 10px; }
+.hc-h { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.hc-row { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.tier { font-size: 12.5px; color: var(--muted); }
+.hintcol .score { min-width: 0; border: 0; border-radius: 0; padding: 0 0 12px; border-bottom: 1px solid var(--line); }
+.hintcol .win { grid-template-columns: minmax(0, 1fr); gap: 0; margin-bottom: 4px; }
+.hintcol .swirl { max-width: 200px; justify-self: center; }
+.hintcol .win-txt { padding: 0 14px 14px; }
+.hintcol .win-txt strong { justify-self: start; font-size: 18px; border-radius: 4px; }
+/* focused by script on success so screen readers announce it; not a control, so no ring */
+#wintxt:focus { outline: none; }
+.hintcol .rule { max-width: none; }
+.tier b { color: var(--fg); font-weight: 600; }
+.tier .pips { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: middle; }
+.tier .pips i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--hint); display: inline-block; }
+.tier .pips i.on { background: var(--hint); }
+@media (max-width: 1000px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); max-width: 980px; }
+  .wrap > .hintcol { grid-column: 1; grid-row: auto; position: static; }
+}
+.top { display: grid; gap: 8px; }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+h1 { margin: 0; font-size: clamp(24px, 4vw, 32px); line-height: 1.15; font-weight: 600; text-wrap: balance; }
+h2 { margin: 0; font-size: 18px; font-weight: 600; text-wrap: balance; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+.speech { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 8px; }
+
+.board { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 28px; padding: 12px 16px; border-bottom: 1px solid var(--line); margin: 0; }
+.meta div { display: grid; gap: 1px; }
+.meta dt { font-size: 11px; color: var(--muted); }
+.meta dd { margin: 0; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.instr { padding: 12px 16px 0; font-size: 14px; }
+.status { margin: 8px 16px 0; min-height: 40px; font-size: 13.5px; color: var(--muted); display: flex; gap: 10px; align-items: flex-start; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid transparent; }
+.status:empty { border: 0; padding: 0; min-height: 0; }
+.status b { color: var(--fg); font-weight: 600; }
+.status.ok { border-color: color-mix(in srgb, var(--good) 45%, transparent); color: var(--fg); }
+.status.note { border-color: color-mix(in srgb, var(--info) 45%, transparent); color: var(--fg); }
+.status .ico { flex: none; width: 18px; height: 18px; display: grid; place-items: center; margin-top: 1px; }
+.status.ok .ico { color: var(--good); }
+.status.note .ico { color: var(--info); }
+
+.rootzone {
+  margin: 10px 16px 6px; width: calc(100% - 32px); display: flex; align-items: center; gap: 10px; justify-content: center;
+  border: 1px dashed var(--line); border-radius: var(--radius-sm); padding: 10px 12px; background: transparent; color: var(--muted);
+  font: 600 12px var(--font-mono); letter-spacing: 0.03em; cursor: pointer;
+}
+.rootzone:disabled { cursor: default; opacity: 0.5; }
+body.targeting .rootzone { border-color: var(--drop); color: var(--drop); background: var(--drop-tint); opacity: 1; }
+.rootzone.hover { outline: 2px solid var(--drop); outline-offset: 1px; }
+.rootzone.hint-cand, .row.hint-cand { outline: 2px solid var(--hint); outline-offset: 2px; }
+
+.wf { position: relative; padding: 0 16px 14px; }
+.axis, .row { display: grid; grid-template-columns: minmax(0, 40%) minmax(0, 1fr); gap: 14px; }
+.axis { height: 30px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.ticks { position: relative; }
+.tick { position: absolute; bottom: 0; height: 100%; border-left: 1px solid var(--line); }
+.tick span { position: absolute; top: 7px; left: 5px; font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tick.last span { left: auto; right: 5px; }
+.rows { position: relative; display: grid; gap: 2px; }
+.row {
+  position: relative; align-items: center; min-height: 46px; padding: 4px 6px; border-radius: 8px; border: 1px solid transparent;
+  cursor: pointer; user-select: none; -webkit-user-select: none; color: inherit; background: transparent; text-align: left; font: inherit; width: 100%;
+}
+.row:hover { background: color-mix(in srgb, var(--surface-2) 70%, transparent); }
+.row:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.row.selected { background: var(--surface-2); border-color: var(--select); }
+.row.is-parent { border-color: color-mix(in srgb, var(--parent) 70%, transparent); border-style: dashed; }
+body.targeting .row.likely { background: var(--drop-tint); border-color: var(--drop); border-style: solid; }
+body.targeting .row.overflow { border-color: color-mix(in srgb, var(--drop) 40%, transparent); border-style: dashed; opacity: 0.55; }
+body.targeting .row.invalid { opacity: 0.3; cursor: not-allowed; }
+body.targeting .row.src { opacity: 1; background: var(--surface-2); border-color: var(--select); border-style: solid; }
+.row.hover { outline: 2px solid var(--drop); outline-offset: 1px; opacity: 1 !important; }
+body.done .row { cursor: default; }
+
+.lbl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: center; min-width: 0; }
+.grip { width: 22px; height: 30px; display: grid; place-items: center; color: var(--faint); touch-action: none; cursor: grab; border-radius: 6px; }
+.grip:hover { color: var(--fg); }
+body.done .grip { visibility: hidden; }
+.txt { min-width: 0; display: grid; gap: 1px; }
+.l1 { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; min-width: 0; }
+.name { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.svc { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+.l2 { font-family: var(--font-mono); font-size: 10.5px; color: var(--faint); display: flex; flex-wrap: wrap; gap: 2px 10px; font-variant-numeric: tabular-nums; align-items: center; }
+.tid { color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+.cmp { color: var(--fg); border: 1px dashed var(--band-edge); border-radius: 4px; padding: 0 5px; }
+.tid.tint-0, .cmp.tint-0 { background: var(--tint-0); border-color: var(--tint-0-edge); color: var(--fg); }
+.tid.tint-1, .cmp.tint-1 { background: var(--tint-1); border-color: var(--tint-1-edge); color: var(--fg); }
+.tag.oth { color: var(--muted); border-color: var(--line); }
+body.targeting .row.othertrace { opacity: 0.45; }
+.tag { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em; padding: 0 6px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+.tag.sel { color: var(--fg); border-color: var(--select); }
+.tag.par { color: var(--parent); border-color: color-mix(in srgb, var(--parent) 60%, transparent); }
+.mark { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; flex: none; align-self: center; }
+.mark.ok { color: var(--good); }
+.mark.no { color: var(--info); }
+.elbow { display: inline-block; width: 9px; height: 9px; border-left: 1px solid var(--muted); border-bottom: 1px solid var(--muted); margin-right: 2px; transform: translateY(-3px); flex: none; }
+
+.track { position: relative; height: 26px; }
+.gridl { position: absolute; top: 0; bottom: 0; border-left: 1px dashed color-mix(in srgb, var(--line) 55%, transparent); }
+.bar {
+  position: absolute; top: 2px; height: 22px; border-radius: 4px; display: flex; align-items: center; gap: 6px; padding: 0 7px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--bar-fg); white-space: nowrap; z-index: 2;
+}
+.bar b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.row.selected .bar { outline: 2px solid var(--select); outline-offset: 1px; }
+.row.is-parent .bar { outline: 1.5px dashed var(--parent); outline-offset: 1px; }
+.bar.error { box-shadow: inset 0 0 0 1.5px var(--error); }
+.conn { position: absolute; border: 0 solid color-mix(in srgb, var(--muted) 70%, transparent); z-index: 1; pointer-events: none; }
+.conn.v { border-left-width: 1px; }
+.conn.h { border-top-width: 1px; }
+.band { position: absolute; z-index: 0; pointer-events: none; background: var(--band); border-left: 1px solid var(--band-edge); border-right: 1px solid var(--band-edge); }
+.band span { position: absolute; top: 2px; left: 4px; font-family: var(--font-mono); font-size: 10px; color: var(--parent); white-space: nowrap; }
+
+.queue-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.queue-head strong { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--parent); font-weight: 600; }
+.queue-head span { font-size: 12.5px; color: var(--muted); }
+.qdots { display: inline-flex; gap: 5px; align-items: center; }
+.qdots i { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--muted); display: inline-block; }
+.qdots i.on { background: var(--muted); }
+.qdots i.cur { background: var(--parent); border-color: var(--parent); }
+.row.arriving { background: color-mix(in srgb, var(--parent) 7%, transparent); border-color: color-mix(in srgb, var(--parent) 45%, transparent); }
+.row.waiting { opacity: 0.5; cursor: not-allowed; }
+.row.waiting:hover { background: transparent; }
+.tag.wait { color: var(--muted); border-color: var(--line); border-style: dashed; }
+.row.waiting .bar { background: transparent !important; border: 1px dashed var(--muted); color: var(--muted); }
+
+.ghost {
+  position: fixed; z-index: 50; pointer-events: none; transform: translate(-30%, -60%) rotate(-1.5deg);
+  box-shadow: 0 12px 26px var(--shadow), 0 0 0 1px color-mix(in srgb, var(--fg) 35%, transparent); border-radius: 4px;
+  font-family: var(--font-mono); font-size: 11px; padding: 4px 9px; color: var(--bar-fg); display: flex; gap: 8px; align-items: center;
+}
+.ghost .gt { border: 1px dashed currentColor; border-radius: 4px; padding: 0 5px; font-size: 10px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 10px 16px 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.k { display: inline-block; width: 22px; height: 12px; border-radius: 3px; background: var(--surface-2); flex: none; }
+.k.sel { outline: 2px solid var(--select); outline-offset: 1px; }
+.k.par { outline: 1.5px dashed var(--parent); outline-offset: 1px; }
+.k.likely { background: var(--drop-tint); border: 1px solid var(--drop); }
+.k.kband { background: var(--band); border-left: 1px solid var(--band-edge); border-right: 1px solid var(--band-edge); }
+.k.err { box-shadow: inset 0 0 0 1.5px var(--error); }
+
+.helpbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: start; }
+.hintbox { display: grid; gap: 8px; min-width: 0; }
+.hintrow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.hinttext { border-left: 2px solid var(--hint); padding: 2px 0 2px 12px; font-size: 14px; display: grid; gap: 6px; }
+.hinttext:empty { display: none; }
+.hinttext .lvl { font-family: var(--font-mono); font-size: 10.5px; color: var(--hint); letter-spacing: 0.05em; text-transform: uppercase; }
+.btn { font: 600 14px var(--font-sans); border-radius: 999px; padding: 9px 20px; cursor: pointer; border: 1px solid transparent; }
+.btn.primary { background: var(--btn-bg); color: var(--btn-fg); }
+.btn.ghost-btn { background: transparent; color: var(--fg); border-color: var(--line); }
+.btn.hint-btn { background: transparent; color: var(--hint); border-color: color-mix(in srgb, var(--hint) 55%, transparent); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn:focus-visible, .rootzone:focus-visible, .grip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.score { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 6px; min-width: 220px; }
+.counts { display: flex; gap: 18px; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.counts b { font-size: 16px; display: block; font-weight: 600; }
+.stars { display: flex; gap: 3px; color: var(--parent); }
+.stars svg { width: 13px; height: 13px; }
+.stars path { fill: none; stroke: currentColor; stroke-width: 1.1; stroke-linejoin: round; }
+.stars .poss { color: color-mix(in srgb, var(--parent) 55%, transparent); }
+.stars .off { color: color-mix(in srgb, var(--line) 70%, transparent); }
+.stars .off path { stroke-dasharray: 1.6 1.4; }
+.stars .earned path { fill: currentColor; }
+.rule { font-size: 11.5px; color: var(--muted); max-width: 34ch; }
+
+.win { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 18px; align-items: center; background: #0c0c0c; color: #e9e6e1; border-radius: var(--radius); overflow: hidden; }
+.swirl { aspect-ratio: 1 / 1; max-width: 100%; width: 100%; background: radial-gradient(circle at 50% 52%, rgba(214, 150, 60, 0.3) 0%, rgba(160, 100, 30, 0.12) 32%, rgba(12, 12, 12, 0) 62%), #0c0c0c; }
+.swirl canvas { display: block; width: 100%; height: 100%; }
+.win-txt { padding: 16px 16px 16px 0; display: grid; gap: 0; }
+.win-txt strong + p { margin-top: 10px; }
+.win-txt p + p { margin-top: 14px; }
+.win-txt strong { font-size: 20px; font-weight: 600; }
+.win-txt p { color: #b8b3ac; font-size: 14px; }
+.win-txt code { color: #e9e6e1; }
+
+.levels { display: grid; gap: 10px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tab { font: 600 12.5px var(--font-sans); color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.tab .tn { font-family: var(--font-mono); font-size: 10.5px; color: var(--faint); margin-right: 6px; }
+.tab[aria-selected="true"] { color: var(--fg); border-color: var(--fg); background: var(--surface-2); }
+.tab:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; font-size: 12px; color: var(--muted); }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 10.5px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); }
+.chip i { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
+.chip.on { color: var(--fg); border-color: color-mix(in srgb, var(--good) 50%, transparent); }
+.chip.on i { background: var(--good); }
+.chip.off { color: var(--faint); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--faint) 60%, transparent); }
+body.targeting .row.valid { background: var(--drop-tint); border-color: color-mix(in srgb, var(--drop) 65%, transparent); border-style: dashed; }
+.feedback { border-radius: var(--radius); padding: 12px 16px; border: 1px solid color-mix(in srgb, var(--info) 55%, transparent); display: grid; gap: 8px; }
+.feedback:focus { outline: none; }
+.feedback ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; }
+.feedback .code { font-family: var(--font-mono); font-size: 10.5px; color: var(--faint); margin-left: 6px; }
+.cost { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); }
+.notes { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 18px; }
+.notes ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; color: var(--muted); max-width: 80ch; }
+.notes b { color: var(--fg); font-weight: 600; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--fg); text-decoration: underline; cursor: pointer; font: inherit; }
+.linkbtn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+@media (max-width: 700px) { .helpbar { grid-template-columns: minmax(0, 1fr); } .score { min-width: 0; } }
+@media (max-width: 600px) {
+  .axis, .row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .axis .lblcol { display: none; }
+  .row { padding: 6px; }
+  .win { grid-template-columns: minmax(0, 1fr); }
+  .swirl { max-width: 240px; justify-self: center; }
+  .win-txt { padding: 0 16px 16px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <p class="eyebrow">Level 2.1 · Spans and traces · Build it · playable prototype v9</p>
+    <h1>Rebuild the request's span tree.</h1>
+  </header>
+
+  <div class="levels">
+    <div class="tabs" role="tablist" aria-label="Difficulty (simulated Build it levels)" id="tabs"></div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="speech">
+    <p id="speech1"></p>
+    <p>A trace id is the request's id: every span of one request carries it, so spans with different trace ids are never parent and child. Each row shows its span's trace id.</p>
+  </div>
+
+  <div class="board" id="board">
+    <dl class="meta">
+      <div><dt>Spans</dt><dd id="m-placed">1 of 5 placed</dd></div>
+      <div><dt>Services</dt><dd>2</dd></div>
+      <div><dt>Window</dt><dd>0 to 100 ms</dd></div>
+    </dl>
+    <p class="instr" id="instr">Drag each span onto its parent, or pick a span and then its parent.</p>
+    <button class="rootzone" id="rootzone" type="button" data-drop="root">
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" fill="none"><path d="M7 12V3M3 6.5 7 2.5l4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      No parent (root)
+    </button>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+    <div class="wf" id="wf">
+      <div class="axis" aria-hidden="true"><div class="lblcol"></div><div class="ticks" id="ticks"></div></div>
+      <div class="rows" id="rows"></div>
+      <div id="queue"></div>
+    </div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <aside class="hintcol" aria-label="Result, score and hints">
+    <div class="win" id="win" hidden>
+      <div class="swirl" id="swirl" role="img" aria-label="Golden dots swirl once and settle."></div>
+      <div class="win-txt">
+        <strong tabindex="-1" id="wintxt">Trace assembled</strong>
+        <p id="winline">Every span checks out.</p>
+        <p><code>GET /products</code> stays a root. The next step asks why.</p>
+      </div>
+    </div>
+    <div class="score" aria-live="off">
+      <div class="counts"><span><b id="c-wrong">0</b><span id="c-wrong-l">wrong drops</span></span><span><b id="c-hints">0</b>hints</span></div>
+      <div class="stars" id="stars" aria-label=""></div>
+      <p class="rule">Provisional, game-wide: penalties are wrong drops (or failed Checks) plus hints used. 0 gives 5 stars, 1 gives 4, 2 gives 3, 3 to 4 give 2, more give 1. Retrying is free.</p>
+    </div>
+    <h2 class="hc-h" id="hc-h">Hints</h2>
+    <div class="hc-row">
+      <button class="btn hint-btn" id="hint" type="button">Hint</button>
+      <span class="cost" id="cost">costs 1 star</span>
+    </div>
+    <p class="tier" id="tier"></p>
+    <div class="hinttext" id="hinttext" tabindex="-1"></div>
+  </aside>
+
+  <div class="helpbar">
+    <div class="hintbox">
+      <div class="hintrow">
+        <button class="btn primary" id="check" type="button">Check</button>
+        <button class="btn ghost-btn" id="reset" type="button">Reset</button>
+      </div>
+      <div class="feedback" id="feedback" role="status" aria-live="polite" tabindex="-1" hidden></div>
+    </div>
+  </div>
+
+  <section class="notes" aria-labelledby="n-h">
+    <h2 id="n-h">Prototype notes</h2>
+    <ul>
+      <li><b>Same grading:</b> the spans, trace ids and answer come from <code>levels/spans-and-traces.mjs</code>. <code>setParent</code> and <code>checkBuild</code> are copied unchanged. The tick or note after a drop is <code>checkBuild</code>'s result for the span you just moved. A span's grade depends only on its own parent, so that per-drop result is exact. The trace counts as assembled when every span is placed and <code>checkBuild</code> passes as a whole.</li>
+      <li><b>New view behaviour, not new grading:</b> the arrival queue, the time band, the "likely parent" highlight, the tiered hints and the stars are all view-side. Hint 2's second candidate is a decoy picked from the timing: the next-closest span that also contains it, or "No parent (root)".</li>
+      <li><b>Not verified:</b> nobody has seen this in a browser, on a phone or with a screen reader. Touch drag starts from the grip; tapping uses the pick path. No span in this level is ERROR, so the error marker appears only in the legend.</li>
+      <li><b>Trace tint</b> is a help on L1 and L2 only: each trace id gets its own tint, and while you move a span, candidates from another trace fade and show "other trace". They still accept the drop, and dropping there gives the note. On L3 and L4 the trace chips are plain.</li>
+      <li><b>Difficulty tabs are simulated:</b> all four use the 2.1 spans and only switch helps on or off. Switching a tab resets the board. Without instant feedback, Hint picks the span to help with from <code>checkBuild</code>, so pressing it shows which span is still wrong.</li>
+      <li>To see the success state without solving: <button class="linkbtn" id="solve" type="button">fill in the answer</button> (doesn't count toward the score).</li>
+    </ul>
+  </section>
+</div>
+
+<script type="module">
+/* ---------- level data (levels/spans-and-traces.mjs) ---------- */
+const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
+const OTHER_TRACE = '0af7651916cd43dd8448eb211c80319c';
+const A = '00f067aa0ba902b7', B = 'b7ad6b7169203331', C = '53995c3f42cd8ad8', D = '1d5c3a2f8e4b6a90', E = '9e1f2a3b4c5d6e7f';
+const span = (spanId, traceId, service, name, kind, startMs, endMs) => ({
+  spanId, traceId, name, service, kind, startMs, endMs, status: 'UNSET', attributes: {}, events: [], parentId: null, links: [],
+});
+const TREE = {
+  id: 'sat-tree',
+  spans: [
+    span(A, TRACE, 'storefront', 'POST /checkout', 'SERVER', 0, 100),
+    span(B, TRACE, 'storefront', 'POST api-gateway', 'CLIENT', 10, 90),
+    span(C, TRACE, 'api-gateway', 'POST /checkout', 'SERVER', 15, 85),
+    span(D, TRACE, 'api-gateway', 'validate cart', 'INTERNAL', 20, 30),
+    span(E, OTHER_TRACE, 'storefront', 'GET /products', 'SERVER', 40, 60),
+  ],
+  edit: ['parent'],
+  answer: { [B]: { parentId: A }, [C]: { parentId: B }, [D]: { parentId: C } },
+};
+
+/* ---------- grading core (port of lib/widgets/build-it.mjs, span mode) ---------- */
+const EDITS = ['parent', 'kind', 'status', 'links'];
+const FIELD = { parent: 'parentId', kind: 'kind', status: 'status', links: 'links' };
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const own = (obj, key) => isObject(obj) && Object.hasOwn(obj, key);
+function newBuildState(spec) {
+  const spans = {};
+  for (const s of spec.spans) spans[s.spanId] = { parentId: s.parentId, kind: s.kind, status: s.status, links: [...s.links] };
+  return { spans, logs: {} };
+}
+const has = (st, id) => typeof id === 'string' && Object.hasOwn(st.spans, id);
+function createsLoop(st, spanId, parentId) {
+  const seen = new Set();
+  for (let at = parentId; at != null && has(st, at) && !seen.has(at); at = st.spans[at].parentId) {
+    if (at === spanId) return true;
+    seen.add(at);
+  }
+  return false;
+}
+function setParent(spec, st, spanId, parentId) {
+  if (!has(st, spanId) || (parentId !== null && !has(st, parentId))) return 'unknown';
+  if (parentId === spanId) return 'self';
+  if (parentId !== null && createsLoop(st, spanId, parentId)) return 'cycle';
+  st.spans[spanId].parentId = parentId;
+  return 'set';
+}
+function expected(spec, s, field) {
+  const want = own(spec.answer, s.spanId) ? spec.answer[s.spanId] : undefined;
+  return own(want, field) ? want[field] : s[field];
+}
+const linkSet = (links) => [...new Set(links)].sort();
+function gradedState(spec, st) {
+  return spec.spans.map((s) => {
+    const e = st.spans[s.spanId];
+    const g = { spanId: s.spanId };
+    for (const name of EDITS) {
+      if (!spec.edit.includes(name)) continue;
+      g[FIELD[name]] = name === 'links' ? linkSet(e.links) : e[FIELD[name]];
+    }
+    return g;
+  });
+}
+function checkBuild(spec, st) {
+  const byId = new Map(spec.spans.map((s) => [s.spanId, s]));
+  const graded = new Map(gradedState(spec, st).map((g) => [g.spanId, g]));
+  const label = (s) => `${s.name} (${s.service})`;
+  const issues = [];
+  const add = (code, s, text) => issues.push({ code, spanId: s.spanId, message: `${label(s)}: ${text}` });
+  const edit = (name) => spec.edit.includes(name);
+  for (const given of spec.spans) {
+    const s = { ...given, ...graded.get(given.spanId) };
+    if (edit('parent')) {
+      const p = s.parentId === null ? undefined : byId.get(s.parentId);
+      if (p && p.traceId !== s.traceId) add('cross-trace-parent', s, "its parent is in another trace. A parent always shares its child's trace ID.");
+      else if (s.parentId !== expected(spec, given, 'parentId')) add('wrong-parent', s, 'the parent is not right.');
+    }
+    if (edit('kind') && s.kind !== expected(spec, given, 'kind')) add('wrong-kind', s, 'the kind is not right.');
+    if (edit('status') && s.status !== expected(spec, given, 'status')) add('wrong-status', s, 'the status is not right.');
+    if (edit('links')) {
+      const want = linkSet(expected(spec, given, 'links'));
+      for (const id of want) if (!s.links.includes(id)) add('missing-link', s, 'a link is missing.');
+      for (const id of s.links) if (!want.includes(id)) add('extra-link', s, `links ${label(byId.get(id))}, which it should not.`);
+    }
+  }
+  return { ok: issues.length === 0, issues };
+}
+
+/* ---------- view ---------- */
+const spec = TREE;
+const byId = new Map(spec.spans.map((s) => [s.spanId, s]));
+const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const L = (id) => { const s = byId.get(id); return `<b>${esc(s.name)}</b> (${esc(s.service)})`; };
+const short = (t) => t.slice(0, 8);
+const TRACES = [...new Set(TREE.spans.map((s) => s.traceId))];
+const tintOf = (t) => (mode.tint ? ` tint-${TRACES.indexOf(t) % 2}` : '');
+const SVC_VAR = { storefront: '--svc-storefront', 'api-gateway': '--svc-api-gateway' };
+const pct = (ms) => ms; // the window is 0 to 100 ms
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const answerOf = (id) => expected(spec, byId.get(id), 'parentId');
+const contains = (p, s) => p.startMs <= s.startMs && p.endMs >= s.endMs;
+const ICON_OK = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2.5 7.5 5.5 10.5 11.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_NOTE = '<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5.6" stroke="currentColor" stroke-width="1.4"/><path d="M7 4v3.6M7 9.8v.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+const STAR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.2 10 5.6l4.8.5-3.6 3.2 1 4.7L8 11.6 3.8 14l1-4.7L1.2 6.1 6 5.6Z"/></svg>';
+
+// Arrival order: start time, as the queue shows it. The root of the answer starts placed.
+const ARRIVAL = [...spec.spans].sort((a, b) => a.startMs - b.startMs).map((s) => s.spanId);
+const FIRST = ARRIVAL.find((id) => answerOf(id) === null);
+
+const MODES = [
+  { name: '2.1 Spans and traces', queue: true, tint: true, guide: true, instant: true, hint: true },
+  { name: 'Span kinds', queue: false, tint: true, guide: true, instant: true, hint: true },
+  { name: 'Context propagation', queue: false, tint: false, guide: false, instant: false, hint: true },
+  { name: 'Events and links', queue: false, tint: false, guide: false, instant: false, hint: false },
+];
+const HELPS = [['queue', 'One span at a time'], ['tint', 'Trace tint'], ['guide', 'Time-window guide'], ['instant', 'Instant feedback'], ['hint', 'Hints']];
+let mode = MODES[0], lastFailed = null;
+let state, placed, arrived, selected, picking, done, wrongDrops, hintsUsed, hintTier, verdict, hintCands, shortcut;
+const $ = (id) => document.getElementById(id);
+const rowsEl = $('rows'), statusEl = $('status'), rootBtn = $('rootzone'), wf = $('wf');
+
+$('ticks').innerHTML = [0, 20, 40, 60, 80, 100].map((ms, i, a) =>
+  `<div class="tick${i === a.length - 1 ? ' last' : ''}" style="left:${i === a.length - 1 ? 'calc(100% - 1px)' : pct(ms) + '%'}"><span>${ms === 0 ? '0' : ms + ' ms'}</span></div>`).join('');
+$('legend').innerHTML =
+  Object.keys(SVC_VAR).map((k) => `<span><i class="sw" style="background:var(${SVC_VAR[k]})"></i>${k}</span>`).join('') +
+  '<span><i class="k sel"></i>Selected</span><span><i class="k par"></i>Its current parent</span>' +
+  '<span><i class="k kband"></i>Time window of the span you move</span><span><i class="k likely"></i>Contains it in time</span>' +
+  '<span><i class="k err"></i>ERROR (none in this level)</span>';
+const TINT_LEGEND = '<span><i class="k" style="background:var(--tint-0);border:1px solid var(--tint-0-edge)"></i><i class="k" style="background:var(--tint-1);border:1px solid var(--tint-1-edge)"></i>One tint per trace id</span>';
+const BASE_LEGEND = $('legend').innerHTML;
+
+function descendants(id) {
+  const out = new Set();
+  for (const s of spec.spans) {
+    for (let at = state.spans[s.spanId].parentId, seen = new Set(); at != null && !seen.has(at); at = state.spans[at].parentId) {
+      seen.add(at);
+      if (at === id) { out.add(s.spanId); break; }
+    }
+  }
+  return out;
+}
+const arriving = () => ARRIVAL.find((id) => !placed.has(id)) ?? null;
+function order() {
+  const kids = new Map(), roots = [];
+  const byStart = (a, b) => byId.get(a).startMs - byId.get(b).startMs;
+  for (const id of placed) {
+    const p = state.spans[id].parentId;
+    if (p === null || !placed.has(p)) roots.push(id); else (kids.get(p) ?? kids.set(p, []).get(p)).push(id);
+  }
+  const out = [];
+  const walk = (id, depth) => { out.push([id, depth]); (kids.get(id) ?? []).sort(byStart).forEach((k) => walk(k, depth + 1)); };
+  roots.sort(byStart).forEach((r) => walk(r, 0));
+  return out;
+}
+
+function rowHtml(id, depth, kind) {
+  const s = byId.get(id);
+  const pid = state.spans[id].parentId;
+  const v = verdict[id];
+  const mark = kind === 'placed' && v ? `<span class="mark ${v === 'ok' ? 'ok' : 'no'}" title="${v === 'ok' ? 'Right' : 'Not right yet'}" aria-label="${v === 'ok' ? 'right' : 'not right yet'}">${v === 'ok' ? ICON_OK : ICON_NOTE}</span>` : '';
+  const interactive = kind !== 'waiting';
+  const ariaParent = kind === 'placed' ? (pid ? `, parent ${esc(byId.get(pid).name)} (${esc(byId.get(pid).service)})` : ', root') : ', arriving, not placed yet';
+  return `<div class="row ${kind}" ${interactive ? `role="button" tabindex="${done ? -1 : 0}" data-span="${id}" aria-describedby="instr" aria-label="${esc(s.name)}, ${esc(s.service)}, ${s.kind}, ${s.startMs} to ${s.endMs} ms, trace ${short(s.traceId)}${ariaParent}"` : `data-waiting="${id}" aria-label="${esc(s.name)}, ${esc(s.service)}, waiting, not arrived yet"`} ${kind === 'placed' ? `data-drop="${id}"` : ''}>
+    <div class="lbl" style="padding-left:${depth * 18}px">
+      <span class="grip" ${interactive ? 'data-grip' : ''} aria-hidden="true"><svg width="10" height="14" viewBox="0 0 10 14"><g fill="currentColor"><circle cx="3" cy="3" r="1.2"/><circle cx="7" cy="3" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="3" cy="11" r="1.2"/><circle cx="7" cy="11" r="1.2"/></g></svg></span>
+      <span class="txt">
+        <span class="l1">${depth ? '<i class="elbow" aria-hidden="true"></i>' : ''}<span class="name">${esc(s.name)}</span>
+          <span class="svc"><i class="sw" style="background:var(${SVC_VAR[s.service]})"></i>${esc(s.service)}</span>${mark}${kind === 'waiting' ? '<span class="tag wait">waiting</span>' : ''}<span class="tags"></span></span>
+        <span class="l2"><span class="tid${tintOf(s.traceId)}" title="trace id ${s.traceId}">trace ${short(s.traceId)}</span><span class="cmp" hidden></span><span>${s.kind}</span><span>${s.status}</span><span>${s.startMs}–${s.endMs} ms</span></span>
+      </span>
+    </div>
+    <div class="track">${[20, 40, 60, 80].map((m) => `<i class="gridl" style="left:${pct(m)}%"></i>`).join('')}
+      <div class="bar${s.status === 'ERROR' ? ' error' : ''}" data-bar style="left:${pct(s.startMs)}%;width:${pct(s.endMs) - pct(s.startMs)}%;background:var(${SVC_VAR[s.service]})"><b>${s.endMs - s.startMs}ms</b><span>${esc(s.name)}</span></div>
+    </div>
+  </div>`;
+}
+
+function draw() {
+  document.body.classList.toggle('done', done);
+  rowsEl.innerHTML = order().map(([id, d]) => rowHtml(id, d, 'placed')).join('');
+  const cur = arriving();
+  const waiting = ARRIVAL.filter((id) => !placed.has(id) && id !== cur);
+  const n = ARRIVAL.length, k = placed.size + 1;
+  $('queue').innerHTML = cur ? `
+    <div class="queue-head"><strong>Span ${k} of ${n} arriving</strong>
+      <span class="qdots" aria-hidden="true">${ARRIVAL.map((id) => `<i class="${placed.has(id) ? 'on' : id === cur ? 'cur' : ''}"></i>`).join('')}</span>
+      <span>${waiting.length ? `${waiting.length} more waiting` : 'last one'}</span></div>
+    ${rowHtml(cur, 0, 'arriving')}
+    ${waiting.map((id) => rowHtml(id, 0, 'waiting')).join('')}` : '';
+  $('m-placed').textContent = `${placed.size} of ${n} placed`;
+  decorate();
+  connectors();
+  hintButton();
+  score();
+}
+const rowEl = (id) => wf.querySelector(`[data-span="${id}"]`);
+
+// Selection, parent mark, and (while moving a span) targets, time band and trace-id comparison. Restyles in place.
+function decorate() {
+  const src = dragId ?? (picking ? selected : null);
+  const bad = src ? new Set([src, ...descendants(src)]) : new Set();
+  const parentOfSel = selected && placed.has(selected) ? state.spans[selected].parentId : null;
+  document.body.classList.toggle('targeting', !!src && !done);
+  rootBtn.disabled = done || !src;
+  rootBtn.classList.toggle('hint-cand', hintCands.has('root'));
+  for (const r of wf.querySelectorAll('[data-span]')) {
+    const id = r.dataset.span, s = byId.get(id);
+    r.classList.toggle('selected', id === selected);
+    r.classList.toggle('is-parent', !src && id === parentOfSel);
+    r.classList.toggle('hint-cand', hintCands.has(id));
+    r.setAttribute('aria-pressed', String(id === selected));
+    r.querySelector('.tags').innerHTML = (id === selected ? '<span class="tag sel">selected</span>' : '') +
+      (!src && id === parentOfSel ? '<span class="tag par">its parent</span>' : '');
+    const isTarget = src && r.dataset.drop && !bad.has(id);
+    r.classList.toggle('src', id === src);
+    r.classList.toggle('invalid', !!src && bad.has(id) && id !== src);
+    r.classList.toggle('likely', !!isTarget && mode.guide && contains(s, byId.get(src)));
+    r.classList.toggle('overflow', !!isTarget && mode.guide && !contains(s, byId.get(src)));
+    r.classList.toggle('valid', !!isTarget && !mode.guide);
+    if (src && bad.has(id) && id !== src) r.setAttribute('aria-disabled', 'true'); else r.removeAttribute('aria-disabled');
+    const cmp = r.querySelector('.cmp');
+    cmp.hidden = !isTarget || !mode.guide;
+    if (isTarget) {
+      cmp.textContent = `moving: ${short(byId.get(src).traceId)}`;
+      cmp.className = 'cmp' + tintOf(byId.get(src).traceId);
+      cmp.title = `trace id of the span you move: ${byId.get(src).traceId}`;
+    }
+    const other = !!isTarget && mode.tint && s.traceId !== byId.get(src).traceId;
+    r.classList.toggle('othertrace', other);
+    if (other) r.querySelector('.tags').insertAdjacentHTML('beforeend', '<span class="tag oth">other trace</span>');
+  }
+  wf.querySelector('.band')?.remove();
+  if (src && !done && mode.guide) {
+    const s = byId.get(src), track = wf.querySelector('.track'), axis = wf.querySelector('.axis');
+    if (track) {
+      const box = wf.getBoundingClientRect(), tr = track.getBoundingClientRect();
+      const b = document.createElement('div'); b.className = 'band';
+      b.style.left = `${tr.left - box.left + (tr.width * s.startMs) / 100}px`;
+      b.style.width = `${(tr.width * (s.endMs - s.startMs)) / 100}px`;
+      b.style.top = `${axis.offsetTop + axis.offsetHeight}px`;
+      b.style.bottom = '14px';
+      b.innerHTML = `<span>${s.startMs}–${s.endMs} ms</span>`;
+      wf.prepend(b);
+    }
+  }
+}
+function connectors() {
+  rowsEl.querySelectorAll('.conn').forEach((n) => n.remove());
+  const box = rowsEl.getBoundingClientRect();
+  for (const id of placed) {
+    const p = state.spans[id].parentId;
+    if (p === null || !placed.has(p)) continue;
+    const pb = rowsEl.querySelector(`[data-span="${p}"] [data-bar]`)?.getBoundingClientRect();
+    const cb = rowsEl.querySelector(`[data-span="${id}"] [data-bar]`)?.getBoundingClientRect();
+    if (!pb || !cb) continue;
+    const x = pb.left - box.left + 5, y0 = pb.bottom - box.top, y1 = cb.top - box.top + cb.height / 2;
+    const v = document.createElement('i'); v.className = 'conn v';
+    v.style.cssText = `left:${x}px;top:${y0}px;height:${Math.max(0, y1 - y0)}px`;
+    const h = document.createElement('i'); h.className = 'conn h';
+    h.style.cssText = `left:${x}px;top:${y1}px;width:${Math.max(0, cb.left - box.left - x)}px`;
+    rowsEl.append(v, h);
+  }
+}
+new ResizeObserver(() => { connectors(); if (dragId || picking) decorate(); }).observe(wf);
+
+function say(kind, html) {
+  statusEl.className = 'status' + (kind ? ' ' + kind : '');
+  statusEl.innerHTML = html ? (kind === 'ok' ? `<span class="ico">${ICON_OK}</span>` : kind === 'note' ? `<span class="ico">${ICON_NOTE}</span>` : '') + `<span>${html}</span>` : '';
+}
+
+/* per-drop note: checkBuild's issue for this span, worded as a specific nudge that never names the answer */
+function note(issue) {
+  const s = byId.get(issue.spanId), pid = state.spans[issue.spanId].parentId, p = pid ? byId.get(pid) : null;
+  switch (issue.code) {
+    case 'cross-trace-parent':
+      return `${L(s.spanId)} carries trace id <code>${short(s.traceId)}</code>, ${L(p.spanId)} carries <code>${short(p.traceId)}</code>. Different trace ids, so it can't be the parent.`;
+    case 'wrong-parent':
+      if (!p) return `${L(s.spanId)} is a root now, yet another span of trace <code>${short(s.traceId)}</code> was already running when it started. Which call was it doing work for?`;
+      if (!contains(p, s)) return `${L(s.spanId)} runs ${s.startMs} to ${s.endMs} ms, which is not inside ${L(p.spanId)} (${p.startMs} to ${p.endMs} ms). A parent starts first and is still running when its child ends.`;
+      return `${L(s.spanId)} runs inside ${L(p.spanId)}, but a span closer to it also contains it. Look for the innermost span that was running when it started.`;
+    case 'wrong-kind': return `${L(s.spanId)}: the kind doesn't match what it did.`;
+    case 'wrong-status': return `${L(s.spanId)}: check the status. Only an operation that failed is ERROR.`;
+    case 'missing-link': return `${L(s.spanId)}: it should also point at a related span that is not its parent.`;
+    case 'extra-link': return `${L(s.spanId)}: one of its links points at a span it is not related to.`;
+    default: return esc(issue.message);
+  }
+}
+
+function move(id, parentId, { viaHint = false } = {}) {
+  if (done) return;
+  const outcome = setParent(spec, state, id, parentId);
+  picking = false;
+  if (outcome === 'self') { say('note', `${L(id)} can't be its own parent: that would make a loop.`); draw(); return; }
+  if (outcome === 'cycle') { say('note', `${L(parentId)} is already below ${L(id)}, so that would make a loop.`); draw(); return; }
+  if (outcome !== 'set') return;
+  placed.add(id);
+  if (!mode.instant && !viaHint) {
+    selected = null; draw();
+    say('', parentId === null ? `${L(id)} is a root now.` : `${L(id)} now sits under ${L(parentId)}.`);
+    rowEl(id)?.focus({ preventScroll: true });
+    return;
+  }
+  const issue = checkBuild(spec, state).issues.find((i) => i.spanId === id);
+  verdict[id] = issue ? 'no' : 'ok';
+  if (issue && !viaHint) wrongDrops++;
+  if (!issue) { hintCands = new Set(); }
+  const where = parentId === null ? 'is a root' : `sits under ${L(parentId)}`;
+  if (!issue) say('ok', `${L(id)} ${where}. Right.${viaHint ? ' ' + why(id) : ''}`);
+  else say('note', `${L(id)} ${where}, but not quite. ${note(issue)} It stays here; move it when you are ready.`);
+  selected = issue ? id : null;
+  draw();
+  if (mode.instant && placed.size === ARRIVAL.length && checkBuild(spec, state).ok) return finish();
+  const next = arriving();
+  (rowEl(issue ? id : next) ?? rowEl(id))?.focus({ preventScroll: true });
+}
+function pick(id) {
+  if (done) return;
+  if (picking && selected) {
+    if (id === selected) { picking = false; selected = null; say('', 'Cancelled.'); draw(); return; }
+    if (!placed.has(id)) return;          // the arriving span can't be a parent yet
+    move(selected, id);
+    return;
+  }
+  selected = id; picking = true;
+  say('', `Pick the parent of ${L(id)}, or <b>No parent (root)</b>. Esc cancels.`);
+  draw();
+  rowEl(id)?.focus({ preventScroll: true });
+}
+wf.addEventListener('click', (e) => {
+  if (suppressClick) { suppressClick = false; return; }
+  if (e.target.closest('[data-waiting]')) { say('note', "This span hasn't arrived yet; place the current one first."); return; }
+  const r = e.target.closest('[data-span]'); if (r) pick(r.dataset.span);
+});
+wf.addEventListener('keydown', (e) => {
+  const r = e.target.closest('[data-span]');
+  if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pick(r.dataset.span); }
+});
+rootBtn.addEventListener('click', () => { if (picking && selected) move(selected, null); });
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (dragId) { endDrag(null); say('', 'Drag cancelled.'); return; }
+  if (picking || selected) { const id = selected; picking = false; selected = null; say('', 'Cancelled.'); draw(); if (id) rowEl(id)?.focus(); }
+});
+
+/* drag: mouse/pen from anywhere on a row or bar; touch from the grip */
+let dragId = null, pending = null, ghost = null, hoverEl = null, suppressClick = false;
+wf.addEventListener('pointerdown', (e) => {
+  if (done || e.button !== 0) return;
+  const r = e.target.closest('[data-span]'); if (!r) return;
+  if (e.pointerType === 'touch' && !e.target.closest('[data-grip]')) return;
+  pending = { id: r.dataset.span, x: e.clientX, y: e.clientY };
+});
+window.addEventListener('pointermove', (e) => {
+  if (pending && !dragId && Math.hypot(e.clientX - pending.x, e.clientY - pending.y) > 6) startDrag(e);
+  if (!dragId) return;
+  ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px';
+  const t = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-drop]');
+  if (hoverEl && hoverEl !== t) hoverEl.classList.remove('hover');
+  const ok = t && (t.dataset.drop === 'root' || t.classList.contains('likely') || t.classList.contains('overflow') || t.classList.contains('valid'));
+  hoverEl = ok ? t : null; if (hoverEl) hoverEl.classList.add('hover');
+});
+window.addEventListener('pointerup', (e) => {
+  if (dragId) {
+    const t = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-drop]');
+    endDrag(t);
+    suppressClick = true; setTimeout(() => { suppressClick = false; }, 0);
+  }
+  pending = null;
+});
+window.addEventListener('pointercancel', () => { if (dragId) endDrag(null); pending = null; });
+function startDrag(e) {
+  dragId = pending.id; picking = false; selected = dragId;
+  const s = byId.get(dragId);
+  ghost = document.createElement('div'); ghost.className = 'ghost';
+  ghost.style.background = `var(${SVC_VAR[s.service]})`;
+  ghost.innerHTML = `<b>${s.endMs - s.startMs}ms</b> ${esc(s.name)} <span class="gt" title="${s.traceId}">trace ${short(s.traceId)}</span>`;
+  ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px';
+  document.body.append(ghost);
+  say('', `Drop ${L(dragId)} on its parent, or on <b>No parent (root)</b>.`);
+  decorate();   // restyle in place: re-rendering would remove the element under a touch pointer
+}
+function endDrag(t) {
+  const id = dragId; dragId = null;
+  ghost?.remove(); ghost = null; hoverEl?.classList.remove('hover'); hoverEl = null;
+  if (t && id) { move(id, t.dataset.drop === 'root' ? null : t.dataset.drop); return; }
+  if (id) say('', `${L(id)} is unchanged.`);
+  draw();
+}
+
+/* tiered hints for the current span */
+function hintTarget() {
+  if (done) return null;
+  const cur = arriving();
+  if (cur) return cur;
+  const wrong = new Set(checkBuild(spec, state).issues.map((i) => i.spanId));
+  if (selected && wrong.has(selected)) return selected;
+  return ARRIVAL.find((id) => wrong.has(id)) ?? null;
+}
+function candidates(id) {
+  const s = byId.get(id), want = answerOf(id);
+  const holders = [...placed].filter((p) => p !== id && p !== want && !descendants(id).has(p) && contains(byId.get(p), s))
+    .sort((a, b) => (byId.get(a).endMs - byId.get(a).startMs) - (byId.get(b).endMs - byId.get(b).startMs));
+  const decoy = holders[0] ?? 'root';
+  return new Set([want ?? 'root', decoy === (want ?? 'root') ? 'root' : decoy]);
+}
+function why(id) {
+  const s = byId.get(id), want = answerOf(id);
+  if (want === null) return `Its trace id is <code>${short(s.traceId)}</code>, unlike the others, so no span of this trace can be its parent.`;
+  const p = byId.get(want);
+  if (p.kind === 'CLIENT' && s.kind === 'SERVER') return `${L(want)} is the CLIENT call into ${esc(s.service)}, and this is the SERVER span that handled it.`;
+  return `${L(want)} is the innermost span of trace <code>${short(s.traceId)}</code> that runs around it (${p.startMs} to ${p.endMs} ms).`;
+}
+function hintButton() {
+  const id = hintTarget(), t = id ? hintTier[id] ?? 0 : 0;
+  const btn = $('hint');
+  btn.disabled = !id || t >= 3;
+  btn.textContent = id ? (t >= 3 ? 'No more hints' : `Hint ${t + 1} of 3`) : 'Hint';
+  btn.hidden = !mode.hint; $('cost').hidden = !mode.hint || btn.disabled; $('hinttext').hidden = !mode.hint;
+  $('tier').innerHTML = !mode.hint ? 'No hints on this level.'
+    : id ? `For <b>${esc(byId.get(id).name)}</b> (${esc(byId.get(id).service)}): ${t} of 3 used<span class="pips" aria-hidden="true">${[1, 2, 3].map((i) => `<i class="${i <= t ? 'on' : ''}"></i>`).join('')}</span>`
+    : 'Nothing to hint right now.';
+  $('check').hidden = mode.instant;
+}
+$('hint').addEventListener('click', () => {
+  const id = hintTarget(); if (!id) return;
+  const t = (hintTier[id] ?? 0) + 1;
+  if (t > 3) return;
+  hintTier[id] = t; hintsUsed++;
+  const box = $('hinttext');
+  const head = `<span class="lvl">Hint ${t} of 3 · ${esc(byId.get(id).name)} (${esc(byId.get(id).service)})</span>`;
+  if (t === 1) {
+    box.innerHTML = head + '<p>A child starts after its parent starts and ends before its parent ends, and it carries the same trace id. When one service calls another, the CLIENT span\'s child is the SERVER span it called.</p>';
+  } else if (t === 2) {
+    hintCands = candidates(id);
+    const names = [...hintCands].map((c) => (c === 'root' ? '<b>No parent (root)</b>' : L(c)));
+    box.innerHTML = head + `<p>It is one of these two, outlined on the board: ${names.join(' or ')}.</p>`;
+  } else {
+    hintCands = new Set();
+    box.innerHTML = head + `<p>Placed for you. ${why(id)}</p>`;
+    move(id, answerOf(id), { viaHint: true });
+  }
+  draw();
+  box.focus();
+});
+
+function score() {
+  $('c-wrong').textContent = wrongDrops; $('c-hints').textContent = hintsUsed;
+  const total = wrongDrops + hintsUsed, n = total === 0 ? 5 : total === 1 ? 4 : total === 2 ? 3 : total <= 4 ? 2 : 1;
+  $('c-wrong-l').textContent = mode.instant ? 'wrong drops' : 'failed Checks';
+  const st = $('stars');
+  // Muted outlines until the trace is assembled; the earned stars fill only then.
+  st.innerHTML = [1, 2, 3, 4, 5].map((i) => `<span class="${i > n ? 'off' : done ? 'earned' : 'poss'}">${STAR}</span>`).join('');
+  st.setAttribute('aria-label', done ? `${n} of 5 stars` : `${n} of 5 stars still possible`);
+  return n;
+}
+function finish() {
+  done = true; picking = false; selected = null; hintCands = new Set();
+  $('feedback').hidden = true;
+  draw();
+  const n = score();
+  say('ok', 'Trace assembled. Every span checks out.');
+  $('winline').textContent = shortcut ? 'Answer filled in (not scored).' :
+    `${n} of 5 stars: ${wrongDrops} ${mode.instant ? (wrongDrops === 1 ? 'wrong drop' : 'wrong drops') : (wrongDrops === 1 ? 'failed Check' : 'failed Checks')}, ${hintsUsed} ${hintsUsed === 1 ? 'hint' : 'hints'}.`;
+  $('win').hidden = false;
+  playSwirl();
+  $('wintxt').focus({ preventScroll: true });
+  $('win').scrollIntoView({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' });
+}
+
+function reset(msg = 'Reset. The first span is placed; the rest arrive one at a time.') {
+  state = newBuildState(spec);
+  placed = mode.queue ? new Set([FIRST]) : new Set(ARRIVAL); verdict = mode.queue ? { [FIRST]: 'ok' } : {};
+  lastFailed = null; $('feedback').hidden = true;
+  $('speech1').innerHTML = mode.queue
+    ? 'The spans of trace <code>4bf92f35</code> reach the backend one by one, as each one ends. The first is already placed. Give each new span its parent as it arrives, so the request reads top to bottom.'
+    : 'The spans of trace <code>4bf92f35</code> arrived one by one, so the waterfall shows every one as a root. Give each span its parent so the request reads top to bottom.';
+  selected = null; picking = false; done = false; wrongDrops = 0; hintsUsed = 0; hintTier = {}; hintCands = new Set(); shortcut = false;
+  $('hinttext').innerHTML = ''; $('win').hidden = true;
+  say('', msg);
+  draw();
+}
+$('reset').addEventListener('click', () => reset(mode.queue ? undefined : 'Reset: every span is a root again.'));
+
+/* Check (levels without instant feedback): same rule as the real view, a repeat of the last failed state is free */
+$('check').addEventListener('click', () => {
+  if (done) return;
+  const result = checkBuild(spec, state);
+  const fb = $('feedback');
+  if (result.ok) return finish();
+  const key = JSON.stringify(gradedState(spec, state)), same = key === lastFailed;
+  if (!same) wrongDrops++;
+  lastFailed = key;
+  score();
+  const n = result.issues.length;
+  fb.hidden = false;
+  fb.innerHTML = `<p>${same ? 'Same as last time' : 'Not yet'}: ${n} ${n === 1 ? 'problem' : 'problems'}.</p><ul>` +
+    result.issues.map((i) => `<li>${note(i)}<span class="code">${i.code}</span></li>`).join('') + '</ul>';
+  fb.focus();
+});
+
+/* difficulty tabs */
+function drawLevels() {
+  $('legend').innerHTML = BASE_LEGEND + (mode.tint ? TINT_LEGEND : '');
+  $('tabs').innerHTML = MODES.map((m, i) => `<button class="tab" type="button" role="tab" id="tab-${i}" aria-selected="${m === mode}" tabindex="${m === mode ? 0 : -1}"><span class="tn">L${i + 1}</span>${esc(m.name)}</button>`).join('');
+  $('chips').innerHTML = '<span>Helps:</span>' + HELPS.map(([k, label]) => `<span class="chip ${mode[k] ? 'on' : 'off'}"><i></i>${label} ${mode[k] ? 'on' : 'off'}</span>`).join('');
+}
+$('tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('.tab'); if (!b) return;
+  const m = MODES[+b.id.slice(4)]; if (m === mode) return;
+  mode = m; drawLevels();
+  reset(mode.queue ? undefined : `Level ${MODES.indexOf(m) + 1}: every span starts as a root.`);
+  $(b.id).focus();
+});
+$('tabs').addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+  const i = (MODES.indexOf(mode) + (e.key === 'ArrowRight' ? 1 : MODES.length - 1)) % MODES.length;
+  $(`tab-${i}`).click();
+});
+drawLevels();
+$('solve').addEventListener('click', () => {
+  reset('');
+  shortcut = true;
+  for (const id of ARRIVAL) {
+    setParent(spec, state, id, answerOf(id)); placed.add(id); verdict[id] = 'ok';
+  }
+  if (checkBuild(spec, state).ok) finish();
+});
+reset('');
+say('', `${L(FIRST)} is placed as the root. ${L(arriving())} is arriving: drag it onto its parent.`);
+
+/* ---------- success swirl (three.js 0.180.0) ---------- */
+let swirl = null;
+async function playSwirl() {
+  try { if (!swirl) swirl = await makeSwirl(); swirl.play(); } catch (e) { /* the text still says Trace assembled */ }
+}
+async function makeSwirl() {
+  const THREE = await import('https://cdnjs.cloudflare.com/ajax/libs/three.js/0.180.0/three.module.min.js');
+  const el = $('swirl');
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); renderer.setClearColor(0, 0);
+  el.append(renderer.domElement);
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(35, 1, 0.1, 50);
+  camera.position.set(0, 0, 3.4);
+  const size = () => { const w = el.clientWidth || 220; renderer.setSize(w, w, false); };
+  size(); new ResizeObserver(size).observe(el);
+  const n = 640, GA = Math.PI * (3 - Math.sqrt(5));
+  const pos = new Float32Array(n * 3), rr = new Float32Array(n), ang = new Float32Array(n);
+  for (let i = 0; i < n; i++) { rr[i] = Math.sqrt((i + 0.5) / n); ang[i] = i * GA; }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('aR', new THREE.BufferAttribute(rr, 1));
+  const u = { uPR: { value: renderer.getPixelRatio() }, uFade: { value: 1 } };
+  const pts = new THREE.Points(geo, new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: u,
+    vertexShader: `attribute float aR; uniform float uPR; uniform float uFade; varying float vA;
+      void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); vA = smoothstep(0.05,0.85,aR) * uFade;
+        gl_PointSize = (1.4 + 5.2 * aR * aR) * uPR * (3.4 / -mv.z); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `varying float vA; void main(){ float d = length(gl_PointCoord-0.5)*2.0; if(d>1.0) discard;
+        gl_FragColor = vec4(vec3(1.0,0.76,0.40) * vA * smoothstep(1.0,0.35,d), 1.0); }`,
+  }));
+  pts.rotation.x = -0.5; scene.add(pts);
+  const ease = (x) => 1 - Math.pow(1 - x, 3), DUR = 2.6;
+  function layout(p) {
+    const e = ease(p), spin = (1 - e) * Math.PI * 2, spread = 1 + (1 - e) * 0.55;
+    for (let i = 0; i < n; i++) {
+      const a = ang[i] + spin * (0.6 + 0.4 * rr[i]), r = rr[i] * spread;
+      pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = Math.sin(a) * r; pos[i * 3 + 2] = (1 - e) * (rr[i] - 0.5) * 0.6;
+    }
+    geo.attributes.position.needsUpdate = true; u.uFade.value = Math.min(1, 0.15 + p * 1.6);
+  }
+  return {
+    play() {
+      if (reduced) { layout(1); renderer.render(scene, camera); return; }
+      const t0 = performance.now();
+      renderer.setAnimationLoop(() => {
+        const p = Math.min(1, (performance.now() - t0) / (DUR * 1000));
+        layout(p); renderer.render(scene, camera);
+        if (p >= 1) renderer.setAnimationLoop(null);   // plays once, then holds still
+      });
+    },
+  };
+}
+</script>
