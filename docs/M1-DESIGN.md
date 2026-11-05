@@ -91,20 +91,30 @@ remaining(spec, state) → itemIds not yet right, spec order
 untried(spec, state, itemId) → bucketIds not yet tried, spec order
 isComplete(spec, state) → boolean
 ```
-View `lib/widgets/sort-it-view.mjs`: `renderSort(spec, state, {selected, escapeHtml,
-labelledBy?})` (item buttons `data-item` + `aria-pressed`; bucket buttons `data-bucket`,
-disabled when tried for the selected item or nothing selected; `[data-bucket-list]` of placed
-items; `#ID-feedback`; `labelledBy`, a plain-token heading id, makes the widget a labelled group).
-Above the board every Sort it step shows one plain-text instruction, `<p class="sort-hint"
-id="ID-hint">` ("Drag each item into the right bucket, or pick an item and then a bucket."),
-the same on every step, not a live region; the item pool (`.sort-pool`) is a named group
-(`role="group" aria-label="Items to sort"`) carrying `aria-describedby="ID-hint"`.
-`mountSort(ctx, spec, {onComplete})`: tap-to-place (item then bucket; keyboard-native); drag is
-an enhancement calling the same path. Only `'wrong'` costs a mistake. Feedback: `Right. <label>
-goes in <bucket>. <why>` / `Not quite. <label> is not <bucket>. <whyNot?>` (doesn't reveal the
-answer) / `You already tried <bucket> for <label>.` (a repeat; free) / `Pick an item first.`
-Focus: first remaining item → its first untried bucket → after wrong, next untried bucket →
-after right, next remaining item → `onComplete()`'s return.
+`bucketOf(spec, itemId)` → the item's answer bucket id (undefined if unknown): the one reader of
+an answer; `place` grades with it and stays the only grader.
+View `lib/widgets/sort-it-view.mjs` (the UI kit, #156): one typed `sortView(spec, state,
+{order, selected, hinted})` → `{id, total, left, done, pool: [{id, labelHtml, pressed, hinted}],
+buckets: [{id, labelHtml, enabled, hinted, placed: [{id, labelHtml}]}]}` (pool in `order`, buckets
+in spec order, a bucket enabled only for the selected item and when untried; placed plus left
+equals total). `renderSort(spec, state, {selected, order, escapeHtml, labelledBy?})` renders it in
+a wide step: a kit split with the board and the side column (score card with a wrong-placement
+count, success card with its swirl; no hints yet). Items are toggle options (`data-item` +
+`aria-pressed`, no answer attribute) in a named group (`role="group" aria-label="Items to sort"`,
+`aria-describedby="ID-instr"`); buckets are drop panels (`[data-drop]` holding the `data-bucket`
+button and the `[data-bucket-list]` of placed items); a kit stats line reads "Sorted N of M";
+`#ID-feedback` is the kit feedback region; the plain-text instruction ("Drag each item into the
+right bucket, or pick an item and then a bucket.") is `<p class="ui-note" id="ID-instr">`.
+`labelledBy`, a plain-token heading id, makes the widget a labelled group.
+`mountSort(ctx, spec, {onComplete, swirl?})`: the pool order is shuffled once per mount through
+`ctx.shuffle`; tap-to-place (item then bucket; keyboard-native); drag is an enhancement calling
+the same path. Only `'wrong'` costs a mistake (`ctx.mistake()` and the score card's count in one
+branch); nothing counts after the last item. Feedback (D7): `Right. <label> goes in <bucket>.
+<why>` (success) / `Not quite. <label> is not <bucket>. <whyNot?>` (error; doesn't reveal the
+answer) / `You already tried <bucket> for <label>.` (a repeat; free, neutral) / `Pick an item
+first.` (neutral). Focus: first remaining item → its first untried bucket → after wrong, next
+untried bucket → after right, next remaining item → after the last, `onComplete()` runs and the
+success card's heading takes focus.
 
 ### 4.2 Build it, trace waterfall (P5)
 Core `lib/widgets/trace.mjs`:
