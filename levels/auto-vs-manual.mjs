@@ -2,7 +2,7 @@
 // from what only their own code adds, finds why each of cart's fetch calls shows two CLIENT
 // spans (an injected agent plus a tracing.js NodeSDK), and picks the fix.
 // Spec: docs/M1-DESIGN.md §6 Act 2.
-// Spec: https://opentelemetry.io/docs/zero-code/js/ , https://opentelemetry.io/docs/platforms/kubernetes/operator/automatic/ , https://opentelemetry.io/docs/specs/otel/trace/api/#spankind
+// Spec: https://opentelemetry.io/docs/zero-code/js/ , https://opentelemetry.io/docs/platforms/kubernetes/operator/automatic/ , https://opentelemetry.io/docs/specs/otel/trace/api/#spankind , https://opentelemetry.io/docs/concepts/signals/traces/
 
 // Step 1. Label wording must not give the bucket away (test/sort-tells.test.mjs).
 const SORT = {
@@ -22,7 +22,7 @@ const SORT = {
       id: 'loyalty',
       label: 'INTERNAL spans around <code>applyLoyaltyDiscount()</code> calls',
       bucket: 'manual',
-      why: 'Instrumentation knows nothing about your business functions. You start that span yourself with the API. Its span kind defaults to INTERNAL, though instrumentation libraries emit INTERNAL spans too.',
+      why: 'Instrumentation knows nothing about your business functions. You start that span yourself with the API. Its span kind defaults to INTERNAL, though instrumentation libraries may emit INTERNAL spans too.',
     },
     {
       id: 'redis',
