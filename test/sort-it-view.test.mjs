@@ -274,6 +274,7 @@ test('S4 the pool is shuffled once through ctx.shuffle and keeps that order thro
   assert.deepEqual(items(), ['i4', 'i3', 'i2', 'i1']);
   click('[data-bucket="log"]'); // right
   assert.deepEqual(items(), ['i4', 'i3', 'i1'], 'still reversed, minus the placed item');
+  assert.equal(focus.last(), 'item:i1', 'focus goes to the next item as shown, not in spec order');
   sortTo('i3', 'trace');
   assert.deepEqual(items(), ['i4', 'i1']);
   assert.equal(r.calls.length, 1, 'shuffled exactly once; redraws never reshuffle');
