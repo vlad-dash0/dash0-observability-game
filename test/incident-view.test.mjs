@@ -338,6 +338,25 @@ test('V9 the unlocking open clears the stale "Not yet" pick line', () => {
   assert.deepEqual(feedback(), { text: '', tone: null, hidden: true });
 });
 
+test('V9 an unlocking open that also spends the budget clears the pick line and says the causes are unlocked', () => {
+  const s = tight();
+  s.budget = { startPct: 15, burnPctPerMin: 5 }; // 3 min: the two clues fit, a neutral look eats the slack
+  s.answerAfterViews = 2;
+  s.views = [
+    { id: 'a', label: 'A', costMin: 1, html: 'a', kind: 'clue' },
+    { id: 'n', label: 'N', costMin: 1, html: 'n', kind: 'neutral' },
+    { id: 'b', label: 'B', costMin: 1, html: 'b', kind: 'clue' },
+  ];
+  setup(s);
+  open('a');
+  pick('bad-deploy');
+  open('n');
+  assert.equal(feedback().hidden, false, 'a neutral look leaves the pick line');
+  open('b');
+  assert.deepEqual(feedback(), { text: '', tone: null, hidden: true });
+  assert.deepEqual(status(), { text: 'The error budget is spent, which costs a star. The causes in Step 3 are now unlocked. You can keep investigating.', tone: 'error', hidden: false });
+});
+
 // ---- V10 penalties, once each ------------------------------------------------------------
 
 test('V10 a herring that also spends the budget costs two, in one combined error line, tallied apart', () => {
@@ -411,7 +430,7 @@ test('V11 D7 tones: opens speak in the status bar, picks in the feedback; error 
   assert.equal(feedback().tone, 'success');
 });
 
-test('V11 the open that unlocks the causes says so in success; an open after that, or on a board open from the start, is neutral', () => {
+test('V11 the open that unlocks the causes says so in success; an open after that, or on a board that is never locked, is neutral', () => {
   setup();
   open('traces');
   assert.deepEqual(status(), { text: 'Opened Traces (3 min). Its card is at the top of Evidence.', tone: 'neutral', hidden: false }, 'one clue of two: still locked');
@@ -474,12 +493,12 @@ test('V13 the right cause: done once, the board closes, the win card shows and t
 
 const winLine = () => text(`[id="${ID}-win-stars"]`);
 
-test('V13 the win card sums up the run: stars, wrong picks, misleading views, hints, minutes used; "budget run out" only when it did', () => {
+test('V13 the win card sums up the run: stars, wrong picks, misleading views, hints, minutes used; "ran out of budget" only when it did', () => {
   setup();
   open('traces');
   open('db-metrics');
   pick('slow-query');
-  assert.equal(winLine(), '5 of 5 stars: 0 wrong picks, 0 misleading, 0 hints. 7 min used.');
+  assert.equal(winLine(), '5 of 5 stars: 0 wrong picks, 0 misleading views, 0 hints. 7 min used.');
 
   setup(tight());
   open('a');
@@ -487,7 +506,7 @@ test('V13 the win card sums up the run: stars, wrong picks, misleading views, hi
   click(`[id="${ID}-hint"]`);
   pick('bad-deploy');
   pick('slow-query');
-  assert.equal(winLine(), '2 of 5 stars: 1 wrong pick, 1 misleading, 1 hint, budget run out. 2 min used.', 'four penalties; the singulars');
+  assert.equal(winLine(), '2 of 5 stars: 1 wrong pick, 1 misleading view, 1 hint, ran out of budget. 2 min used.', 'four penalties; the singulars');
 });
 
 test('V13 a solved board previews no cost: hovering a tile after the win leaves the meter alone', () => {

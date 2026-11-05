@@ -32,7 +32,7 @@ test('H1 tier 1: the authored hint when the scenario has one, else one generic r
   assert.equal(a.hypothesis, null);
 });
 
-test('H2 tier 2: up to two clue views, only the unopened while any remain, all outlined', () => {
+test('H2 tier 2: up to two clue views, only the unopened ones while any remain, and only those are outlined', () => {
   const s = incidentScenario();
   const fresh = hintFor(s, newIncident(s), 2);
   assert.deepEqual(fresh.views, ['traces', 'db-metrics'], 'both unopened: both outlined, in scenario order');
@@ -48,7 +48,7 @@ test('H2 tier 2: up to two clue views, only the unopened while any remain, all o
 
   const both = hintFor(s, open(s, newIncident(s), 'traces', 'db-metrics'), 2);
   assert.deepEqual(both.views, []);
-  assert.equal(plain(both.html), 'Worth opening: Traces and Database metrics (you have both open).', 'none left: the two clues, already open');
+  assert.equal(plain(both.html), 'You have Traces and Database metrics open.', 'none left: the two clues, already open');
 
   const t = threeClues();
   const three = hintFor(t, open(t, newIncident(t), 'traces'), 2);
