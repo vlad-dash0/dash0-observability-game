@@ -16,7 +16,7 @@ Stay in your lane: puzzle fairness is `level-design-reviewer`'s, wording is `ui-
 ## What you check
 
 1. **Every fact has a citation that says it.** Each claim on screen (level copy, option labels and explanations, card fronts and backs, reward text) traces to a URL on the level's `// Spec:` line or a card's `specUrl`, or on a `// Docs` / `// Dash0 docs` line. **Open the page and confirm it states the claim**: a URL on the right host that does not say it is a finding. Allowed hosts:
-   - `// Spec:` and `specUrl`: `opentelemetry.io`, `www.w3.org`, `prometheus.io` (enforced by `test/content.test.mjs`).
+   - `// Spec:` and `specUrl`: `opentelemetry.io`, `www.w3.org`, `prometheus.io`, and `www.dash0.com` for Dash0 product claims (owner decision 2026-11-05; enforced by `test/content.test.mjs`).
    - `// Docs` / `// Dash0 docs` (owner decision 2026-11-05): `dash0.com` docs, `sre.google`, `perses.dev`, and the OpenTelemetry GitHub READMEs already in use.
    A claim with no citation, or one sourced from a blog, a vendor other than Dash0, or memory, is a finding.
 2. **Every Collector config the player sees is validated in a test.** Assemble it as shown (every line, in the order the level presents it) and confirm a test runs it through the real `checkConfig` (`lib/configure/check.mjs`) against `COLLECTOR_SCHEMA` (`lib/configure/collector.mjs`) and checks **connector pairing**: each connector is the exporter of one pipeline and the receiver of another, of the right signal types. A config shown only in copy, with no such test, is a finding.

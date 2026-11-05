@@ -8,6 +8,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseHTML } from 'linkedom';
 import { headersFor, ignoreMatcher } from '../tools/serve.mjs';
+import { definedClasses } from './helpers/css.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const VENDOR = join(ROOT, 'vendor');
@@ -67,6 +68,19 @@ test('index.html has no on* or style attributes', () => {
       assert.notEqual(n, 'style', `<${el.localName} style> is an inline style`);
     }
   }
+});
+
+// T9 (#158): a class with no CSS rule is a typo or dead markup. Static class attributes and
+// the quoted class names in :class bindings, template content included.
+test('T9 every class index.html writes has a CSS rule', () => {
+  const defined = definedClasses();
+  const used = new Set();
+  for (const el of all) {
+    for (const c of (el.getAttribute('class') ?? '').split(/\s+/)) if (c) used.add(c);
+    for (const m of (el.getAttribute(':class') ?? '').matchAll(/'([\w-]+)'/g)) used.add(m[1]);
+  }
+  assert.ok(used.has('ui-btn') && used.has('overlay') && used.has('show'), 'the scan sees static and bound classes');
+  assert.deepEqual([...used].filter((c) => !defined.has(c)).sort(), [], 'index.html classes with no rule in styles/');
 });
 
 test('index.html has no :style or x-bind:style bindings', () => {

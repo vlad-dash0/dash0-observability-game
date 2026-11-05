@@ -112,49 +112,58 @@ function box(list) {
   return Object.fromEntries(SIDES.map((s) => [s, pad[s] + border[s]]));
 }
 
+// The Choice cards and feedback are the kit's since #158 P1b (kit.css): an answered card is
+// marked by data-state, the feedback tone by data-tone.
+const kitRules = rules(read('styles/kit.css'));
+/** Declarations, in cascade order, of every kit.css rule whose selector list has `sel`. */
+const kitDecls = (...sels) => sels.flatMap((sel) => kitRules
+  .filter((r) => r.selector.split(',').map((s) => s.trim()).includes(sel))
+  .flatMap((r) => decls(r.body)));
+const CARD = ['.ui-option', '.ui-option--choice'];
+const STATES = [['.ui-option[data-state="correct"]', '✓', 'Correct'], ['.ui-option[data-state="wrong"]', '✗', 'Wrong']];
+const decode = (s) => s.replace(/\\([0-9a-f]{1,6})\s?/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)));
+
 test('marking a choice does not move its content: padding + border is the same per side', () => {
-  const plain = box(declsFor('.choice'));
-  for (const s of SIDES) assert.ok(plain[s] > 0, `.choice ${s} has padding and border`);
-  for (const sel of ['.choice.correct', '.choice.wrong']) {
-    assert.deepEqual(box(declsFor('.choice', sel)), plain, `${sel} keeps the .choice box`);
+  const plain = box(kitDecls(...CARD));
+  for (const s of SIDES) assert.ok(plain[s] > 0, `.ui-option ${s} has padding and border`);
+  for (const [sel] of STATES) {
+    assert.deepEqual(box(kitDecls(...CARD, sel)), plain, `${sel} keeps the card's box`);
   }
 });
 
-test('correct and wrong choices carry a non-colour cue: a marker and a thicker border', () => {
-  const plain = px(last(declsFor('.choice'), 'border'));
-  assert.ok(plain > 0, '.choice has a px border');
-  const decode = (s) => s.replace(/\\([0-9a-f]{1,6})\s?/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)));
-  for (const [sel, glyph, alt] of [['.choice.correct', '✓', 'correct'], ['.choice.wrong', '✗', 'wrong']]) {
-    assert.ok(px(last(declsFor(sel), 'border-width')) > plain, `${sel} border is thicker than .choice`);
-    const content = declsFor(`${sel}::after`).filter(([k]) => k === 'content').map(([, v]) => decode(v));
+test('correct and wrong choices carry non-colour cues: a spoken marker, and a ring or a strike', () => {
+  for (const [sel, glyph, alt] of STATES) {
+    const content = kitDecls(`${sel}::after`).filter(([k]) => k === 'content').map(([, v]) => decode(v));
     // Fallback first (browsers without alt text drop the second), then glyph / alt text.
     assert.deepEqual(content, [`"${glyph}"`, `"${glyph}" / "${alt}"`], `${sel}::after marker`);
   }
-  // The 3:1 success token only helps if the border uses it unmixed.
-  assert.match(last(declsFor('.feedback.good'), 'border') ?? '', /^\d+px solid var\(--color-success\)$/);
+  // Second cues: correct gets an inset ring in the success colour, wrong a struck-through label.
+  assert.match(last(kitDecls(STATES[0][0]), 'box-shadow') ?? '', /^inset 0 0 0 1px var\(--color-success\)$/);
+  assert.equal(last(kitDecls(`${STATES[1][0]} .ui-option-label`), 'text-decoration'), 'line-through');
+  // The success feedback says it with its icon (glyph and alt text), in the unmixed 3:1 token.
+  const ico = '.ui-feedback[data-tone="success"] .ui-feedback-ico';
+  assert.equal(last(kitDecls(ico), 'color'), 'var(--color-success)');
+  assert.deepEqual(kitDecls(`${ico}::before`).filter(([k]) => k === 'content').map(([, v]) => decode(v)), ['"✓"', '"✓" / "Correct"']);
+  assert.equal(last(kitDecls('.ui-feedback[data-tone="error"] .ui-feedback-ico'), 'color'), 'var(--color-error)');
 });
 
-test('the markers are visible and reach 3:1 over the tinted choice fill, both themes', () => {
-  for (const sel of ['.choice.correct', '.choice.wrong']) {
-    const marker = declsFor(`${sel}::after`);
+test('the markers are visible and reach 3:1 over the answered card, both themes', () => {
+  for (const [sel] of STATES) {
+    const marker = kitDecls(`${sel}::after`);
     assert.notEqual(last(marker, 'display'), 'none', `${sel}::after is displayed`);
     for (const prop of ['visibility', 'opacity']) {
       assert.equal(last(marker, prop), undefined, `${sel}::after does not set ${prop}`);
     }
     const color = last(marker, 'color') ?? '';
     assert.match(color, /^var\(--color-[\w-]+\)$/, `${sel}::after colour is a token, not transparent`);
-    const fill = /^color-mix\(in srgb, (var\(--color-[\w-]+\)) ([\d.]+)%, transparent\)$/
-      .exec(last(declsFor('.choice', sel), 'background') ?? '');
-    assert.ok(fill, `${sel} background is a token tint over transparent`);
+    // The card keeps its surface (palette rule 4: no tint over 8%); the marker sits on it.
+    const fill = last(kitDecls(...CARD, sel), 'background') ?? '';
+    assert.match(fill, /^var\(--color-[\w-]+\)$/, `${sel} background is an opaque token`);
     for (const theme of ['light', 'dark']) {
-      for (const under of ['--color-bg', '--color-surface']) {
-        const u = resolveColor(`var(${under})`, theme);
-        const tint = resolveColor(fill[1], theme).map((c, i) => c * fill[2] / 100 + u[i] * (1 - fill[2] / 100));
-        const a = luminance(resolveColor(color, theme));
-        const b = luminance(tint);
-        const r = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-        assert.ok(r >= 3, `${theme}: ${sel} marker over its fill on ${under} is ${r.toFixed(2)}, needs 3`);
-      }
+      const a = luminance(resolveColor(color, theme));
+      const b = luminance(resolveColor(fill, theme));
+      const r = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      assert.ok(r >= 3, `${theme}: ${sel} marker on its card is ${r.toFixed(2)}, needs 3`);
     }
   }
 });

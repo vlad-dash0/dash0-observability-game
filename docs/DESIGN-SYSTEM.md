@@ -5,9 +5,9 @@ inherits the same look (#158). **The one rule:** build markup with the `lib/ui/*
 only they emit `ui-` classes, only `styles/kit.css` styles them, and colours come only from
 `styles/tokens.css`. `test/design-system.test.mjs` and `test/ui.test.mjs` enforce it.
 
-Status: P1a (this foundation) is additive; nothing renders through the kit yet. P1b moves
-`lib/play.mjs`, `ctx.speech`, Choice, the help ladder and Build it onto it; P2 to P6 move the other
-widgets and the hand-written levels; P7 deletes the retired CSS.
+Status: P1b moved the step frame (`lib/play.mjs`), `ctx.speech`, Choice, the help ladder, Build it
+and the `index.html` buttons onto the kit; P2 to P6 move the other widgets and the hand-written
+levels (until then `base.css` keeps their wrappers narrow); P7 deletes the retired CSS.
 
 Owner decisions (#158, 2026-11-04), cited as D1 to D7 here and in the code: **D1** wrong answers
 stay purple (`--color-error`); red `--color-alert` is only for the firing banner. **D2** the primary
@@ -91,11 +91,11 @@ while an answered choice card stays legible.
 ## Layout
 
 `.ui-step` caps a step at `--layout-narrow` (760px, centred); `.ui-step--wide` at `--layout-wide`
-(1320px). The step type decides which (`STEP_TYPES[*].wide` in `lib/play.mjs` from P1b; hand-written
-levels pass it). Every step is the `level` container; a `.ui-split` inside it shows its side column
-(300px, sticky) from `@container level (min-width: 960px)` and stacks below. The 960 is a literal:
-custom properties do not work in container conditions. Questions are centred in narrow steps and
-left-aligned in wide ones (D4).
+(1320px). The step type decides which (`STEP_TYPES[*].wide` in `lib/play.mjs`; hand-written levels
+pass it); the level overlay is as wide as the widest step. Every step is the `level` container; a
+`.ui-split` inside it shows its side column (300px, sticky) from `@container level (min-width:
+960px)` and stacks below. The 960 is a literal: custom properties do not work in container
+conditions. Questions are centred in narrow steps and left-aligned in wide ones (D4).
 
 ## Authoring content
 
@@ -119,17 +119,18 @@ token with a contrast check.
 | T2 | design-system | Primitives only in `tokens.css`; no custom property declared elsewhere. |
 | T3 | design-system | Every `var(--x)` is a declared token. |
 | T4 | design-system | Only `kit.css` names `ui-` classes; its selectors are kit-scoped, no ids. |
-| T5 | design-system | No `:has(` (legacy list) and no `!important` (reduced motion, `[x-cloak]`); no glows. |
+| T5 | design-system | No `:has(` and no `!important` (reduced motion, `[x-cloak]`); no glows. |
 | T6 | design-system | Only `lib/ui` emits `ui-` classes (`index.html` is the static exception). |
 | T7 | design-system | Retired classes: only files in `LEGACY` emit them; a stale entry fails. |
-| T8, T9, T12 | levels-play, static (P1b) | Rendered and `index.html` classes defined; generic two-column layout. |
+| T8, T9 | levels-play, static | Every class a level renders (each step, the page after each click) and `index.html` writes has a CSS rule. |
+| T12 | play, design-system | The step frame is the kit's, wide by `STEP_TYPES[*].wide`; one `level` container. |
 | T10 | ui | Exact markup, escaping, TypeErrors, CSP-safe output, every class defined in `kit.css`. |
 | T11 | ui | `setFeedback` / `clearFeedback`. |
-| T13 | design-system | Contrast of the kit tokens in both themes. |
+| T13 | design-system | Contrast of the kit tokens in both themes; faded waterfall rows keep 4.5:1 text. |
 | T14 | design-system | Tone colours colour only markers. |
 
-`LEGACY`, `HAS_ALLOW` (and P1b's `UNDEFINED_ALLOW`) only shrink: each migration deletes its own
-entries; the last phase asserts them empty and deletes the retired CSS from `base.css`.
+`LEGACY`, `UNDEFINED_ALLOW` (T8) and `CONTAINER_ALLOW` (T12) only shrink: each migration deletes
+its own entries; the last phase asserts them empty and deletes the retired CSS from `base.css`.
 
 **Retired classes** (`RETIRED` in the test): the old buttons (`btn`, `ghost`, `small`, `build-btn`,
 `help-btn`, `back-btn`), options (`choice`, `choices`, `spot-line`, `sort-item`, `sort-bucket-btn`,

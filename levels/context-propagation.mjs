@@ -6,6 +6,7 @@
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
 import { newBuildState } from '../lib/widgets/build-it.mjs';
+import { prose } from '../lib/ui/index.mjs';
 
 const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
 const NEW_TRACE = '7f3a9c1e5b2d4f6a8c0e2b4d6f8a1c3e';
@@ -140,10 +141,7 @@ export default {
             '<code>traceparent</code> header.',
         )}</div>
         <div class="lesson-stage">
-          <p>Headers on each hop:</p>
-          <ul class="prop-hops">${hops}</ul>
-          <p>Root spans for the request:</p>
-          <ul class="prop-roots">${roots}</ul>
+          ${prose(`<p>Headers on each hop:</p><ul>${hops}</ul><p>Root spans for the request:</p><ul>${roots}</ul>`)}
           <h3 class="q" id="prop-q-where">Where did the trace break?</h3>
           ${choiceHtml(ctx, WHERE, { id: 'prop', labelledBy: 'prop-q-where' })}
         </div>`,

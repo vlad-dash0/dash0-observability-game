@@ -7,8 +7,8 @@ Design for M2's first item (OUTLINE §8). It builds on FOUNDATION §2 and §3 an
 ## 1. What the levels share, and where they are bespoke
 
 **Common case (8 of 13: 0.1, 0.2, 0.3, 2.1, 2.3, 2.5, 2.6, 2.7).** Each level is a straight sequence of steps. Each step does the following:
-- Renders `<div class="lesson-intro">${ctx.speech(intro)}</div>`, then a `lesson-stage` with `<h3 class="q">` and one widget's render.
-- Renders a disabled `#<prefix>-next`. On the last step it is a disabled `#<prefix>-finish` carrying `data-finish`.
+- Renders one kit step (#158): the `ctx.speech(intro)` lesson card, the optional prose and code, `question()` as `<h3 class="ui-question">`, and one widget's render.
+- Renders a disabled `#<prefix>-next` in the actions bar. On the last step it is a disabled `#<prefix>-finish` carrying `data-finish`.
 - Calls `mountX(ctx, spec, {onComplete|onRight: () => (btn.disabled = false, btn)})`.
 - Next renders the following step. Finish calls `ctx.finish({text, cards})`.
 
@@ -48,8 +48,8 @@ A level file keeps today's metadata (FOUNDATION §2.1) and declares `play` inste
 | `play.finish` | reward text, longer than 10 characters. Finish awards `level.cards`, never a separate list |
 
 **A step** has exactly one type key holding that widget's spec, plus:
-- `intro`: required. Trusted authored HTML, shown in the speech bubble.
-- `question`: trusted HTML, rendered as `<h3 class="q" id="<widgetId>-q">`. Required for labelled types (choice, sort), optional otherwise.
+- `intro`: required. Trusted authored HTML, shown in the lesson card (`ctx.speech`).
+- `question`: trusted HTML, rendered as `<h3 class="ui-question" id="<widgetId>-q">`. Required for labelled types (choice, sort), optional otherwise.
 - `show`: optional. Trusted authored HTML shown before the question (lists, tables).
 - `code`: optional. Plain text, escaped, rendered in `<pre><code>`. Intended for env files, YAML and PromQL.
 - `qid`: optional plain token, the question heading's id. Default `<widgetId>-q`. Migrated levels set it to keep today's hand-named ids (e.g. `avm-q-sort`).
@@ -154,19 +154,21 @@ Derived `mechanics`: `['build']`, as pinned (`act-2.test.mjs:46`).
 - `run: (ctx) => runPlay(built, ctx)`.
 - Run-level entries get `play: null`.
 
-**`runPlay`** (one closure per run, no module-level state):
+**`runPlay`** (one closure per run, no module-level state). The sketch below is the shape after #158; `lib/play.mjs` is the source of truth.
 
 ```js
 const show = (i) => {
   const step = steps[i], type = typeOf(step), spec = step[type.key], last = i === steps.length - 1;
-  const qid = step.qid ?? `${type.idOf(spec)}-q`, e = ctx.escapeHtml;
+  const qid = step.qid ?? `${type.idOf(spec)}-q`;
+  const body = ctx.speech(step.intro)                          // the lesson card (ui-lesson)
+    + (step.show == null ? '' : prose(step.show))
+    + (step.code == null ? '' : codeBlock(step.code))
+    + (step.question == null ? '' : question({ id: qid, html: step.question }))  // h3.ui-question
+    + type.render(ctx, spec, { labelledBy: step.question != null && type.labelled ? qid : undefined });
   ctx.renderStep(
-    `<div class="lesson-intro">${ctx.speech(step.intro)}</div><div class="lesson-stage">` +
-      `${step.show ?? ''}${step.code != null ? `<pre><code>${e(step.code)}</code></pre>` : ''}` +
-      `${step.question != null ? `<h3 class="q" id="${qid}">${step.question}</h3>` : ''}` +
-      `${type.render(ctx, spec, { labelledBy: step.question != null && type.labelled ? qid : undefined })}</div>`,
-    last ? `<button class="btn" id="${prefix}-finish" data-finish disabled>Finish</button>`
-         : `<button class="btn" id="${prefix}-next" disabled>Next</button>`);
+    kitStep({ wide: type.wide, bodyHtml: body }),
+    actions({ wide: type.wide, buttonsHtml: last ? finishButton(`${prefix}-finish`)   // data-finish, disabled
+                                                 : nextButton(`${prefix}-next`) }));  // disabled
   const btn = ctx.ovActions.querySelector(`#${prefix}-${last ? 'finish' : 'next'}`);
   btn.onclick = last ? () => ctx.finish({ text: finish, cards: level.cards }) : () => show(i + 1);
   type.mount(ctx, spec, { onDone: () => { btn.disabled = false; return btn; } });
@@ -180,6 +182,7 @@ show(0);
 STEP_TYPES[key] = {
   key, mechanic,          // a MECHANICS value, or null (choice)
   labelled,               // question required; render receives labelledBy
+  wide,                   // true: a wide step (board with a side column); false: narrow (#158)
   idOf(spec),             // the widget id: `${id}-q`, `${id}-feedback`
   validate(spec) → string[],  // pure, never throws, every problem; includes I7 (reference passes the checker)
                               // and "the given state is not already solved"

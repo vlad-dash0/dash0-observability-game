@@ -34,17 +34,17 @@ kbd { border-bottom-width: 2px; }
 
 :focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 
-/* ---------- Level regions (filled by every level) ---------- */
-/* flex items: the flex column parent (the level overlay) arrives in F5's hub.css. */
-.lesson-intro { flex: 0 0 auto; }
+/* ---------- Level regions (hand-written levels; #165 moves them onto the kit step) ---------- */
+/* flex items of the overlay's scrolling column (hub.css). The overlay is as wide as the
+   widest kit step (#158), so these wrappers keep a hand-written step at the narrow width,
+   centred (the cap on the stage's children is at the end of this file); a Build it board in
+   the stage takes the wide width, and the stage is the `level` container, so the board's side
+   column sits beside it from 960px as in a kit step. */
+.lesson-intro { flex: 0 0 auto; inline-size: 100%; max-inline-size: var(--layout-narrow); margin: 0 auto 14px; }
 /* Top padding gives variable-height stage content clearance from the intro above. */
-.lesson-stage { flex: 0 0 auto; padding-top: 8px; }
-
-.speech { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 22px; }
-.bubble {
-  background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: 4px 16px 16px 16px; padding: 13px 15px; font-size: 15px;
-  line-height: 1.5; font-weight: 500;
+.lesson-stage {
+  flex: 0 0 auto; padding-top: 8px; container: level / inline-size;
+  display: flex; flex-direction: column; gap: 12px;
 }
 
 h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: center; }
@@ -165,7 +165,7 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 /* ---------- Sort it (lib/widgets/sort-it-view.mjs) ---------- */
 /* Labels may hold long <code> names: items, bucket buttons and placed items wrap anywhere
    (as does .feedback above, which quotes them), so no Sort it label overflows at 320px.
-   .choice and .speech are not covered. Only existing text/background pairs (text on surface and surface-2, muted text on
+   .choice is not covered. Only existing text/background pairs (text on surface and surface-2, muted text on
    surface), so test/theme.test.mjs's contrast checks cover them in both themes. */
 .sort-hint { color: var(--color-text-muted); font-size: 13.5px; margin: 0 0 8px; }
 .sort-pool { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; min-height: 8px; }
@@ -199,32 +199,7 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 }
 .sort-placed li::before { content: "\2713 "; content: "\2713 " / ""; color: var(--color-success); }
 
-/* ---------- Build it (lib/widgets/build-it-view.mjs, #146) ---------- */
-/* A Dash0-style waterfall as DOM rows: a label column (name and service first, then trace id,
-   kind, status, timing) and a track, an SVG without a viewBox, so its text never stretches and
-   every position is an attribute (CSP). Bars are coloured by service from --color-svc-*;
-   ERROR is a stroke, never the fill; the selected bar gets a text-coloured stroke. Highlights
-   follow data-* attributes the view sets: data-mark while a span moves, data-other (another
-   trace), data-parent-of-selected, data-hint-cand, data-arriving, data-waiting. Colours are
-   tokens only, so both themes follow. Below about 960px of widget width the right column
-   stacks under the board (a container query, since the overlay is narrower than the page). */
-.build { container: build / inline-size; }
-.build-layout { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
-.build-main { min-width: 0; display: grid; gap: 0; align-content: start; }
-.build-frame {
-  background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: var(--radius); overflow: hidden;
-}
-.build-instr { padding: 12px 16px 0; font-size: 14px; }
-.build-status {
-  margin: 8px 16px 0; min-height: 40px; font-size: 13.5px; color: var(--color-text-muted);
-  padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid transparent; overflow-wrap: anywhere;
-}
-.build-status:empty { min-height: 0; padding: 0; border: 0; }
-.build-status b { color: var(--color-text); font-weight: 600; }
-.build-status.ok { border-color: var(--color-success); color: var(--color-text); }
-.build-status.note { border-color: color-mix(in srgb, var(--color-note) 55%, transparent); color: var(--color-text); }
-/* The waterfall's own rules (.wf-*) live in styles/widgets.css (#158). */
+/* The Build it waterfall's own rules (.wf-*) live in styles/widgets.css, its layout in kit.css (#158). */
 
 /* The panel (pick a span, then its parent or field), the log stream and the problems. Rows,
    panel buttons and problems quote span names, so they wrap anywhere like the Sort it labels. */
@@ -245,25 +220,9 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .build-opt[aria-pressed="true"] { border: 3px solid var(--color-text); padding: 5.5px 9px; }
 .build-opt:disabled { opacity: .4; cursor: not-allowed; }
 .build-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-.build-btn {
-  font: 600 14px var(--font-sans); border-radius: 999px; padding: 9px 20px; cursor: pointer;
-  border: 1px solid var(--color-border); background: transparent; color: var(--color-text);
-}
-.build-btn.primary { background: var(--color-primary); color: var(--color-primary-contrast); border-color: transparent; }
-.build-btn:disabled { opacity: .45; cursor: default; }
 .build-issues { margin: 8px 0 0 18px; }
 .build-issues li { max-width: 100%; overflow-wrap: anywhere; }
 .build-code { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-muted); margin-left: 6px; }
-/* Logs mode: a record is a debug-style line in the stream under the waterfall; the pressed
-   record gets a thicker text-coloured border, not colour alone. */
-.build-logs { list-style: none; display: flex; flex-direction: column; gap: 4px; margin: 0 16px 12px; }
-.build-log {
-  width: 100%; text-align: left; border: 1.5px solid var(--color-border); background: var(--color-surface);
-  color: var(--color-text); border-radius: var(--radius-sm); padding: 8px 11.5px; font-family: var(--font-mono);
-  font-size: 13px; font-weight: 500; cursor: pointer; max-width: 100%; overflow-wrap: anywhere;
-}
-.build-log:hover { border-color: var(--color-accent); }
-.build-log[aria-pressed="true"] { border: 3px solid var(--color-text); background: var(--color-surface-2); padding: 6.5px 10px; }
 .build-attrs { list-style: none; margin: 8px 0 0; padding: 0; font-family: var(--font-mono); font-size: 13px; overflow-wrap: anywhere; }
 
 /* ---------- Help ladder and right column (lib/widgets/help-ladder.mjs, #146) ---------- */
@@ -310,11 +269,6 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .help-rule { font-size: 11.5px; color: var(--color-text-muted); }
 .help-h { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-muted); font-weight: 600; }
 .help-hint-row { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
-.help-btn {
-  font: 600 14px var(--font-sans); border-radius: 999px; padding: 9px 20px; cursor: pointer; background: transparent;
-  color: var(--color-hint); border: 1px solid var(--color-hint);
-}
-.help-btn:disabled { opacity: .45; cursor: default; }
 .help-cost { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-muted); }
 .help-tier { font-size: 12.5px; color: var(--color-text-muted); }
 .help-tier b { color: var(--color-text); font-weight: 600; }
@@ -325,11 +279,6 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .help-hint-text:empty { display: none; }
 .help-hint-text:focus { outline: none; }
 .help-hint-head { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-hint); letter-spacing: .05em; text-transform: uppercase; }
-
-@container build (min-width: 960px) {
-  .build-layout { grid-template-columns: minmax(0, 1fr) 300px; column-gap: 24px; align-items: start; }
-  .help-side { position: sticky; top: 0; }
-}
 
 /* ---------- Config editor (level 1.2) ---------- */
 .env-label { display: block; font-weight: 700; font-size: 14px; margin-bottom: 6px; }
@@ -342,6 +291,13 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .env-editor[readonly] { opacity: .7; }
 .env-note { font-size: 13px; color: var(--color-text-muted); margin: 8px 0 4px; }
 .env-issues { margin: 8px 0 0 18px; }
+
+/* Hand-written steps (see Level regions above): the stage's children keep the narrow width,
+   centred; a Build it board takes the wide one. Last, so it wins over the components' own
+   side margins; the stage's gap replaces the question's bottom margin. */
+.lesson-stage > * { inline-size: 100%; max-inline-size: var(--layout-narrow); margin-inline: auto; }
+.lesson-stage > [data-build] { max-inline-size: var(--layout-wide); }
+.lesson-stage > h3.q { margin-bottom: 2px; }
 
 @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 

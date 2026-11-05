@@ -25,7 +25,7 @@
 
   <!-- The hub: inert while the level or reward dialog is open, so Tab and Enter cannot
        reach the cards behind it. Alpine removes the attribute when the value is false. -->
-  <div class="hub" :inert="overlayOpen || rewardOpen">
+  <div id="hub" :inert="overlayOpen || rewardOpen">
     <header class="hub-header">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">0</span>
@@ -40,7 +40,9 @@
           <span aria-hidden="true" x-text="stars.earned + ' / ' + stars.max">0 / 0</span>
           <span class="visually-hidden" x-text="starSummary()"></span>
         </div>
-        <button class="theme-btn" type="button" @click="toggleTheme()" :aria-label="themeLabel()"
+        <!-- The buttons in this file are the kit's (docs/DESIGN-SYSTEM.md; the one static
+             place that writes ui- classes by hand): the markup lib/ui/button.mjs makes. -->
+        <button type="button" class="ui-btn ui-btn--icon" id="theme-toggle" @click="toggleTheme()" :aria-label="themeLabel()"
                 :title="themeLabel()">
           <span aria-hidden="true" x-text="theme === 'light' ? '☾' : '☀'">&#9728;</span>
         </button>
@@ -117,7 +119,7 @@
   <div class="overlay" :class="overlayOpen ? 'show' : ''" x-cloak
        role="dialog" aria-modal="true" :aria-label="overlayTitle">
     <div class="lesson-top">
-      <button class="back-btn" type="button" @click="closeOverlay()" aria-label="Back to the map">&larr;</button>
+      <button type="button" class="ui-btn ui-btn--icon" id="ov-back" aria-label="Back to the map" @click="closeOverlay()"><span aria-hidden="true">&larr;</span></button>
       <h2 x-text="overlayTitle"></h2>
     </div>
     <div class="level-host" x-ignore>
@@ -134,14 +136,14 @@
       <p class="reward-stars" role="img" :aria-label="rewardStarsLabel()" x-show="rewardStars !== null"
          x-text="rewardStarsText()"></p>
       <p x-text="rewardText"></p>
-      <p class="reward-debug" x-show="rewardDebug" x-cloak x-text="rewardNote()"></p>
+      <p x-show="rewardDebug" x-cloak x-text="rewardNote()"></p>
       <div class="reward-cards" x-show="rewardCards.length > 0">
         <p class="reward-cards-title">New nuance card</p>
         <template x-for="front in rewardCards" :key="front">
           <p class="nuance-card" x-text="front"></p>
         </template>
       </div>
-      <button class="btn" type="button" @click="closeReward()">Back to the map</button>
+      <button type="button" class="ui-btn ui-btn--primary" id="reward-close" @click="closeReward()">Back to the map</button>
     </div>
   </div>
 

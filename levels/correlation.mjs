@@ -8,7 +8,7 @@
 // Spec: https://opentelemetry.io/docs/specs/otel/logs/data-model/ , https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-traceid , https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-spanid , https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-traceflags
 // Spec: https://opentelemetry.io/docs/specs/otel/logs/api/ , https://opentelemetry.io/docs/specs/otel/logs/ , https://opentelemetry.io/docs/concepts/signals/logs/
 // Spec: https://www.w3.org/TR/trace-context/#trace-id , https://www.w3.org/TR/trace-context/#parent-id
-// Dash0 docs (not an allowed Spec host): https://www.dash0.com/docs/dash0/telemetry/logging/log-sidebar , https://www.dash0.com/docs/dash0/telemetry/logging/related-logs , https://www.dash0.com/docs/dash0/telemetry/tracing/span-sidebar , https://www.dash0.com/docs/dash0/telemetry/tracing/view
+// Dash0 docs: https://www.dash0.com/docs/dash0/telemetry/logging/log-sidebar , https://www.dash0.com/docs/dash0/telemetry/logging/related-logs , https://www.dash0.com/docs/dash0/telemetry/tracing/span-sidebar , https://www.dash0.com/docs/dash0/telemetry/tracing/view
 //
 // Facts used, each from the pages above: TraceId and SpanId are fields of the log record, set "for logs
 // that are part of request processing" (the data model); the Logs API call takes a Context that, when
