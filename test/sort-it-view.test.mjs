@@ -797,3 +797,67 @@ test('the tier-2 decoy is drawn through ctx.shuffle: a reversing draw picks Trac
   assert.equal(calls >= 2, true, 'ctx.shuffle drew the decoy');
   assert.deepEqual(counts, { mistakes: 0, hints: 2, done: 0 });
 });
+
+test('the hint panel follows the hint target: each item\'s own tier-2 pair on reselect, else the rule once shown, else empty', () => {
+  // Reversing on every call: the pool reads i4 i3 i2 i1, and each decoy is the LAST untried wrong
+  // bucket, so i2 (-> log) gets Log or Trace while i1 (-> metric) gets Metric or Trace: distinct pairs.
+  const r = reversing();
+  const { counts, mount } = setup(withHints(), { shuffle: r.shuffle });
+  mount();
+  const pairOf = (html) => [...html.matchAll(/<b>([^<]+)<\/b>/g)].map((m) => m[1]);
+  assert.equal(hintText(), '', 'before any hint the panel is empty');
+  click('[data-item="i3"]');
+  assert.equal(hintText(), '', 'selecting an item before any hint leaves the panel empty: no free rule');
+  click('[data-item="i2"]');
+  click('#signals-hint'); // tier 1: the rule
+  click('#signals-hint'); // tier 2 on i2
+  assert.deepEqual(pairOf(hintText()), ['Log', 'Trace']);
+  assert.deepEqual(hintedBuckets(), ['log', 'trace']);
+  click('[data-item="i1"]');
+  click('#signals-hint'); // tier 2 on i1 (the rule is board-wide)
+  assert.deepEqual(pairOf(hintText()), ['Metric', 'Trace']);
+  assert.deepEqual(hintedBuckets(), ['metric', 'trace']);
+  assert.deepEqual(counts, { mistakes: 0, hints: 3, done: 0 });
+  click('[data-item="i2"]');
+  assert.deepEqual(pairOf(hintText()), ['Log', 'Trace'], 'reselecting i2 shows i2\'s own pair, not i1\'s last hint');
+  assert.equal(hintText().includes('Hint 2 of 3'), true, 'with its own eyebrow');
+  assert.deepEqual(hintedBuckets(), ['log', 'trace'], 'the text and the outlines name the same pair');
+  click('[data-item="i1"]');
+  assert.deepEqual(pairOf(hintText()), ['Metric', 'Trace']);
+  assert.deepEqual(hintedBuckets(), ['metric', 'trace']);
+  click('[data-item="i3"]'); // no hint of its own, but the rule was paid for on this board
+  assert.equal(hintText().includes('Ask what the item actually is'), true, 'the rule text stays');
+  assert.equal(hintText().includes('Hint 1 of 3'), true);
+  assert.deepEqual(pairOf(hintText()), [], 'no other item\'s pair');
+  assert.deepEqual(hintedBuckets(), []);
+  // A wrong try re-syncs too: i1's own hint, then placing i1 drops it and the next target shows the rule.
+  sortTo('i1', 'trace');
+  assert.deepEqual(pairOf(hintText()), ['Metric', 'Trace'], 'after a wrong try i1\'s own hint text stays');
+  assert.deepEqual(hintedBuckets(), ['metric'], 'the tried decoy loses its outline');
+  click('[data-bucket="metric"]');
+  assert.equal(placed('metric'), 'Request rate');
+  assert.equal(hintText().includes('Ask what the item actually is'), true, 'placed: the next target has no own hint, so the rule');
+  assert.deepEqual(counts, { mistakes: 1, hints: 3, done: 0 }, 'syncing the panel never charges');
+});
+
+test('one untried bucket left: "No more hints", disabled, and a forced click charges nothing', () => {
+  const { counts, mount } = setup(withHints());
+  mount();
+  sortTo('i2', 'metric');
+  sortTo('i2', 'trace'); // i2 -> log: only the right bucket is left untried
+  assert.deepEqual(counts, { mistakes: 2, hints: 0, done: 0 });
+  assert.equal(pressed('i2'), 'true', 'i2 is still the hint target');
+  assert.equal(hintLabel(), 'No more hints');
+  assert.equal(q('#signals-hint').disabled, true);
+  q('#signals-hint').onclick?.({});
+  q('#signals-hint').disabled = false; // gets through anyway
+  q('#signals-hint').onclick?.({});
+  assert.deepEqual(counts, { mistakes: 2, hints: 0, done: 0 }, 'no hint charged');
+  assert.equal(q('#signals-hints').textContent, '0');
+  assert.equal(placed('log'), '', 'nothing placed for the player');
+  assert.equal(hintText(), '', 'and nothing shown');
+  // Another item still has its ladder.
+  click('[data-item="i1"]');
+  assert.equal(hintLabel(), 'Hint 1 of 3');
+  assert.equal(q('#signals-hint').disabled, false);
+});

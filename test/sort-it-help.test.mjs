@@ -1,4 +1,4 @@
-// The Sort it help ladder, pure (#156 P3b; docs/M1-DESIGN.md §4.1): lib/widgets/sort-it-help.mjs.
+// The Sort it help ladder, pure (#156; docs/M1-DESIGN.md §4.1): lib/widgets/sort-it-help.mjs.
 // Which helps a sort step declares (sortHelps, validateSortHelps), the item a hint is for
 // (hintTarget), which tiers an item has (hintLadder) and the three hint tiers (hintFor), all
 // derived from the answer through bucketOf: there is no second grader.
@@ -160,6 +160,20 @@ test('hintLadder: exactly NARROWS_AT untried keeps tier 2; one fewer drops it, u
     'a tier 2 already given stays counted');
   // Another item's tries do not drop this item's tier 2: untried is per item.
   assert.deepEqual(hintLadder(spec, two, 'y').tiers, [1, 2, 3]);
+});
+
+test('hintLadder: with exactly one untried bucket (the right one) next is null whatever is used; two untried still give a hint', () => {
+  const spec = four(); // x -> c
+  const one = after(spec, [['x', 'a'], ['x', 'b'], ['x', 'd']]); // untried: c only
+  assert.deepEqual(hintLadder(spec, one, 'x'), { tiers: [1, 3], done: 0, next: null },
+    'nothing used, yet no hint: the only bucket left is the answer');
+  assert.deepEqual(hintLadder(spec, one, 'x', { ruleShown: true }), { tiers: [1, 3], done: 1, next: null });
+  assert.deepEqual(hintLadder(spec, one, 'x', { ruleShown: true, taken: [2] }), { tiers: [1, 2, 3], done: 2, next: null },
+    'a tier 2 already given stays counted, but nothing more is offered');
+  const two = after(spec, [['x', 'a'], ['x', 'b']]); // untried: c, d
+  assert.deepEqual(hintLadder(spec, two, 'x'), { tiers: [1, 3], done: 0, next: 1 }, 'two untried: the ladder still runs');
+  // Per item: x's tries leave y (-> a, all four untried) its full ladder.
+  assert.deepEqual(hintLadder(spec, one, 'y'), { tiers: [1, 2, 3], done: 0, next: 1 });
 });
 
 test('hintLadder: the rule counts once shown for any item (ruleShown) or when this item took it; taken tiers of another kind do not', () => {
