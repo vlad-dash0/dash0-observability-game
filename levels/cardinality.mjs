@@ -56,10 +56,10 @@ const SPOT = {
     { id: 'route', text: 'http_server_requests_total{http_route="/recommendations/{id}"}' },
     { id: 'url-path', text: 'http_server_requests_total{url_path="/recommendations/48211"}' },
     { id: 'method', text: 'http_server_requests_total{http_request_method="POST"}' },
-    { id: 'status', text: 'http_server_requests_total{http_response_status_code="503"}' },
     { id: 'user-id', text: 'http_server_requests_total{user_id="u-31402"}' },
-    { id: 'tier', text: 'http_server_requests_total{customer_tier="member"}' },
+    { id: 'status', text: 'http_server_requests_total{http_response_status_code="503"}' },
     { id: 'request-id', text: 'http_server_requests_total{request_id="9f3c0e2a-77b1"}' },
+    { id: 'tier', text: 'http_server_requests_total{customer_tier="member"}' },
   ],
   faults: ['url-path', 'user-id', 'request-id'],
   whyNot: {
