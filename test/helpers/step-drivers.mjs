@@ -137,6 +137,8 @@ const spot = {
       slip(`pick ${other}`, other),
       // Part of a multi-fault set is still wrong.
       ...(s.faults.length > 1 ? [slip(`only ${s.faults[0]}`, s.faults[0])] : []),
+      // A hint changes no pick, so solve() still starts from an empty selection.
+      ...(s.helps?.hints ? [{ name: 'hint', clicks: [`#${s.id}-hint`], says: /\S/, at: `#${s.id}-hint-text` }] : []),
     ];
   },
   first: (s) => `line:${s.lines[0].id}`,
