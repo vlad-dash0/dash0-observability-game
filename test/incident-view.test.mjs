@@ -110,6 +110,20 @@ test('V2 spent exactly to 0 is over: every cell over and "Budget spent."', () =>
   assert.deepEqual(budget(ID).cells, { total: 2, spent: 0, over: 2, preview: 0, left: 0 }, 'at exactly 0, not only past it');
 });
 
+test('V2 a look past the budget never shows more spent than the total, and left stays 0', () => {
+  const s = tight();
+  setup(s);
+  open('a');
+  open('b');
+  open('c');
+  const st = ['a', 'b', 'c'].reduce((acc, id) => openView(s, acc, id).state, newIncident(s));
+  assert.equal(st.minutes, 3, 'the engine count stays honest');
+  const b = budget(ID);
+  assert.equal(b.spent, '2 of 2 min spent');
+  assert.equal(b.left, 'Budget spent.');
+  assert.deepEqual(b.cells, { total: 2, spent: 0, over: 2, preview: 0, left: 0 });
+});
+
 test('V2 a fractional rate shows clean minutes (one decimal) and rounds the cells up', () => {
   const s = frac();
   setup(s);

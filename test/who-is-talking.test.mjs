@@ -404,6 +404,7 @@ test('who-is-talking: every clue and neutral leaves 1 min and no mistake; a herr
   open('k8s-warnings');
   assert.equal(slips.mistakes, 2, 'the cheapest herring (3 min) alone runs the 1 min out');
   assert.equal(board(ID).left, 'Budget spent.');
+  assert.equal(board(ID).spent, '20 of 20 min spent', 'the 3-min herring at 19 min never reads 22 of 20');
   assert.deepEqual(board(ID).cells, { total: 20, spent: 0, over: 20, preview: 0, left: 0 });
   assert.deepEqual([status().tone, status().text.includes('was misleading, and the error budget is spent')], ['error', true]);
   assert.equal(causeState(ID, 'name-dropped'), null, 'still answerable at 0');
