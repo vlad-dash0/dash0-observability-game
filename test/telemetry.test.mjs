@@ -483,3 +483,145 @@ test('reportError never receives the token: a late error after disconnect or rec
   }
   assert.deepEqual(failures, [], 'no late report carries the token');
 });
+
+test('reportError never receives the token in another shape: URL-encoded, upper-cased or base64 in a thrown message', async () => {
+  const SPECIAL = 'auth_Sp+ec/ial=Tok9en#42';
+  const forms = {
+    'URL-encoded': encodeURIComponent(SPECIAL),
+    'upper-cased': SPECIAL.toUpperCase(),
+    base64: Buffer.from(SPECIAL).toString('base64'),
+    'URL-safe base64': Buffer.from(`Bearer ${SPECIAL}`).toString('base64url'),
+  };
+  for (const [name, form] of Object.entries(forms)) {
+    const seen = [];
+    const { telemetry } = make({
+      fetch: async () => res(200),
+      reportError: (e) => seen.push(e),
+      clearTimeout: () => {
+        throw new Error(`proxy said no: ${form}`);
+      },
+    });
+    assert.deepEqual(telemetry.connect(live(SPECIAL)), { ok: true });
+    await telemetry.sendTest();
+    assert.equal(seen.length, 1, name);
+    assert.ok(seen[0] instanceof Error, name);
+    assert.equal(seen[0].message, 'telemetry error (message withheld)', name);
+    assert.equal(seen[0].cause, undefined, name);
+  }
+});
+
+test('a message with no token in it is forwarded as it is', async () => {
+  const seen = [];
+  const { telemetry } = make({
+    fetch: async () => res(200),
+    reportError: (e) => seen.push(e),
+    clearTimeout: () => {
+      throw new Error('timer table full');
+    },
+  });
+  telemetry.connect(live());
+  await telemetry.sendTest();
+  assert.deepEqual(seen.map((e) => e.message), ['timer table full']);
+});
+
+// ---- a config change while a flush is in flight --------------------------------------
+
+async function heldConnected() {
+  const f = heldFetch();
+  const made = make({ fetch: f.fetch });
+  made.telemetry.connect(live());
+  const first = made.telemetry.sendTest();
+  await tick();
+  f.calls[0].resolve(res(200));
+  await first;
+  assert.equal(made.telemetry.status().state, 'connected');
+  return { ...made, f };
+}
+
+test('a reconnect during a flush: the old 500 neither counts as dropped nor touches the new config', async () => {
+  const { telemetry, f } = await heldConnected();
+  telemetry.emit(draft('one'));
+  telemetry.emit(draft('two'));
+  const flushing = telemetry.flush();
+  await tick();
+  assert.equal(f.calls.length, 2);
+  assert.deepEqual(telemetry.connect(live(TOKEN2)), { ok: true });
+  f.calls[1].resolve(res(500));
+  await flushing;
+  assert.deepEqual({ ...telemetry.stats() }, { buffered: 0, dropped: 0 });
+  assert.equal(telemetry.status().state, 'configured', 'the new config is not connected by the old flush');
+  assert.equal(telemetry.status().mode, 'live');
+});
+
+test('a flush that finishes after the config changed returns unreachable/aborted, as sendBatch does', async () => {
+  for (const settle of [(c) => c.resolve(res(200)), (c) => c.resolve(res(500))]) {
+    const { telemetry, f } = await heldConnected();
+    telemetry.emit(draft('one'));
+    const flushing = telemetry.flush();
+    await tick();
+    telemetry.disconnect();
+    settle(f.calls[1]);
+    assert.deepEqual(await flushing, { kind: 'unreachable', cause: 'aborted' });
+  }
+  const { telemetry, f } = await heldConnected();
+  const batching = telemetry.sendBatch([draft('b')]);
+  await tick();
+  telemetry.disconnect();
+  f.calls[1].resolve(res(200));
+  assert.deepEqual(await batching, { kind: 'unreachable', cause: 'aborted' });
+});
+
+// ---- leaving connected ----------------------------------------------------------------
+
+test('a failed re-test (connected -> configured) clears the buffer and counts it dropped', async () => {
+  let status = 200;
+  const f = instantFetch(() => res(status));
+  const { telemetry } = make({ fetch: f.fetch });
+  telemetry.connect(live());
+  await telemetry.sendTest();
+  telemetry.emit(draft('a'));
+  telemetry.emit(draft('b'));
+  status = 401;
+  await telemetry.sendTest();
+  assert.equal(telemetry.status().state, 'configured');
+  assert.deepEqual({ ...telemetry.stats() }, { buffered: 0, dropped: 2 });
+  status = 200;
+  await telemetry.sendTest();
+  assert.equal(telemetry.status().state, 'connected');
+  assert.equal(await telemetry.flush(), null, 'the old spans did not come back with the connection');
+  assert.equal(f.calls.length, 3);
+});
+
+test('an aborted re-test also clears the buffer and counts it dropped', async () => {
+  const { telemetry } = await connected();
+  telemetry.emit(draft('a'));
+  const ac = new AbortController();
+  ac.abort();
+  assert.deepEqual(await telemetry.sendTest({ signal: ac.signal }), { kind: 'unreachable', cause: 'aborted' });
+  assert.equal(telemetry.status().state, 'configured');
+  assert.deepEqual({ ...telemetry.stats() }, { buffered: 0, dropped: 1 });
+});
+
+// ---- drafts are copied ------------------------------------------------------------------
+
+test('mutating a draft after emit cannot change or poison the buffered span', async () => {
+  const { telemetry, calls } = await connected();
+  const d = {
+    name: 'copy',
+    attributes: { k: 'v' },
+    events: [{ name: 'ev', timeMs: NOW, attributes: { e: 1 } }],
+    status: { code: 'ok' },
+  };
+  telemetry.emit(d);
+  d.attributes.k = { not: 'encodable' };
+  d.attributes.extra = 'late';
+  d.events[0].attributes.e = Symbol('bad');
+  d.status.code = 'bogus';
+  assert.equal((await telemetry.flush()).kind, 'accepted');
+  const [span] = calls.at(-1).body.resourceSpans[0].scopeSpans[0].spans;
+  const attrs = Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
+  assert.deepEqual(attrs.k, { stringValue: 'v' });
+  assert.equal(attrs.extra, undefined);
+  assert.deepEqual(span.events[0].attributes, [{ key: 'e', value: { intValue: '1' } }]);
+  assert.equal(span.status.code, 1);
+});

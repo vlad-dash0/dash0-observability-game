@@ -435,6 +435,25 @@ test('completing a level while connected sends one level.complete span with the 
   assert.equal(JSON.stringify(calls[1].body).includes(TEL_TOKEN), false);
 });
 
+test('a debug completion while connected still sends its span, marked game.debug, and saves nothing', async () => {
+  const { telemetry, calls } = telemetrySession();
+  assert.equal((await telemetry.sendTest()).kind, 'accepted');
+  const initial = { [STORAGE_KEY]: v1({ x: { stars: 4, at: AT } }) };
+  const { game, store } = setup({ telemetry, debug: true, initial });
+  const before = JSON.stringify(stored(store));
+  game.openLevel('x');
+  ctxs.x.mistake();
+  ctxs.x.mistake();
+  const result = ctxs.x.finish({ text: 'done' });
+  assert.equal(result.stars, 3);
+  await tick();
+  assert.equal(calls.length, 2, 'one flush request');
+  const attrs = attrsOf(spansOf(calls[1].body)[0]);
+  assert.deepEqual(attrs['game.debug'], { boolValue: true });
+  assert.deepEqual(attrs['game.level.stars'], { intValue: '3' });
+  assert.equal(JSON.stringify(stored(store)), before, 'a debug run saves nothing');
+});
+
 test('not connected: completion makes no request', async () => {
   const { telemetry, calls } = telemetrySession(() => 401);
   assert.equal((await telemetry.sendTest()).kind, 'rejected');
