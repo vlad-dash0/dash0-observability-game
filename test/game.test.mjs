@@ -793,6 +793,17 @@ function deepQuery(root, sel) {
   return null;
 }
 
+test('index.html: each element the game focuses on opening a level and the reward is in the shell exactly once', () => {
+  const { game } = setup();
+  const focused = [];
+  game.focusSoon = (selector) => focused.push(selector);
+  assert.equal(game.openLevel('x'), true);
+  ctxs.x.finish({ text: 'whatever text here' });
+  assert.equal(game.rewardOpen, true);
+  assert.deepEqual(focused, ['#ov-back', '#reward-close'], 'the back button on open, the reward close on finish');
+  for (const sel of focused) assert.equal(shell.querySelectorAll(sel).length, 1, `${sel} matches one element in index.html`);
+});
+
 test('index.html: the level overlay elements live inside an x-ignore wrapper', () => {
   for (const id of ['ov-body', 'ov-actions']) {
     const el = shell.getElementById(id);

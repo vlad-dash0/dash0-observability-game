@@ -609,6 +609,21 @@ test('kind editing with instant feedback: a wrong kind costs one and says why it
   assert.equal(q('#b1-win-stars').textContent, '4 of 5 stars: 1 wrong pick, 0 hints.');
 });
 
+test('a tier-3 kind hint on a span still wrong in its status is neutral and free: the hint fixed one field, not the move', () => {
+  const spec = { ...b1Spec(), edit: ['kind', 'status'], answer: { [B]: { kind: 'SERVER', status: 'ERROR' } }, helps: { tint: true, instant: true, hints: true } };
+  const { counts, mount } = setup(spec);
+  mount();
+  click(`[data-span="${B}"]`);
+  click('#b1-hint');
+  click('#b1-hint');
+  click('#b1-hint');
+  assert.equal(counts.hints, 3);
+  assert.equal(label(B), 'POST, storefront, SERVER, UNSET, 10 to 90 ms, trace 4bf92f35, root, not right yet', 'the hint set the kind; the status is still UNSET');
+  assert.equal(status(), 'POST (storefront) is now SERVER, but not quite. POST (storefront): check the status. Only an operation that failed is ERROR. It stays here; move it when you are ready.');
+  assert.equal(tone(), 'neutral', 'a move the hint made is information, not an error');
+  assert.deepEqual([counts.mistakes, counts.done], [0, 0], 'no mistake charged, and the board is not done');
+});
+
 test('status and links in Check mode with no helps: edits are free, Check grades them', () => {
   const spec = { ...b1Spec(), edit: ['status', 'links'], answer: { [E]: { status: 'ERROR', links: [B] } } };
   const { counts, mount } = setup(spec);

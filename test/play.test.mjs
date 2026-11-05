@@ -185,6 +185,24 @@ test('T12 each step renders one kit step, wide by its type: a build step holds t
   assert.deepEqual(seen.includes('build') && seen.includes('choice'), true);
 });
 
+test('a step\'s show is its lead-in prose: after the lesson card, before the question, and only on that step', () => {
+  const lv = playFixture();
+  lv.play.steps[0].show = 'Lead-in <em>before</em> the pick.';
+  const level = build(lv).levels[ID];
+  const run = start(level);
+  const leads = qa('.ui-step .ui-prose').filter((el) => !el.closest('.ui-lesson'));
+  assert.equal(leads.length, 1, 'one lead-in on the step with show');
+  assert.equal(leads[0].innerHTML, 'Lead-in <em>before</em> the pick.');
+  const order = qa('.ui-step .ui-lesson, .ui-step .ui-prose, .ui-step .ui-question')
+    .filter((el) => el.matches('.ui-lesson, .ui-question') || !el.closest('.ui-lesson'))
+    .map((el) => (el.matches('.ui-lesson') ? 'lesson' : el.matches('.ui-question') ? 'question' : 'show'));
+  assert.deepEqual(order, ['lesson', 'show', 'question']);
+  for (const sel of STEP_DRIVERS.choice.solve(level.play.steps[0].choice)) click(sel);
+  click(advanceId(level, 0));
+  assert.equal(qa('.ui-step .ui-prose').filter((el) => !el.closest('.ui-lesson')).length, 0, 'step 2 has no show, so no lead-in');
+  assert.equal(run.calls.length, 0);
+});
+
 test('the step frame: Next and Finish are the kit primary buttons, the question carries its id', () => {
   start(FX);
   assert.equal(q('#fx-next').getAttribute('type'), 'button');

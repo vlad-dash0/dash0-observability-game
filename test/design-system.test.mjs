@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  classesInSelector, contrast, decls, emittedClasses, overlay, ratio, read, resolveColor, rules,
+  classesInSelector, compounds, contrast, decls, emittedClasses, overlay, ratio, read, resolveColor, rules,
   splitTop, styleFiles, stripComments, VARS, walk,
 } from './helpers/css.mjs';
 
@@ -147,7 +147,25 @@ test('T12 the split shows its side column from 960px of the level container: min
   assert.equal(Object.fromEntries(decls(kitStep.body)).container, 'level / inline-size', 'every kit step is the level container');
 });
 
-test('T12 every container query names level; only the kit step (and the listed legacy stage) declares a container', () => {
+/** `file .class` when the selector is that one class alone (no ancestor, attribute or state), else null. */
+const containerKey = (f, selector) => {
+  const cs = splitTop(selector).length === 1 ? compounds(selector) : [];
+  const [c] = cs;
+  return cs.length === 1 && c.classes.length === 1 && !c.attrs.length && !c.pseudos.length && selector.trim() === `.${c.classes[0]}`
+    ? `${f} .${c.classes[0]}` : null;
+};
+const CONTAINER_PROP = /^container(?:-name|-type)?$/;
+
+test('T12 harness: a container is keyed only by a lone class, and its declaration is read with its value', () => {
+  assert.equal(containerKey('base.css', '.lesson-stage'), 'base.css .lesson-stage');
+  for (const sel of ['.x .lesson-stage', '.lesson-stage:hover', '.lesson-stage[data-x]', '.lesson-stage, .y', '.lesson-stage.y']) {
+    assert.equal(containerKey('base.css', sel), null, sel);
+  }
+  const [r] = rules('.lesson-stage { container: other / size; }');
+  assert.deepEqual(decls(r.body).filter(([p]) => CONTAINER_PROP.test(p)), [['container', 'other / size']]);
+});
+
+test('T12 every container query names level; only the kit step (and the listed legacy stage) declares a container, as level / inline-size', () => {
   const seen = new Set();
   let queries = 0;
   for (const f of SHEETS) {
@@ -156,16 +174,18 @@ test('T12 every container query names level; only the kit step (and the listed l
         queries++;
         assert.match(a, /^@container level \(/, `styles/${f} "${a}": query the step's level container`);
       }
-      for (const [prop] of decls(r.body)) {
-        if (prop !== 'container' && prop !== 'container-name') continue;
-        const key = `${f} ${r.selector}`;
-        if (f === 'kit.css' && r.selector === '.ui-step') continue;
-        assert.ok(CONTAINER_ALLOW.includes(key), `${key} declares a container; the step type decides the layout (STEP_TYPES[*].wide)`);
+      for (const [prop, value] of decls(r.body)) {
+        if (!CONTAINER_PROP.test(prop)) continue;
+        const key = containerKey(f, r.selector) ?? `${f} ${r.selector}`;
+        assert.ok(key === 'kit.css .ui-step' || CONTAINER_ALLOW.includes(key),
+          `${key} declares a container; the step type decides the layout (STEP_TYPES[*].wide)`);
+        assert.equal(`${prop}: ${value}`, 'container: level / inline-size', `${key} must be the level container, by the container shorthand`);
         seen.add(key);
       }
     }
   }
   assert.ok(queries >= 2, 'kit.css and widgets.css query the level container');
+  assert.ok(seen.has('kit.css .ui-step'), 'the kit step declares the container');
   for (const key of CONTAINER_ALLOW) assert.ok(seen.has(key), `stale CONTAINER_ALLOW entry: ${key}`);
 });
 
@@ -310,29 +330,58 @@ test('T13 meter cells left and the alert red reach 3:1 (non-text) on surface and
   }
 });
 
+// A row is matched by its compound selector (class wf-row plus the attribute test), in any
+// quote or value form and under any ancestor, so `.wf .wf-row[data-other='true']` counts.
+const FADED_ROWS = {
+  overflow: (c) => c.classes.includes('wf-row') && c.attrs.some((a) => a.name === 'data-mark' && a.value === 'overflow'),
+  other: (c) => c.classes.includes('wf-row') && c.attrs.some((a) => a.name === 'data-other'),
+};
+const subjects = (list) => list.flatMap((r) => splitTop(r.selector).map((s) => ({ cs: compounds(s), body: r.body })));
+/** The lowest opacity a rule puts on the matched row itself (its last compound), so on every word in it. */
+const rowAlpha = (list, isRow) => Math.min(1, ...subjects(list)
+  .filter(({ cs }) => isRow(cs.at(-1)))
+  .flatMap(({ body }) => decls(body)).filter(([p]) => p === 'opacity').map(([, v]) => Number(v)));
+/** Opacities put on a .wf-bar inside the matched row. */
+const barOpacities = (list, isRow) => subjects(list)
+  .filter(({ cs }) => cs.at(-1).classes.includes('wf-bar') && cs.slice(0, -1).some(isRow))
+  .flatMap(({ body }) => decls(body)).filter(([p]) => p === 'opacity').map(([, v]) => Number(v));
+
+test('T13 harness: a row fade is found in any quote, value or ancestor form; a bar fade is not a row fade', () => {
+  for (const css of ['.wf-row[data-other="true"] { opacity: .35 }', ".wf-row[data-other='true'] { opacity: .35 }",
+    '.wf .wf-row[data-other] { opacity: .35 }', '.wf-row[data-other]:hover { opacity: .35 }', '.wf-row[ data-other = true ] { opacity: .35 }']) {
+    assert.equal(rowAlpha(rules(css), FADED_ROWS.other), 0.35, css);
+  }
+  for (const css of ['.wf-row[data-mark="overflow"] { opacity: .4 }', ".wf-row[data-mark='overflow'] { opacity: .4 }",
+    '.wf-row[data-mark=overflow] { opacity: .4 }', '.wf > .wf-row[data-mark="overflow"] { opacity: .4 }', 'a, .wf-row[data-mark="overflow"] { opacity: .4 }']) {
+    assert.equal(rowAlpha(rules(css), FADED_ROWS.overflow), 0.4, css);
+  }
+  for (const css of ['.wf-row[data-other] .wf-bar { opacity: .35 }', '.wf-row[data-mark="invalid"] { opacity: .3 }', '.wf-root[data-other] { opacity: .3 }']) {
+    assert.equal(rowAlpha(rules(css), FADED_ROWS.other), 1, css);
+    assert.equal(rowAlpha(rules(css), FADED_ROWS.overflow), 1, css);
+  }
+  assert.deepEqual(barOpacities(rules(".wf .wf-row[data-other='1'] .wf-bar { opacity: .35 }"), FADED_ROWS.other), [0.35]);
+  assert.deepEqual(barOpacities(rules('.wf-row[data-other] { opacity: .35 }'), FADED_ROWS.other), []);
+});
+
 // Deferred from the PR #164 review: a faded waterfall row (the overflow mark, another trace)
 // faded the whole row, so its "its parent" text fell to about 2.2:1. The fade goes on the
 // marks and bars; the row's text keeps 4.5:1 in both themes.
 test('T13 faded waterfall rows fade the bars, not the text: row text keeps 4.5:1 on the board, both themes', () => {
   const list = sheetRules('widgets.css');
-  const declsOf = (match) => list.filter((r) => splitTop(r.selector).some(match)).flatMap((r) => decls(r.body));
-  for (const row of ['.wf-row[data-mark="overflow"]', '.wf-row[data-other]']) {
-    // Opacity on the row itself (any state of it, no descendant) fades every word in it.
-    const own = declsOf((s) => s.startsWith(row) && !/[\s>+~]/.test(s.slice(row.length)))
-      .filter(([p]) => p === 'opacity').map(([, v]) => Number(v));
-    const alpha = Math.min(1, ...own);
+  for (const [row, isRow] of Object.entries(FADED_ROWS)) {
+    const alpha = rowAlpha(list, isRow);
     for (const theme of ['light', 'dark']) {
       for (const bg of ['--color-surface', '--color-bg']) {
         const under = resolveColor(`var(${bg})`, theme);
         for (const fg of ['--color-text', '--color-text-muted', '--color-parent']) {
           const seen = resolveColor(`var(${fg})`, theme).map((c, i) => c * alpha + under[i] * (1 - alpha));
           const r = ratio(seen, under);
-          assert.ok(r >= 4.5, `${theme}: ${fg} in ${row} on ${bg} is ${r.toFixed(2)} (row opacity ${alpha}), needs 4.5`);
+          assert.ok(r >= 4.5, `${theme}: ${fg} in the ${row} row on ${bg} is ${r.toFixed(2)} (row opacity ${alpha}), needs 4.5`);
         }
       }
     }
-    const bar = declsOf((s) => s.startsWith(row) && /\.wf-bar\b/.test(s)).find(([p]) => p === 'opacity');
-    assert.ok(bar && Number(bar[1]) < 1, `${row} still fades its bars, the non-text cue`);
+    const bar = barOpacities(list, isRow);
+    assert.ok(bar.length && Math.min(...bar) < 1, `the ${row} row still fades its bars, the non-text cue`);
   }
 });
 
