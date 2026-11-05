@@ -85,6 +85,15 @@
   --wf-win-text: #e9e6e1;
   --wf-win-muted: #b8b3ac;
 
+  /* Kit primitives (#158, from the lesson and incident prototypes the owner approved on
+     2026-11-04; not dash0.com brand values). Lesson text is softer than full white or
+     black; the light amber ink replaces the prototype's #a8650f, which fails AA on the
+     light surface; the light alert red is for the firing banner only (D1). */
+  --kit-lesson-dark: #d9d6d1;
+  --kit-lesson-light: #3a3836;
+  --kit-ink-amber-light: #7a4a08;
+  --kit-alert-light: #d42a2e;
+
   /* Semantic colours: light-dark(<light>, <dark>). */
   --color-bg: light-dark(var(--d0-white), var(--d0-grey-900));
   --color-surface: light-dark(color-mix(in srgb, var(--d0-grey-400) 10%, var(--d0-white)), var(--d0-grey-800));
@@ -134,13 +143,52 @@
   --color-win-muted: light-dark(var(--wf-win-muted), var(--wf-win-muted));
   --color-swirl-dot: light-dark(var(--globe-amber), var(--globe-amber));
   --color-shadow: light-dark(color-mix(in srgb, var(--d0-grey-900) 15%, transparent), color-mix(in srgb, var(--d0-grey-900) 60%, transparent));
+  /* The UI kit (#158, docs/DESIGN-SYSTEM.md). The lesson card: its text, the "Lesson"
+     eyebrow, inline code, the amber glow top left and the dot top right. */
+  --color-lesson: light-dark(var(--kit-lesson-light), var(--kit-lesson-dark));
+  --color-lesson-eyebrow: light-dark(var(--kit-ink-amber-light), color-mix(in srgb, var(--globe-amber) 82%, var(--d0-grey-800)));
+  --color-lesson-code: light-dark(var(--kit-ink-amber-light), var(--globe-amber));
+  --color-lesson-glow: light-dark(color-mix(in srgb, var(--wf-parent-light) 11%, transparent), color-mix(in srgb, var(--globe-amber) 13%, transparent));
+  --color-lesson-dot: light-dark(color-mix(in srgb, var(--wf-parent-light) 28%, transparent), color-mix(in srgb, var(--globe-amber) 28%, transparent));
+  /* Meter cells still left (3:1 on surface); the firing banner's red (D1: wrong answers
+     stay --color-error purple). */
+  --color-meter-left: light-dark(color-mix(in srgb, var(--d0-mint) 40%, var(--d0-grey-600)), color-mix(in srgb, var(--d0-mint) 50%, var(--d0-grey-600)));
+  --color-alert: light-dark(var(--kit-alert-light), var(--d0-red));
 
   /* Type and shape. */
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: "Martian Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius-xs: 6px;
   --radius-sm: 10px;
   --radius: 14px;
   --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  /* Kit scale (#158): spacing (4px steps; --space-N is 4N px, no 7), type sizes, weights,
+     layout widths, the disabled fade and the short transition. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --text-xs: 10.5px;
+  --text-sm: 12.5px;
+  --text-md: 14px;
+  --text-base: 15px;
+  --text-q: 18px;
+  --text-lesson: 18px;
+  --text-title: 24px;
+  --weight-regular: 400;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --layout-narrow: 760px;
+  --layout-wide: 1320px;
+  --side-width: 300px;
+  --measure: 72ch;
+  --opacity-disabled: .45;
+  --dur-fast: .15s;
 }
 
 :root[data-theme="light"] {
