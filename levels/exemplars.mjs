@@ -28,36 +28,33 @@
 // behaviour and has no Dash0 step. OUTLINE is not edited here.
 
 // Step 1. Eight points of payments.charge.duration (a histogram, seconds), as a debug view would print
-// them: time, route, count and sum of the window, and the point's exemplar field. Five windows of
-// /pay show a spike at 09:14:30 to 09:15:00; a scheduler-run job and a series that has a trace id as
-// a label are on the list too. The faults are the three points whose exemplar field holds a value,
-// a trace_id and a span_id. `whyNot` is shown for a picked point that has none. The text never says why
-// a point has none; step 2 asks.
+// them: time, series, the point's fields (count, sum, min and max of the window, two decimals) and its
+// exemplar field. Six 15 s windows of one /pay series (09:14:00 to 09:15:15, the same label set on each)
+// show a spike from 09:14:30 to 09:15:00: charges got slow, so fewer finish and the sums jump. A
+// scheduler-run job (refund-batch) and a series that has a trace id and span id as labels are on the
+// list too. The faults are the three points whose exemplar field holds a value, a trace_id and a
+// span_id (the spike points hold two and three, one per recorded measurement, since a point can carry
+// several; the quiet window holds one). `whyNot` is shown for a picked point that has none. The text
+// never says why a point has none; step 2 asks.
+// The numbers are placed so that no blind rule reads the answer off them (test/spot-tells.test.mjs):
+// among the answers and the decoys, count, sum, min, max, length, digits, words and "=" signs
+// interleave. The decoys that are not the /pay series carry extra labels so their length and token
+// counts sit between the answers'. Exemplar values lie within the point's min and max; the pay-label
+// decoy's ids appear nowhere else.
 const SPOT = {
   id: 'exm-spot',
   target: 'config',
   helps: { hints: true },
+  hint: 'An exemplar is not part of the series and does not come with a big number: ask where a point would carry one.',
   lines: [
-    { id: 'pay-0914-00', text: '09:14:00 payments.charge.duration{route="/pay"} count=9 sum=2.9s exemplar: none' },
-    {
-      id: 'pay-0914-15',
-      text: '09:14:15 payments.charge.duration{route="/pay"} count=11 sum=3.6s exemplar: value=0.28s trace_id=0af7651916cd43dd8448eb211c80319c span_id=b7ad6b7169203331',
-    },
-    { id: 'refund-batch', text: '09:14:30 payments.charge.duration{route="/refund-batch"} count=3 sum=17.4s exemplar: none' },
-    {
-      id: 'pay-0914-30',
-      text: '09:14:30 payments.charge.duration{route="/pay"} count=10 sum=47.3s exemplar: value=6.12s trace_id=4bf92f3577b34da6a3ce929d0e0e4736 span_id=00f067aa0ba902b7',
-    },
-    {
-      id: 'pay-label',
-      text: '09:14:45 payments.charge.duration{route="/pay", trace_id="4bf92f3577b34da6a3ce929d0e0e4736"} count=1 sum=5.4s exemplar: none',
-    },
-    { id: 'pay-0914-45', text: '09:14:45 payments.charge.duration{route="/pay"} count=9 sum=41.8s exemplar: none' },
-    {
-      id: 'pay-0915-00',
-      text: '09:15:00 payments.charge.duration{route="/pay"} count=12 sum=52.9s exemplar: value=5.47s trace_id=5b8efff798038103d269b633813fc60c span_id=eee19b7ec3c1b174',
-    },
-    { id: 'pay-0915-15', text: '09:15:15 payments.charge.duration{route="/pay"} count=10 sum=3.1s exemplar: none' },
+    { id: 'pay-0914-00', text: '09:14:00 payments.charge.duration{route="/pay"} count=14 sum=4.31s min=0.19s max=0.52s exemplar: none' },
+    { id: 'pay-0914-15', text: '09:14:15 payments.charge.duration{route="/pay"} count=13 sum=3.39s min=0.21s max=0.50s exemplar: value=0.28s trace_id=ae926589c1fd4adc8eeaeb2bfcb0d19c span_id=b7adcbfe6920dc31' },
+    { id: 'refund-batch', text: '09:14:30 payments.charge.duration{route="/refund-batch", job="settlement-sweep", cloud_region="eu-west-1", instance_id="10.244.103.117:9464", build_id="20241102"} count=4 sum=17.38s min=2.31s max=6.80s exemplar: none' },
+    { id: 'pay-0914-30', text: '09:14:30 payments.charge.duration{route="/pay"} count=11 sum=34.52s min=0.34s max=6.12s exemplar: value=0.41s trace_id=3b7e51d09a84c2f6e1470bd8a35c9f12 span_id=6e0d41a9c85b27f3 exemplar: value=6.12s trace_id=ecddaaffc7bfdda6a3ce9f9dcebec436 span_id=00f0c7aa0bacf2b7' },
+    { id: 'pay-label', text: '09:14:45 payments.charge.duration{route="/pay", cloud_region="eu-west-1", build_id="2411", trace_id="7d1e0b6a94c2f35880ad41c6be92f07d", span_id="c4a1e5d27b903f68"} count=1 sum=5.40s min=5.40s max=5.40s exemplar: none' },
+    { id: 'pay-0914-45', text: '09:14:45 payments.charge.duration{route="/pay"} count=10 sum=41.83s min=0.40s max=7.35s exemplar: none' },
+    { id: 'pay-0915-00', text: '09:15:00 payments.charge.duration{route="/pay"} count=9 sum=36.17s min=0.47s max=5.47s exemplar: value=0.52s trace_id=91c4a8e2d7b6035f4ea1c9d82b70f6a3 span_id=d3159b6c0e7a48f2 exemplar: value=2.84s trace_id=5fa07d3c1e9b46a8b2d80c7f4136e95a span_id=08e6b2f4a1c937d5 exemplar: value=5.47s trace_id=fccad9972863abf3deeabec3b1afc60c span_id=eeeb9b7ec3cfb174' },
+    { id: 'pay-0915-15', text: '09:15:15 payments.charge.duration{route="/pay"} count=12 sum=3.90s min=0.22s max=0.61s exemplar: none' },
   ],
   faults: ['pay-0914-15', 'pay-0914-30', 'pay-0915-00'],
   whyNot: {
@@ -65,13 +62,13 @@ const SPOT = {
     'pay-0914-45': 'This point is on the spike and its exemplar field says none. A high value does not bring an exemplar with it, so there is no trace to jump to from this point.',
     'pay-0915-15': 'The spike is over and the field says none: no exemplar, so no link from this point.',
     'refund-batch': 'A job started by a scheduler, not by a request, and its point says none: no exemplar, so no link.',
-    'pay-label': 'The trace id here is a label of the series, not an exemplar: a label makes a series of its own for every value, and an exemplar sits beside the point, in its own field. This point\'s field says none.',
+    'pay-label': 'The trace id and span id here are labels of the series, not an exemplar: a label makes a series of its own for every value, and an exemplar sits beside the point, in its own field. This point\'s field says none.',
   },
   explain:
-    'Three points carry an exemplar: one measurement recorded in that window, with its value, the <code>trace_id</code> and the ' +
-    '<code>span_id</code> of the span it was recorded in. The value is one measurement, not the point\'s sum, and an exemplar can sit on an ' +
-    'ordinary point as well as on the spike: the point at 09:14:15 has one, and the spike point at 09:14:45 with count=9 has none. The ' +
-    'trace id in a series label does not link anything, and the scheduled job has no exemplar either.',
+    'Three points carry exemplars. Each exemplar is one measurement recorded in that window, with its value, the <code>trace_id</code> and the ' +
+    '<code>span_id</code> of the span it was recorded in, and a point can carry more than one: two of the spike points carry two and three. The value is one measurement, not the point\'s sum, and an exemplar can sit on an ' +
+    'ordinary point as well as on the spike: the point at 09:14:15 has one, and the spike point at 09:14:45, with ten charges and a 7.35s slowest one, has none. The ' +
+    'trace id and span id in series labels do not link anything, and the scheduled job has no exemplar either.',
 };
 
 // Step 2: why the other points have none. `why` follows "Right." or "Not quite.".
@@ -110,8 +107,8 @@ export default {
       {
         intro:
           'Charges got slow on Kettle &amp; Co at 09:14:30. The payments histogram <code>payments.charge.duration</code> shows ' +
-          'the spike, and an engineer wants to jump from a point to a trace of one slow charge. A point can link to one: ' +
-          'its exemplar, a recorded measurement with the <code>trace_id</code> and <code>span_id</code> of the span it was ' +
+          'the spike, and an engineer wants to jump from a point to a trace of one slow charge. A point can link to traces ' +
+          'through its exemplars: each is a recorded measurement with the <code>trace_id</code> and <code>span_id</code> of the span it was ' +
           'recorded in. Payments traces are sampled, so only some requests are recorded. A debug view prints each point and its exemplar field.',
         question: 'Spot the points that carry an exemplar.',
         qid: 'exm-q-spot',

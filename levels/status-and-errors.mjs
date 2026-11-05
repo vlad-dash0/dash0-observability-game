@@ -12,6 +12,7 @@ import { newSortState } from '../lib/widgets/sort-it.mjs';
 const SORT = {
   id: 'status-sort',
   helps: { hints: true },
+  hint: 'Ask which side of the call this span is on. A 4xx can be an error for the caller and fine for the server.',
   buckets: [
     { id: 'ok', label: 'Status is right' },
     { id: 'wrong', label: 'Status is wrong' },
