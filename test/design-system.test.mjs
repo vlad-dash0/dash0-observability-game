@@ -432,3 +432,17 @@ test('T14 kit.css sets color to a tone token only on markers (::before/::after, 
   }
   assert.ok(markers > 0, 'the kit colours its markers by tone');
 });
+
+// ---- Prose evidence scrolls inside its card (#143) ---------------------------------------
+
+test('prose tables and code scroll sideways inside the block, and the prose column can shrink', () => {
+  const kit = sheetRules('kit.css');
+  const props = (sel) => Object.fromEntries(kit.filter((r) => splitTop(r.selector).includes(sel)).flatMap((r) => decls(r.body)));
+  const table = props('.ui-prose table');
+  assert.equal(table['overflow-x'], 'auto', 'a wide evidence table scrolls instead of being clipped by the card');
+  assert.equal(table['max-inline-size'], '100%');
+  assert.equal(props('.ui-prose')['grid-template-columns'], 'minmax(0, 1fr)', 'a grid item would otherwise grow to the table width');
+  assert.equal(props('.ui-prose')['min-width'], '0');
+  assert.equal(props('.ui-prose pre')['overflow-x'], 'auto');
+  assert.equal(props('.ui-prose pre')['max-inline-size'], '100%');
+});

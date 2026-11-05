@@ -71,12 +71,12 @@
 .ui-step-title { font-size: var(--text-base); font-weight: var(--weight-semibold); }
 .ui-step-note { font-size: 13.5px; color: var(--color-text-muted); }
 .ui-note { font-size: 13.5px; color: var(--color-text-muted); overflow-wrap: anywhere; }
-.ui-prose { display: grid; gap: var(--space-3); font-size: var(--text-md); line-height: 1.55; min-width: 0; }
+.ui-prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); font-size: var(--text-md); line-height: 1.55; min-width: 0; }
 .ui-prose p, .ui-prose li { max-inline-size: var(--measure); }
 .ui-prose ul, .ui-prose ol { padding-left: 1.4em; display: grid; gap: 6px; }
 /* A deletion keeps text colour; the strike carries the error tone. */
 .ui-prose del { text-decoration-color: var(--color-error); text-decoration-thickness: 2px; }
-.ui-prose pre, .ui-code { font-size: 12px; line-height: 1.6; overflow-x: auto; }
+.ui-prose pre, .ui-code { font-size: 12px; line-height: 1.6; overflow-x: auto; max-inline-size: 100%; }
 
 /* ---------- Panel (panel.mjs) ---------- */
 .ui-panel {
@@ -277,6 +277,9 @@
 /* ---------- Table (table.mjs; the same look inside prose) ---------- */
 .ui-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: 8px; }
 .ui-table, .ui-prose table { border-collapse: collapse; inline-size: 100%; font-size: var(--text-sm); }
+/* A prose table is the evidence a card shows; it scrolls sideways inside its block instead of
+   being clipped by the card. The prose grid column is minmax(0, 1fr) so it can shrink. */
+.ui-prose table { display: block; overflow-x: auto; max-inline-size: 100%; }
 .ui-table caption, .ui-prose caption { caption-side: top; text-align: left; font-size: 11px; color: var(--color-text-muted); padding: 7px 10px 0; }
 .ui-table th, .ui-prose th {
   text-align: left; font-size: 11px; font-weight: var(--weight-semibold); color: var(--color-text-muted);

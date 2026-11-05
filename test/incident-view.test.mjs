@@ -329,6 +329,15 @@ test('V9 a locked cause is focusable; picking it explains, free, and keeps focus
   assert.equal(causeState(ID, 'bad-deploy'), 'wrong');
 });
 
+test('V9 the unlocking open clears the stale "Not yet" pick line', () => {
+  setup();
+  open('traces');
+  pick('bad-deploy');
+  assert.equal(feedback().hidden, false);
+  open('db-metrics');
+  assert.deepEqual(feedback(), { text: '', tone: null, hidden: true });
+});
+
 // ---- V10 penalties, once each ------------------------------------------------------------
 
 test('V10 a herring that also spends the budget costs two, in one combined error line, tallied apart', () => {
