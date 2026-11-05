@@ -68,7 +68,7 @@ const SPOT = {
     route: 'A route template: the dynamic segments are placeholders, so every request to the route carries the same value. The semantic conventions require <code>http.route</code> to be low-cardinality for this reason.',
     method: 'A short list of values. The semantic conventions map a method the instrumentation does not know to <code>_OTHER</code>, so this cannot grow without bound.',
     status: 'It looks like a number, but a status code is one of a short list of values. What makes an attribute high-cardinality is how many different values it takes, not what they look like.',
-    port: 'A port number looks like an unbounded id, but a service listens on a short list of ports that its configuration sets, and the list changes only when somebody changes that configuration. What makes an attribute high-cardinality is how many different values it takes, not how many digits it has.',
+    port: 'A port is a number, but a service listens on a short list of ports that its configuration sets, and the list changes only when somebody changes that configuration. What makes an attribute high-cardinality is how many different values it takes, not how many digits it has.',
     region: 'A cloud provider has a short, published list of regions, and a company runs in a handful of them. Few values, and the set changes rarely.',
   },
   explain:

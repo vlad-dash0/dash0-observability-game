@@ -29,7 +29,7 @@
 
 // Step 1. Eight points of payments.charge.duration (a histogram, seconds), as a debug view would print
 // them: time, series, the point's fields (count, sum, min and max of the window, two decimals) and its
-// exemplar field. Five 15 s windows of one /pay series (09:14:00 to 09:15:15, the same label set on each)
+// exemplar field. Six 15 s windows of one /pay series (09:14:00 to 09:15:15, the same label set on each)
 // show a spike from 09:14:30 to 09:15:00: charges got slow, so fewer finish and the sums jump. A
 // scheduler-run job (refund-batch) and a series that has a trace id and span id as labels are on the
 // list too. The faults are the three points whose exemplar field holds a value, a trace_id and a
@@ -66,7 +66,7 @@ const SPOT = {
   },
   explain:
     'Three points carry exemplars. Each exemplar is one measurement recorded in that window, with its value, the <code>trace_id</code> and the ' +
-    '<code>span_id</code> of the span it was recorded in, and a point can carry more than one: the spike points here carry two and three. The value is one measurement, not the point\'s sum, and an exemplar can sit on an ' +
+    '<code>span_id</code> of the span it was recorded in, and a point can carry more than one: two of the spike points carry two and three. The value is one measurement, not the point\'s sum, and an exemplar can sit on an ' +
     'ordinary point as well as on the spike: the point at 09:14:15 has one, and the spike point at 09:14:45, with ten charges and a 7.35s slowest one, has none. The ' +
     'trace id and span id in series labels do not link anything, and the scheduled job has no exemplar either.',
 };
@@ -107,8 +107,8 @@ export default {
       {
         intro:
           'Charges got slow on Kettle &amp; Co at 09:14:30. The payments histogram <code>payments.charge.duration</code> shows ' +
-          'the spike, and an engineer wants to jump from a point to a trace of one slow charge. A point can link to one: ' +
-          'its exemplar, a recorded measurement with the <code>trace_id</code> and <code>span_id</code> of the span it was ' +
+          'the spike, and an engineer wants to jump from a point to a trace of one slow charge. A point can link to traces ' +
+          'through its exemplars: each is a recorded measurement with the <code>trace_id</code> and <code>span_id</code> of the span it was ' +
           'recorded in. Payments traces are sampled, so only some requests are recorded. A debug view prints each point and its exemplar field.',
         question: 'Spot the points that carry an exemplar.',
         qid: 'exm-q-spot',
