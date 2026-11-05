@@ -8,6 +8,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseHTML } from 'linkedom';
 import { headersFor, ignoreMatcher } from '../tools/serve.mjs';
+import { INGRESS_HOSTS } from '../lib/dash0/ingress.mjs';
 import { definedClasses } from './helpers/css.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -18,11 +19,16 @@ const JS_YAML = 'js-yaml-5.5.0.mjs';
 // version is in the directory.
 const THREE = ['three-0.180.0/three.module.min.js', 'three-0.180.0/three.core.min.js'];
 
-// docs/FOUNDATION.md §7, verbatim.
-const CSP =
+// docs/FOUNDATION.md §7, verbatim while INGRESS_HOSTS is empty. connect-src is 'self' plus one
+// https origin per INGRESS_HOSTS entry (lib/dash0/ingress.mjs is the one source of truth,
+// docs/DASH0-LAB.md), so the validator's allowlist and vercel.json cannot drift.
+const M0_CSP =
   "default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self'; img-src 'self' data:; " +
   "font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; " +
   "frame-ancestors 'none'; object-src 'none'";
+const cspFor = (hosts) =>
+  M0_CSP.replace("connect-src 'self';", `connect-src ${["'self'", ...hosts.map((h) => `https://${h}`)].join(' ')};`);
+const CSP = cspFor(INGRESS_HOSTS);
 
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 const html = read('index.html');
@@ -113,6 +119,16 @@ test('vercel.json CSP equals the design, with no unsafe-inline and no framing', 
   const d = directives(csp);
   assert.ok(!d['script-src'].includes("'unsafe-inline'"), "script-src allows 'unsafe-inline'");
   assert.deepEqual(d['frame-ancestors'], ["'none'"]);
+});
+
+// I4 (docs/DASH0-LAB.md): the validator's host set is exactly connect-src minus 'self'.
+test("vercel.json connect-src is 'self' plus exactly the INGRESS_HOSTS origins", () => {
+  const d = directives(headerRule('/(.*)')['Content-Security-Policy']);
+  assert.deepEqual(d['connect-src'], ["'self'", ...INGRESS_HOSTS.map((h) => `https://${h}`)]);
+  assert.ok(Object.isFrozen(INGRESS_HOSTS), 'INGRESS_HOSTS is frozen');
+  // The derivation: the M0 policy for an empty list, one origin per host otherwise.
+  assert.equal(cspFor([]), M0_CSP);
+  assert.match(cspFor(['a.example', 'b.example']), /; connect-src 'self' https:\/\/a\.example https:\/\/b\.example; base-uri/);
 });
 
 test('vercel.json keeps the hardening headers and the vendor cache rule', () => {
