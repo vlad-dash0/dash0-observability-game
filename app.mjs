@@ -14,6 +14,7 @@ import { ACT_REGIONS, actOfCountry, COUNTRY_NAMES, LEVEL_COUNTRY } from './hub/g
 import { NODE_IDS } from './hub/map-data.mjs';
 import { ACTS } from './levels/index.mjs';
 import { shuffle as kitShuffle } from './lib/lesson-kit.mjs';
+import { endSentence } from './lib/text.mjs';
 import { globeState } from './lib/globe.mjs';
 import { freshlyLit, igniteView, litText } from './lib/globe-ignite.mjs';
 import { dotStates, globeLabel, globeLines, globeTarget } from './lib/globe-view.mjs';
@@ -199,8 +200,8 @@ export function createGame(deps) {
     levelLabel(id) {
       const l = registry.levels[id];
       const head = l.kind === 'boss' ? 'Incident' : l.no;
-      const sub = l.sub ? ` ${l.sub}.` : '';
-      return `${head}: ${l.name}.${sub} ${STATE_LABELS[this.levelState(id)]}`;
+      const sub = l.sub ? ` ${endSentence(l.sub)}` : '';
+      return `${head}: ${endSentence(l.name)}${sub} ${STATE_LABELS[this.levelState(id)]}`;
     },
     // The card subtitle: the lock reason while nudged, else the level's sub.
     levelSub(id) {

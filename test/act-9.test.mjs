@@ -1,4 +1,4 @@
-// Act 9 "Live Demo" and level 9.2 "The 34% error rate" beyond the generated play-through
+// Act 9 "Live Demo", level 9.1 "Filter, sampler, or both?" and level 9.2 "The 34% error rate" beyond the generated play-through
 // (test/play.test.mjs, test/answers.test.mjs, test/levels-play.test.mjs): the act's place in the
 // registry, unlock and globe; level fields; the verdict Choice and the setup Trade-off through the
 // real graders; the arithmetic the copy shows, recomputed here from scratch; and the sources
@@ -18,8 +18,12 @@ import { expectedStarMax } from './helpers/stars.mjs';
 import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { isActComplete, isActUnlocked, levelState, lockReason } from '../lib/unlock.mjs';
 import { allPlans, evaluatePlan, validateTradeoffSpec } from '../lib/widgets/trade-off.mjs';
+import { validateSortSpec } from '../lib/widgets/sort-it.mjs';
+import { validateSortHelps } from '../lib/widgets/sort-it-help.mjs';
 
-const ID = 'the-34-percent-error-rate';
+const ID91 = 'filter-or-sampler';
+const ID92 = 'the-34-percent-error-rate';
+const ID = ID92; // the 9.2 tests below
 const LIVE = liveRegistry();
 const MAX_STARS = expectedStarMax(LIVE);
 const read = (rel) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
@@ -40,17 +44,23 @@ const [VERDICT_STEP, PLAN_STEP] = level.play.steps;
 const choices = VERDICT_STEP.choice.choices;
 const spec = PLAN_STEP.tradeoff;
 const copyOf = (step) => plain([step.intro, step.show ?? '', step.question].join(' '));
+const SRC91 = read(`levels/${ID91}.mjs`);
+const level91 = LIVE.levels[ID91];
+// Optional chaining so a registry without 9.1 fails the act and globe tests on their assertions, not this file at load.
+const [V91, S91_STEP] = level91?.play.steps ?? [];
+const choices91 = V91?.choice.choices;
+const sort91 = S91_STEP?.sort;
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-9 "Live Demo" is the last act, after act-6, holding only 9.2 and no boss', () => {
+test('act-9 "Live Demo" is the last act, after act-6, holding 9.1 then 9.2 and no boss', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-9');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 9, name: 'Live Demo', sub: 'Does that answer hold?', levelIds: [ID], bossId: null },
+    { no: 9, name: 'Live Demo', sub: 'Does that answer hold?', levelIds: [ID91, ID92], bossId: null },
   );
   assert.deepEqual(LIVE.acts.map((a) => a.id).slice(-2), ['act-6', 'act-9']);
-  assert.deepEqual(LIVE.order.slice(-2), ['errors-tripled', ID]);
+  assert.deepEqual(LIVE.order.slice(-3), ['errors-tripled', ID91, ID92]);
 });
 
 test('act-9 unlocks like the acts before it: open when acts 0-6 are complete, or once entered', () => {
@@ -61,19 +71,27 @@ test('act-9 unlocks like the acts before it: open when acts 0-6 are complete, or
   assert.equal(levelState(ID, progressOf(before), LIVE), 'open');
   assert.equal(levelState(ID, progressOf([ID]), LIVE), 'done', 'completed even when earlier acts are not');
   assert.equal(isActUnlocked(index, progressOf([ID]), LIVE), true);
+  assert.equal(levelState(ID91, progressOf(before), LIVE), 'open');
+  assert.equal(levelState(ID91, progressOf([ID92]), LIVE), 'open', 'entering the act (9.2 done) opens 9.1');
+  assert.equal(levelState(ID92, progressOf([ID91]), LIVE), 'open', 'and 9.1 done opens 9.2');
+  assert.equal(levelState(ID91, progressOf([ID91]), LIVE), 'done');
 
   const withoutBoss = before.filter((id) => id !== 'errors-tripled');
   assert.equal(isActUnlocked(index, progressOf(withoutBoss), LIVE), false, 'the boss of act-6 counts');
   assert.equal(levelState(ID, progressOf(withoutBoss), LIVE), 'locked');
+  assert.equal(levelState(ID91, progressOf(withoutBoss), LIVE), 'locked');
+  assert.deepEqual(lockReason(ID91, progressOf(withoutBoss), LIVE), { kind: 'act', actId: 'act-6' });
   assert.deepEqual(lockReason(ID, progressOf(withoutBoss), LIVE), { kind: 'act', actId: 'act-6' });
   assert.equal(levelState(ID, emptyProgress(), LIVE), 'locked');
   assert.deepEqual(lockReason(ID, emptyProgress(), LIVE), { kind: 'act', actId: 'act-0' });
 });
 
-test('act-9 is complete when its one level is done (no boss)', () => {
+test('act-9 is complete only when both its levels are done (no boss)', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-9');
   assert.equal(isActComplete(act, emptyProgress()), false);
-  assert.equal(isActComplete(act, progressOf([ID])), true);
+  assert.equal(isActComplete(act, progressOf([ID92])), false, '9.2 alone');
+  assert.equal(isActComplete(act, progressOf([ID91])), false, '9.1 alone');
+  assert.equal(isActComplete(act, progressOf([ID91, ID92])), true);
 });
 
 test('adding act-9 re-locks nothing in acts 0-6: every level has the state it has in a registry built without it', () => {
@@ -88,9 +106,11 @@ test('adding act-9 re-locks nothing in acts 0-6: every level has the state it ha
     all.filter((id) => !idsOf('act-6').includes(id)), // acts 0-5 complete, act 6 not entered: its levels are open only through the act before
     all,
     [...all, ID],
+    [...all, ID91],
+    [ID91, ID92],
     ['head-sampling'],
   ];
-  assert.deepEqual(without.order, LIVE.order.slice(0, -1));
+  assert.deepEqual(without.order, LIVE.order.slice(0, -2));
   for (const ids of fixtures) {
     const p = progressOf(ids);
     for (const id of without.order) assert.equal(levelState(id, p, LIVE), levelState(id, p, without), `${id} with ${ids.length} done`);
@@ -313,15 +333,163 @@ test('sources: the Spec and Dash0 URLs, only allowed hosts, the LIVE-DEMO source
   assert.equal(SRC.includes('\u2014'), false);
 });
 
+// ---- level 9.1: Filter, sampler, or both? -------------------------------------------------------
+
+test('9.1 fields: scored with no par time, in act-9, lights the collector, awards no card', () => {
+  assert.deepEqual(
+    { no: level91.no, name: level91.name, sub: level91.sub, icon: level91.icon, rewardTitle: level91.rewardTitle, kind: level91.kind, actId: level91.actId, scored: level91.scored, parMs: level91.scoring.parMs },
+    { no: '9.1', name: 'Filter, sampler, or both?', sub: 'Does that answer hold?', icon: '\u{1F4E2}', rewardTitle: 'Trace keeper', kind: 'level', actId: 'act-9', scored: true, parMs: null },
+  );
+  assert.deepEqual([...level91.mechanics], ['sort']);
+  assert.equal(level91.play.prefix, 'fos');
+  assert.deepEqual([...level91.cards], []);
+  assert.deepEqual([...level91.lights], ['collector']);
+  assert.deepEqual(starTotals(progressOf([ID91, ID92]), LIVE), { earned: 6, max: MAX_STARS });
+});
+
+test('9.1 step 1 is the Act 9 verdict Choice: holds, wrong, follow-up; exactly one right answer, "wrong"', () => {
+  assert.equal(V91.qid, 'fos-q-verdict');
+  assert.equal(V91.choice.id, 'fos-verdict');
+  assert.deepEqual(choices91.map((c) => c.key), ['holds', 'wrong', 'follow-up']);
+  assert.deepEqual(choices91.filter((c) => c.right).map((c) => c.key), ['wrong']);
+  for (const c of choices91) assert.equal(c.label.startsWith({ holds: 'It holds:', wrong: 'It is wrong:', 'follow-up': 'Ask first:' }[c.key]), true, c.key);
+  assert.equal(plain(V91.question), "Does the presenter's answer hold?");
+  assert.match(plain(V91.intro), /presenter/);
+  assert.match(plain(V91.intro), /filter/);
+});
+
+test('9.1 step 1 labels give nothing away: the right one is neither the longest nor the shortest, lengths within 10, no digits', () => {
+  const lens = choices91.map((c) => plain(c.label).length);
+  const right = choices91.find((c) => c.right);
+  assert.equal(plain(right.label).length < Math.max(...lens), true, 'the right label is not the longest');
+  assert.equal(plain(right.label).length > Math.min(...lens), true, `the right label is not the shortest (${lens.join(', ')})`);
+  assert.equal(Math.max(...lens) - Math.min(...lens) <= 10, true, `lengths ${lens.join(', ')}`);
+  for (const c of choices91) assert.equal(/\d/.test(c.label), false, `no digit in ${c.key}`);
+});
+
+test('9.1 step 1 evidence: one trace of 7 spans, 3 Error, and the right why says keeps the 3 and drops the other 4', () => {
+  // 7, 3 and 4 are literals here on purpose: an independent check on the TRACE table the level derives its copy from.
+  assert.equal(V91.show.includes('<table'), true);
+  assert.equal(V91.show.includes('<pre'), false, 'prose and a table, no YAML');
+  const body = V91.show.match(/<tbody>([\s\S]*)<\/tbody>/)[1];
+  const rows = body.match(/<tr>[\s\S]*?<\/tr>/g);
+  assert.equal(rows.length, 7);
+  const cells = rows.map((r) => [...r.matchAll(/<td>([\s\S]*?)<\/td>/g)].map((m) => plain(m[1])));
+  for (const r of cells) assert.equal(r.length, 3, r.join(' | '));
+  assert.equal(cells.filter((r) => r[2] === 'Error').length, 3);
+  assert.equal(cells.filter((r) => r[2] === 'Unset').length, 4);
+  assert.match(plain(V91.show), /One failed checkout trace, 7 spans/);
+  const right = choices91.find((c) => c.right);
+  assert.equal(plain(right.why).includes('keeps the 3 with status Error and drops the other 4'), true, plain(right.why));
+  assert.match(plain(right.why), /Of the 7 spans/);
+  for (const key of ['holds', 'follow-up']) assert.match(plain(choices91.find((c) => c.key === key).why), /drops the 4 healthy spans/, key);
+});
+
+test('9.1 step 2 Sort: a valid 3-bucket board, hints off, 9 items, buckets of 3/4/2', () => {
+  assert.equal(S91_STEP.qid, 'fos-q-sort');
+  assert.equal(sort91.id, 'fos-sort');
+  assert.deepEqual(validateSortSpec(sort91), []);
+  assert.deepEqual(validateSortHelps(sort91), []);
+  assert.deepEqual(sort91.helps, { hints: false });
+  assert.equal(Object.hasOwn(sort91, 'hint'), false, 'no hint of its own');
+  assert.deepEqual(sort91.buckets.map((b) => [b.id, b.label]), [
+    ['filter', 'A filter processor'],
+    ['tail', 'A tail sampler'],
+    ['both', 'Both: a filter and a tail sampler'],
+  ]);
+  assert.deepEqual(sort91.items.map((it) => it.id), ['errors-whole', 'healthz', 'slow-no-cache', 'slow', 'debug-logs', 'many-spans', 'production-only', 'via-payments', 'errors-no-keepalive']);
+  const count = (b) => sort91.items.filter((it) => it.bucket === b).length;
+  assert.deepEqual([count('filter'), count('tail'), count('both')], [3, 4, 2], 'not 3/3/3: "keep the buckets balanced" never wins');
+});
+
+test('9.1 step 2 oracle: each bucket follows from two independent facts', () => {
+  // [the decision needs the whole trace, something inside a kept trace still has to go]
+  const CAP = {
+    'errors-whole': [1, 0],
+    slow: [1, 0],
+    'many-spans': [1, 0],
+    'via-payments': [1, 0],
+    healthz: [0, 0],
+    'debug-logs': [0, 0],
+    'production-only': [0, 0],
+    'slow-no-cache': [1, 1],
+    'errors-no-keepalive': [1, 1],
+  };
+  assert.deepEqual(Object.keys(CAP).sort(), sort91.items.map((it) => it.id).sort());
+  const expected = ([whole, inside]) => (whole && inside ? 'both' : whole ? 'tail' : 'filter');
+  for (const it of sort91.items) assert.equal(it.bucket, expected(CAP[it.id]), it.id);
+});
+
+test('9.1 step 2 every wrong drop explains itself', () => {
+  for (const it of sort91.items) {
+    const others = sort91.buckets.map((b) => b.id).filter((b) => b !== it.bucket);
+    assert.deepEqual(Object.keys(it.whyNot ?? {}).sort(), others.sort(), `${it.id}: a whyNot for each other bucket`);
+    for (const b of others) assert.match(plain(it.whyNot[b]), /^[A-Z][\s\S]*\.$/, `${it.id} whyNot.${b} is a capitalised sentence`);
+    assert.match(plain(it.why), /^[A-Z][\s\S]*\.$/, `${it.id} why`);
+  }
+  const logsNotTail = plain(sort91.items.find((it) => it.id === 'debug-logs').whyNot.tail);
+  assert.match(logsNotTail, /works on traces/, 'the tail sampler handles traces');
+  assert.match(logsNotTail, /Log records never pass through it/, 'and log records never reach it');
+});
+
+test('9.1 sources: the Spec and Dash0 URLs, only allowed hosts, the LIVE-DEMO source line, every Dash0 sentence sourced, no pricing, no em dash', () => {
+  for (const url of [
+    'https://opentelemetry.io/docs/concepts/sampling/#tail-sampling',
+    'https://opentelemetry.io/docs/collector/transforming-telemetry/',
+    'https://opentelemetry.io/docs/specs/semconv/resource/deployment-environment/',
+  ]) assert.equal(SRC91.includes(url), true, url);
+  assert.match(SRC91, /^\/\/ Spec: https:/m);
+  const hosts = ['opentelemetry.io', 'www.w3.org', 'prometheus.io', 'www.dash0.com'];
+  for (const url of SRC91.match(/https:\/\/[^\s,)]+/g)) {
+    const u = new URL(url);
+    assert.equal(hosts.includes(u.host) || (u.host === 'github.com' && u.pathname.startsWith('/open-telemetry/')), true, url);
+  }
+  assert.match(SRC91.split('\n').slice(0, 12).join('\n'), /docs\/LIVE-DEMO\.md/);
+  assert.match(SRC91, /Facts used/);
+  assert.match(SRC91, /Invented/);
+  // G2-c: every sentence of the copy that names Dash0 or one of its features is backed by the `// Dash0 docs:` line: each
+  // feature it names has its page there, and a sentence that names Dash0 names a feature (no bare "Dash0 does X").
+  const dash0Docs = SRC91.match(/^\/\/ Dash0 docs: (.*)$/m)?.[1] ?? '';
+  const DASH0_PAGES = {
+    'spam filter': 'https://www.dash0.com/docs/dash0/cost-control/spam-filters',
+    signalcontrol: 'https://www.dash0.com/docs/dash0/telemetry/signal-control/about-signal-control',
+  };
+  for (const url of Object.values(DASH0_PAGES)) assert.equal(dash0Docs.includes(url), true, `the Dash0 docs line has ${url}`);
+  const copy = plain(JSON.stringify(level91.play));
+  const strings = [];
+  const walk = (v) => (typeof v === 'string' ? strings.push(plain(v)) : v && typeof v === 'object' && Object.values(v).forEach(walk));
+  walk(level91.play);
+  const sentences = strings.flatMap((t) => t.split(/(?<=[.?!])\s+/)).filter((s) => /dash0|signalcontrol|spam filter/i.test(s));
+  assert.equal(sentences.length > 0, true, 'the copy ties the lesson to Dash0');
+  for (const s of sentences) {
+    const named = Object.keys(DASH0_PAGES).filter((f) => s.toLowerCase().includes(f));
+    assert.equal(named.length > 0, true, `a Dash0 sentence names a sourced feature: ${s}`);
+  }
+  assert.equal(/pric|\$|dollar|cost per|per GB|invoice|bill/i.test(copy), false, 'no pricing copy');
+  assert.equal(SRC91.includes('—'), false, 'no em dash');
+  for (const step of level91.play.steps) assert.equal(JSON.stringify(step).includes('<pre'), false, 'no YAML block');
+});
+
 // ---- the globe -----------------------------------------------------------------------------
 
-test('globe: 9.2 lights Australia, completing Oceania, and the announcement says so', () => {
-  assert.equal(LEVEL_COUNTRY[ID], 'AUS');
+test('globe: 9.2 lights Australia, 9.1 lights New Zealand; Oceania completes with both, in either order', () => {
+  assert.equal(LEVEL_COUNTRY[ID92], 'AUS');
+  assert.equal(LEVEL_COUNTRY[ID91], 'NZL');
   assert.equal(COUNTRY_NAMES.AUS, 'Australia');
+  assert.equal(COUNTRY_NAMES.NZL, 'New Zealand');
   assert.equal(ACT_REGIONS['act-9'].region, 'Oceania');
   const map = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES };
-  const fresh = freshlyLit(emptyProgress(), progressOf([ID]), LIVE, map);
-  assert.deepEqual(fresh.countryIds, ['AUS']);
-  assert.deepEqual(fresh.regionIds, ['act-9']);
-  assert.equal(litText(fresh, level, map), 'Australia is now lit: The 34% error rate. Oceania is complete.');
+  const first = freshlyLit(emptyProgress(), progressOf([ID92]), LIVE, map);
+  assert.deepEqual(first, { countryIds: ['AUS'], regionIds: [] }, '9.1 is still open, so the region is not');
+  assert.equal(litText(first, level, map), 'Australia is now lit: The 34% error rate.');
+  const second = freshlyLit(progressOf([ID92]), progressOf([ID92, ID91]), LIVE, map);
+  assert.deepEqual(second, { countryIds: ['NZL'], regionIds: ['act-9'] });
+  assert.equal(litText(second, level91, map), 'New Zealand is now lit: Filter, sampler, or both? Oceania is complete.', 'no "?." after the name');
+  // The other order: 9.1 first lights New Zealand alone, then 9.2 lights Australia and completes the region.
+  const nzFirst = freshlyLit(emptyProgress(), progressOf([ID91]), LIVE, map);
+  assert.deepEqual(nzFirst, { countryIds: ['NZL'], regionIds: [] }, '9.2 is still open, so the region is not');
+  assert.equal(litText(nzFirst, level91, map), 'New Zealand is now lit: Filter, sampler, or both?', 'no "?." and no region line');
+  const auSecond = freshlyLit(progressOf([ID91]), progressOf([ID91, ID92]), LIVE, map);
+  assert.deepEqual(auSecond, { countryIds: ['AUS'], regionIds: ['act-9'] });
+  assert.equal(litText(auSecond, level, map), 'Australia is now lit: The 34% error rate. Oceania is complete.');
 });

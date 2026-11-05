@@ -50,6 +50,7 @@ import statusAndErrors from './status-and-errors.mjs';
 import structuredLogs from './structured-logs.mjs';
 import tailSampling from './tail-sampling.mjs';
 import temporality from './temporality.mjs';
+import filterOrSampler from './filter-or-sampler.mjs';
 import the34PercentErrorRate from './the-34-percent-error-rate.mjs';
 import the3amErrors from './the-3am-errors.mjs';
 import theBill from './the-bill.mjs';
@@ -121,7 +122,7 @@ export const ACTS = [
     no: 9,
     name: 'Live Demo',
     sub: 'Does that answer hold?',
-    levels: [the34PercentErrorRate],
+    levels: [filterOrSampler, the34PercentErrorRate],
     boss: null,
   },
 ];
