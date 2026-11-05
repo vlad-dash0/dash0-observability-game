@@ -29,7 +29,7 @@ const SPOT = {
     { id: 'payments-increase', text: 'alert: PaymentsFailing expr: increase(payments_failed_total{job="payments"}[10m]) > 20 for: 5m' },
     { id: 'cause-cpu', text: 'alert: CheckoutHighCpu expr: avg(rate(process_cpu_seconds_total{job="checkout"}[5m])) > 0.9 for: 15m' },
     { id: 'checkout-slow', text: 'alert: CheckoutSlow expr: histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job="checkout"}[5m]))) > 2 for: 10m' },
-    { id: 'no-for', text: 'alert: SearchSlowP99Latency expr: histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job="search"}[1m]))) > 1 for: 0s' },
+    { id: 'no-for', text: 'alert: SearchSlowP99Latency expr: histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job="search-api"}[1m]))) > 1 for: 0s' },
   ],
   faults: ['counter-value', 'cause-cpu', 'no-for'],
   whyNot: {
@@ -39,9 +39,9 @@ const SPOT = {
     'checkout-slow': 'A symptom, slow checkouts, from the histogram\'s rate over 5 minutes, and it waits 10 minutes before it pages, so one slow minute does not wake anyone.',
   },
   explain:
-    '<code>CheckoutErrors</code> compares a cumulative counter\'s value with 500. A counter only grows until the process restarts, so once it passes 500 the rule fires and never resolves: alert on <code>rate()</code> or <code>increase()</code> over a window. ' +
-    '<code>CheckoutHighCpu</code> pages on a cause: busy CPUs may hurt no one, and when they do, the error and latency rules already fire. Page on symptoms users feel and keep causes on a dashboard. ' +
-    '<code>SearchSlowP99Latency</code> has <code>for: 0s</code>, so it fires on the first evaluation over the line, and a p99 over 1 minute crosses it and falls back often: the alert flaps. ' +
+    '<code>CheckoutErrors</code> compares a cumulative counter\'s value with 500. A counter only grows until the process restarts, so once it passes 500 the rule stays firing until a restart. ' +
+    '<code>CheckoutHighCpu</code> pages on a cause: checkout processes each using 0.9 of a CPU core may hurt no one, and when they do, the error and latency rules already fire. Page on symptoms users feel and keep causes on a dashboard. ' +
+    '<code>SearchSlowP99Latency</code> has no <code>for</code> wait (<code>for: 0s</code>), so it fires on the first evaluation over the line, and a p99 over 1 minute crosses it and falls back often: the alert flaps. ' +
     'A <code>for</code> duration makes the condition hold that long before the alert fires.',
 };
 
@@ -54,14 +54,14 @@ const FIX = [
   {
     key: 'for-1h',
     label: 'Add <code>for: 1h</code>, so the condition must hold for an hour first',
-    why: 'Once the total is over 500 it stays over, so the condition is true every hour after that. <code>for</code> delays the page; it cannot make it resolve.',
+    why: 'Once the total is over 500 it stays over for as long as the process runs, so the condition is true every hour after that. <code>for</code> delays the page; it cannot make it resolve.',
   },
   {
     key: 'increase',
     label: 'Alert on <code>increase()</code> over 10 minutes: failures in that window',
     right: true,
     why:
-      '<code>increase(http_requests_total{job="checkout", code=~"5.."}[10m]) > 20</code> counts the failures in the last ten minutes, so it fires while checkout fails and resolves when it stops, and it adjusts for the reset when the process restarts. ' +
+      '<code>increase(http_requests_total{job="checkout", code=~"5.."}[10m]) > 20</code> estimates the failures in the last ten minutes, so it fires while checkout fails and resolves when it stops, and it adjusts for the reset when the process restarts. ' +
       'Better still, page on the share that fails, as <code>CheckoutErrorRatio</code> does. ' +
       'In Dash0, a check rule evaluates a PromQL expression against a threshold, and its For setting is how long the threshold must be exceeded before alerting.',
   },
