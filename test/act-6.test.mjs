@@ -345,11 +345,15 @@ test('spot: the lines are valid, five of them, and exactly one, the traces pipel
   const spec = spot();
   assert.deepEqual(validateSpotSpec(spec), []);
   assert.equal(spec.target, 'config');
-  assert.deepEqual(spec.lines.map((l) => l.id), ['traces', 'metrics-spans', 'logs', 'connector-def', 'sampler-def']);
+  const ids = spec.lines.map((l) => l.id);
+  assert.deepEqual([...ids].sort(), ['connector-def', 'logs', 'metrics-spans', 'sampler-def', 'traces']);
+  // #190: the answer is not the focused first line (nor the last), and sits below the two lines it is read against.
+  assert.equal(ids.indexOf('traces') > 0 && ids.indexOf('traces') < ids.length - 1, true, `traces is neither first nor last: ${ids}`);
+  assert.equal(ids.indexOf('traces') > ids.indexOf('metrics-spans') && ids.indexOf('traces') > ids.indexOf('connector-def'), true, `traces below metrics-spans and connector-def: ${ids}`);
   const rule = (l) => /processors: \[[^\]]*tail_sampling[^\]]*\]/.test(l.text) && /exporters: \[[^\]]*span_metrics[^\]]*\]/.test(l.text);
   assert.deepEqual(spec.lines.filter(rule).map((l) => l.id), ['traces'], 'the one line that matches the rule');
   assert.deepEqual([...spec.faults], ['traces']);
-  assert.equal(spec.lines[0].text, 'traces: receivers: [otlp] processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0, span_metrics]');
+  assert.equal(spec.lines.find((l) => l.id === 'traces').text, 'traces: receivers: [otlp] processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0, span_metrics]');
   assert.equal(spec.lines.find((l) => l.id === 'metrics-spans').text, 'metrics/spans: receivers: [span_metrics] processors: [batch] exporters: [otlp_grpc/dash0]');
   assert.equal(spec.lines.every((l) => !l.text.includes('spanmetrics')), true, 'the current component name, span_metrics');
 });

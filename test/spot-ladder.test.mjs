@@ -129,15 +129,6 @@ const RULES = {
   'the last k lines': (n, len, k) => n > len - k,
 };
 
-// Boards a position rule solves today, deferred to #190 (Spot it levels whose lines give the
-// answer away). The test below asserts this is EXACTLY the set that fails, so a fix to any of
-// these levels turns it red until its entry is removed here.
-const KNOWN = {
-  '3.2 temp-spot': ['every even line'],
-  '5.5 ottl-spot': ['every even line'],
-  '6.2 ts-spot': ['the first k lines'],
-};
-
 test('no two Spot boards share an answer layout', async () => {
   const byLayout = {};
   for (const { no, specs } of await spotLevels()) {
@@ -148,7 +139,7 @@ test('no two Spot boards share an answer layout', async () => {
   assert.equal(Object.values(byLayout).flat().length, 6, 'all six Spot boards were compared');
 });
 
-test('no position rule (every odd or even line, the first or last k lines) solves a Spot board through checkSpot, apart from the KNOWN #190 boards', async () => {
+test('no position rule (every odd or even line, the first or last k lines) solves any Spot board through checkSpot (#190)', async () => {
   const solving = {};
   let boards = 0;
   for (const { no, specs } of await spotLevels()) {
@@ -164,5 +155,5 @@ test('no position rule (every odd or even line, the first or last k lines) solve
     }
   }
   assert.equal(boards, 6, 'all six Spot boards were tried');
-  assert.deepEqual(solving, KNOWN, 'KNOWN (#190) must be exactly the boards a position rule solves');
+  assert.deepEqual(solving, {}, 'boards a position rule solves without reading them');
 });
