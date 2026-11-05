@@ -407,7 +407,7 @@ test('trace waterfall (#146): bar text on every service fill, trace chips, hint 
   }
 });
 
-test('parent-coloured text (the "its parent" tag, the queue heading) reaches 4.5:1 on every row fill it can sit on, both themes', () => {
+test('parent-coloured text (the "its parent" tag, the queue heading) reaches 4.5:1 on the unfaded row fills (plain, hover, pressed, likely, valid, arriving), both themes', () => {
   for (const [sel, prop] of [['.wf-tag[data-tag="par"]', 'color'], ['.wf-queue-head strong', 'color']]) {
     assert.equal(last(declsFor(sel), prop), 'var(--color-parent)', `${sel} is set in --color-parent`);
   }

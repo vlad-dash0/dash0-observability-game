@@ -323,6 +323,42 @@ test('Escape during a pick is marked handled so the level stays open; with nothi
   assert.equal(esc(), false, 'nothing picked: the app may close the level');
 });
 
+/** Press Escape on Build it box `id`; returns whether the widget marked it handled. */
+const escOn = (id) => {
+  const e = { key: 'Escape', defaultPrevented: false };
+  e.preventDefault = () => {
+    e.defaultPrevented = true;
+  };
+  q(`[data-build="${id}"]`).onkeydown(e);
+  return e.defaultPrevented;
+};
+
+test('Escape is the widget\'s only while a move is pending: a selection with no pick is left to the app', () => {
+  // After a wrong instant drop the span stays selected, but nothing is being moved.
+  const wrong = setup(withHelps({ ...ALL, queue: false }));
+  wrong.mount();
+  drag(C, E);
+  assert.equal(wrong.counts.mistakes, 1, 'a wrong drop');
+  const note = status();
+  assert.equal(escOn('b1'), false, 'after a wrong drop');
+  assert.equal(status(), note, 'no "Cancelled." for a move that was not pending');
+  click(`[data-span="${D}"]`);
+  assert.equal(escOn('b1'), true, 'during a pick it is still the widget\'s');
+  // A kind step: a row click only selects the span.
+  setup({ ...b1Spec(), edit: ['kind'], answer: { [B]: { kind: 'SERVER' } } }).mount();
+  click(`[data-span="${B}"]`);
+  assert.equal(escOn('b1'), false, 'select-only row on a kind step');
+  // Logs mode: a selected record is a selection, not a pending move.
+  setup(logsSpec()).mount();
+  click('[data-log="l-cart"]');
+  assert.equal(escOn('l1'), false, 'a selected record');
+  // After success a row click selects, and nothing can move.
+  setup(withHelps(ALL)).mount();
+  solveQueue();
+  click(`[data-span="${C}"]`);
+  assert.equal(escOn('b1'), false, 'after success');
+});
+
 // ---- completion, success card and swirl ----------------------------------------------
 
 test('instant feedback: placing the last span right assembles the trace, once, with no Check button', () => {

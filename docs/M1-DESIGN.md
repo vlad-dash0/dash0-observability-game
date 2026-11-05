@@ -139,8 +139,12 @@ View `lib/widgets/build-it-view.mjs` (redesigned in #146 from the owner-approved
   stroke, not the fill. The selected row and bar are outlined, its current parent dashed.
 - **Moving a span.** Drag a row onto a span or the root zone (HTML drag and drop, `el.on*`), or
   pick it (click or Enter on its row), then click its parent row or the root zone, as in the
-  prototype; clicking the picked span again, or Escape, cancels (the widget marks that Escape
-  handled, so the app's Escape does not also close the level). The panel stays as an extra
+  prototype; clicking the picked span again, or Escape, cancels. The widget takes Escape only
+  while a move is pending (a span picked in parent mode, when the status says "Esc cancels"),
+  and marks it handled so the app's Escape does not also close the level. In every other state
+  (a span left selected after a wrong instant drop, a row selected on a kind, status or link
+  step, a record selected in logs mode, any row after success) Escape is not handled and
+  reaches the app, which closes the level. The panel stays as an extra
   keyboard and screen-reader path (`data-parent`: root, then the placed spans; itself and its
   descendants disabled). All call `setParent`; a loop refused there stays free. While a span
   moves, itself and its descendants are marked invalid and are not drop targets. Kind, status,
