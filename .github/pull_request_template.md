@@ -4,7 +4,8 @@
 
 ## How it was tested
 
-<!-- Tests added or changed, run with NODE_OPTIONS=--max-old-space-size=2048; mutations run. -->
+<!-- Tests added or changed, run with NODE_OPTIONS=--max-old-space-size=2048; mutations run.
+     No full-suite test count: CI shows it, and a pasted count goes stale on the next push. -->
 
 ## Not verifiable here
 
@@ -13,7 +14,11 @@
 <!--
 REVIEW COMMENTS: post findings and dispositions as PR comments in these formats.
 `node tools/pr-findings.mjs <PR>` reads them (all pages) and exits 0 PASS, 1 open
-findings, 2 inconclusive. Merge needs `All checks` green and the detector at 0.
+findings, 2 inconclusive. Merge needs `All checks` green and the `PR findings` status
+green: CI runs this same script on every push, comment, review and resolved thread and
+posts its verdict on the head commit (pending while the PR is a draft). Hiding a comment
+fires no event, and a failed PR findings run may leave the status out of date: re-run it
+then (Actions, PR findings, Run workflow, the PR number).
 
 1. Findings, one comment per review round. The heading names the reviewed commit:
 
@@ -137,8 +142,19 @@ its author, so the bypass shows in the output. Minimizing removes the whole comm
 from the audit: its findings and its dispositions no longer count. To fix a malformed
 review or dispositions comment (e.g. one with a lead-in line), edit it or post a
 corrected one; minimize only what must not count at all.
-Trust: the detector does not check who posts dispositions; anyone who can comment can
-clear findings. That holds only because this repo is private and only collaborators can
-comment. Each dispositions comment is printed as DISPOSITIONS for <sha> by <login> so
-who cleared what is visible; revisit (enforce an author list) if the repo opens up.
+Trust: the repo is public, so anyone can comment. The detector reads only comments,
+review bodies and review threads whose author is the repo's owner, a member of its
+organisation or a collaborator (GitHub's author association OWNER, MEMBER or
+COLLABORATOR; MEMBER alone does not mean write access). Everyone else's are ignored and
+printed as IGNORED untrusted <comment|thread> by <login>: they can neither clear a
+finding nor block a merge (an ignored malformed or NOT CLEAN comment is not
+inconclusive). A review from an outside reviewer therefore does not count: a
+collaborator posts it. Each counted dispositions comment is still printed as
+DISPOSITIONS for <sha> by <login>, so who cleared what is visible.
+GitHub lets a PR's author resolve any thread on it, write access or not: a thread
+resolved by the PR's author counts as resolved only if that author is trusted too;
+otherwise it stays open, marked "resolved by <login>, the PR's untrusted author". What
+else an outsider can do does not change the verdict: hiding, dismissing or editing
+someone else's comment or review needs write access; their own comments, edits and
+deletions are ignored; the PR body is not read; unresolving a thread only reopens it.
 -->
