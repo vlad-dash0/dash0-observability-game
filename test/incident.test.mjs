@@ -2,8 +2,9 @@
 // Spec: docs/M1-DESIGN.md §4.3, §7 P10. Asserts strings, numbers and booleans only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { incidentScenario } from './fixtures/incident-scenario.mjs';
-import { answer, budgetLeft, canAnswer, newIncident, openView, validateScenario } from '../lib/widgets/incident.mjs';
+import { incidentScenario, threeClues, zero } from './fixtures/incident-scenario.mjs';
+import { answer, budgetLeft, canAnswer, clueIds, cluesFound, newIncident, openView, validateScenario } from '../lib/widgets/incident.mjs';
+import { STEP_TYPES } from '../lib/play.mjs';
 
 const S = incidentScenario;
 const open = (s, st, ...ids) => ids.reduce((cur, id) => openView(s, cur, id).state, st);
@@ -131,4 +132,56 @@ test('I7: the reference path (all clues, then the right answer) solves within bu
   const st = open(s, newIncident(s), ...clues);
   assert.ok(budgetLeft(s, st) > 0);
   assert.equal(answer(s, st, s.hypotheses.find((h) => h.right).id).outcome, 'right');
+});
+
+// ---- P2a (#143): clue counting, the one unlock rule, the optional hint -------------------
+
+test('E1 cluesFound counts distinct opened clue views, uncapped: neutral and herring opens count 0, a repeat once', () => {
+  const s = S();
+  assert.equal(cluesFound(s, newIncident(s)), 0);
+  assert.equal(cluesFound(s, open(s, newIncident(s), 'status-page', 'deploys')), 0, 'neutral and herring are not clues');
+  assert.equal(cluesFound(s, open(s, newIncident(s), 'status-page', 'traces')), 1);
+  assert.equal(cluesFound(s, open(s, newIncident(s), 'traces', 'traces', 'deploys')), 1, 'a repeat open counts once');
+  const t = threeClues();
+  const all = open(t, newIncident(t), 'traces', 'db-metrics', 'logs');
+  assert.equal(cluesFound(t, all), 3, 'uncapped: three clues found though two are needed');
+  assert.equal(cluesFound(t, { ...all, solved: true }), 3, 'solving changes nothing');
+});
+
+test('E2 canAnswer is exactly cluesFound >= answerAfterViews and not solved', () => {
+  const z = zero();
+  assert.equal(canAnswer(z, newIncident(z)), true, 'answerAfterViews 0: open at the start');
+  assert.equal(canAnswer(z, { ...newIncident(z), solved: true }), false, 'never once solved');
+  const s = S();
+  const one = open(s, newIncident(s), 'traces');
+  assert.equal(cluesFound(s, one), 1);
+  assert.equal(canAnswer(s, one), false, '1 of 2');
+  const two = open(s, one, 'db-metrics');
+  assert.equal(cluesFound(s, two), s.answerAfterViews);
+  assert.equal(canAnswer(s, two), true, 'exactly the number needed unlocks (>=, not >)');
+  const t = threeClues();
+  const three = open(t, newIncident(t), 'traces', 'db-metrics', 'logs');
+  assert.equal(canAnswer(t, three), true, 'more than needed stays unlocked');
+  assert.equal(canAnswer(t, { ...three, solved: true }), false);
+});
+
+test('E3 clueIds lists the clue views in scenario order, nothing else', () => {
+  assert.deepEqual(clueIds(S()), ['traces', 'db-metrics']);
+  assert.deepEqual(clueIds(threeClues()), ['traces', 'db-metrics', 'logs']);
+  const s = S();
+  s.views.reverse();
+  assert.deepEqual(clueIds(s), ['db-metrics', 'traces'], 'scenario order, whatever it is');
+});
+
+test('E4 a scenario hint is optional; when given it is non-empty text', () => {
+  const with_ = (hint) => validateScenario({ ...S(), hint });
+  assert.deepEqual(validateScenario(S()), [], 'absent is fine');
+  assert.deepEqual(with_('Start where the latency is.'), []);
+  for (const bad of ['', '   ', 5]) {
+    const problems = with_(bad);
+    assert.equal(problems.length, 1, JSON.stringify(bad));
+    assert.equal(problems[0].startsWith('hint'), true, problems[0]);
+  }
+  assert.deepEqual(STEP_TYPES.incident.validate({ ...S(), hint: 'Start where the latency is.' }), [], 'the incident step type accepts the key');
+  assert.equal(STEP_TYPES.incident.validate({ ...S(), hint: '' }).some((p) => p.startsWith('hint')), true);
 });

@@ -114,8 +114,10 @@ const incident = {
     const herring = s.views.find((v) => v.kind === 'herring');
     const wrong = s.hypotheses.find((h) => !h.right);
     return [
-      ...(herring ? [{ name: `view ${herring.id}`, clicks: [`[data-view="${herring.id}"]`], says: /red herring/ }] : []),
+      // Opens speak in the status bar, picks in the feedback (D7, #143).
+      ...(herring ? [{ name: `view ${herring.id}`, clicks: [`[data-view="${herring.id}"]`], says: /was misleading/, at: `#${s.id}-status` }] : []),
       ...(wrong ? [{ name: `guess ${wrong.id}`, clicks: [...openClues(s), `[data-hypothesis="${wrong.id}"]`], says: NOT_QUITE }] : []),
+      { name: 'hint', clicks: [`#${s.id}-hint`], says: /\S/, at: `#${s.id}-hint-text` },
     ];
   },
   first: (s) => `view:${s.views[0].id}`,

@@ -2,7 +2,8 @@
 // rate, answerAfterViews), the engine's validator and budget arithmetic on it, the numbers the three
 // clues share (one series count from the volume view to the label breakdown, one label, one deploy
 // time before the step), the reference path within budget (I7), one penalty per run (herring, exhaustion,
-// wrong hypothesis), and a focus walk that ends on Finish. The scenario is designed for this game
+// wrong hypothesis), and a focus walk that ends on Finish; the board is read in minutes (25 at 4%/min,
+// #143) through test/helpers/incident-board.mjs. The scenario is designed for this game
 // (docs/OUTLINE.md §4 Act 3 defines no boss; decided on #16); the structure mirrors The 3 a.m. errors
 // (test/the-3am-errors.test.mjs). The happy and sloppy runs are generated from the level's data
 // (test/play.test.mjs). Asserts strings, numbers and booleans only.
@@ -16,6 +17,7 @@ import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { answer, budgetLeft, canAnswer, newIncident, openView, validateScenario } from '../lib/widgets/incident.mjs';
 import { liveRegistry } from '../app.mjs';
 import { expectedStarMax } from './helpers/stars.mjs';
+import { alertTitle, budget as board, causeState, locked as lockedOf, region } from './helpers/incident-board.mjs';
 import { litIds } from './helpers/lights.mjs';
 import { isActUnlocked, levelState } from '../lib/unlock.mjs';
 
@@ -35,7 +37,7 @@ const ACT_3 = ['instruments', 'temporality', 'histograms', 'promql-basics', 'car
 test('the-bill: scenario pin: id, budget, burn rate, answerAfterViews, views with kinds and costs, hypotheses', () => {
   assert.equal(S.id, ID);
   assert.equal(S.alert.title, 'The bill');
-  assert.deepEqual(S.budget, { startPct: 100, burnPctPerMin: 5 });
+  assert.deepEqual(S.budget, { startPct: 100, burnPctPerMin: 4 });
   assert.equal(S.answerAfterViews, 2);
   assert.deepEqual(
     S.views.map((v) => `${v.id}|${v.kind}|${v.costMin}`),
@@ -51,14 +53,13 @@ test('the-bill: scenario pin: id, budget, burn rate, answerAfterViews, views wit
   );
 });
 
-test('the-bill: valid; clues plus neutrals cost 19 min and leave 5%, so only a herring can exhaust the budget', () => {
+test('the-bill: valid; 25 minutes; clues plus neutrals cost 19 and leave 6, so only the herrings can exhaust the budget', () => {
   assert.deepEqual(validateScenario(S), []);
+  assert.equal(S.budget.startPct / S.budget.burnPctPerMin, 25);
   assert.equal(cost('clue'), 12);
   assert.equal(cost('neutral'), 7);
-  assert.equal(S.budget.startPct - (cost('clue') + cost('neutral')) * S.budget.burnPctPerMin, 5);
-  for (const h of S.views.filter((v) => v.kind === 'herring')) {
-    assert.equal(h.costMin * S.budget.burnPctPerMin > 5, true, `${h.id} spends more than the 5% that is left`);
-  }
+  assert.equal(25 - (cost('clue') + cost('neutral')), 6);
+  assert.equal(cost('herring'), 7, 'both herrings on top spend more than the 6 minutes left');
   assert.equal(S.views.every((v) => v.kind === 'clue' || v.costMin <= 4), true, 'no view is a long wait');
 });
 
@@ -221,12 +222,16 @@ function start() {
   return { finished, focus, slips };
 }
 
-const text = (sel) => q(sel)?.textContent.replace(/\s+/g, ' ').trim() ?? null;
 const open = (id) => click(`[data-view="${id}"]`);
 const guess = (id) => click(`[data-hypothesis="${id}"]`);
-const budget = () => text('[data-budget-text]');
-const locked = () => qa('[data-hypothesis]').map((b) => b.disabled).join();
-const FEEDBACK = `#${ID}-feedback`;
+/** The meter's headline and spent line. */
+const budget = () => {
+  const b = board(ID);
+  return `${b.left} ${b.spent}`;
+};
+const locked = () => lockedOf(ID);
+const status = () => region(ID, 'status');
+const feedback = () => region(ID, 'feedback');
 /** After the right hypothesis: Next, the closing Choice answered right, then Finish. */
 const finish = () => {
   click('#tbl-next');
@@ -236,8 +241,9 @@ const finish = () => {
 
 test('the-bill: the first screen shows the alert, a full budget, eight views, locked hypotheses, a disabled Next and no Finish', () => {
   start();
-  assert.equal(text('.incident-alert h3'), 'The bill');
-  assert.equal(budget(), 'Error budget: 100% left (0 min in).');
+  assert.equal(alertTitle(ID), 'The bill');
+  assert.equal(budget(), '25 min left. 0 of 25 min spent');
+  assert.equal(board(ID).cells.total, 25);
   assert.equal(qa('[data-view]').length, 8);
   assert.equal(locked(), 'true,true,true,true');
   assert.equal(q('#tbl-next').disabled, true);
@@ -265,7 +271,7 @@ test('the-bill: neutral and herring views never unlock the answers; only clue vi
 
 // ---- reference path (I7) -------------------------------------------------------------
 
-test('the-bill: the reference path (volume, labels, deploy, then user-id-label) solves with 40% of the budget left and no penalty', () => {
+test('the-bill: the reference path (volume, labels, deploy, then user-id-label) solves with 52% of the budget (13 min) left and no penalty', () => {
   let st = newIncident(S);
   let mistakes = 0;
   for (const id of ['volume-by-metric', 'label-breakdown', 'deploys']) {
@@ -273,20 +279,20 @@ test('the-bill: the reference path (volume, labels, deploy, then user-id-label) 
     st = r.state;
     mistakes += Number(r.herring) + Number(r.exhaustedNow);
   }
-  assert.equal(budgetLeft(S, st), 40);
+  assert.equal(budgetLeft(S, st), 52);
   assert.equal(canAnswer(S, st), true);
   assert.equal(answer(S, st, 'user-id-label').outcome, 'right');
   assert.equal(mistakes, 0);
 });
 
-test('the-bill: the shortest path is two clues (volume, labels); it solves at 55% with no penalty', () => {
+test('the-bill: the shortest path is two clues (volume, labels); it solves with 16 of 25 min left and no penalty', () => {
   const { finished, slips } = start();
   open('volume-by-metric');
   open('label-breakdown');
   assert.equal(q('#tbl-next').disabled, true, 'Next waits for the right answer');
   guess('user-id-label');
   assert.equal(slips.mistakes, 0);
-  assert.equal(budget(), 'Error budget: 55% left (9 min in).');
+  assert.equal(budget(), '16 min left. 9 of 25 min spent');
   finish();
   assert.equal(finished.length, 1);
   assert.equal(finished[0].stars, 5);
@@ -299,7 +305,7 @@ test('the-bill: a herring costs one mistake on its first open only, and the run 
   const { slips, finished } = start();
   open('biggest-metric');
   assert.equal(slips.mistakes, 1);
-  assert.equal(text(FEEDBACK).includes('red herring'), true);
+  assert.deepEqual([status().tone, status().text.includes('was misleading')], ['error', true]);
   open('biggest-metric');
   assert.equal(slips.mistakes, 1, 'a repeat open is free');
   open('volume-by-metric');
@@ -325,14 +331,16 @@ test('the-bill: the second herring is a second mistake; a wrong answer on top is
 });
 
 for (const id of ['traffic-growth', 'new-service-metrics', 'export-interval-change']) {
-  test(`the-bill: guessing ${id} costs one mistake, once, and is then disabled`, () => {
+  test(`the-bill: guessing ${id} costs one mistake, once, and is then ruled out (picking it again is free)`, () => {
     const { slips, finished } = start();
     open('volume-by-metric');
     open('label-breakdown');
     guess(id);
     assert.equal(slips.mistakes, 1);
-    assert.equal(q(`[data-hypothesis="${id}"]`).disabled, true);
-    assert.equal(text(FEEDBACK).startsWith('Not quite.'), true);
+    assert.equal(causeState(ID, id), 'wrong');
+    assert.equal(feedback().text.startsWith('Not quite.'), true);
+    guess(id);
+    assert.equal(slips.mistakes, 1);
     guess('user-id-label');
     finish();
     assert.equal(slips.mistakes, 1);
@@ -340,19 +348,23 @@ for (const id of ['traffic-growth', 'new-service-metrics', 'export-interval-chan
   });
 }
 
-test('the-bill: every clue and neutral leaves 5% and no mistake; a herring then spends the rest, a herring mistake and an exhaustion mistake in one open', () => {
+test('the-bill: every clue and neutral leaves 6 min and no mistake; one herring leaves 3; the second spends the rest, a herring mistake and an exhaustion mistake in one open', () => {
   const { slips, finished } = start();
   for (const id of ['volume-by-metric', 'label-breakdown', 'deploys', 'request-rate', 'export-interval', 'collector-health']) open(id);
-  assert.equal(slips.mistakes, 0, '19 min in: 5% left, nothing spent yet');
-  assert.equal(budget(), 'Error budget: 5% left (19 min in).');
+  assert.equal(slips.mistakes, 0, '19 min in: 6 left, nothing spent yet');
+  assert.equal(budget(), '6 min left. 19 of 25 min spent');
   open('new-service');
-  assert.equal(slips.mistakes, 2);
-  assert.equal(budget(), 'Error budget: 0% left (22 min in).');
-  assert.equal(text(FEEDBACK).includes('red herring, and the error budget is spent'), true);
-  assert.equal(q('[data-hypothesis="user-id-label"]').disabled, false, 'still answerable at 0');
+  assert.equal(slips.mistakes, 1, 'one herring alone does not exhaust');
+  assert.equal(budget(), '3 min left. 22 of 25 min spent');
+  open('biggest-metric');
+  assert.equal(slips.mistakes, 3);
+  assert.equal(board(ID).left, 'Budget spent.');
+  assert.equal(board(ID).cells.over, 25);
+  assert.deepEqual([status().tone, status().text.includes('was misleading, and the error budget is spent')], ['error', true]);
+  assert.equal(causeState(ID, 'user-id-label'), null, 'still answerable at 0');
   guess('user-id-label');
   finish();
-  assert.equal(finished[0].stars, 3, 'two penalties leave 3 stars (the star rule: 2 penalties)');
+  assert.equal(finished[0].stars, 2, 'three penalties leave 2 stars (the star rule: 3 or 4 penalties)');
 });
 
 test('the-bill: opening a view again costs neither time nor a mistake, so repeat opens cannot exhaust the budget', () => {
@@ -360,7 +372,7 @@ test('the-bill: opening a view again costs neither time nor a mistake, so repeat
   for (const id of ['volume-by-metric', 'label-breakdown', 'deploys', 'request-rate', 'export-interval', 'collector-health']) open(id);
   for (const id of ['volume-by-metric', 'deploys', 'collector-health']) open(id);
   assert.equal(slips.mistakes, 0);
-  assert.equal(budget(), 'Error budget: 5% left (19 min in).');
+  assert.equal(budget(), '6 min left. 19 of 25 min spent');
 });
 
 // ---- the closing step: the fix -------------------------------------------------------
@@ -395,14 +407,15 @@ test('the-bill: a wrong answer on the closing step costs one mistake, once, and 
   assert.equal(finished[0].stars, 4);
 });
 
-test('the-bill: focus walk: first view, an opened heading, then Finish', () => {
+test('the-bill: focus walk: first view, an opened heading, the win card, then Finish', () => {
   const { focus } = start();
   assert.equal(focus.last(), 'view:volume-by-metric');
   open('volume-by-metric');
   assert.equal(focus.last(), 'heading:volume-by-metric');
   open('label-breakdown');
   guess('user-id-label');
-  assert.equal(focus.last(), '#tbl-next');
+  assert.equal(focus.last(), `#${ID}-win-title`);
+  assert.equal(q('#tbl-next').disabled, false);
   click('#tbl-next');
   click('[data-pick="drop-the-label"]');
   assert.equal(focus.last(), '#tbl-finish');

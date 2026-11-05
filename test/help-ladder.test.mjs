@@ -116,3 +116,31 @@ test('the swirl gets ctx.reduceMotion, and a swirl that throws leaves the card s
   assert.equal(q('#s2-hint-tier').textContent, 'No hints on this level.');
   assert.equal(qa('#s2-hint').length, 0);
 });
+
+test('S1 score takes more counts (the incident board\'s misleading views and budget run out): shown, folded into the stars and into the hint cost', () => {
+  makeDom();
+  document.body.innerHTML = `<div id="box">${sideColumn({
+    id: 'x',
+    titleHtml: 'Incident resolved',
+    counts: [{ key: 'wrong', label: '' }, { key: 'misleading', label: 'misleading views' }, { key: 'budget', label: 'budget run out' }],
+    hints: true,
+    ruleHtml: RULE,
+  })}</div>`;
+  const side = mountSide({ ovBody: document.body, escapeHtml }, q('#box'), 'x');
+  const n = side.score({ wrong: 1, wrongLabel: 'wrong picks', hints: 0, more: { misleading: 1, budget: 1 }, done: false });
+  assert.equal(n, 2, 'three penalties: 2 stars');
+  assert.equal(q('#x-wrong').textContent, '1');
+  assert.equal(q('#x-misleading').textContent, '1');
+  assert.equal(q('#x-budget').textContent, '1');
+  assert.equal(q('#x-hints').textContent, '0');
+  assert.equal(q('#x-stars').getAttribute('aria-label'), '2 of 5 stars still possible');
+  side.hintUi({ label: 'Hint 1 of 3', disabled: false, tierHtml: '0 of 3 used' });
+  assert.equal(q('#x-hint-cost').textContent, 'costs no star now', 'a fourth penalty still gives 2 stars');
+  side.score({ wrong: 0, wrongLabel: 'wrong picks', hints: 0, more: { misleading: 1, budget: 0 }, done: false });
+  assert.equal(q('#x-misleading').textContent, '1');
+  assert.equal(q('#x-budget').textContent, '0');
+  assert.equal(q('#x-stars').getAttribute('aria-label'), '4 of 5 stars still possible');
+  side.hintUi({ label: 'Hint 1 of 3', disabled: false, tierHtml: '0 of 3 used' });
+  assert.equal(q('#x-hint-cost').textContent, 'costs 1 star');
+  assert.equal(side.score({ wrong: 0, wrongLabel: 'wrong picks', hints: 0, done: false }), 5, 'without more: no extra penalty');
+});

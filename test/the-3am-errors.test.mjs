@@ -2,7 +2,8 @@
 // budget, burn rate, answerAfterViews), the engine's validator and budget arithmetic on it, the
 // facts the three clues share (one trace id from the log to the trace, one field name, one deploy
 // time before the burst), the reference path within budget (I7), one penalty per run (herring,
-// exhaustion, wrong hypothesis), and a focus walk that ends on Finish. The scenario is designed
+// exhaustion, wrong hypothesis), and a focus walk that ends on Finish; the board is read in minutes
+// (25 at 4%/min, #143) through test/helpers/incident-board.mjs. The scenario is designed
 // for this game (docs/OUTLINE.md §4 Act 4 gives only "error burst; correlate logs to the trace to
 // the deploy"); the structure mirrors Checkout is slow (test/checkout-is-slow.test.mjs). The happy
 // and sloppy runs are generated from the level's data (test/play.test.mjs). Asserts strings,
@@ -17,6 +18,7 @@ import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { answer, budgetLeft, canAnswer, newIncident, openView, validateScenario } from '../lib/widgets/incident.mjs';
 import { liveRegistry } from '../app.mjs';
 import { expectedStarMax } from './helpers/stars.mjs';
+import { alertTitle, budget as board, causeState, locked as lockedOf, region } from './helpers/incident-board.mjs';
 import { litIds } from './helpers/lights.mjs';
 import { levelState } from '../lib/unlock.mjs';
 
@@ -35,7 +37,7 @@ const cost = (kind) => S.views.filter((v) => v.kind === kind).reduce((n, v) => n
 test('the-3am-errors: scenario pin: id, budget, burn rate, answerAfterViews, views with kinds and costs, hypotheses', () => {
   assert.equal(S.id, ID);
   assert.equal(S.alert.title, 'The 3 a.m. errors');
-  assert.deepEqual(S.budget, { startPct: 100, burnPctPerMin: 5 });
+  assert.deepEqual(S.budget, { startPct: 100, burnPctPerMin: 4 });
   assert.equal(S.answerAfterViews, 2);
   assert.deepEqual(
     S.views.map((v) => `${v.id}|${v.kind}|${v.costMin}`),
@@ -51,14 +53,13 @@ test('the-3am-errors: scenario pin: id, budget, burn rate, answerAfterViews, vie
   );
 });
 
-test('the-3am-errors: valid; clues plus neutrals cost 19 min and leave 5%, so only a herring can exhaust the budget', () => {
+test('the-3am-errors: valid; 25 minutes; clues plus neutrals cost 19 and leave 6, so only the herrings can exhaust the budget', () => {
   assert.deepEqual(validateScenario(S), []);
+  assert.equal(S.budget.startPct / S.budget.burnPctPerMin, 25);
   assert.equal(cost('clue'), 12);
   assert.equal(cost('neutral'), 7);
-  assert.equal(S.budget.startPct - (cost('clue') + cost('neutral')) * S.budget.burnPctPerMin, 5);
-  for (const h of S.views.filter((v) => v.kind === 'herring')) {
-    assert.equal(h.costMin * S.budget.burnPctPerMin > 5, true, `${h.id} spends more than the 5% that is left`);
-  }
+  assert.equal(25 - (cost('clue') + cost('neutral')), 6);
+  assert.equal(cost('herring'), 7, 'both herrings on top spend more than the 6 minutes left');
   assert.equal(S.views.every((v) => v.kind === 'clue' || v.costMin <= 4), true, 'no view is a long wait');
 });
 
@@ -197,12 +198,16 @@ function start() {
   return { finished, focus, slips };
 }
 
-const text = (sel) => q(sel)?.textContent.replace(/\s+/g, ' ').trim() ?? null;
 const open = (id) => click(`[data-view="${id}"]`);
 const guess = (id) => click(`[data-hypothesis="${id}"]`);
-const budget = () => text('[data-budget-text]');
-const locked = () => qa('[data-hypothesis]').map((b) => b.disabled).join();
-const FEEDBACK = `#${ID}-feedback`;
+/** The meter's headline and spent line. */
+const budget = () => {
+  const b = board(ID);
+  return `${b.left} ${b.spent}`;
+};
+const locked = () => lockedOf(ID);
+const status = () => region(ID, 'status');
+const feedback = () => region(ID, 'feedback');
 /** After the right hypothesis: Next, the closing Choice answered right, then Finish. */
 const finish = () => {
   click('#tae-next');
@@ -212,8 +217,9 @@ const finish = () => {
 
 test('the-3am-errors: the first screen shows the alert, a full budget, eight views, locked hypotheses and a disabled Next', () => {
   start();
-  assert.equal(text('.incident-alert h3'), 'The 3 a.m. errors');
-  assert.equal(budget(), 'Error budget: 100% left (0 min in).');
+  assert.equal(alertTitle(ID), 'The 3 a.m. errors');
+  assert.equal(budget(), '25 min left. 0 of 25 min spent');
+  assert.equal(board(ID).cells.total, 25);
   assert.equal(qa('[data-view]').length, 8);
   assert.equal(locked(), 'true,true,true,true');
   assert.equal(q('#tae-next').disabled, true);
@@ -241,7 +247,7 @@ test('the-3am-errors: neutral and herring views never unlock the answers; only c
 
 // ---- reference path (I7) -------------------------------------------------------------
 
-test('the-3am-errors: the reference path (logs, trace, deploy, then inventory-reply) solves with 40% of the budget left and no penalty', () => {
+test('the-3am-errors: the reference path (logs, trace, deploy, then inventory-reply) solves with 52% of the budget (13 min) left and no penalty', () => {
   let st = newIncident(S);
   let mistakes = 0;
   for (const id of ['error-patterns', 'trace-of-error', 'deploys']) {
@@ -249,20 +255,20 @@ test('the-3am-errors: the reference path (logs, trace, deploy, then inventory-re
     st = r.state;
     mistakes += Number(r.herring) + Number(r.exhaustedNow);
   }
-  assert.equal(budgetLeft(S, st), 40);
+  assert.equal(budgetLeft(S, st), 52);
   assert.equal(canAnswer(S, st), true);
   assert.equal(answer(S, st, 'inventory-reply').outcome, 'right');
   assert.equal(mistakes, 0);
 });
 
-test('the-3am-errors: the shortest path is two clues (logs, trace); it solves at 55% with no penalty', () => {
+test('the-3am-errors: the shortest path is two clues (logs, trace); it solves with 16 of 25 min left and no penalty', () => {
   const { finished, slips } = start();
   open('error-patterns');
   open('trace-of-error');
   assert.equal(q('#tae-next').disabled, true, 'Next waits for the right answer');
   guess('inventory-reply');
   assert.equal(slips.mistakes, 0);
-  assert.equal(budget(), 'Error budget: 55% left (9 min in).');
+  assert.equal(budget(), '16 min left. 9 of 25 min spent');
   finish();
   assert.equal(finished.length, 1);
   assert.equal(finished[0].stars, 5);
@@ -275,7 +281,7 @@ test('the-3am-errors: a herring costs one mistake on its first open only, and th
   const { slips, finished } = start();
   open('warn-noise');
   assert.equal(slips.mistakes, 1);
-  assert.equal(text(FEEDBACK).includes('red herring'), true);
+  assert.deepEqual([status().tone, status().text.includes('was misleading')], ['error', true]);
   open('warn-noise');
   assert.equal(slips.mistakes, 1, 'a repeat open is free');
   open('error-patterns');
@@ -301,14 +307,16 @@ test('the-3am-errors: the second herring is a second mistake; a wrong answer on 
 });
 
 for (const id of ['orders-release', 'database', 'traffic-spike']) {
-  test(`the-3am-errors: guessing ${id} costs one mistake, once, and is then disabled`, () => {
+  test(`the-3am-errors: guessing ${id} costs one mistake, once, and is then ruled out (picking it again is free)`, () => {
     const { slips, finished } = start();
     open('error-patterns');
     open('trace-of-error');
     guess(id);
     assert.equal(slips.mistakes, 1);
-    assert.equal(q(`[data-hypothesis="${id}"]`).disabled, true);
-    assert.equal(text(FEEDBACK).startsWith('Not quite.'), true);
+    assert.equal(causeState(ID, id), 'wrong');
+    assert.equal(feedback().text.startsWith('Not quite.'), true);
+    guess(id);
+    assert.equal(slips.mistakes, 1);
     guess('inventory-reply');
     finish();
     assert.equal(slips.mistakes, 1);
@@ -316,19 +324,23 @@ for (const id of ['orders-release', 'database', 'traffic-spike']) {
   });
 }
 
-test('the-3am-errors: every clue and neutral leaves 5% and no mistake; a herring then spends the rest, a herring mistake and an exhaustion mistake in one open', () => {
+test('the-3am-errors: every clue and neutral leaves 6 min and no mistake; one herring leaves 3; the second spends the rest, a herring mistake and an exhaustion mistake in one open', () => {
   const { slips, finished } = start();
   for (const id of ['error-patterns', 'trace-of-error', 'deploys', 'db-metrics', 'gateway-traffic', 'orders-pods']) open(id);
-  assert.equal(slips.mistakes, 0, '19 min in: 5% left, nothing spent yet');
-  assert.equal(budget(), 'Error budget: 5% left (19 min in).');
+  assert.equal(slips.mistakes, 0, '19 min in: 6 left, nothing spent yet');
+  assert.equal(budget(), '6 min left. 19 of 25 min spent');
   open('provider-errors');
-  assert.equal(slips.mistakes, 2);
-  assert.equal(budget(), 'Error budget: 0% left (22 min in).');
-  assert.equal(text(FEEDBACK).includes('red herring, and the error budget is spent'), true);
-  assert.equal(q('[data-hypothesis="inventory-reply"]').disabled, false, 'still answerable at 0');
+  assert.equal(slips.mistakes, 1, 'one herring alone does not exhaust');
+  assert.equal(budget(), '3 min left. 22 of 25 min spent');
+  open('warn-noise');
+  assert.equal(slips.mistakes, 3);
+  assert.equal(board(ID).left, 'Budget spent.');
+  assert.equal(board(ID).cells.over, 25);
+  assert.deepEqual([status().tone, status().text.includes('was misleading, and the error budget is spent')], ['error', true]);
+  assert.equal(causeState(ID, 'inventory-reply'), null, 'still answerable at 0');
   guess('inventory-reply');
   finish();
-  assert.equal(finished[0].stars, 3, 'two penalties leave 3 stars (the star rule: 2 penalties)');
+  assert.equal(finished[0].stars, 2, 'three penalties leave 2 stars (the star rule: 3 or 4 penalties)');
 });
 
 test('the-3am-errors: opening a view again costs neither time nor a mistake, so repeat opens cannot exhaust the budget', () => {
@@ -336,7 +348,7 @@ test('the-3am-errors: opening a view again costs neither time nor a mistake, so 
   for (const id of ['error-patterns', 'trace-of-error', 'deploys', 'db-metrics', 'gateway-traffic', 'orders-pods']) open(id);
   for (const id of ['error-patterns', 'deploys', 'orders-pods']) open(id);
   assert.equal(slips.mistakes, 0);
-  assert.equal(budget(), 'Error budget: 5% left (19 min in).');
+  assert.equal(budget(), '6 min left. 19 of 25 min spent');
 });
 
 test('the-3am-errors: the closing step: the trace_id and the resource link the views; time alone and message text are corrected', () => {
@@ -366,14 +378,15 @@ test('the-3am-errors: a wrong answer on the closing step costs one mistake, once
   assert.equal(finished[0].stars, 4);
 });
 
-test('the-3am-errors: focus walk: first view, an opened heading, then Finish', () => {
+test('the-3am-errors: focus walk: first view, an opened heading, the win card, then Finish', () => {
   const { focus } = start();
   assert.equal(focus.last(), 'view:error-patterns');
   open('error-patterns');
   assert.equal(focus.last(), 'heading:error-patterns');
   open('trace-of-error');
   guess('inventory-reply');
-  assert.equal(focus.last(), '#tae-next');
+  assert.equal(focus.last(), `#${ID}-win-title`);
+  assert.equal(q('#tae-next').disabled, false);
   click('#tae-next');
   click('[data-pick="trace-and-resource"]');
   assert.equal(focus.last(), '#tae-finish');

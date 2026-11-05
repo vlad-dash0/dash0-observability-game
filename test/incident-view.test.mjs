@@ -1,252 +1,459 @@
-// lib/widgets/incident-view.mjs: the Incident view and mount (render, penalties, one
-// budget source, focus). Spec: docs/M1-DESIGN.md §4.3, §7 P10. Strings/numbers/booleans only.
+// lib/widgets/incident-view.mjs on the kit (#143): the incident board (alert panel, a budget
+// meter in minutes counting down, tiles, Spent on, the evidence log, the clue counter, the lock
+// line, the causes, the side column), its penalties and its focus. Spec: docs/M1-DESIGN.md
+// §4.3; the RED spec V1-V14. The fixture is 20 minutes (100% at 5%/min) with view costs
+// 3/4/6/2, unlike any boss. Strings, numbers and booleans only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeDom, q, qa, click } from './helpers/dom.mjs';
 import { recordFocus } from './helpers/focus.mjs';
+import {
+  alertTitle, budget, card, cards, causeState, clues, cluesOn, fire, hinted, locked, lockLine, minutesShown, region, spentOn, tally,
+} from './helpers/incident-board.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
-import { incidentScenario } from './fixtures/incident-scenario.mjs';
+import { frac, incidentScenario, rightLast, slow, threeClues, tight, zero } from './fixtures/incident-scenario.mjs';
 import { budgetLeft, newIncident, openView } from '../lib/widgets/incident.mjs';
+import { boardStars, starsLabel } from '../lib/widgets/help-ladder.mjs';
 import { mountIncident, renderIncident } from '../lib/widgets/incident-view.mjs';
+
+const ID = 'checkout-slow';
 
 function setup(s = incidentScenario()) {
   const dom = makeDom();
   const focus = recordFocus(dom.window);
-  const counts = { mistakes: 0, done: 0 };
-  const ctx = { ovBody: dom.body, ovActions: dom.actions, escapeHtml, mistake() { counts.mistakes += 1; } };
+  const counts = { mistakes: 0, hints: 0, done: 0 };
+  const ctx = {
+    ovBody: dom.body,
+    ovActions: dom.actions,
+    escapeHtml,
+    reduceMotion: true,
+    signal: new AbortController().signal,
+    mistake() { counts.mistakes += 1; },
+    hint() { counts.hints += 1; },
+  };
   dom.body.innerHTML = renderIncident(s, newIncident(s), { escapeHtml });
-  dom.actions.innerHTML = '<button id="finish" disabled>Finish</button>';
+  dom.actions.innerHTML = '<button id="next" disabled>Next</button>';
   const onComplete = () => {
     counts.done += 1;
-    const fin = dom.actions.querySelector('#finish');
-    fin.disabled = false;
-    return fin;
+    const next = dom.actions.querySelector('#next');
+    next.disabled = false;
+    return next;
   };
-  mountIncident(ctx, s, { onComplete });
-  return { counts, focus };
+  mountIncident(ctx, s, { onComplete, swirl: () => {} });
+  return { counts, focus, s };
 }
 
-const meterValue = () => q('meter').getAttribute('value');
-const budgetText = () => q('[data-budget-text]').textContent;
-const feedback = () => q('#checkout-slow-feedback').textContent;
-const hypDisabled = () => qa('[data-hypothesis]').map((b) => b.disabled);
-const openIds = () => qa('[data-panel]').map((p) => p.dataset.panel).join();
+const open = (id) => click(`[data-view="${id}"]`);
+const pick = (id) => click(`[data-hypothesis="${id}"]`);
+const tile = (id) => q(`[data-view="${id}"]`);
+const cause = (id) => q(`[data-hypothesis="${id}"]`);
+const status = () => region(ID, 'status');
+const feedback = () => region(ID, 'feedback');
+const group = () => cause('slow-query').closest('[role="group"]');
 
-test('render: alert, meter, labelled view buttons, locked hypotheses', () => {
+// ---- V1 render ---------------------------------------------------------------------------
+
+test('V1 render: alert panel, the meter in minutes with minutes left as the headline, the three steps, causes locked but focusable', () => {
   setup();
-  assert.ok(q('.incident-alert').textContent.includes('Checkout latency is burning the error budget'));
-  assert.ok(q('.incident-alert').innerHTML.includes('<b>4s</b>'));
-  assert.equal(q('meter').getAttribute('min'), '0');
-  assert.equal(q('meter').getAttribute('max'), '100');
-  assert.equal(meterValue(), '100');
-  assert.equal(q('meter').getAttribute('aria-label'), 'Error budget');
-  assert.equal(budgetText(), 'Error budget: 100% left (0 min in).');
-  assert.equal(qa('[data-view]').map((b) => b.textContent).join('|'), 'Traces (3 min)|Database metrics (4 min)|Deploy log (6 min)|Status page (2 min)');
-  assert.equal(hypDisabled().join(), 'true,true,true');
-  assert.equal(openIds(), '');
+  assert.equal(alertTitle(ID), 'Checkout latency is burning the error budget');
+  assert.equal(q(`[data-incident="${ID}"] .ui-panel--alert`).innerHTML.includes('<b>4s</b>'), true, 'the alert html is kept');
+  const b = budget(ID);
+  assert.equal(b.left, '20 min left.', 'the headline: minutes left');
+  assert.equal(b.spent, '0 of 20 min spent', 'spent is the secondary line');
+  assert.deepEqual(b.cells, { total: 20, spent: 0, over: 0, preview: 0, left: 20 });
+  assert.equal(b.look, null);
+  assert.equal(qa('meter').length, 0, 'no native meter');
+  const heads = qa(`[data-incident="${ID}"] h3`).map((h) => h.textContent.replace(/\s+/g, ' ').trim());
+  const at = ['Investigate', 'Unlock the causes', 'Name the cause'].map((t) => heads.findIndex((h) => h.endsWith(t)));
+  assert.equal(at.every((i) => i >= 0), true, heads.join(' | '));
+  assert.deepEqual([...at].sort((x, y) => x - y), at, 'the steps in order');
+  for (const v of incidentScenario().views) {
+    const t = tile(v.id).textContent.replace(/\s+/g, ' ');
+    assert.equal(t.includes(v.label) && t.includes(`${v.costMin} min`), true, t);
+    assert.equal(tile(v.id).disabled, false);
+  }
+  assert.equal(locked(ID), 'true,true,true');
+  for (const h of ['slow-query', 'bad-deploy', 'network']) {
+    assert.equal(causeState(ID, h), 'locked');
+    assert.equal(cause(h).disabled, false, `${h} stays focusable`);
+  }
+  assert.equal(qa(`[id="${ID}-hint"]`).length, 1, 'the hint button');
+  assert.deepEqual(cards(ID), [], 'no evidence yet');
 });
 
-test('meter value and text are both formatted from budgetLeft', () => {
+// ---- V2 budget from budgetLeft -----------------------------------------------------------
+
+test('V2 the headline and spent line come from budgetLeft in minutes, and count down with each look', () => {
   const s = incidentScenario();
   setup(s);
   let st = newIncident(s);
-  for (const id of ['traces', 'deploys', 'status-page']) {
-    click(`[data-view="${id}"]`);
+  for (const [id, left, spent] of [['traces', 17, 3], ['deploys', 11, 9], ['status-page', 9, 11]]) {
+    open(id);
     st = openView(s, st, id).state;
-    assert.equal(meterValue(), String(budgetLeft(s, st)));
-    assert.equal(budgetText(), `Error budget: ${budgetLeft(s, st)}% left (${st.minutes} min in).`);
+    assert.equal(budgetLeft(s, st) / s.budget.burnPctPerMin, left);
+    const b = budget(ID);
+    assert.equal(b.left, `${left} min left.`, id);
+    assert.equal(b.spent, `${spent} of 20 min spent`, id);
+    assert.deepEqual(b.cells, { total: 20, spent, over: 0, preview: 0, left: 20 - spent }, id);
   }
 });
 
-test('opening a view shows a tabindex=-1 heading panel and focuses it; repeat is free', () => {
+test('V2 spent exactly to 0 is over: every cell over and "Budget spent."', () => {
+  setup(tight());
+  open('a');
+  assert.equal(budget(ID).left, '1 min left.');
+  assert.deepEqual(budget(ID).cells, { total: 2, spent: 1, over: 0, preview: 0, left: 1 });
+  open('b');
+  assert.equal(budget(ID).left, 'Budget spent.');
+  assert.equal(budget(ID).spent, '2 of 2 min spent');
+  assert.deepEqual(budget(ID).cells, { total: 2, spent: 0, over: 2, preview: 0, left: 0 }, 'at exactly 0, not only past it');
+});
+
+test('V2 a fractional rate shows clean minutes (one decimal) and rounds the cells up', () => {
+  const s = frac();
+  setup(s);
+  assert.equal(budget(ID).left, '43.5 min left.');
+  open('a');
+  const st = openView(s, newIncident(s), 'a').state;
+  assert.equal(minutesShown(budgetLeft(s, st) / s.budget.burnPctPerMin), 29.5);
+  assert.equal(budget(ID).left, '29.5 min left.');
+  assert.equal(budget(ID).spent, '14 of 43.5 min spent');
+  assert.equal(budget(ID).cells.total, 44);
+});
+
+test('V2 a long budget draws at most 100 cells', () => {
+  setup(slow());
+  assert.equal(budget(ID).left, '200 min left.');
+  assert.equal(budget(ID).spent, '0 of 200 min spent');
+  assert.equal(budget(ID).cells.total, 100);
+});
+
+// ---- V3 preview --------------------------------------------------------------------------
+
+test('V3 focus or hover on a tile previews its cost; blur ends it; an opened tile previews nothing; the preview stops at the end', () => {
+  setup();
+  fire(tile('traces'), 'focus');
+  assert.equal(budget(ID).cells.preview, 3);
+  assert.equal(budget(ID).look, 'This look: 3 min.');
+  assert.equal(budget(ID).left, '20 min left.', 'a preview spends nothing');
+  fire(tile('traces'), 'blur');
+  assert.equal(budget(ID).cells.preview, 0);
+  assert.equal(budget(ID).look, null);
+  fire(tile('deploys'), 'pointerenter');
+  assert.equal(budget(ID).cells.preview, 6);
+  assert.equal(budget(ID).look, 'This look: 6 min.');
+  fire(tile('deploys'), 'pointerleave');
+  assert.equal(budget(ID).cells.preview, 0);
+  open('traces');
+  fire(tile('traces'), 'focus');
+  assert.equal(budget(ID).cells.preview, 0, 'opening it again is free');
+  assert.equal(budget(ID).look, null);
+
+  setup(tight());
+  open('b');
+  fire(tile('a'), 'focus');
+  assert.deepEqual(budget(ID).cells, { total: 2, spent: 1, over: 0, preview: 1, left: 0 });
+  open('c');
+  fire(tile('a'), 'focus');
+  assert.equal(budget(ID).cells.preview, 0, 'nothing left to preview into');
+  assert.equal(budget(ID).cells.total, 2);
+});
+
+// ---- V4 Spent on -------------------------------------------------------------------------
+
+test('V4 Spent on lists each opened view in the order opened, and its minutes add up to the spent line', () => {
+  setup();
+  assert.equal(spentOn(ID), null, 'absent before any look');
+  open('status-page');
+  open('traces');
+  open('deploys');
+  open('traces');
+  const chips = spentOn(ID);
+  assert.deepEqual(chips, [['Status page', 2], ['Traces', 3], ['Deploy log', 6]], 'open order, not scenario order; a repeat adds nothing');
+  const sum = chips.reduce((n, [, m]) => n + m, 0);
+  assert.equal(budget(ID).spent, `${sum} of 20 min spent`);
+});
+
+// ---- V5 evidence log ---------------------------------------------------------------------
+
+test('V5 the evidence log: newest first, only the new card open, focus on its heading', () => {
+  const { focus } = setup();
+  open('status-page');
+  assert.deepEqual(cards(ID), ['status-page:open']);
+  assert.equal(focus.last(), 'heading:status-page');
+  open('traces');
+  assert.deepEqual(cards(ID), ['traces:open', 'status-page:closed']);
+  assert.equal(focus.last(), 'heading:traces');
+  assert.equal(q('[data-heading="traces"]').getAttribute('tabindex'), '-1');
+  assert.deepEqual(focus.unfocusable(), []);
+});
+
+test('V5 a card the player opened stays open through a redraw that adds no card (a hint)', () => {
+  setup();
+  open('status-page');
+  open('traces');
+  card(ID, 'status-page').setAttribute('open', '');
+  click(`[id="${ID}-hint"]`);
+  assert.deepEqual(cards(ID), ['traces:open', 'status-page:open']);
+});
+
+test('V5 opening a view again reopens its card and focuses its heading, free, with a neutral line', () => {
   const { counts, focus } = setup();
-  click('[data-view="traces"]');
-  assert.equal(openIds(), 'traces');
-  assert.equal(q('[data-panel="traces"] h4').getAttribute('tabindex'), '-1');
+  open('traces');
+  open('status-page');
+  assert.deepEqual(cards(ID), ['status-page:open', 'traces:closed']);
+  const before = budget(ID).spent;
+  open('traces');
+  assert.deepEqual(cards(ID), ['status-page:open', 'traces:open'], 'reopened in place, not moved to the top');
   assert.equal(focus.last(), 'heading:traces');
-  assert.equal(budgetText(), 'Error budget: 85% left (3 min in).');
-  click('[data-view="traces"]');
-  assert.equal(budgetText(), 'Error budget: 85% left (3 min in).');
+  assert.equal(budget(ID).spent, before, 'no extra time');
   assert.equal(counts.mistakes, 0);
-  assert.equal(focus.last(), 'heading:traces');
-  assert.equal(focus.unfocusable().length, 0);
+  assert.deepEqual(status(), { text: 'Traces is already open. No extra time.', tone: 'neutral', hidden: false });
 });
 
-test('a herring costs one mistake on first open only', () => {
-  const { counts } = setup();
-  click('[data-view="deploys"]');
-  assert.equal(counts.mistakes, 1);
-  assert.ok(feedback().includes('red herring'));
-  click('[data-view="deploys"]');
-  assert.equal(counts.mistakes, 1);
-  click('[data-view="status-page"]');
-  click('[data-view="traces"]');
-  assert.equal(counts.mistakes, 1);
-});
+// ---- V6 kinds ----------------------------------------------------------------------------
 
-test('exhausting the budget costs one mistake, once', () => {
+test('V6 only an opened herring is tagged misleading; clue and neutral tiles look the same; no data-kind', () => {
+  setup();
+  const misleading = (id) => [...tile(id).querySelectorAll('.ui-chip')].filter((c) => c.textContent.includes('misleading')).map((c) => c.getAttribute('data-tone'));
+  assert.deepEqual(misleading('deploys'), [], 'not before it is opened');
+  open('deploys');
+  assert.deepEqual(misleading('deploys'), ['error']);
+  open('traces');
+  open('status-page');
+  assert.deepEqual(misleading('traces'), []);
+  assert.deepEqual(misleading('status-page'), []);
   const s = incidentScenario();
-  s.budget = { startPct: 10, burnPctPerMin: 5 };
-  s.views = [
-    { id: 'a', label: 'A', costMin: 1, html: 'a', kind: 'clue' },
-    { id: 'b', label: 'B', costMin: 1, html: 'b', kind: 'neutral' },
-    { id: 'c', label: 'C', costMin: 1, html: 'c', kind: 'neutral' },
-  ];
-  s.answerAfterViews = 1;
-  const { counts } = setup(s);
-  click('[data-view="a"]');
-  assert.equal(counts.mistakes, 0);
-  click('[data-view="b"]');
-  assert.equal(counts.mistakes, 1);
-  assert.equal(budgetText(), 'Error budget: 0% left (2 min in).');
-  assert.ok(feedback().includes('budget is spent'));
-  click('[data-view="c"]');
-  click('[data-view="b"]');
-  assert.equal(counts.mistakes, 1);
-  assert.equal(budgetText(), 'Error budget: 0% left (3 min in).');
+  const norm = (id) => {
+    const v = s.views.find((x) => x.id === id);
+    return tile(id).outerHTML.replaceAll(v.id, 'ID').replaceAll(v.label, 'LABEL').replace(new RegExp(`\\b${v.costMin}\\b`, 'g'), 'N');
+  };
+  assert.equal(norm('traces'), norm('status-page'), 'an opened clue and an opened neutral view are told apart by nothing');
+  assert.equal(qa(`[data-incident="${ID}"] [data-kind]`).length, 0);
+  assert.equal(q(`[data-incident="${ID}"]`).outerHTML.includes('clue"'), false, 'no kind in any attribute');
 });
 
-test('hypotheses enable after answerAfterViews; wrong costs one, then is disabled', () => {
+// ---- V7 clue counter ---------------------------------------------------------------------
+
+test('V7 Clues found F of N stops at N, with F dots on', () => {
+  setup(threeClues());
+  assert.equal(clues(ID), 'Clues found: 0 of 2');
+  assert.equal(cluesOn(ID), 0);
+  open('status-page');
+  open('deploys');
+  assert.equal(clues(ID), 'Clues found: 0 of 2', 'neutral and herring do not count');
+  open('logs');
+  assert.equal(clues(ID), 'Clues found: 1 of 2');
+  assert.equal(cluesOn(ID), 1);
+  open('traces');
+  open('db-metrics');
+  assert.equal(clues(ID), 'Clues found: 2 of 2', 'capped at the number needed, though three are open');
+  assert.equal(cluesOn(ID), 2);
+  assert.equal(qa('[data-clues] [data-on]').length, 2);
+});
+
+test('V7 a board that needs no clue has no counter, and its causes are open from the start', () => {
+  setup(zero());
+  assert.equal(clues(ID), null);
+  assert.equal(locked(ID), 'false,false,false');
+  assert.equal(causeState(ID, 'slow-query'), null);
+});
+
+// ---- V8 lock line ------------------------------------------------------------------------
+
+const LOCKED = (n, need) => `Locked until you find ${need} clue${need === 1 ? '' : 's'} in Step 1 (${n} of ${need} so far). A clue is a view that helps explain the alert.`;
+const UNLOCKED = 'Unlocked. Pick the cause the evidence supports. A wrong pick costs a star.';
+
+test('V8 the lock line counts clues only, describes the causes group, and is not a live region', () => {
+  setup();
+  assert.equal(lockLine(ID), LOCKED(0, 2));
+  open('status-page');
+  open('deploys');
+  assert.equal(lockLine(ID), LOCKED(0, 2), 'two opens, no clue: still 0');
+  open('traces');
+  assert.equal(lockLine(ID), LOCKED(1, 2));
+  assert.equal(locked(ID), 'true,true,true');
+  open('db-metrics');
+  assert.equal(lockLine(ID), UNLOCKED);
+  assert.equal(locked(ID), 'false,false,false');
+  assert.equal(group().getAttribute('role'), 'group');
+  assert.equal(group().getAttribute('aria-describedby'), `${ID}-lock`);
+  const lock = q(`[id="${ID}-lock"]`);
+  assert.equal(lock.getAttribute('aria-live'), null);
+  assert.equal(lock.getAttribute('role'), null);
+  pick('slow-query');
+  assert.equal(lockLine(ID), 'Solved.');
+});
+
+test('V8 one clue needed: singular', () => {
+  setup(tight());
+  assert.equal(lockLine(ID), LOCKED(0, 1));
+});
+
+// ---- V9 locked causes --------------------------------------------------------------------
+
+test('V9 a locked cause is focusable; picking it explains, free, and keeps focus; once unlocked a wrong pick costs', () => {
   const { counts, focus } = setup();
-  click('[data-view="traces"]');
-  assert.equal(hypDisabled().join(), 'true,true,true');
-  click('[data-view="db-metrics"]');
-  assert.equal(hypDisabled().join(), 'false,false,false');
-  click('[data-hypothesis="bad-deploy"]');
+  open('traces');
+  const seen = focus.names().length;
+  pick('bad-deploy');
+  assert.equal(counts.mistakes, 0);
+  assert.deepEqual(feedback(), { text: 'Not yet. Find 2 clues in Step 1 first: you have 1 of 2. Picking now costs nothing.', tone: 'neutral', hidden: false });
+  assert.equal(focus.names().length, seen, 'focus stays on the cause');
+  assert.equal(causeState(ID, 'bad-deploy'), 'locked');
+  assert.equal(tally(ID).wrong, 0);
+  open('db-metrics');
+  pick('bad-deploy');
   assert.equal(counts.mistakes, 1);
-  assert.ok(feedback().startsWith('Not quite. A bad deploy is not the cause.'));
-  assert.equal(hypDisabled().join(), 'false,true,false');
+  assert.equal(causeState(ID, 'bad-deploy'), 'wrong');
+});
+
+// ---- V10 penalties, once each ------------------------------------------------------------
+
+test('V10 a herring that also spends the budget costs two, in one combined error line, tallied apart', () => {
+  const { counts } = setup(tight());
+  open('a');
+  open('h');
+  assert.equal(counts.mistakes, 2);
+  assert.deepEqual(status(), { text: 'Herring was misleading, and the error budget is spent. Each costs a star.', tone: 'error', hidden: false });
+  assert.deepEqual(tally(ID), { wrong: 0, misleading: 1, budget: 1, hints: 0 });
+  open('h');
+  open('b');
+  assert.equal(counts.mistakes, 2, 'a repeat and a look past the end cost nothing more');
+  assert.deepEqual(tally(ID), { wrong: 0, misleading: 1, budget: 1, hints: 0 });
+});
+
+test('V10 a wrong pick costs one, stays clickable as ruled out; picking it again is free', () => {
+  const { counts, focus } = setup();
+  open('traces');
+  open('db-metrics');
+  pick('bad-deploy');
+  assert.equal(counts.mistakes, 1);
+  assert.equal(causeState(ID, 'bad-deploy'), 'wrong');
+  assert.equal(cause('bad-deploy').disabled, false);
+  assert.equal(feedback().tone, 'error');
+  assert.equal(feedback().text.startsWith('Not quite. A bad deploy is not the cause. No deploy happened.'), true, feedback().text);
   assert.equal(focus.last(), 'hypothesis:network');
-  assert.equal(counts.done, 0);
+  pick('bad-deploy');
+  assert.equal(counts.mistakes, 1);
+  assert.equal(feedback().tone, 'neutral');
+  assert.match(feedback().text, /already ruled/);
+  assert.deepEqual(tally(ID), { wrong: 1, misleading: 0, budget: 0, hints: 0 });
 });
 
-test('neutral and herring opens do not enable the hypotheses; clue opens do', () => {
+test('V10 each hint is exactly one ctx.hint; the side counts always equal ctx mistakes and the stars follow boardStars', () => {
   const { counts } = setup();
-  click('[data-view="status-page"]');
-  click('[data-view="deploys"]');
-  assert.equal(counts.mistakes, 1, 'only the herring costs');
-  assert.equal(hypDisabled().join(), 'true,true,true');
-  click('[data-view="traces"]');
-  assert.equal(hypDisabled().join(), 'true,true,true');
-  click('[data-view="db-metrics"]');
-  assert.equal(hypDisabled().join(), 'false,false,false');
+  open('deploys');
+  click(`[id="${ID}-hint"]`);
+  assert.equal(counts.hints, 1);
+  open('traces');
+  open('db-metrics');
+  pick('network');
+  click(`[id="${ID}-hint"]`);
+  assert.equal(counts.hints, 2);
+  const t = tally(ID);
+  assert.deepEqual(t, { wrong: 1, misleading: 1, budget: 0, hints: 2 });
+  assert.equal(t.wrong + t.misleading + t.budget, counts.mistakes);
+  const stars = q(`[id="${ID}-stars"]`).getAttribute('aria-label');
+  assert.equal(stars, starsLabel(boardStars(t.wrong, t.hints, t.misleading + t.budget), false));
+  assert.equal(stars, '2 of 5 stars still possible', 'four penalties (a wrong pick, a herring, two hints) give 2');
 });
 
-test('the right hypothesis explains, closes the board and hands focus to onComplete', () => {
+// ---- V11 tones ---------------------------------------------------------------------------
+
+test('V11 D7 tones: opens speak in the status bar, picks in the feedback; error only for what costs a star', () => {
+  setup();
+  open('status-page');
+  assert.deepEqual([status().tone, status().text], ['neutral', 'Opened Status page (2 min). Its card is at the top of Evidence.']);
+  assert.equal(feedback().hidden, true, 'an open says nothing in the pick feedback');
+  open('status-page');
+  assert.equal(status().tone, 'neutral');
+  open('deploys');
+  assert.deepEqual([status().tone, status().text], ['error', 'Deploy log was misleading: it does not explain the alert. That costs a star.']);
+  pick('network');
+  assert.equal(feedback().tone, 'neutral', 'a locked pick is free');
+  assert.equal(status().text.startsWith('Deploy log'), true, 'a pick leaves the status bar alone');
+  open('traces');
+  open('db-metrics');
+  pick('network');
+  assert.equal(feedback().tone, 'error');
+  pick('slow-query');
+  assert.equal(feedback().tone, 'success');
+});
+
+// ---- V12 hints ---------------------------------------------------------------------------
+
+test('V12 three hint tiers: the rule, then two clue tiles outlined, then the right cause outlined while locked', () => {
+  setup(rightLast());
+  const hint = () => q(`[id="${ID}-hint"]`);
+  const hintText = () => q(`[id="${ID}-hint-text"]`).textContent.trim();
+  assert.equal(hint().textContent.trim(), 'Hint 1 of 3');
+  click(hint());
+  assert.notEqual(hintText(), '');
+  assert.deepEqual(hinted(ID), []);
+  assert.equal(hint().textContent.trim(), 'Hint 2 of 3');
+  click(hint());
+  assert.deepEqual(hinted(ID), ['view:traces', 'view:db-metrics']);
+  open('traces');
+  assert.deepEqual(hinted(ID), ['view:db-metrics'], 'opening a tile removes its outline');
+  click(hint());
+  assert.equal(hinted(ID).includes('cause:slow-query'), true, 'the right cause, which is third');
+  assert.equal(hinted(ID).includes('cause:bad-deploy'), false);
+  assert.equal(causeState(ID, 'slow-query'), 'locked', 'a hint unlocks nothing');
+  assert.equal(hint().textContent.trim(), 'No more hints');
+  assert.equal(hint().disabled, true);
+  open('db-metrics');
+  pick('slow-query');
+  assert.deepEqual(hinted(ID), [], 'solving clears every outline');
+});
+
+// ---- V13 solved --------------------------------------------------------------------------
+
+test('V13 the right cause: done once, the board closes, the win card shows and takes focus', () => {
   const { counts, focus } = setup();
-  click('[data-view="traces"]');
-  click('[data-view="db-metrics"]');
-  click('[data-hypothesis="slow-query"]');
-  assert.equal(counts.mistakes, 0);
+  open('traces');
+  open('db-metrics');
+  pick('slow-query');
   assert.equal(counts.done, 1);
-  assert.ok(feedback().startsWith('Right. A slow database query. Every slow trace waits on it.'));
-  assert.equal(hypDisabled().join(), 'true,true,true');
-  assert.equal(qa('[data-view]').every((b) => b.disabled), true);
-  assert.equal(focus.last(), '#finish');
-  assert.equal(focus.unfocusable().length, 0);
+  assert.equal(counts.mistakes, 0);
+  assert.equal(causeState(ID, 'slow-query'), 'correct');
+  assert.deepEqual(qa('[data-view]').map((b) => b.disabled), [true, true, true, true]);
+  assert.deepEqual(qa('[data-hypothesis]').map((b) => b.disabled), [true, true, true]);
+  assert.equal(feedback().tone, 'success');
+  assert.equal(feedback().text.startsWith('Right. A slow database query. Every slow trace waits on it.'), true, feedback().text);
+  assert.equal(q(`[id="${ID}-win"]`).hidden, false);
+  assert.equal(focus.last(), `#${ID}-win-title`);
+  assert.equal(q(`[id="${ID}-hint"]`).disabled, true);
+  assert.equal(q(`[id="${ID}-stars"]`).getAttribute('aria-label'), '5 of 5 stars');
+  assert.deepEqual(focus.unfocusable(), []);
 });
 
-test('mountIncident throws TypeError for an invalid scenario, missing onComplete or unrendered scenario', () => {
+// ---- V14 contract ------------------------------------------------------------------------
+
+test('V14 mountIncident throws TypeError for an invalid scenario, missing onComplete or unrendered scenario', () => {
   const s = incidentScenario();
   const dom = makeDom();
-  const ctx = { ovBody: dom.body, ovActions: dom.actions, escapeHtml, mistake() {} };
-  assert.throws(() => mountIncident(ctx, { ...s, hypotheses: [] }, { onComplete() {} }), /invalid scenario/);
+  const ctx = { ovBody: dom.body, ovActions: dom.actions, escapeHtml, mistake() {}, hint() {} };
+  assert.throws(() => mountIncident(ctx, { ...s, hypotheses: [] }, { onComplete() {} }), (e) => e instanceof TypeError && /invalid scenario/.test(e.message));
   dom.body.innerHTML = renderIncident(s, newIncident(s), { escapeHtml });
-  assert.throws(() => mountIncident(ctx, s, {}), /onComplete/);
+  assert.throws(() => mountIncident(ctx, s, {}), (e) => e instanceof TypeError && /onComplete/.test(e.message));
   dom.body.innerHTML = '';
-  assert.throws(() => mountIncident(ctx, s, { onComplete() {} }), /not rendered/);
+  assert.throws(() => mountIncident(ctx, s, { onComplete() {} }), (e) => e instanceof TypeError && /not rendered/.test(e.message));
 });
 
-test('no timers and no Alpine attributes in the incident files (I2, I6)', () => {
-  for (const f of ['incident.mjs', 'incident-view.mjs']) {
-    const src = readFileSync(new URL(`../lib/widgets/${f}`, import.meta.url), 'utf8');
-    assert.equal(/\b(?:setTimeout|setInterval|requestAnimationFrame)\b/.test(src.replace(/\/\/.*$/gm, '')), false, f);
+const src = (f) => readFileSync(new URL(`../lib/widgets/${f}`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+test('V14 no timers and no Alpine attributes in the incident files (I2, I6)', () => {
+  for (const f of ['incident.mjs', 'incident-view.mjs', 'incident-help.mjs']) {
+    assert.equal(/\b(?:setTimeout|setInterval|requestAnimationFrame)\b/.test(src(f)), false, f);
   }
   setup();
   assert.equal(/\s(?:x-[\w.:-]+|@[\w.:-]+)=/.test(q('[data-incident]').outerHTML), false);
 });
 
-test('a fractional burn rate shows a clean, matching meter value and text', () => {
-  const s = incidentScenario();
-  s.budget = { startPct: 100, burnPctPerMin: 2.3 };
-  s.views = [
-    { id: 'a', label: 'A', costMin: 14, html: 'a', kind: 'clue' },
-    { id: 'b', label: 'B', costMin: 1, html: 'b', kind: 'neutral' },
-  ];
-  s.answerAfterViews = 1;
-  setup(s);
-  click('[data-view="a"]');
-  assert.equal(meterValue(), '67.8');
-  assert.equal(budgetText(), 'Error budget: 67.8% left (14 min in).');
-});
-
-test('a herring that also exhausts the budget costs two mistakes and one combined line', () => {
-  const s = incidentScenario();
-  s.budget = { startPct: 10, burnPctPerMin: 5 };
-  s.views = [
-    { id: 'a', label: 'A', costMin: 1, html: 'a', kind: 'clue' },
-    { id: 'h', label: 'Herring', costMin: 1, html: 'h', kind: 'herring' },
-  ];
-  s.answerAfterViews = 1;
-  const { counts } = setup(s);
-  click('[data-view="a"]');
-  click('[data-view="h"]');
-  assert.equal(counts.mistakes, 2);
-  assert.equal(feedback(), 'Herring was a red herring, and the error budget is spent.');
-});
-
-const HINT = 'Look for more evidence before naming the cause.';
-// Text (or null), never the element: a failed assert would inspect the whole DOM graph.
-const hintText = () => qa('#checkout-slow-locked-hint')[0]?.textContent ?? null;
-const group = () => q('.incident-hypotheses');
-
-test('locked: a generic line says to look for more evidence and describes the hypothesis group', () => {
-  setup();
-  assert.equal(hintText(), HINT);
-  assert.equal(group().getAttribute('role'), 'group');
-  assert.equal(group().getAttribute('aria-label'), 'Hypotheses');
-  assert.equal(group().getAttribute('aria-describedby'), 'checkout-slow-locked-hint');
-  assert.equal(qa('[aria-live]').length, 1, 'the feedback region stays the only live region');
-  assert.equal(q('#checkout-slow-locked-hint').getAttribute('aria-live'), null);
-  assert.equal(q('#checkout-slow-locked-hint').getAttribute('role'), null);
-});
-
-test('locked after only neutral and herring opens: the same line, revealing nothing', () => {
-  setup();
-  const before = hintText();
-  click('[data-view="status-page"]');
-  click('[data-view="deploys"]');
-  assert.equal(hintText(), before);
-  assert.equal(group().getAttribute('aria-describedby'), 'checkout-slow-locked-hint');
-  click('[data-view="traces"]');
-  assert.equal(hintText(), HINT, 'one clue of two: same text, no count');
-});
-
-test('unlocked: the line and the description are gone', () => {
-  setup();
-  click('[data-view="traces"]');
-  click('[data-view="db-metrics"]');
-  assert.equal(hintText(), null);
-  assert.equal(group().getAttribute('aria-describedby'), null);
-  assert.equal(group().getAttribute('role'), 'group');
-});
-
-test('unlocked but one hypothesis answered wrong: still no line', () => {
-  setup();
-  click('[data-view="traces"]');
-  click('[data-view="db-metrics"]');
-  click('[data-hypothesis="bad-deploy"]');
-  assert.equal(hypDisabled().join(), 'false,true,false');
-  assert.equal(hintText(), null);
-  assert.equal(group().getAttribute('aria-describedby'), null);
-});
-
-test('solved: no line', () => {
-  setup();
-  click('[data-view="traces"]');
-  click('[data-view="db-metrics"]');
-  click('[data-hypothesis="slow-query"]');
-  assert.equal(hintText(), null);
-  assert.equal(group().getAttribute('aria-describedby'), null);
+test('V14 the view and the help never read a kind as "clue" (clueIds is the one place)', () => {
+  for (const f of ['incident-view.mjs', 'incident-help.mjs']) {
+    assert.equal(/['"`]clue['"`]/.test(src(f)), false, `${f} names the clue kind`);
+  }
 });

@@ -3,7 +3,8 @@
 // share (one fallback name, one executable, one deployment and pod, one version, a deploy two minutes
 // before the first alert), the shortcuts a player could take through the real incident engine, the
 // reference path within budget (I7), one penalty per run (herring, exhaustion, wrong hypothesis), and a
-// focus walk that ends on Finish. The scenario is designed for this game (docs/OUTLINE.md §4 Act 1 defines
+// focus walk that ends on Finish. The board is read in minutes (25 at 4%/min, #143) through
+// test/helpers/incident-board.mjs. The scenario is designed for this game (docs/OUTLINE.md §4 Act 1 defines
 // no boss; decided on #16); the structure mirrors The 3 a.m. errors (test/the-3am-errors.test.mjs). The
 // happy and sloppy runs are generated from the level's data (test/play.test.mjs). Asserts strings, numbers
 // and booleans only.
@@ -17,6 +18,7 @@ import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { answer, budgetLeft, canAnswer, newIncident, openView, validateScenario } from '../lib/widgets/incident.mjs';
 import { liveRegistry } from '../app.mjs';
 import { expectedStarMax } from './helpers/stars.mjs';
+import { alertTitle, budget as board, causeState, locked as lockedOf, region } from './helpers/incident-board.mjs';
 import { litIds } from './helpers/lights.mjs';
 import { levelState } from '../lib/unlock.mjs';
 
@@ -37,7 +39,7 @@ const NEUTRALS = ['collector-restart', 'message-volume', 'pod-health'];
 test('who-is-talking: scenario pin: id, budget, burn rate, answerAfterViews, views with kinds and costs, hypotheses', () => {
   assert.equal(S.id, ID);
   assert.equal(S.alert.title, 'Who is unknown_service:node?');
-  assert.deepEqual(S.budget, { startPct: 100, burnPctPerMin: 5 });
+  assert.deepEqual(S.budget, { startPct: 100, burnPctPerMin: 4 });
   assert.equal(S.answerAfterViews, 2);
   assert.deepEqual(
     S.views.map((v) => `${v.id}|${v.kind}|${v.costMin}`),
@@ -53,14 +55,13 @@ test('who-is-talking: scenario pin: id, budget, burn rate, answerAfterViews, vie
   );
 });
 
-test('who-is-talking: valid; clues plus neutrals cost 19 min and leave 5%, so only a herring can exhaust the budget', () => {
+test('who-is-talking: valid; 25 minutes; clues plus neutrals cost 19 and leave 6, so only the herrings can exhaust the budget', () => {
   assert.deepEqual(validateScenario(S), []);
+  assert.equal(S.budget.startPct / S.budget.burnPctPerMin, 25);
   assert.equal(cost('clue'), 12);
   assert.equal(cost('neutral'), 7);
-  assert.equal(S.budget.startPct - (cost('clue') + cost('neutral')) * S.budget.burnPctPerMin, 5);
-  for (const h of S.views.filter((v) => v.kind === 'herring')) {
-    assert.equal(h.costMin * S.budget.burnPctPerMin > 5, true, `${h.id} spends more than the 5% that is left`);
-  }
+  assert.equal(25 - (cost('clue') + cost('neutral')), 6);
+  assert.equal(cost('herring'), 7, 'both herrings on top spend more than the 6 minutes left');
   assert.equal(S.views.every((v) => v.kind === 'clue' || v.costMin <= 4), true, 'no view is a long wait');
   assert.equal(S.views.filter((v) => v.kind === 'herring').length >= 2, true);
   assert.equal(S.views.filter((v) => v.kind === 'neutral').length >= 2, true);
@@ -216,12 +217,16 @@ function start() {
   return { finished, focus, slips };
 }
 
-const text = (sel) => q(sel)?.textContent.replace(/\s+/g, ' ').trim() ?? null;
 const open = (id) => click(`[data-view="${id}"]`);
 const guess = (id) => click(`[data-hypothesis="${id}"]`);
-const budget = () => text('[data-budget-text]');
-const locked = () => qa('[data-hypothesis]').map((b) => b.disabled).join();
-const FEEDBACK = `#${ID}-feedback`;
+/** The meter's headline and spent line. */
+const budget = () => {
+  const b = board(ID);
+  return `${b.left} ${b.spent}`;
+};
+const locked = () => lockedOf(ID);
+const status = () => region(ID, 'status');
+const feedback = () => region(ID, 'feedback');
 /** After the right hypothesis: Next, the closing Choice answered right, then Finish. */
 const finish = () => {
   click('#wit-next');
@@ -231,8 +236,9 @@ const finish = () => {
 
 test('who-is-talking: the first screen shows the alert, a full budget, eight views, locked hypotheses, a disabled Next and no Finish', () => {
   start();
-  assert.equal(text('.incident-alert h3'), 'Who is unknown_service:node?');
-  assert.equal(budget(), 'Error budget: 100% left (0 min in).');
+  assert.equal(alertTitle(ID), 'Who is unknown_service:node?');
+  assert.equal(budget(), '25 min left. 0 of 25 min spent');
+  assert.equal(board(ID).cells.total, 25);
   assert.equal(qa('[data-view]').length, 8);
   assert.equal(locked(), 'true,true,true,true');
   assert.equal(q('#wit-next').disabled, true);
@@ -260,7 +266,7 @@ test('who-is-talking: neutral and herring views never unlock the answers; only c
 
 // ---- reference path (I7) and shortcuts -----------------------------------------------
 
-test('who-is-talking: the reference path (resource, deploys, pod env, then name-dropped) solves with 40% left and no penalty', () => {
+test('who-is-talking: the reference path (resource, deploys, pod env, then name-dropped) solves with 52% (13 min) left and no penalty', () => {
   let st = newIncident(S);
   let mistakes = 0;
   for (const id of CLUES) {
@@ -268,13 +274,13 @@ test('who-is-talking: the reference path (resource, deploys, pod env, then name-
     st = r.state;
     mistakes += Number(r.herring) + Number(r.exhaustedNow);
   }
-  assert.equal(budgetLeft(S, st), 40);
+  assert.equal(budgetLeft(S, st), 52);
   assert.equal(canAnswer(S, st), true);
   assert.equal(answer(S, st, 'name-dropped').outcome, 'right');
   assert.equal(mistakes, 0);
 });
 
-test('who-is-talking: shortcut: opening every view in order ends at 0%, with the two penalties of the first herring (herring, exhaustion) and the right answer still open', () => {
+test('who-is-talking: shortcut: opening every view in order ends at 0%: the first herring costs one, the second its herring and the exhaustion, and the right answer is still open', () => {
   let st = newIncident(S);
   let mistakes = 0;
   for (const v of S.views) {
@@ -287,7 +293,7 @@ test('who-is-talking: shortcut: opening every view in order ends at 0%, with the
   assert.equal(answer(S, st, 'name-dropped').outcome, 'right', 'the incident is still solvable at 0');
 });
 
-test('who-is-talking: shortcut: only clues, in any order, never penalised; even the lucky two (resource, pod env) unlock the answer at 60%', () => {
+test('who-is-talking: shortcut: only clues, in any order, never penalised; even the lucky two (resource, pod env) unlock the answer at 68%', () => {
   for (const order of [CLUES, [...CLUES].reverse(), ['pod-env', 'alert-resource', 'deploy-history']]) {
     let st = newIncident(S);
     let mistakes = 0;
@@ -297,12 +303,12 @@ test('who-is-talking: shortcut: only clues, in any order, never penalised; even 
       mistakes += Number(r.herring) + Number(r.exhaustedNow);
     }
     assert.equal(mistakes, 0, order.join());
-    assert.equal(budgetLeft(S, st), 40, order.join());
+    assert.equal(budgetLeft(S, st), 52, order.join());
   }
   let st = newIncident(S);
   for (const id of ['alert-resource', 'pod-env']) st = openView(S, st, id).state;
   assert.equal(canAnswer(S, st), true);
-  assert.equal(budgetLeft(S, st), 60);
+  assert.equal(budgetLeft(S, st), 68);
 });
 
 test('who-is-talking: shortcut: every clue and neutral in any order never exhausts; skipping the closing Choice leaves no Finish', () => {
@@ -312,7 +318,7 @@ test('who-is-talking: shortcut: every clue and neutral in any order never exhaus
     st = r.state;
     assert.equal(r.exhaustedNow, false, id);
   }
-  assert.equal(budgetLeft(S, st), 5);
+  assert.equal(budgetLeft(S, st), 24);
   const { finished } = start();
   open('alert-resource');
   open('deploy-history');
@@ -322,14 +328,14 @@ test('who-is-talking: shortcut: every clue and neutral in any order never exhaus
   assert.equal(q('#wit-next').disabled, false);
 });
 
-test('who-is-talking: the shortest path is two clues (resource, deploys); it solves at 60% with no penalty and 5 stars', () => {
+test('who-is-talking: the shortest path is two clues (resource, deploys); it solves with 17 of 25 min left, no penalty and 5 stars', () => {
   const { finished, slips } = start();
   open('alert-resource');
   open('deploy-history');
   assert.equal(q('#wit-next').disabled, true, 'Next waits for the right answer');
   guess('name-dropped');
   assert.equal(slips.mistakes, 0);
-  assert.equal(budget(), 'Error budget: 60% left (8 min in).');
+  assert.equal(budget(), '17 min left. 8 of 25 min spent');
   finish();
   assert.equal(finished.length, 1);
   assert.equal(finished[0].stars, 5);
@@ -342,7 +348,7 @@ test('who-is-talking: a herring costs one mistake on its first open only, and th
   const { slips, finished } = start();
   open('catalog-rename');
   assert.equal(slips.mistakes, 1);
-  assert.equal(text(FEEDBACK).includes('red herring'), true);
+  assert.deepEqual([status().tone, status().text.includes('was misleading')], ['error', true]);
   open('catalog-rename');
   assert.equal(slips.mistakes, 1, 'a repeat open is free');
   open('alert-resource');
@@ -368,14 +374,16 @@ test('who-is-talking: the second herring is a second mistake; a wrong answer on 
 });
 
 for (const id of ['new-service', 'detector-broken', 'collector-renamed']) {
-  test(`who-is-talking: guessing ${id} costs one mistake, once, and is then disabled`, () => {
+  test(`who-is-talking: guessing ${id} costs one mistake, once, and is then ruled out (picking it again is free)`, () => {
     const { slips, finished } = start();
     open('alert-resource');
     open('deploy-history');
     guess(id);
     assert.equal(slips.mistakes, 1);
-    assert.equal(q(`[data-hypothesis="${id}"]`).disabled, true);
-    assert.equal(text(FEEDBACK).startsWith('Not quite.'), true);
+    assert.equal(causeState(ID, id), 'wrong');
+    assert.equal(feedback().text.startsWith('Not quite.'), true);
+    guess(id);
+    assert.equal(slips.mistakes, 1);
     guess('name-dropped');
     finish();
     assert.equal(slips.mistakes, 1);
@@ -383,19 +391,23 @@ for (const id of ['new-service', 'detector-broken', 'collector-renamed']) {
   });
 }
 
-test('who-is-talking: every clue and neutral leaves 5% and no mistake; a herring then spends the rest, a herring mistake and an exhaustion mistake in one open', () => {
+test('who-is-talking: every clue and neutral leaves 6 min and no mistake; one herring leaves 3; the second spends the rest, a herring mistake and an exhaustion mistake in one open', () => {
   const { slips, finished } = start();
   for (const id of [...CLUES, ...NEUTRALS]) open(id);
-  assert.equal(slips.mistakes, 0, '19 min in: 5% left, nothing spent yet');
-  assert.equal(budget(), 'Error budget: 5% left (19 min in).');
+  assert.equal(slips.mistakes, 0, '19 min in: 6 left, nothing spent yet');
+  assert.equal(budget(), '6 min left. 19 of 25 min spent');
   open('k8s-warnings');
-  assert.equal(slips.mistakes, 2);
-  assert.equal(budget(), 'Error budget: 0% left (22 min in).');
-  assert.equal(text(FEEDBACK).includes('red herring, and the error budget is spent'), true);
-  assert.equal(q('[data-hypothesis="name-dropped"]').disabled, false, 'still answerable at 0');
+  assert.equal(slips.mistakes, 1, 'one herring alone does not exhaust');
+  assert.equal(budget(), '3 min left. 22 of 25 min spent');
+  open('catalog-rename');
+  assert.equal(slips.mistakes, 3);
+  assert.equal(board(ID).left, 'Budget spent.');
+  assert.equal(board(ID).cells.over, 25);
+  assert.deepEqual([status().tone, status().text.includes('was misleading, and the error budget is spent')], ['error', true]);
+  assert.equal(causeState(ID, 'name-dropped'), null, 'still answerable at 0');
   guess('name-dropped');
   finish();
-  assert.equal(finished[0].stars, 3, 'two penalties leave 3 stars (the star rule: 2 penalties)');
+  assert.equal(finished[0].stars, 2, 'three penalties leave 2 stars (the star rule: 3 or 4 penalties)');
 });
 
 test('who-is-talking: opening a view again costs neither time nor a mistake, so repeat opens cannot exhaust the budget', () => {
@@ -403,7 +415,7 @@ test('who-is-talking: opening a view again costs neither time nor a mistake, so 
   for (const id of [...CLUES, ...NEUTRALS]) open(id);
   for (const id of ['alert-resource', 'pod-env', 'pod-health']) open(id);
   assert.equal(slips.mistakes, 0);
-  assert.equal(budget(), 'Error budget: 5% left (19 min in).');
+  assert.equal(budget(), '6 min left. 19 of 25 min spent');
 });
 
 test('who-is-talking: the closing step grades the fix and the fallback; renaming the executable and k8s attributes are corrected', () => {
@@ -434,14 +446,15 @@ test('who-is-talking: a wrong answer on the closing step costs one mistake, once
   assert.equal(finished[0].stars, 4);
 });
 
-test('who-is-talking: focus walk: first view, an opened heading, then Finish', () => {
+test('who-is-talking: focus walk: first view, an opened heading, the win card, then Finish', () => {
   const { focus } = start();
   assert.equal(focus.last(), 'view:alert-resource');
   open('alert-resource');
   assert.equal(focus.last(), 'heading:alert-resource');
   open('deploy-history');
   guess('name-dropped');
-  assert.equal(focus.last(), '#wit-next');
+  assert.equal(focus.last(), `#${ID}-win-title`);
+  assert.equal(q('#wit-next').disabled, false);
   click('#wit-next');
   click('[data-pick="env-var"]');
   assert.equal(focus.last(), '#wit-finish');
