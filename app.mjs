@@ -321,7 +321,7 @@ export function createGame(deps) {
       } catch (e) {
         report(e);
       }
-      this.focusSoon('.overlay .back-btn');
+      this.focusSoon('#ov-back');
       return true;
     },
 
@@ -375,7 +375,7 @@ export function createGame(deps) {
       this.rewardStars = level?.scored ? result.stars : null; // this run's stars
       this.rewardCards = rec.newCards.map((c) => cardFront[c] ?? c);
       this.rewardOpen = true;
-      this.focusSoon('.reward .btn');
+      this.focusSoon('#reward-close');
     },
 
     closeReward() {

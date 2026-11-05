@@ -6,6 +6,7 @@
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
 import { newBuildState } from '../lib/widgets/build-it.mjs';
+import { prose } from '../lib/ui/index.mjs';
 
 const CHARGE = '8f14e45fceea167a';
 const RETRY = '45c48cce2e2d7fbd';
@@ -139,7 +140,7 @@ export default {
             'the operation failed, Unset when it completed, even if it handled an error on the way.',
         )}</div>
         <div class="lesson-stage">
-          <ul class="evl-stories">${stories}</ul>
+          ${prose(`<ul>${stories}</ul>`)}
           <h3 class="q">Give each span the status its outcome calls for.</h3>
           ${renderBuild(ERRORS, newBuildState(ERRORS), { escapeHtml: e })}
         </div>`,

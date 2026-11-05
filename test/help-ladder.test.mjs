@@ -1,12 +1,23 @@
-// lib/widgets/help-ladder.mjs: the shared help ladder and right column (score card, hint
-// tools, success card), for Build it now and Sort it later (#146, #156). Asserts strings,
-// numbers and booleans only.
+// lib/widgets/help-ladder.mjs: the shared help ladder's behaviour around the right column
+// (score card, hint tools, success card), for Build it now and Sort it later (#146, #156).
+// The markup is the kit's (lib/ui/side.mjs helpChips, sideColumn, stars; #158). Asserts
+// strings, numbers and booleans only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeDom, q, qa } from './helpers/dom.mjs';
 import { recordFocus } from './helpers/focus.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
-import { chipsHtml, hintCost, mountSide, sideHtml, starsLabel, validateHelps } from '../lib/widgets/help-ladder.mjs';
+import { helpChips, sideColumn } from '../lib/ui/index.mjs';
+import * as ladder from '../lib/widgets/help-ladder.mjs';
+import { hintCost, mountSide, RULE, starsLabel, validateHelps } from '../lib/widgets/help-ladder.mjs';
+
+/** The column as Build it renders it: one count (`wrong`, labelled by score()), the star rule. */
+const sideHtml = (id, { hints, title }) =>
+  sideColumn({ id, titleHtml: title, counts: [{ key: 'wrong', label: '' }], hints, ruleHtml: RULE });
+
+test('help-ladder keeps the behaviour; the markup lives in the kit (lib/ui/side.mjs)', () => {
+  assert.deepEqual(Object.keys(ladder).sort(), ['HINT_TIERS', 'RULE', 'boardStars', 'hintCost', 'mountSide', 'starsLabel', 'validateHelps']);
+});
 
 const KEYS = ['queue', 'hints'];
 
@@ -20,9 +31,9 @@ test('validateHelps: absent is fine; an object of known keys with boolean values
   ]);
 });
 
-test('chipsHtml: one chip per help, saying on or off in words', () => {
+test('helpChips: one chip per help, saying on or off in words', () => {
   makeDom();
-  document.body.innerHTML = chipsHtml('x', [
+  document.body.innerHTML = helpChips('x', [
     { key: 'queue', label: 'One span at a time', on: true },
     { key: 'hints', label: 'Hints', on: false },
   ]);

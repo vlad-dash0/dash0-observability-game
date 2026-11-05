@@ -36,11 +36,7 @@
   padding: 6px 11px; border-radius: 20px; font-weight: 700; font-size: 13px;
 }
 .star-count span:first-child { color: var(--color-accent); }
-.theme-btn {
-  width: 34px; height: 34px; border-radius: 10px; cursor: pointer;
-  border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text);
-  display: grid; place-items: center; font-size: 16px;
-}
+/* The theme, Back and reward buttons are kit buttons (index.html; D3: the hub changes only its buttons). */
 @media (max-width: 360px) {
   .brand-name span { display: none; }
 }
@@ -169,21 +165,16 @@
 .overlay {
   position: fixed; inset: 0; z-index: 50; display: none;
   background: var(--color-bg);
-  max-width: 720px; margin: 0 auto;
+  max-width: var(--layout-wide); margin: 0 auto;
 }
 .overlay.show { display: flex; flex-direction: column; animation: slideUp .35s ease; }
-/* A Build it step is laptop-first: the waterfall plus its 300px right column (#146). */
-.overlay:has(.build) { max-width: 1320px; }
+/* As wide as the widest step; each step caps itself (kit .ui-step, narrow or wide by its
+   type, #158), so the overlay never needs to know what it holds. */
 .lesson-top {
   flex: 0 0 auto; z-index: 5; display: flex; align-items: center; gap: 12px;
   padding: 16px 18px; background: var(--color-surface); border-bottom: 1px solid var(--color-border);
 }
 .lesson-top h2 { font-weight: 700; font-size: 17px; }
-.back-btn {
-  width: 36px; height: 36px; border-radius: 11px; border: 1px solid var(--color-border);
-  background: var(--color-surface-2); color: var(--color-text); display: grid; place-items: center;
-  cursor: pointer; font-size: 18px; flex-shrink: 0;
-}
 /* The x-ignore wrapper: takes the rest of the overlay and stacks body over actions. */
 .level-host { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .lesson-scroll {
@@ -196,7 +187,14 @@
   border-top: 1px solid var(--color-border); background: var(--color-surface);
 }
 .lesson-actions:empty { display: none; }
-.lesson-actions .btn { margin-top: 0; }
+/* A hand-written level's Next, Finish or Escalate (the legacy .btn until #165 moves those
+   levels onto the kit) looks like the kit's primary pill (D2) and sits where a narrow step's
+   actions bar puts it: right-aligned to the narrow column (percent margins are of this bar). */
+.lesson-actions .btn {
+  display: block; width: auto; margin: 0 max(0px, calc((100% - var(--layout-narrow)) / 2)) 0 auto;
+  padding: 9px 20px; border-radius: var(--radius-pill); box-shadow: none;
+  font-size: var(--text-md); font-weight: var(--weight-semibold); line-height: 1.3;
+}
 
 /* ---------- Reward card ---------- */
 .reward {
