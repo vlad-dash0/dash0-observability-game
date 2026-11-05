@@ -189,6 +189,13 @@ test('T12 every container query names level; only the kit step (and the listed l
   for (const key of CONTAINER_ALLOW) assert.ok(seen.has(key), `stale CONTAINER_ALLOW entry: ${key}`);
 });
 
+test('a chip never overflows its container: capped at the container width, and its text may wrap', () => {
+  const chip = Object.fromEntries(sheetRules('kit.css').filter((r) => r.selector === '.ui-chip').flatMap((r) => decls(r.body)));
+  assert.equal(chip['max-width'], '100%');
+  assert.notEqual(chip['white-space'], 'nowrap', 'a long chip must be able to wrap');
+  assert.equal(chip['overflow-wrap'], 'anywhere', 'and break inside a long word');
+});
+
 test('palette rule 5: kit.css puts no shadow or glow on anything, only inset rings', () => {
   let rings = 0;
   for (const r of sheetRules('kit.css')) {

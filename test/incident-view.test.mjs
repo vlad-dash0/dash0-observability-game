@@ -403,6 +403,7 @@ test('V10 each hint is exactly one ctx.hint; the side counts always equal ctx mi
   const t = tally(ID);
   assert.deepEqual(t, { wrong: 1, misleading: 1, budget: 0, hints: 2 });
   assert.equal(t.wrong + t.misleading + t.budget, counts.mistakes);
+  assert.equal(q(`[id="${ID}-misleading-label"]`).textContent, 'misleading', 'the label reads right after any count: "1 misleading"');
   const stars = q(`[id="${ID}-stars"]`).getAttribute('aria-label');
   assert.equal(stars, starsLabel(boardStars(t.wrong, t.hints, t.misleading + t.budget), false));
   assert.equal(stars, '2 of 5 stars still possible', 'four penalties (a wrong pick, a herring, two hints) give 2');

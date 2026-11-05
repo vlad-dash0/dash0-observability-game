@@ -106,7 +106,7 @@
   display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
   font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.6; font-variant-numeric: tabular-nums;
   padding: 1px var(--space-2); border-radius: var(--radius-pill); border: 1px solid var(--color-border);
-  color: var(--color-text-muted); white-space: nowrap;
+  color: var(--color-text-muted); white-space: normal; overflow-wrap: anywhere;
 }
 .ui-chip--dashed { border-style: dashed; }
 .ui-chip-dot { inline-size: 7px; block-size: 7px; border-radius: 50%; flex: none; }

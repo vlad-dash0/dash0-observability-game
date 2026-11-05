@@ -54,6 +54,10 @@ test('H2 tier 2: up to two clue views, only the unopened ones while any remain, 
   const three = hintFor(t, open(t, newIncident(t), 'traces'), 2);
   assert.deepEqual(three.views, ['db-metrics', 'logs'], 'three clues, one open: the two unopened, not the opened one');
   assert.equal(plain(three.html), 'Worth opening: Database metrics and Logs (outlined in Step 1).');
+
+  const all = hintFor(t, open(t, newIncident(t), 'traces', 'db-metrics', 'logs'), 2);
+  assert.deepEqual(all.views, []);
+  assert.equal(plain(all.html), 'You have Traces, Database metrics and Logs open.', 'all three open: every clue is named');
 });
 
 test('H3 tier 3: outlines the right cause, says how to unlock only while locked, and changes nothing', () => {

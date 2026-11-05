@@ -265,8 +265,8 @@ Each incident boss sets its own rate: 5%/min (20 min) for who-is-talking, the-bi
 
 Hints, `lib/widgets/incident-help.mjs` (pure): `hintFor(s, st, tier)` → `{html, views, hypothesis}`. Tier 1 is
 the scenario's `hint` (authored HTML) or one generic rule that names no view; tier 2 names up to two clue views
-(from `clueIds`): the unopened ones while any remain, else the first two clues as already open (then the text
-reads "You have X and Y open."); it outlines only the unopened (`views`); tier 3 names the right cause,
+(from `clueIds`): the unopened ones while any remain, else every clue as already open (then the text
+reads "You have X and Y open." or "You have X, Y and Z open."); it outlines only the unopened (`views`); tier 3 names the right cause,
 outlines it (`hypothesis`) and says how many clues unlock it only while it is locked. A hint never changes
 the state. Each tier costs one `ctx.hint()`.
 
