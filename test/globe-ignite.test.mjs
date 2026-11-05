@@ -347,6 +347,22 @@ test('ignite: the globe turns to the country first, then the dots flare, the rin
   handle.dispose();
 });
 
+test('an update for the same act after an ignite keeps the view: no snap back east', async () => {
+  const { THREE, rec } = recordingThree();
+  const dom = recordingDom();
+  const act = { actId: 'a0', x: 0.3, y: 1.2 };
+  const handle = await mountGlobe(dom.host, { ...BASE, target: act, window: dom.window, document: dom.document, importThree: async () => THREE });
+  const view = VIEW_XXX();
+  handle.ignite(view, new Uint8Array([1, 1, 0, 0, 0]));
+  for (let i = 0; i < 400; i++) dom.tick();
+  const y0 = rec.groups[0].rotation.last[1];
+  handle.update(new Uint8Array([1, 1, 0, 0, 0]), act);
+  dom.tick();
+  const moved = Math.abs(wrap(rec.groups[0].rotation.last[1] - y0));
+  assert.ok(moved < 0.05, `the view stays where the ignite left it (moved ${moved})`);
+  handle.dispose();
+});
+
 test('ignite plays about 1.5 s of frames, once', async () => {
   const { handle, rec, dom } = await mounted();
   handle.ignite(VIEW_XXX(), new Uint8Array([1, 1, 0, 0, 0]));

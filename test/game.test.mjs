@@ -83,7 +83,7 @@ function fakeGlobe(result = 'handle') {
   return { mount, log };
 }
 
-function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true, globe, window } = {}) {
+function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true, globe, window, debug } = {}) {
   const dom = makeDom(read('index.html'));
   const store = fakeStorage({ initial, throwOn });
   const timers = [];
@@ -104,6 +104,7 @@ function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true,
     globeMap: GLOBE_MAP,
     dots: DOTS,
     window,
+    debug,
   });
   return { game, store, dom, timers, errors };
 }
@@ -617,6 +618,45 @@ test('Back to the map before the globe has loaded plays the ignite once it arriv
   await tick();
   assert.equal(log.ignites.length, 1);
   assert.equal(log.ignites[0].view.target.key, 'country:XXX');
+});
+
+test('a debug run lights nothing: no ignite, no note, no scroll, and focus goes back to the card', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game, dom } = setup({ globe: mount, debug: true, reduceMotion: false });
+  const spy = spyHub(dom);
+  const focused = [];
+  const card = dom.document.createElement('div');
+  card.setAttribute('data-level-id', 'x');
+  card.focus = () => focused.push('x');
+  dom.document.body.appendChild(card);
+  game.init();
+  await tick();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  await tick();
+  game.closeReward();
+  assert.equal(log.ignites.length, 0, 'nothing was saved, so nothing is fresh');
+  assert.equal(game.litNote, '');
+  assert.deepEqual(spy.scrolls, []);
+  assert.deepEqual(spy.focuses, []);
+  assert.deepEqual(focused, ['x']);
+});
+
+test('an ignite queued before the globe loaded is dropped when the hub hides: the next mount plays nothing', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game } = setup({ globe: mount });
+  game.init();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  game.closeReward(); // queued: the first mount has not resolved yet
+  game.openLevel('y'); // hides the globe; the stale mount is disposed on arrival
+  await tick();
+  await tick();
+  game.closeOverlay(); // without finishing: a fresh mount
+  await tick();
+  await tick();
+  assert.equal(log.handles.length - log.disposed, 1, 'one live globe, mounted after the level closed');
+  assert.equal(log.ignites.length, 0, 'no stale ignite on that globe');
 });
 
 test('without WebGL the text fallback names the newly lit country', () => {
