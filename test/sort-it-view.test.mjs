@@ -167,7 +167,7 @@ test('S2 sortView: with no selection, or once done, no bucket is enabled', () =>
 // ---- S3 kit markup ------------------------------------------------------------------------
 
 test('S3 renderSort: kit markup in one split; the side column with a hidden success card and zeroed score; toggle items; buckets in drop zones; no retired class', () => {
-  setup();
+  const { mount } = setup();
   assert.equal(qa('.ui-split').length, 1, 'one board-and-side split');
   assert.equal(qa('.ui-split-side [id="signals-win"]').length, 1, 'the success card is in the side column');
   assert.equal(q('#signals-win').hasAttribute('hidden'), true, 'hidden until success');
@@ -182,6 +182,12 @@ test('S3 renderSort: kit markup in one split; the side column with a hidden succ
   const group = q('[data-item="i1"]').closest('[role="group"]');
   assert.ok(group, 'the items are in a group');
   assert.equal(Boolean(group.getAttribute('aria-label') || group.getAttribute('aria-labelledby')), true, 'the group is named');
+  const describedBy = () => q('[data-item="i1"]').closest('[role="group"]').getAttribute('aria-describedby');
+  assert.equal(describedBy(), 'signals-instr', 'the group is described by the instruction');
+  mount();
+  sortTo('i2', 'log');
+  assert.equal(describedBy(), 'signals-instr', 'still after a placement');
+  setup();
   assert.deepEqual(qa('[data-bucket]').map((b) => b.dataset.bucket), ['metric', 'log', 'trace']);
   assert.deepEqual(qa('[data-bucket]').map((b) => b.textContent.trim()), ['Metric', 'Log', 'Trace']);
   for (const b of qa('[data-bucket]')) {
@@ -449,6 +455,9 @@ test('the drop path is the click path: a wrong drop costs a mistake, a right dro
   assert.equal(tone(), 'success');
   assert.equal(feedback(), 'Right. Stack trace text goes in Log. A timestamped record.');
   assert.equal(placed('log'), 'Stack trace text');
+  drop(null, 'trace');
+  assert.equal(counts.mistakes, 1, 'an empty drop costs nothing');
+  assert.equal(feedback(), 'Pick an item first.', 'the finished drag was cleared');
 });
 
 test('a bucket with nothing selected costs nothing, is neutral and asks for an item first', () => {

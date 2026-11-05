@@ -104,7 +104,7 @@ count, success card with its swirl; no hints yet). Items are toggle options (`da
 `aria-describedby="ID-instr"`); buckets are drop panels (`[data-drop]` holding the `data-bucket`
 button and the `[data-bucket-list]` of placed items); a kit stats line reads "Sorted N of M";
 `#ID-feedback` is the kit feedback region; the plain-text instruction ("Drag each item into the
-right bucket, or pick an item and then a bucket.") is `<p class="ui-note" id="ID-instr">`.
+right bucket, or pick an item and then a bucket.") is `<p class="sort-instr" id="ID-instr">`.
 `labelledBy`, a plain-token heading id, makes the widget a labelled group.
 `mountSort(ctx, spec, {onComplete, swirl?})`: the pool order is shuffled once per mount through
 `ctx.shuffle`; tap-to-place (item then bucket; keyboard-native); drag is an enhancement calling
@@ -188,7 +188,7 @@ View `lib/widgets/build-it-view.mjs` (redesigned in #146 from the owner-approved
   time: N problems.`). Each hint tier costs one `ctx.hint()`. Retrying is free; Reset puts the
   board back and keeps what was paid.
 - **Right column** (markup: `sideColumn` and `helpChips` in `lib/ui/side.mjs`; behaviour:
-  `lib/widgets/help-ladder.mjs`, shared so Sort it can adopt it, #156): about
+  `lib/widgets/help-ladder.mjs`, shared; Sort it adopted it in #156): about
   300px and sticky beside the board from about 960px of widget width (a container query), else
   stacked under it: the success card (hidden until success; heading focused, no focus ring;
   stars line; the spec's `closing`), the score card (wrong drops or failed Checks, hints, five

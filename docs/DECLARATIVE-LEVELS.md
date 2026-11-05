@@ -230,7 +230,7 @@ Each type also has a test driver in `test/helpers/step-drivers.mjs` (§4). Addin
 |---|---|---|
 | cards awarded on finish | `level.cards` plus `finish({cards})` in all 13 levels | `runPlay` passes `level.cards`; one home. Run-levels keep theirs, guarded by `levels-play` "card … is not in level.cards" (`levels-play.test.mjs:488-490`) |
 | level mechanics | hand-written per level | derived by `validatePlay`, the one source; a declared value must equal it (registry error otherwise) |
-| choice spec validity | only inside `mountChoice` (`choice.mjs:51-63`) | `validateChoiceSpec`; `mountChoice` calls it (like `mountSort` → `validateSortSpec`, `sort-it-view.mjs:75`) |
+| choice spec validity | only inside `mountChoice` (`choice.mjs:51-63`) | `validateChoiceSpec`; `mountChoice` calls it (like `mountSort` → `validateSortSpec`, called from `renderSort`) |
 | Next/Finish markup, gating, `data-finish` | 13 copies | `runPlay` only |
 | reference answer solvable (I7) | per-act test loops (`act-2.test.mjs:358-393`), plus `validateBuildSpec` and `validateScenario` | each type's `validate`, run when the registry is built, plus the generated suite. The per-act loops stay (not deleted in M2) |
 | what costs a star (slip list) | hand `SLIPS` tables (`act-2.test.mjs:599-660`) | derived from the spec by the step drivers; the hand tables stay for migrated levels as proof |
