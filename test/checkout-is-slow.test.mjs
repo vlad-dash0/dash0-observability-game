@@ -1,7 +1,8 @@
 // Act 2 boss "Checkout is slow" beyond the play-through: the scenario pinned to
 // docs/M1-DESIGN.md §6, the engine's validator and budget arithmetic on it, the reference
 // path within budget (I7), one penalty per run (herring, exhaustion, wrong hypothesis),
-// the triage numbers, and a focus walk that ends on Finish. Spec: docs/M1-DESIGN.md §6
+// the triage numbers, and a focus walk that ends on the win card, with the board read in
+// minutes (25 at 4%/min) through test/helpers/incident-board.mjs. Spec: docs/M1-DESIGN.md §6
 // Boss checkout-is-slow and §7 P11. The happy and sloppy runs live in test/levels-play.test.mjs.
 // Asserts strings, numbers and booleans only.
 import { test } from 'node:test';
@@ -15,6 +16,7 @@ import { answer, budgetLeft, newIncident, openView, validateScenario } from '../
 import { compareAttribute } from '../lib/widgets/triage.mjs';
 import { liveRegistry } from '../app.mjs';
 import { expectedStarMax } from './helpers/stars.mjs';
+import { alertTitle, budget as board, cardText, causeState, locked as lockedOf, region } from './helpers/incident-board.mjs';
 import boss, { CONTENT } from '../levels/checkout-is-slow.mjs';
 
 const LIVE = liveRegistry();
@@ -101,17 +103,22 @@ function start() {
   return { finished, focus, slips };
 }
 
-const text = (sel) => q(sel)?.textContent.replace(/\s+/g, ' ').trim() ?? null;
+const ID = 'checkout-is-slow';
 const open = (id) => click(`[data-view="${id}"]`);
 const guess = (id) => click(`[data-hypothesis="${id}"]`);
-const budget = () => text('[data-budget-text]');
-const panel = (id) => text(`[data-panel="${id}"]`);
-const locked = () => qa('[data-hypothesis]').map((b) => b.disabled).join();
+/** The meter's headline and spent line: 25 minutes at 4%/min. */
+const budget = () => {
+  const b = board(ID);
+  return `${b.left} ${b.spent}`;
+};
+const panel = (id) => cardText(ID, id);
+const locked = () => lockedOf(ID);
 
 test('checkout-is-slow: the first screen shows the alert, a full budget, locked hypotheses and a disabled Finish', () => {
   start();
-  assert.equal(text('.incident-alert h3'), 'Checkout is slow');
-  assert.equal(budget(), 'Error budget: 100% left (0 min in).');
+  assert.equal(alertTitle(ID), 'Checkout is slow');
+  assert.equal(budget(), '25 min left. 0 of 25 min spent');
+  assert.equal(board(ID).cells.total, 25);
   assert.equal(qa('[data-view]').length, 8);
   assert.equal(locked(), 'true,true,true,true');
   assert.equal(q('[data-finish]').disabled, true);
@@ -124,7 +131,7 @@ test('checkout-is-slow: trace-slow shows inventory GET /stock with 40 sequential
   for (const part of ['inventory', 'GET /stock', '40', 'SELECT stock', 'CLIENT', 'one after another']) {
     assert.equal(p.includes(part), true, `trace-slow says "${part}"`);
   }
-  assert.equal(budget(), 'Error budget: 80% left (5 min in).');
+  assert.equal(budget(), '20 min left. 5 of 25 min spent');
 });
 
 test('checkout-is-slow: the triage view shows 100% against 7% for 2.4.0 and an even region', () => {
@@ -184,7 +191,7 @@ test('checkout-is-slow: the reference run ends with 5 stars-worth of play: no mi
   assert.equal(q('[data-finish]').disabled, true, 'Finish waits for the right answer');
   guess('n-plus-one');
   assert.equal(slips.mistakes, 0);
-  assert.equal(budget(), 'Error budget: 64% left (9 min in).');
+  assert.equal(budget(), '16 min left. 9 of 25 min spent');
   click('[data-finish]');
   assert.equal(finished.length, 1);
   assert.equal(finished[0].stars, 5);
@@ -218,13 +225,15 @@ test('checkout-is-slow: the second herring is a second mistake (2 stars after a 
   assert.equal(finished[0].stars, 2);
 });
 
-test('checkout-is-slow: a wrong hypothesis costs one mistake, once, and is then disabled', () => {
+test('checkout-is-slow: a wrong hypothesis costs one mistake, once, and is then ruled out (picking it again is free)', () => {
   const { slips, finished } = start();
   open('trace-slow');
   guess('provider');
   assert.equal(slips.mistakes, 1);
-  assert.equal(q('[data-hypothesis="provider"]').disabled, true);
-  assert.equal(text('#checkout-is-slow-feedback').startsWith('Not quite.'), true);
+  assert.equal(causeState(ID, 'provider'), 'wrong');
+  assert.equal(region(ID, 'feedback').text.startsWith('Not quite.'), true);
+  guess('provider');
+  assert.equal(slips.mistakes, 1, 'a repeat pick is free');
   guess('n-plus-one');
   click('[data-finish]');
   assert.equal(slips.mistakes, 1);
@@ -235,25 +244,27 @@ test('checkout-is-slow: opening every clue and neutral view exhausts the budget 
   const { slips, finished } = start();
   const ids = ['trace-slow', 'triage', 'deploys', 'checkout-logs', 'db-metrics', 'gateway-latency'];
   ids.slice(0, 5).forEach((id) => open(id));
-  assert.equal(slips.mistakes, 0, '21 min in: 16% left, nothing spent yet');
-  assert.equal(budget(), 'Error budget: 16% left (21 min in).');
+  assert.equal(slips.mistakes, 0, '21 min in: 4 min left, nothing spent yet');
+  assert.equal(budget(), '4 min left. 21 of 25 min spent');
   open('gateway-latency');
   assert.equal(slips.mistakes, 1);
-  assert.equal(budget(), 'Error budget: 0% left (25 min in).');
-  assert.equal(text('#checkout-is-slow-feedback').includes('error budget is spent'), true);
-  assert.equal(q('[data-hypothesis="n-plus-one"]').disabled, false, 'still answerable at 0');
+  assert.equal(budget(), 'Budget spent. 25 of 25 min spent');
+  assert.equal(board(ID).cells.over, 25);
+  assert.deepEqual([region(ID, 'status').tone, region(ID, 'status').text.includes('error budget is spent')], ['error', true]);
+  assert.equal(causeState(ID, 'n-plus-one'), null, 'still answerable at 0');
   guess('n-plus-one');
   click('[data-finish]');
   assert.equal(finished[0].stars, 4);
 });
 
-test('checkout-is-slow: focus walk: first view, an opened heading, then Finish', () => {
+test('checkout-is-slow: focus walk: first view, an opened heading, then the win card; Finish is enabled', () => {
   const { focus } = start();
   assert.equal(focus.last(), 'view:trace-slow');
   open('trace-slow');
   assert.equal(focus.last(), 'heading:trace-slow');
   guess('n-plus-one');
-  assert.equal(focus.last(), '#cis-finish');
+  assert.equal(focus.last(), `#${ID}-win-title`);
+  assert.equal(q('#cis-finish').disabled, false);
   assert.equal(q('[data-finish]').id, 'cis-finish');
   assert.deepEqual(focus.unfocusable(), []);
 });

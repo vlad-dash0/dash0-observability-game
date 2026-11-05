@@ -11,7 +11,7 @@ import { decls, definedClasses, read, ROOT, rules, splitTop } from './helpers/cs
 import * as ui from '../lib/ui/index.mjs';
 
 const {
-  actions, button, checkbox, chip, clearFeedback, codeBlock, dots, eyebrow, feedback, field, finishButton,
+  actions, button, checkbox, chip, clearFeedback, codeBlock, dots, eyebrow, feedback, field, finishButton, fold,
   helpChips, lesson, meter, nextButton, note, option, options, panel, prose, question, radio, setFeedback,
   sideColumn, split, stars, stats, step, stepHead, table,
   BUTTON_VARIANTS, DOTS_TONES, FEEDBACK_TONES, OPTION_KINDS, OPTION_STATES, OPTIONS_LAYOUTS, PANEL_VARIANTS, TONES,
@@ -42,6 +42,9 @@ test('text: lesson, question, eyebrow, stepHead, note, prose, codeBlock', () => 
     '<div class="ui-step-head"><p class="ui-eyebrow">Step 1</p><h3 class="ui-step-title">T</h3><p class="ui-step-note">n</p></div>');
   assert.equal(note('Costs <b>2</b> min'), '<p class="ui-note">Costs <b>2</b> min</p>');
   assert.equal(prose('<ul><li>a</li></ul>'), '<div class="ui-prose"><ul><li>a</li></ul></div>');
+  assert.equal(prose('<p>x</p><table><tr><td>1</td></tr></table><pre>t</pre><table class="k"><tr><td>2</td></tr></table>'),
+    '<div class="ui-prose"><p>x</p><div class="ui-table-wrap"><table><tr><td>1</td></tr></table></div><pre>t</pre>' +
+    '<div class="ui-table-wrap"><table class="k"><tr><td>2</td></tr></table></div></div>', 'each table sits in the kit scroller; nothing else is wrapped');
   assert.equal(codeBlock('a < b && "c"'), '<pre class="ui-code"><code>a &lt; b &amp;&amp; &quot;c&quot;</code></pre>');
 });
 
@@ -119,6 +122,23 @@ test('meter: 20 cells by default, spent then preview then left; the text line is
   assert.match(over, /12 of 10<\/span>/);
   const half = meter({ id: 'h', label: 'H', value: 1, max: 4, cells: 4, previewCells: 9 });
   assert.deepEqual([...half.matchAll(/data-cell="(\w+)"/g)].map((m) => m[1]), ['spent', 'preview', 'preview', 'preview'], 'preview stops at the end');
+});
+
+test('U1 fold: a native details evidence card; open and fresh are attributes; the title is an h4 that takes focus by script', () => {
+  const caret = '<svg class="ui-fold-caret" viewBox="0 0 14 14" aria-hidden="true" focusable="false"><path d="M5 3l4 4-4 4"></path></svg>';
+  assert.equal(fold({ value: 'traces', titleHtml: 'Traces', bodyHtml: '<p>Slow spans.</p>' }),
+    '<details class="ui-fold" data-fold="traces">' +
+    `<summary class="ui-fold-summary">${caret}<h4 class="ui-fold-title" tabindex="-1" data-heading="traces">Traces</h4></summary>` +
+    '<div class="ui-fold-body"><p>Slow spans.</p></div></details>');
+  const full = fold({ value: 'deploys', titleHtml: 'Deploy log', metaHtml: '6 min', bodyHtml: 'b', open: true, fresh: true });
+  assert.ok(full.startsWith('<details class="ui-fold" data-fold="deploys" open data-fresh><summary'), full);
+  assert.ok(full.includes('</h4><span class="ui-fold-meta">6 min</span></summary>'), full);
+  assert.equal(/\sopen[\s>]/.test(fold({ value: 'a', titleHtml: 't', bodyHtml: 'b', fresh: true })), false, 'closed unless open');
+  assert.equal(fold({ value: 'a', titleHtml: 't', bodyHtml: 'b', open: true }).includes('data-fresh'), false, 'fresh only when asked');
+  const { document } = parseHTML(`<!doctype html><html><body>${full}</body></html>`);
+  const d = document.querySelector('details');
+  assert.equal(d.hasAttribute('open'), true);
+  assert.equal(d.querySelector('summary [data-heading="deploys"]').getAttribute('tabindex'), '-1');
 });
 
 test('field, radio, checkbox', () => {
@@ -212,6 +232,7 @@ const CASES = [
   ['helpChips', (t) => helpChips('h', [{ key: 'k', label: t, on: true }]), null],
   ['sideColumn', (t) => sideColumn({ id: 's', titleHtml: 't', counts: [{ key: 'wrong', label: t }] }), (h) => sideColumn({ id: 's', titleHtml: h, counts: [], hints: true, ruleHtml: h })],
   ['stars', null, null, () => stars(5, true)],
+  ['fold', null, (h) => fold({ value: 'v', titleHtml: h, metaHtml: h, bodyHtml: h })],
 ];
 
 // Every static variant: each value of the exported enums and each boolean modifier, so a
@@ -226,6 +247,7 @@ const VARIANTS = () => [
   step({ wide: true, bodyHtml: '' }), actions({ wide: true, buttonsHtml: '' }), feedback({ id: 'f', bar: true }),
   field({ id: 'f', label: 'l', kind: 'code', noteHtml: 'n' }), field({ id: 'f', label: 'l' }),
   radio({ name: 'r', value: 'v', labelHtml: 'l' }), checkbox({ labelHtml: 'l' }),
+  fold({ value: 'v', titleHtml: 't', metaHtml: 'm', bodyHtml: 'b', open: true, fresh: true }),
 ];
 
 const outputs = () => CASES.flatMap(([, t, h, plain]) => [t?.('x'), h?.('<i>x</i>'), plain?.()].filter((o) => o !== undefined)).concat(VARIANTS());
@@ -387,6 +409,13 @@ const INVALID = [
   ['stars', () => stars(Number.NaN, false)],
   ['stars', () => stars(6, true)],
   ['stars', () => stars(2, 'yes')],
+  ['fold', () => fold()],
+  ['fold', () => fold({ value: 'Not a token!', titleHtml: 't', bodyHtml: 'b' })],
+  ['fold', () => fold({ value: 'v', titleHtml: '', bodyHtml: 'b' })],
+  ['fold', () => fold({ value: 'v', titleHtml: 't', bodyHtml: 1 })],
+  ['fold', () => fold({ value: 'v', titleHtml: 't', bodyHtml: 'b', open: 'yes' })],
+  ['fold', () => fold({ value: 'v', titleHtml: 't', bodyHtml: 'b', fresh: 1 })],
+  ['fold', () => fold({ value: 'v', titleHtml: 't', bodyHtml: 'b', colour: 'red' })],
 ];
 
 test('T10 bad input throws a TypeError naming the helper', () => {

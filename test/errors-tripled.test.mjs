@@ -4,7 +4,8 @@
 // the rest: 328 requests are counted, so the error ratio goes from 4.0% to 12.2%, about 3x, while the error count stays
 // 40 and the load balancer stays at 1,000), the shortcuts a player could take through the real incident engine, the
 // reference path within budget (I7), one penalty per run (herring, exhaustion, wrong hypothesis), and a focus walk that
-// ends on Finish. Structure mirrors test/silence.test.mjs. The happy and sloppy runs are generated from the level's data
+// ends on Finish; the board is read in minutes (100/6 = 16.7 at 6%/min, 17 cells, #143) through test/helpers/incident-board.mjs.
+// Structure mirrors test/silence.test.mjs. The happy and sloppy runs are generated from the level's data
 // (test/play.test.mjs). Asserts strings, numbers and booleans only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,6 +19,7 @@ import { liveRegistry } from '../app.mjs';
 import { checkConfig } from '../lib/configure/check.mjs';
 import { COLLECTOR_SCHEMA } from '../lib/configure/collector.mjs';
 import { expectedStarMax } from './helpers/stars.mjs';
+import { alertTitle, budget as board, causeState, locked as lockedOf, region } from './helpers/incident-board.mjs';
 import { litIds } from './helpers/lights.mjs';
 import { levelState } from '../lib/unlock.mjs';
 
@@ -69,14 +71,15 @@ test('errors-tripled: scenario pin: id, budget, burn rate, answerAfterViews, vie
   );
 });
 
-test('errors-tripled: valid; clues plus neutrals cost 15 min and leave 10%, so only a herring can exhaust the budget', () => {
+test('errors-tripled: valid; 16.7 minutes; clues plus neutrals cost 15 min and leave 10% (1.7 min), so any one herring exhausts the budget', () => {
   assert.deepEqual(validateScenario(S), []);
+  assert.equal(Number((S.budget.startPct / S.budget.burnPctPerMin).toFixed(1)), 16.7);
   assert.equal(cost('clue'), 9);
   assert.equal(cost('neutral'), 6);
   const left = S.budget.startPct - (cost('clue') + cost('neutral')) * S.budget.burnPctPerMin;
   assert.equal(left, 10);
   for (const h of S.views.filter((v) => v.kind === 'herring')) {
-    assert.equal(h.costMin * S.budget.burnPctPerMin > left, true, `${h.id} spends more than the ${left}% that is left`);
+    assert.equal(h.costMin * S.budget.burnPctPerMin > left, true, `${h.id} alone spends more than the ${left}% that is left`);
   }
   assert.equal(S.views.every((v) => v.costMin <= 4), true, 'no view is a long wait');
   assert.equal(S.views.length, 7, 'a small board');
@@ -372,12 +375,16 @@ function start() {
   return { finished, focus, slips };
 }
 
-const text = (sel) => q(sel)?.textContent.replace(/\s+/g, ' ').trim() ?? null;
 const open = (id) => click(`[data-view="${id}"]`);
 const guess = (id) => click(`[data-hypothesis="${id}"]`);
-const budget = () => text('[data-budget-text]');
-const locked = () => qa('[data-hypothesis]').map((b) => b.disabled).join();
-const FEEDBACK = `#${ID}-feedback`;
+/** The meter's headline and spent line. */
+const budget = () => {
+  const b = board(ID);
+  return `${b.left} ${b.spent}`;
+};
+const locked = () => lockedOf(ID);
+const status = () => region(ID, 'status');
+const feedback = () => region(ID, 'feedback');
 /** After the right hypothesis: Next, the closing Choice answered right, then Finish. */
 const finish = () => {
   click('#eto-next');
@@ -387,8 +394,9 @@ const finish = () => {
 
 test('errors-tripled: the first screen shows the alert, a full budget, seven views, locked hypotheses and a disabled Next', () => {
   start();
-  assert.equal(text('.incident-alert h3'), 'Error ratio tripled overnight');
-  assert.equal(budget(), 'Error budget: 100% left (0 min in).');
+  assert.equal(alertTitle(ID), 'Error ratio tripled overnight');
+  assert.equal(budget(), '16.7 min left. 0 of 16.7 min spent');
+  assert.equal(board(ID).cells.total, 17, 'one cell per minute, rounded up');
   assert.equal(qa('[data-view]').length, 7);
   assert.equal(locked(), 'true,true,true,true');
   assert.equal(q('#eto-next').disabled, true);
@@ -417,7 +425,7 @@ test('errors-tripled: neutral and herring views never unlock the answers; only c
 
 // ---- reference path (I7) and shortcuts -----------------------------------------------
 
-test('errors-tripled: the reference path (the three clues, then metrics-after-sampling) solves with 46% of the budget left and no penalty', () => {
+test('errors-tripled: the reference path (the three clues, then metrics-after-sampling) solves with 46% of the budget (7.7 min) left and no penalty', () => {
   let st = newIncident(S);
   let mistakes = 0;
   for (const id of CLUES) {
@@ -434,11 +442,14 @@ test('errors-tripled: the reference path (the three clues, then metrics-after-sa
 test('errors-tripled: shortcut: opening every view in order ends at 0%, with a herring, the exhaustion and a second herring; the answer is still open', () => {
   let st = newIncident(S);
   let mistakes = 0;
+  const exhaustedOn = [];
   for (const v of S.views) {
     const r = openView(S, st, v.id);
     st = r.state;
     mistakes += Number(r.herring) + Number(r.exhaustedNow);
+    if (r.exhaustedNow) exhaustedOn.push(v.id);
   }
+  assert.deepEqual(exhaustedOn, ['payments-deploy'], 'the first herring (10% left, 3 min at 6%/min) runs the budget out');
   assert.equal(budgetLeft(S, st), 0);
   assert.equal(mistakes, 3, 'two herrings and one exhaustion; no mistake for the clues or neutrals');
   assert.equal(answer(S, st, RIGHT).outcome, 'right', 'the incident is still solvable at 0');
@@ -465,10 +476,10 @@ test('errors-tripled: shortcut: clues in any order are never penalised, and ever
   assert.equal(budgetLeft(S, st), 10);
 });
 
-test('errors-tripled: shortcut impossible: both neutrals leave every hypothesis disabled at 64%, so no lucky first guess can win without a clue', () => {
+test('errors-tripled: shortcut impossible: both neutrals leave every hypothesis locked with 10.7 of 16.7 min left, so no lucky first guess can win without a clue', () => {
   const { finished, slips } = start();
   for (const id of NEUTRALS) open(id);
-  assert.equal(budget(), 'Error budget: 64% left (6 min in).');
+  assert.equal(budget(), '10.7 min left. 6 of 16.7 min spent');
   assert.equal(locked(), 'true,true,true,true');
   assert.equal(q('#eto-next').disabled, true);
   assert.equal(finished.length, 0);
@@ -498,13 +509,13 @@ test('errors-tripled: shortcut: solving the incident does not finish the level; 
   assert.equal(q('#eto-next').disabled, false);
 });
 
-test('errors-tripled: the shortest path is the three clues; it solves at 46% with no penalty and 5 stars', () => {
+test('errors-tripled: the shortest path is the three clues; it solves with 7.7 of 16.7 min left, no penalty and 5 stars', () => {
   const { finished, slips } = start();
   for (const id of CLUES) open(id);
   assert.equal(q('#eto-next').disabled, true, 'Next waits for the right answer');
   guess(RIGHT);
   assert.equal(slips.mistakes, 0);
-  assert.equal(budget(), 'Error budget: 46% left (9 min in).');
+  assert.equal(budget(), '7.7 min left. 9 of 16.7 min spent');
   finish();
   assert.equal(finished.length, 1);
   assert.equal(finished[0].stars, 5);
@@ -517,7 +528,7 @@ test('errors-tripled: a herring costs one mistake on its first open only, and th
   const { slips, finished } = start();
   open('payments-deploy');
   assert.equal(slips.mistakes, 1);
-  assert.equal(text(FEEDBACK).includes('red herring'), true);
+  assert.deepEqual([status().tone, status().text.includes('was misleading')], ['error', true]);
   open('payments-deploy');
   assert.equal(slips.mistakes, 1, 'a repeat open is free');
   for (const id of CLUES) open(id);
@@ -542,13 +553,15 @@ test('errors-tripled: the second herring is a second mistake; a wrong answer on 
 });
 
 for (const id of ['payments-regression', 'traffic-fell', 'provider-failing']) {
-  test(`errors-tripled: guessing ${id} costs one mistake, once, and is then disabled`, () => {
+  test(`errors-tripled: guessing ${id} costs one mistake, once, and is then ruled out (picking it again is free)`, () => {
     const { slips, finished } = start();
     for (const v of CLUES) open(v);
     guess(id);
     assert.equal(slips.mistakes, 1);
-    assert.equal(q(`[data-hypothesis="${id}"]`).disabled, true);
-    assert.equal(text(FEEDBACK).startsWith('Not quite.'), true);
+    assert.equal(causeState(ID, id), 'wrong');
+    assert.equal(feedback().text.startsWith('Not quite.'), true);
+    guess(id);
+    assert.equal(slips.mistakes, 1);
     guess(RIGHT);
     finish();
     assert.equal(slips.mistakes, 1);
@@ -556,16 +569,17 @@ for (const id of ['payments-regression', 'traffic-fell', 'provider-failing']) {
   });
 }
 
-test('errors-tripled: every clue and neutral leaves 10% and no mistake; a herring then spends the rest, a herring mistake and an exhaustion mistake in one open', () => {
+test('errors-tripled: every clue and neutral leaves 1.7 min and no mistake; a herring then spends the rest, a herring mistake and an exhaustion mistake in one open', () => {
   const { slips, finished } = start();
   for (const id of [...CLUES, ...NEUTRALS]) open(id);
-  assert.equal(slips.mistakes, 0, '15 min in: 10% left, nothing spent yet');
-  assert.equal(budget(), 'Error budget: 10% left (15 min in).');
+  assert.equal(slips.mistakes, 0, '15 min in: 1.7 left, nothing spent yet');
+  assert.equal(budget(), '1.7 min left. 15 of 16.7 min spent');
   open('payments-deploy');
-  assert.equal(slips.mistakes, 2);
-  assert.equal(budget(), 'Error budget: 0% left (18 min in).');
-  assert.equal(text(FEEDBACK).includes('red herring, and the error budget is spent'), true);
-  assert.equal(q(`[data-hypothesis="${RIGHT}"]`).disabled, false, 'still answerable at 0');
+  assert.equal(slips.mistakes, 2, 'one herring (3 min) alone runs the 1.7 min out');
+  assert.equal(board(ID).left, 'Budget spent.');
+  assert.deepEqual(board(ID).cells, { total: 17, spent: 0, over: 17, preview: 0, left: 0 });
+  assert.deepEqual([status().tone, status().text.includes('was misleading, and the error budget is spent')], ['error', true]);
+  assert.equal(causeState(ID, RIGHT), null, 'still answerable at 0');
   guess(RIGHT);
   finish();
   assert.equal(finished[0].stars, 3, 'two penalties leave 3 stars (the star rule: 2 penalties)');
@@ -576,7 +590,7 @@ test('errors-tripled: opening a view again costs neither time nor a mistake, so 
   for (const id of [...CLUES, ...NEUTRALS]) open(id);
   for (const id of ['rate-vs-lb', 'collector-diff', 'backend-ingest']) open(id);
   assert.equal(slips.mistakes, 0);
-  assert.equal(budget(), 'Error budget: 10% left (15 min in).');
+  assert.equal(budget(), '1.7 min left. 15 of 16.7 min spent');
 });
 
 test('errors-tripled: a wrong answer on the closing step costs one mistake, once, and leaves 4 stars', () => {
@@ -593,7 +607,7 @@ test('errors-tripled: a wrong answer on the closing step costs one mistake, once
   assert.equal(finished[0].stars, 4);
 });
 
-test('errors-tripled: focus walk: first view, an opened heading, then Finish', () => {
+test('errors-tripled: focus walk: first view, an opened heading, the win card, then Finish', () => {
   const { focus } = start();
   assert.equal(focus.last(), 'view:rate-vs-lb');
   open('rate-vs-lb');
@@ -601,7 +615,8 @@ test('errors-tripled: focus walk: first view, an opened heading, then Finish', (
   open('error-count');
   open('collector-diff');
   guess(RIGHT);
-  assert.equal(focus.last(), '#eto-next');
+  assert.equal(focus.last(), `#${ID}-win-title`);
+  assert.equal(q('#eto-next').disabled, false);
   click('#eto-next');
   click(`[data-pick="${RULE}"]`);
   assert.equal(focus.last(), '#eto-finish');

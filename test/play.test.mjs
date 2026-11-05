@@ -97,8 +97,8 @@ for (const level of LEVELS) {
       if (i > 0) click(advanceId(level, i - 1));
       assert.equal(focus.names()[before], driver.first(spec), `step ${i + 1} starts here`);
       for (const sel of driver.solve(spec)) click(sel);
-      // A solved Build it step focuses its success heading (#146); its Next is enabled.
-      const handOff = key === 'build' ? `#${spec.id}-win-title` : advanceId(level, i);
+      // A solved Build it step or incident board focuses its success heading (#146, #143); its Next is enabled.
+      const handOff = key === 'build' || key === 'incident' ? `#${spec.id}-win-title` : advanceId(level, i);
       assert.equal(focus.last(), handOff, `step ${i + 1} hands off to its button`);
       assert.equal(q(advanceId(level, i)).disabled, false, `step ${i + 1} opens its button`);
     });
@@ -162,9 +162,9 @@ test('code is plain text: an <img onerror> in it renders escaped', () => {
 
 // ---- T12 (#158): the step frame comes from the kit; the step type decides its width -------
 
-test('T12 every step type says whether its step is wide; Build it is the wide one (for now the only)', () => {
+test('P2 T12 every step type says whether its step is wide; Build it and the incident board are the wide ones', () => {
   for (const [key, type] of Object.entries(STEP_TYPES)) assert.equal(typeof type.wide, 'boolean', `${key}.wide`);
-  assert.deepEqual(Object.keys(STEP_TYPES).filter((k) => STEP_TYPES[k].wide), ['build']);
+  assert.deepEqual(Object.keys(STEP_TYPES).filter((k) => STEP_TYPES[k].wide), ['build', 'incident']);
 });
 
 test('T12 each step renders one kit step, wide by its type: a build step holds the board and its side column', () => {
@@ -177,12 +177,39 @@ test('T12 each step renders one kit step, wide by its type: a build step holds t
     assert.equal(qa('.ui-actions--wide').length, wide ? 1 : 0, `step ${i + 1} (${key}) actions width`);
     assert.equal(qa('.ui-step .ui-lesson').length, 1, `step ${i + 1} (${key}) opens with the lesson card`);
     assert.equal(qa('.ui-step .ui-question').length, FX.play.steps[i].question == null ? 0 : 1, `step ${i + 1} (${key}) question`);
-    if (key === 'build') {
-      assert.equal(qa('.ui-step--wide .ui-split').length, 1, 'the board and side column split inside the wide step');
-      assert.equal(qa('.ui-split-side [id$="-win"]').length, 1, 'the side column holds the success card');
+    if (key === 'build' || key === 'incident') {
+      assert.equal(qa('.ui-step--wide .ui-split').length, 1, `${key}: the board and side column split inside the wide step`);
+      assert.equal(qa('.ui-split-side [id$="-win"]').length, 1, `${key}: the side column holds the success card`);
     }
   });
-  assert.deepEqual(seen.includes('build') && seen.includes('choice'), true);
+  assert.deepEqual(['build', 'incident', 'choice'].every((k) => seen.includes(k)), true);
+});
+
+const HOW = 'ol[aria-label="How this board works"]';
+
+test('P1 an incident step\'s lesson card is its scenario line, then the generic How this board works list; no other step has it', () => {
+  const lists = [];
+  playAll(FX, (i, { key, spec }) => {
+    const card = q('.ui-step .ui-lesson');
+    if (key !== 'incident') {
+      assert.equal(qa(HOW).length, 0, `step ${i + 1} (${key}) has no board list`);
+      return;
+    }
+    assert.equal(card.textContent.trim().startsWith(FX.play.steps[i].intro), true, 'the scenario line opens the card');
+    assert.equal(qa(`.ui-lesson ${HOW}`).length, 1, 'the list is inside the lesson card');
+    const items = qa(`${HOW} > li`).map((li) => li.textContent.replace(/\s+/g, ' ').trim());
+    assert.equal(items.length, 3);
+    ['Investigate', 'Unlock the causes', 'Name the cause'].forEach((name, n) => assert.equal(items[n].includes(name), true, items[n]));
+    const t = card.textContent;
+    for (const v of spec.views) assert.equal(t.includes(v.label), false, `the lesson does not name the view ${v.label}`);
+    for (const h of spec.hypotheses) assert.equal(t.includes(h.label), false, `nor the cause ${h.label}`);
+    lists.push(q(HOW).outerHTML);
+  });
+  assert.equal(lists.length, 1, 'the fixture has one incident step');
+  for (const level of LEVELS.filter((l) => l.play.steps[0].incident)) {
+    start(level);
+    assert.equal(q(HOW)?.outerHTML, lists[0], `${level.id}: the same list on every incident board`);
+  }
 });
 
 test('a step\'s show is its lead-in prose: after the lesson card, before the question, and only on that step', () => {

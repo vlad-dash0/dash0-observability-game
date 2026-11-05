@@ -473,13 +473,11 @@ function playLevel(level, play) {
 
 const DEFINED = definedClasses();
 // Classes levels render that no stylesheet defines yet, each owned by a later phase of #158:
-// P2 #143 (incident board), P3 #156 (Sort it), P4 #159 (Query it, Configure it),
+// P3 #156 (Sort it), P4 #159 (Query it, Configure it),
 // P5 #160 (Trade-off, Spot it). Sorted; only shrinks: a phase deletes its own, and an entry
 // no level renders any more fails ("stale"). P7 asserts it is empty.
 const UNDEFINED_ALLOW = [
   'configure', 'configure-flow', 'configure-name', 'configure-pipeline-head', // P4 #159
-  'incident', 'incident-alert', 'incident-board', 'incident-budget', 'incident-hypotheses', // P2 #143
-  'incident-hypothesis', 'incident-locked-hint', 'incident-panel', 'incident-panels', 'incident-view', 'incident-views', // P2 #143
   'query', 'query-result', // P4 #159
   'sort', 'sort-board', // P3 #156
   'spot', // P5 #160

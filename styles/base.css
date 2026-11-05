@@ -293,10 +293,10 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .env-issues { margin: 8px 0 0 18px; }
 
 /* Hand-written steps (see Level regions above): the stage's children keep the narrow width,
-   centred; a Build it board takes the wide one. Last, so it wins over the components' own
+   centred; a Build it board or an incident board takes the wide one. Last, so it wins over the components' own
    side margins; the stage's gap replaces the question's bottom margin. */
 .lesson-stage > * { inline-size: 100%; max-inline-size: var(--layout-narrow); margin-inline: auto; }
-.lesson-stage > [data-build] { max-inline-size: var(--layout-wide); }
+.lesson-stage > [data-build], .lesson-stage > [data-incident] { max-inline-size: var(--layout-wide); }
 .lesson-stage > h3.q { margin-bottom: 2px; }
 
 @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }

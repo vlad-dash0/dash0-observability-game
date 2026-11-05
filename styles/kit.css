@@ -50,8 +50,13 @@
   font-family: var(--font-mono); font-size: .8em; border: 0; border-radius: var(--radius-xs); padding: 2px 6px;
   background: var(--color-code-bg); color: var(--color-lesson-code);
 }
+/* The scenario line and the step names in the list read in full text colour; the line after the
+   list (what costs a star) is muted. */
+.ui-lesson strong, .ui-lesson ol b { font-weight: var(--weight-semibold); color: var(--color-text); }
+.ui-lesson ol + p { font-size: var(--text-base); color: var(--color-text-muted); }
 @media (max-width: 520px) {
   .ui-lesson { font-size: 16px; }
+  .ui-lesson ol + p { font-size: 16px; }
 }
 
 /* ---------- Question, step heading, eyebrow, note, prose, code (text.mjs) ---------- */
@@ -66,12 +71,12 @@
 .ui-step-title { font-size: var(--text-base); font-weight: var(--weight-semibold); }
 .ui-step-note { font-size: 13.5px; color: var(--color-text-muted); }
 .ui-note { font-size: 13.5px; color: var(--color-text-muted); overflow-wrap: anywhere; }
-.ui-prose { display: grid; gap: var(--space-3); font-size: var(--text-md); line-height: 1.55; min-width: 0; }
+.ui-prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); font-size: var(--text-md); line-height: 1.55; min-width: 0; }
 .ui-prose p, .ui-prose li { max-inline-size: var(--measure); }
 .ui-prose ul, .ui-prose ol { padding-left: 1.4em; display: grid; gap: 6px; }
 /* A deletion keeps text colour; the strike carries the error tone. */
 .ui-prose del { text-decoration-color: var(--color-error); text-decoration-thickness: 2px; }
-.ui-prose pre, .ui-code { font-size: 12px; line-height: 1.6; overflow-x: auto; }
+.ui-prose pre, .ui-code { font-size: 12px; line-height: 1.6; overflow-x: auto; max-inline-size: 100%; }
 
 /* ---------- Panel (panel.mjs) ---------- */
 .ui-panel {
@@ -82,8 +87,12 @@
   display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: center;
   padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border);
 }
-.ui-panel-sec { display: grid; gap: var(--space-3); padding: var(--space-4); min-width: 0; }
+.ui-panel-sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); padding: var(--space-4); min-width: 0; }
 .ui-panel-sec + .ui-panel-sec { border-top: 1px solid var(--color-border); }
+/* A region a widget redraws in place (the incident board's tiles, evidence log, causes). The column
+   is minmax(0, 1fr): an implicit auto column grows to min-content and the panel clips it at 320px. */
+.ui-panel-sec > [data-region] { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); min-width: 0; align-content: start; }
+.ui-panel-head h3 { font-size: var(--text-base); font-weight: var(--weight-semibold); }
 .ui-panel--inset { background: var(--color-bg); border-radius: var(--radius-sm); }
 .ui-panel--alert { border-color: color-mix(in srgb, var(--color-alert) 55%, var(--color-border)); }
 /* Dashed means one thing: a drop zone. */
@@ -97,7 +106,7 @@
   display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
   font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.6; font-variant-numeric: tabular-nums;
   padding: 1px var(--space-2); border-radius: var(--radius-pill); border: 1px solid var(--color-border);
-  color: var(--color-text-muted); white-space: nowrap;
+  color: var(--color-text-muted); white-space: normal; overflow-wrap: anywhere;
 }
 .ui-chip--dashed { border-style: dashed; }
 .ui-chip-dot { inline-size: 7px; block-size: 7px; border-radius: 50%; flex: none; }
@@ -207,14 +216,14 @@
 .ui-feedback[data-tone="error"] .ui-feedback-ico::before { content: "\2717"; content: "\2717" / "Wrong"; }
 
 /* ---------- Meter (meter.mjs) ---------- */
-.ui-meter { display: grid; gap: var(--space-2); }
+.ui-meter { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); min-width: 0; }
 .ui-meter-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--space-1) var(--space-4); }
 .ui-meter-label {
   font-family: var(--font-mono); font-size: 11px; font-weight: var(--weight-semibold); letter-spacing: .08em;
   text-transform: uppercase; color: var(--color-text-muted);
 }
 .ui-meter-value { font-family: var(--font-mono); font-size: 13px; font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
-.ui-meter-cells { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; }
+.ui-meter-cells { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; min-width: 0; }
 .ui-meter-cells i { block-size: 14px; border-radius: 3px; background: var(--color-meter-left); }
 .ui-meter-cells i[data-cell="spent"] { background: color-mix(in srgb, var(--color-border) 60%, transparent); }
 .ui-meter-cells i[data-cell="preview"] { background: transparent; box-shadow: inset 0 0 0 1px var(--color-parent); }
@@ -222,6 +231,28 @@
 @media (max-width: 520px) {
   .ui-meter-cells { gap: 2px; }
 }
+
+/* The minutes-left headline above a meter (a note around one strong). */
+.ui-note [data-budget-text] { font-size: var(--text-q); font-weight: var(--weight-semibold); color: var(--color-text); }
+
+/* ---------- Fold (fold.mjs) ---------- */
+/* An evidence card that folds to one line: caret, title, meta chips. The newest card (data-fresh)
+   has a warmer border; a title takes focus by script, so it shows the focus ring (below). */
+.ui-fold { min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-bg); }
+.ui-fold[data-fresh] { border-color: color-mix(in srgb, var(--color-parent) 55%, var(--color-border)); }
+.ui-fold-summary {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3);
+  padding: 10px var(--space-3); cursor: pointer; list-style: none;
+}
+.ui-fold-summary::-webkit-details-marker { display: none; }
+.ui-fold-caret {
+  flex: none; inline-size: 14px; block-size: 14px; fill: none; stroke: var(--color-text-muted); stroke-width: 1.5;
+  stroke-linecap: round; stroke-linejoin: round; transition: transform var(--dur-fast);
+}
+.ui-fold[open] .ui-fold-caret { transform: rotate(90deg); }
+.ui-fold-title { min-width: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); overflow-wrap: anywhere; }
+.ui-fold-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.ui-fold-body { padding: 0 var(--space-3) var(--space-3); min-width: 0; }
 
 /* ---------- Form fields (field.mjs) ---------- */
 .ui-field { display: grid; gap: 6px; }
@@ -247,6 +278,8 @@
 /* ---------- Table (table.mjs; the same look inside prose) ---------- */
 .ui-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: 8px; }
 .ui-table, .ui-prose table { border-collapse: collapse; inline-size: 100%; font-size: var(--text-sm); }
+/* prose() wraps each table in .ui-table-wrap, which scrolls sideways inside the card; the table
+   itself stays display: table at full width. The wrap's border replaces the table's own. */
 .ui-table caption, .ui-prose caption { caption-side: top; text-align: left; font-size: 11px; color: var(--color-text-muted); padding: 7px 10px 0; }
 .ui-table th, .ui-prose th {
   text-align: left; font-size: 11px; font-weight: var(--weight-semibold); color: var(--color-text-muted);
@@ -321,7 +354,7 @@
 
 /* ---------- One rule each: hover, focus, disabled ---------- */
 .ui-btn--ghost:hover:not(:disabled), .ui-option:hover:not(:disabled, [aria-disabled="true"]) { border-color: var(--color-text-muted); }
-.ui-btn:focus-visible, .ui-option:focus-visible, .ui-input:focus-visible, .ui-check-input:focus-visible, .ui-option-input:focus-visible {
+.ui-btn:focus-visible, .ui-option:focus-visible, .ui-fold-summary:focus-visible, .ui-fold-title:focus-visible, .ui-input:focus-visible, .ui-check-input:focus-visible, .ui-option-input:focus-visible {
   outline: 2px solid var(--color-focus); outline-offset: 2px;
 }
 .ui-btn:disabled, .ui-input:disabled, .ui-check-input:disabled, .ui-option-input:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }

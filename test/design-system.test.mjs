@@ -189,6 +189,13 @@ test('T12 every container query names level; only the kit step (and the listed l
   for (const key of CONTAINER_ALLOW) assert.ok(seen.has(key), `stale CONTAINER_ALLOW entry: ${key}`);
 });
 
+test('a chip never overflows its container: capped at the container width, and its text may wrap', () => {
+  const chip = Object.fromEntries(sheetRules('kit.css').filter((r) => r.selector === '.ui-chip').flatMap((r) => decls(r.body)));
+  assert.equal(chip['max-width'], '100%');
+  assert.notEqual(chip['white-space'], 'nowrap', 'a long chip must be able to wrap');
+  assert.equal(chip['overflow-wrap'], 'anywhere', 'and break inside a long word');
+});
+
 test('palette rule 5: kit.css puts no shadow or glow on anything, only inset rings', () => {
   let rings = 0;
   for (const r of sheetRules('kit.css')) {
@@ -274,7 +281,6 @@ const LEGACY = {
   'levels/the-signals.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'levels/why-opentelemetry.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'lib/widgets/configure-it-view.mjs': ['btn', 'configure-inactive', 'configure-input', 'configure-label', 'configure-more', 'configure-note', 'feedback', 'ghost', 'info', 'show', 'small'],
-  'lib/widgets/incident-view.mjs': ['feedback', 'show'],
   'lib/widgets/query-it-view.mjs': ['btn', 'feedback', 'ghost', 'info', 'query-data', 'query-input', 'query-label', 'query-note', 'show', 'small'],
   'lib/widgets/sort-it-view.mjs': ['feedback', 'show', 'sort-bucket-btn', 'sort-hint', 'sort-item'],
   'lib/widgets/spot-it-view.mjs': ['btn', 'feedback', 'show', 'spot-line'],
@@ -432,4 +438,23 @@ test('T14 kit.css sets color to a tone token only on markers (::before/::after, 
     }
   }
   assert.ok(markers > 0, 'the kit colours its markers by tone');
+});
+
+// ---- Prose evidence scrolls inside its card (#143) ---------------------------------------
+
+test('prose tables scroll in the kit wrap, regions and the prose column can shrink', () => {
+  const kit = sheetRules('kit.css');
+  const props = (sel) => Object.fromEntries(kit.filter((r) => splitTop(r.selector).includes(sel)).flatMap((r) => decls(r.body)));
+  assert.equal(props('.ui-table-wrap')['overflow-x'], 'auto', 'a wide evidence table scrolls instead of being clipped by the card');
+  assert.equal(props('.ui-table-wrap')['max-width'], '100%');
+  assert.notEqual(props('.ui-prose table').display, 'block', 'the table stays display: table at full width; prose() wraps it');
+  assert.equal(props('.ui-prose table')['inline-size'], '100%');
+  assert.equal(props('.ui-prose')['grid-template-columns'], 'minmax(0, 1fr)', 'a grid item would otherwise grow to the table width');
+  assert.equal(props('.ui-prose')['min-width'], '0');
+  assert.equal(props('.ui-prose pre')['overflow-x'], 'auto');
+  assert.equal(props('.ui-prose pre')['max-inline-size'], '100%');
+  for (const sel of ['.ui-panel-sec > [data-region]', '.ui-panel-sec', '.ui-meter']) {
+    assert.equal(props(sel)['grid-template-columns'], 'minmax(0, 1fr)', `${sel}: an implicit auto column grows to min-content and clips at 320px`);
+  }
+  assert.equal(props('.ui-meter-cells')['grid-auto-columns'], 'minmax(0, 1fr)');
 });

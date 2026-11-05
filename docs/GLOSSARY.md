@@ -13,6 +13,10 @@ links level text to these anchors. "(Act N)" is where it's taught.
   profiles. (Act 0)
 - **Cardinality**: the number of unique values (or label combinations) a field has;
   for metrics, the number of time series. (Act 3)
+- **Clue**: an evidence view on an incident board that helps explain the alert. Finding
+  enough of them unlocks the causes.
+- **Misleading view**: an evidence view that does not explain the alert (a red herring).
+  Opening one costs a star.
 - **MTTD / MTTR**: mean time to detect / to resolve an incident.
 
 ## OpenTelemetry
@@ -102,7 +106,8 @@ links level text to these anchors. "(Act N)" is where it's taught.
 - **SLI**: a measured indicator of service quality (for example, the share of requests
   under 300 ms). (Act 7)
 - **SLO**: a target for an SLI over a window (99.9% over 30 days).
-- **Error budget**: the allowed failure under an SLO (0.1%).
+- **Error budget**: the allowed failure under an SLO (0.1%). In the game's incident boards, the minutes of
+  investigation you can spend before the budget runs out.
 - **Burn rate**: how fast the error budget is being used relative to plan.
 - **Synthetic check**: a scripted probe from outside the system.
 - **Alert fatigue**: ignoring alerts because too many are noise.
