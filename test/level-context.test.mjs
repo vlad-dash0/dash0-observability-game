@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeDom } from './helpers/dom.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
+import { lesson } from '../lib/ui/index.mjs';
 
 const NOW = 1767225600000; // 2026-01-01T00:00:00.000Z
 const LEVEL_A = { id: 'lvl-a', scored: true, scoring: { parMs: null } };
@@ -48,10 +49,8 @@ test('renderStep fills body and actions and scrolls the body to the top', () => 
 
 test('ctx exposes speech, escapeHtml, reduceMotion, the overlay elements and the signal', () => {
   const { dom, ctx, controller } = setup();
-  const html = ctx.speech('<b>hi</b>');
-  assert.ok(html.includes('<b>hi</b>'));
-  assert.ok(html.includes('class="speech"'));
-  assert.ok(html.includes('class="bubble"'));
+  // The lesson voice is the kit's glow card (#158), its API unchanged.
+  assert.equal(ctx.speech('<b>hi</b>'), lesson('<b>hi</b>'));
   assert.equal(ctx.escapeHtml("<it's>"), '&lt;it&#39;s&gt;');
   assert.equal(ctx.reduceMotion, true);
   assert.equal(ctx.ovBody, dom.body);

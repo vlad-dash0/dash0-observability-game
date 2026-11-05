@@ -34,11 +34,18 @@ kbd { border-bottom-width: 2px; }
 
 :focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 
-/* ---------- Level regions (filled by every level) ---------- */
-/* flex items: the flex column parent (the level overlay) arrives in F5's hub.css. */
-.lesson-intro { flex: 0 0 auto; }
+/* ---------- Level regions (hand-written levels; #165 moves them onto the kit step) ---------- */
+/* flex items of the overlay's scrolling column (hub.css). The overlay is as wide as the
+   widest kit step (#158), so these wrappers keep a hand-written step at the narrow width,
+   centred (the cap on the stage's children is at the end of this file); a Build it board in
+   the stage takes the wide width, and the stage is the `level` container, so the board's side
+   column sits beside it from 960px as in a kit step. */
+.lesson-intro { flex: 0 0 auto; inline-size: 100%; max-inline-size: var(--layout-narrow); margin: 0 auto 14px; }
 /* Top padding gives variable-height stage content clearance from the intro above. */
-.lesson-stage { flex: 0 0 auto; padding-top: 8px; }
+.lesson-stage {
+  flex: 0 0 auto; padding-top: 8px; container: level / inline-size;
+  display: flex; flex-direction: column; gap: 12px;
+}
 
 .speech { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 22px; }
 .bubble {
@@ -199,16 +206,9 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 }
 .sort-placed li::before { content: "\2713 "; content: "\2713 " / ""; color: var(--color-success); }
 
-/* ---------- Build it (lib/widgets/build-it-view.mjs, #146) ---------- */
-/* A Dash0-style waterfall as DOM rows: a label column (name and service first, then trace id,
-   kind, status, timing) and a track, an SVG without a viewBox, so its text never stretches and
-   every position is an attribute (CSP). Bars are coloured by service from --color-svc-*;
-   ERROR is a stroke, never the fill; the selected bar gets a text-coloured stroke. Highlights
-   follow data-* attributes the view sets: data-mark while a span moves, data-other (another
-   trace), data-parent-of-selected, data-hint-cand, data-arriving, data-waiting. Colours are
-   tokens only, so both themes follow. Below about 960px of widget width the right column
-   stacks under the board (a container query, since the overlay is narrower than the page). */
-.build { container: build / inline-size; }
+/* ---------- Build it (retired: lib/widgets/build-it-view.mjs renders through the kit, #158) ---------- */
+/* Nothing emits these build-* and help-* classes any more (test/design-system.test.mjs T7);
+   P7 deletes them. The waterfall (.wf-*) lives in styles/widgets.css, the layout in kit.css. */
 .build-layout { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
 .build-main { min-width: 0; display: grid; gap: 0; align-content: start; }
 .build-frame {
@@ -326,11 +326,6 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .help-hint-text:focus { outline: none; }
 .help-hint-head { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-hint); letter-spacing: .05em; text-transform: uppercase; }
 
-@container build (min-width: 960px) {
-  .build-layout { grid-template-columns: minmax(0, 1fr) 300px; column-gap: 24px; align-items: start; }
-  .help-side { position: sticky; top: 0; }
-}
-
 /* ---------- Config editor (level 1.2) ---------- */
 .env-label { display: block; font-weight: 700; font-size: 14px; margin-bottom: 6px; }
 .env-editor {
@@ -342,6 +337,13 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .env-editor[readonly] { opacity: .7; }
 .env-note { font-size: 13px; color: var(--color-text-muted); margin: 8px 0 4px; }
 .env-issues { margin: 8px 0 0 18px; }
+
+/* Hand-written steps (see Level regions above): the stage's children keep the narrow width,
+   centred; a Build it board takes the wide one. Last, so it wins over the components' own
+   side margins; the stage's gap replaces the question's bottom margin. */
+.lesson-stage > * { inline-size: 100%; max-inline-size: var(--layout-narrow); margin-inline: auto; }
+.lesson-stage > [data-build] { max-inline-size: var(--layout-wide); }
+.lesson-stage > h3.q { margin-bottom: 2px; }
 
 @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 

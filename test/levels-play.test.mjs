@@ -16,6 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeDom, q, qa, click as domClick } from './helpers/dom.mjs';
+import { definedClasses } from './helpers/css.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
 import { runPlay, validatePlay } from '../lib/play.mjs';
@@ -391,6 +392,15 @@ function driverGaps(order, drivers) {
 // to the click that caused it; a finish outside a wrapper click sees null. Drivers
 // use these wrappers, not ./helpers/dom.mjs directly.
 let current = null;
+// While a level plays (playLevel), every class on the page after each click (T8).
+let seenClasses = null;
+
+/** Add the class names of every element in the document to `into`. */
+function pageClasses(into) {
+  for (const el of globalThis.document.querySelectorAll('[class]')) {
+    for (const c of el.getAttribute('class').split(/\s+/)) if (c) into.add(c);
+  }
+}
 
 /** dom.mjs click, recording for its duration whether it hit the Finish button. */
 function click(elOrSel) {
@@ -400,6 +410,7 @@ function click(elOrSel) {
     domClick(elOrSel);
   } finally {
     current = null;
+    if (seenClasses) pageClasses(seenClasses);
   }
 }
 
@@ -436,18 +447,57 @@ function playLevel(level, play) {
     steps.push(`${body}${actions ?? ''}`);
     render(body, actions);
   };
-  level.run(ctx);
-  const first = {
-    rendered: steps.length,
-    finishEnabled: qa('[data-finish]').some((b) => !b.disabled),
-    finishedEarly: calls.length,
-  };
-  // The live overlay, not just renderStep's strings: setAttribute, innerHTML and
-  // insertAdjacentHTML can add Alpine attributes too.
-  const injected = [...liveAlpineAttrs(dom.body, dom.actions)];
-  play();
-  injected.push(...liveAlpineAttrs(dom.body, dom.actions));
-  return { calls, steps, first, injected };
+  const classes = new Set();
+  seenClasses = classes;
+  try {
+    level.run(ctx);
+    pageClasses(classes);
+    const first = {
+      rendered: steps.length,
+      finishEnabled: qa('[data-finish]').some((b) => !b.disabled),
+      finishedEarly: calls.length,
+    };
+    // The live overlay, not just renderStep's strings: setAttribute, innerHTML and
+    // insertAdjacentHTML can add Alpine attributes too.
+    const injected = [...liveAlpineAttrs(dom.body, dom.actions)];
+    play();
+    injected.push(...liveAlpineAttrs(dom.body, dom.actions));
+    pageClasses(classes);
+    return { calls, steps, first, injected, classes };
+  } finally {
+    seenClasses = null;
+  }
+}
+
+// ---- T8 (#158): every class a level shows has a CSS rule --------------------------------
+
+const DEFINED = definedClasses();
+// Classes levels render that no stylesheet defines yet, each owned by a later phase of #158:
+// P2 #143 (incident board), P3 #156 (Sort it), P4 #159 (Query it, Configure it),
+// P5 #160 (Trade-off, Spot it). Sorted; only shrinks: a phase deletes its own, and an entry
+// no level renders any more fails ("stale"). P7 asserts it is empty.
+const UNDEFINED_ALLOW = [
+  'configure', 'configure-flow', 'configure-name', 'configure-pipeline-head', // P4 #159
+  'incident', 'incident-alert', 'incident-board', 'incident-budget', 'incident-hypotheses', // P2 #143
+  'incident-hypothesis', 'incident-locked-hint', 'incident-panel', 'incident-panels', 'incident-view', 'incident-views', // P2 #143
+  'query', 'query-result', // P4 #159
+  'sort', 'sort-board', // P3 #156
+  'spot', // P5 #160
+  'tradeoff', 'tradeoff-label', 'tradeoff-model', 'tradeoff-need-head', // P5 #160
+];
+const undefinedSeen = new Set();
+
+/** The classes in `steps` (renderStep strings) and `live` (seen on the page) that no stylesheet defines. */
+function undefinedClasses(steps, live) {
+  const all = new Set(live);
+  const box = globalThis.document.createElement('div');
+  for (const s of steps) {
+    box.innerHTML = s;
+    for (const el of box.querySelectorAll('[class]')) {
+      for (const c of el.getAttribute('class').split(/\s+/)) if (c) all.add(c);
+    }
+  }
+  return [...all].filter((c) => !DEFINED.has(c)).sort();
 }
 
 /** Alpine attribute names (see alpineAttrs) on `roots` and everything under them. */
@@ -479,8 +529,11 @@ function alpineAttrs(html) {
 
 /** Every check a play-through must pass; returns the stars earned. */
 function checkRun(level, run) {
-  const { calls, steps, first, injected } = playLevel(level, run.play);
+  const { calls, steps, first, injected, classes } = playLevel(level, run.play);
   assert.deepEqual(injected, [], 'the overlay holds an Alpine attribute (set outside renderStep)');
+  const missing = undefinedClasses(steps, classes);
+  for (const c of missing) if (UNDEFINED_ALLOW.includes(c)) undefinedSeen.add(c);
+  assert.deepEqual(missing.filter((c) => !UNDEFINED_ALLOW.includes(c)), [], 'rendered classes with no CSS rule (T8)');
   assert.ok(first.rendered >= 1, 'run() renders a first step');
   assert.equal(first.finishEnabled, false, 'the first screen has no enabled Finish');
   assert.equal(first.finishedEarly, 0, 'run() alone does not finish');
@@ -791,4 +844,35 @@ test('harness: an Alpine attribute added outside renderStep, after run() or duri
     { deck: [FIXTURE_CARD], nodeIds: [] },
   ).levels['fx-clean'];
   checkRun(clean, { play: () => (click('#go'), click('#fin')), expect: { stars: 5, cards: [] } });
+});
+
+test('harness T8: a class with no CSS rule fails, in a rendered step or added later on the page', () => {
+  const REWARD = 'A long enough reward text.';
+  const level = (id, { body = '<p>Go on.</p>', late = null }) => buildRegistry(
+    [{ id: 'fx-act', no: 0, levels: [{ ...fixtureLevel, id, run(ctx) {
+      ctx.renderStep(body, '<button id="go">Go</button>');
+      ctx.ovActions.querySelector('#go').onclick = () => {
+        ctx.renderStep('<p id="msg">Done.</p>', '<button id="fin" data-finish>Finish</button>');
+        if (late) ctx.ovBody.querySelector('#msg').setAttribute('class', late);
+        ctx.ovActions.querySelector('#fin').onclick = () => ctx.finish({ text: REWARD });
+      };
+    } }], boss: null }],
+    { deck: [FIXTURE_CARD], nodeIds: [] },
+  ).levels[id];
+  const play = () => (click('#go'), click('#fin'));
+  const expect = { stars: 5, cards: [] };
+  assert.throws(() => checkRun(level('fx-nope', { body: '<p class="nope">Go on.</p>' }), { play, expect }), /no CSS rule/);
+  assert.throws(() => checkRun(level('fx-late', { late: 'ui-lesson nope-late' }), { play, expect }), /no CSS rule/);
+  // Defined classes pass: a kit class and a legacy one.
+  checkRun(level('fx-ok', { body: '<p class="ui-note">Go on.</p>', late: 'visually-hidden' }), { play, expect });
+});
+
+// Runs last: every level above has played, so an allowed class no level renders is stale.
+test('T8 UNDEFINED_ALLOW is sorted and has no stale entry', () => {
+  assert.equal(new Set(UNDEFINED_ALLOW).size, UNDEFINED_ALLOW.length, 'no duplicates');
+  assert.deepEqual([...UNDEFINED_ALLOW].sort(), UNDEFINED_ALLOW, 'sorted');
+  for (const c of UNDEFINED_ALLOW) {
+    assert.ok(!DEFINED.has(c), `UNDEFINED_ALLOW names "${c}", which a stylesheet now defines; delete it`);
+    assert.ok(undefinedSeen.has(c), `stale UNDEFINED_ALLOW entry "${c}": no level renders it any more; delete it`);
+  }
 });

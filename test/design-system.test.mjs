@@ -117,18 +117,11 @@ test('T4 kit.css selectors use only ui- classes, elements and attributes (no ids
 
 // ---- T5 no :has() and no !important ------------------------------------------------------
 
-// Shrinks only: P1b deletes .overlay:has(.build) and this entry.
-const HAS_ALLOW = ['hub.css .overlay:has(.build)'];
-
-test('T5 no :has() (listed legacy only) and no !important outside reduced motion and [x-cloak]', () => {
-  const seen = new Set();
+// P1b deleted the last one (.overlay:has(.build)); the step type now decides the width (T12).
+test('T5 no :has() and no !important outside reduced motion and [x-cloak]', () => {
   for (const f of SHEETS) {
     for (const r of sheetRules(f)) {
-      if (r.selector.includes(':has(')) {
-        const key = `${f} ${r.selector}`;
-        assert.ok(HAS_ALLOW.includes(key), `${key}: no :has(); give the element a class or a data-* state`);
-        seen.add(key);
-      }
+      assert.ok(!r.selector.includes(':has('), `styles/${f} ${r.selector}: no :has(); give the element a class or a data-* state`);
       const reduced = r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a));
       for (const [prop, value] of decls(r.body)) {
         if (!value.includes('!important')) continue;
@@ -136,7 +129,44 @@ test('T5 no :has() (listed legacy only) and no !important outside reduced motion
       }
     }
   }
-  for (const key of HAS_ALLOW) assert.ok(seen.has(key), `stale HAS_ALLOW entry: ${key}`);
+});
+
+// ---- T12 the generic layout: one container, named by the kit ------------------------------
+
+// The legacy hand-written step's stage is the one other `level` container (base.css, until
+// #165 moves those levels onto the kit step). Only shrinks.
+const CONTAINER_ALLOW = ['base.css .lesson-stage'];
+
+test('T12 the split shows its side column from 960px of the level container: minmax(0, 1fr) and a 300px side', () => {
+  const at = sheetRules('kit.css').filter((r) => r.at.includes('@container level (min-width: 960px)'));
+  const split = at.find((r) => r.selector === '.ui-split');
+  assert.ok(split, 'kit.css has @container level (min-width: 960px) { .ui-split { ... } }');
+  assert.equal(Object.fromEntries(decls(split.body))['grid-template-columns'], 'minmax(0, 1fr) var(--side-width)');
+  assert.equal(VARS['--side-width'], '300px');
+  const kitStep = sheetRules('kit.css').find((r) => r.selector === '.ui-step');
+  assert.equal(Object.fromEntries(decls(kitStep.body)).container, 'level / inline-size', 'every kit step is the level container');
+});
+
+test('T12 every container query names level; only the kit step (and the listed legacy stage) declares a container', () => {
+  const seen = new Set();
+  let queries = 0;
+  for (const f of SHEETS) {
+    for (const r of sheetRules(f)) {
+      for (const a of r.at.filter((x) => x.startsWith('@container'))) {
+        queries++;
+        assert.match(a, /^@container level \(/, `styles/${f} "${a}": query the step's level container`);
+      }
+      for (const [prop] of decls(r.body)) {
+        if (prop !== 'container' && prop !== 'container-name') continue;
+        const key = `${f} ${r.selector}`;
+        if (f === 'kit.css' && r.selector === '.ui-step') continue;
+        assert.ok(CONTAINER_ALLOW.includes(key), `${key} declares a container; the step type decides the layout (STEP_TYPES[*].wide)`);
+        seen.add(key);
+      }
+    }
+  }
+  assert.ok(queries >= 2, 'kit.css and widgets.css query the level container');
+  for (const key of CONTAINER_ALLOW) assert.ok(seen.has(key), `stale CONTAINER_ALLOW entry: ${key}`);
 });
 
 test('palette rule 5: kit.css puts no shadow or glow on anything, only inset rings', () => {
@@ -211,7 +241,6 @@ const RETIRED = [
 ];
 
 const LEGACY = {
-  'index.html': ['back-btn', 'btn'],
   'levels/baggage.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'levels/checkout-is-slow.mjs': ['btn', 'lesson-intro', 'lesson-stage'],
   'levels/context-propagation.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
@@ -224,12 +253,7 @@ const LEGACY = {
   'levels/the-pager.mjs': ['btn', 'choice', 'choices', 'feedback', 'info', 'lesson-intro', 'lesson-stage', 'q', 'show'],
   'levels/the-signals.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'levels/why-opentelemetry.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
-  'lib/lesson-kit.mjs': ['bubble', 'speech'],
-  'lib/play.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
-  'lib/widgets/build-it-view.mjs': ['build', 'build-btn', 'build-editing', 'build-group-title', 'build-layout', 'build-log', 'build-main', 'build-opt', 'build-pick', 'build-status', 'feedback', 'help-hint-head', 'help-pips', 'primary', 'show'],
-  'lib/widgets/choice.mjs': ['choice', 'choices', 'feedback', 'show'],
   'lib/widgets/configure-it-view.mjs': ['btn', 'configure-inactive', 'configure-input', 'configure-label', 'configure-more', 'configure-note', 'feedback', 'ghost', 'info', 'show', 'small'],
-  'lib/widgets/help-ladder.mjs': ['help-btn', 'help-chip', 'help-chips', 'help-chips-title', 'help-cost', 'help-count', 'help-counts', 'help-h', 'help-hint-row', 'help-hint-text', 'help-rule', 'help-score', 'help-side', 'help-star', 'help-stars', 'help-swirl', 'help-tier', 'help-win', 'help-win-closing', 'help-win-stars', 'help-win-text', 'help-win-title'],
   'lib/widgets/incident-view.mjs': ['feedback', 'show'],
   'lib/widgets/query-it-view.mjs': ['btn', 'feedback', 'ghost', 'info', 'query-data', 'query-input', 'query-label', 'query-note', 'show', 'small'],
   'lib/widgets/sort-it-view.mjs': ['feedback', 'show', 'sort-bucket-btn', 'sort-hint', 'sort-item'],
@@ -283,6 +307,32 @@ test('T13 meter cells left and the alert red reach 3:1 (non-text) on surface and
   // D1: the alert is red, apart from the purple error.
   for (const theme of ['light', 'dark']) {
     assert.notDeepEqual(resolveColor('var(--color-alert)', theme), resolveColor('var(--color-error)', theme), theme);
+  }
+});
+
+// Deferred from the PR #164 review: a faded waterfall row (the overflow mark, another trace)
+// faded the whole row, so its "its parent" text fell to about 2.2:1. The fade goes on the
+// marks and bars; the row's text keeps 4.5:1 in both themes.
+test('T13 faded waterfall rows fade the bars, not the text: row text keeps 4.5:1 on the board, both themes', () => {
+  const list = sheetRules('widgets.css');
+  const declsOf = (match) => list.filter((r) => splitTop(r.selector).some(match)).flatMap((r) => decls(r.body));
+  for (const row of ['.wf-row[data-mark="overflow"]', '.wf-row[data-other]']) {
+    // Opacity on the row itself (any state of it, no descendant) fades every word in it.
+    const own = declsOf((s) => s.startsWith(row) && !/[\s>+~]/.test(s.slice(row.length)))
+      .filter(([p]) => p === 'opacity').map(([, v]) => Number(v));
+    const alpha = Math.min(1, ...own);
+    for (const theme of ['light', 'dark']) {
+      for (const bg of ['--color-surface', '--color-bg']) {
+        const under = resolveColor(`var(${bg})`, theme);
+        for (const fg of ['--color-text', '--color-text-muted', '--color-parent']) {
+          const seen = resolveColor(`var(${fg})`, theme).map((c, i) => c * alpha + under[i] * (1 - alpha));
+          const r = ratio(seen, under);
+          assert.ok(r >= 4.5, `${theme}: ${fg} in ${row} on ${bg} is ${r.toFixed(2)} (row opacity ${alpha}), needs 4.5`);
+        }
+      }
+    }
+    const bar = declsOf((s) => s.startsWith(row) && /\.wf-bar\b/.test(s)).find(([p]) => p === 'opacity');
+    assert.ok(bar && Number(bar[1]) < 1, `${row} still fades its bars, the non-text cue`);
   }
 });
 

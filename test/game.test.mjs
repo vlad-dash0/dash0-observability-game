@@ -844,14 +844,15 @@ test('index.html: level cards keep the keyboard and screen-reader wiring', () =>
 });
 
 test('index.html: the hub goes inert while a dialog is open; dialogs stay outside it', () => {
-  const hub = shell.querySelector('.hub');
-  assert.ok(hub, '.hub wrapper exists');
+  // An id, not a class: the wrapper has no styles (test/static.test.mjs T9).
+  const hub = shell.querySelector('#hub');
+  assert.ok(hub, '#hub wrapper exists');
   assert.equal(hub.getAttribute(':inert'), 'overlayOpen || rewardOpen');
   for (const sel of ['.hub-header', '.globe-stage', '.globe-fallback', '.levels']) {
-    assert.ok(hub.querySelector(sel), `${sel} is inside .hub`);
+    assert.ok(hub.querySelector(sel), `${sel} is inside #hub`);
   }
   for (const sel of ['.overlay', '.reward']) {
-    assert.equal(shell.querySelector(sel).closest('.hub') === null, true, `${sel} is outside .hub`);
+    assert.equal(shell.querySelector(sel).closest('#hub') === null, true, `${sel} is outside #hub`);
   }
   assert.equal(shell.querySelector('.app').getAttribute('@keydown.escape.window'), 'onEscape($event)');
 });

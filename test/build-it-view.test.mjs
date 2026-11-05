@@ -55,7 +55,12 @@ const placedIds = () => qa('[data-span]:not([data-arriving])').map((r) => r.data
 const arriving = () => qa('[data-arriving]').map((r) => r.dataset.span);
 const waiting = () => qa('[data-waiting]').map((r) => r.dataset.waiting);
 const status = () => q('[id$="-status"]').textContent;
+/** The status line's tone (#158 D7: error for a wrong move that costs, neutral for information). */
+const tone = () => q('[id$="-status"]').getAttribute('data-tone');
 const feedback = () => q('#b1-feedback').textContent;
+const fbTone = () => q('#b1-feedback').getAttribute('data-tone');
+/** The first paragraph of a failed Check's feedback ("Not yet: N problems."). */
+const fbHead = (id) => q(`#${id}-feedback p`).textContent;
 const label = (id) => q(`[data-span="${id}"]`).getAttribute('aria-label');
 // getAttribute, not dataset: linkedom's dataset does not see attributes set after its first read.
 const marks = () => qa('[data-span]').map((r) => `${r.dataset.span}:${r.getAttribute('data-mark') ?? ''}${r.getAttribute('data-other') === 'true' ? '+other' : ''}`);
@@ -150,6 +155,7 @@ test('queue: the first root is placed, the next span arrives, the rest wait and 
   }
   click(`[data-waiting="${D}"]`);
   assert.equal(status(), "This span hasn't arrived yet; place the current one first.");
+  assert.equal(tone(), 'neutral', 'free information, not a wrong answer');
   assert.deepEqual([counts.mistakes, placedIds().length], [0, 1], 'free, and nothing moved');
   assert.equal(q('[data-arriving]').hasAttribute('data-drop'), false, 'the arriving span is not a drop target');
 });
@@ -172,6 +178,7 @@ test('a drag onto a span calls setParent: the tree redraws, a right drop ticks a
   mount();
   assert.equal(drag(B, A), true, 'A accepts the drop');
   assert.equal(status(), 'POST (storefront) sits under POST /checkout (storefront). Right.');
+  assert.equal(tone(), 'success');
   assert.equal(q(`[data-span="${B}"]`).dataset.verdict, 'ok');
   assert.equal(q(`[data-span="${B}"]`).dataset.depth, '1');
   assert.equal(label(B).endsWith('parent POST /checkout (storefront), right'), true);
@@ -185,11 +192,13 @@ test('a wrong drop costs one mistake, says a specific note and stays; the same d
   drag(B, 'root');
   assert.equal(counts.mistakes, 1);
   assert.equal(status(), 'POST (storefront) is a root, but not quite. POST (storefront) is a root now, yet another span of trace 4bf92f35 was already running when it started. Which call was it doing work for? It stays here; move it when you are ready.');
+  assert.equal(tone(), 'error', 'D7: a wrong drop costs a star, so it is the error tone');
   assert.equal(q(`[data-span="${B}"]`).dataset.verdict, 'no');
   assert.deepEqual(arriving(), [C], 'placed anyway; the next span arrives');
   drag(B, 'root');
   assert.equal(counts.mistakes, 1, 'an unchanged repeat is free');
   assert.equal(status(), 'POST (storefront) is already a root.');
+  assert.equal(tone(), 'neutral', 'a free repeat is information');
   drag(B, A);
   assert.deepEqual([counts.mistakes, q(`[data-span="${B}"]`).dataset.verdict], [1, 'ok'], 'retrying is free');
 });
@@ -219,6 +228,7 @@ test('while a span moves: itself and its descendants are refused, a drop there i
   assert.equal(over.prevented, false, 'a descendant is not a drop target');
   q(`[data-drop="${D}"]`).ondrop(ev());
   assert.equal(status(), 'validate cart (api-gateway) is already below POST (storefront), so that would make a loop.');
+  assert.equal(tone(), 'neutral', 'a refused loop is free, so it is information');
   assert.equal(counts.mistakes, 0);
   assert.equal(label(B).endsWith('parent POST /checkout (storefront), right'), true, 'nothing changed');
   q(`[data-span="${C}"]`).ondragend?.(ev());
@@ -371,6 +381,7 @@ test('instant feedback: placing the last span right assembles the trace, once, w
   solveQueue();
   assert.deepEqual([counts.done, counts.mistakes], [1, 0]);
   assert.equal(feedback(), 'Right. Every span checks out.');
+  assert.equal(fbTone(), 'success');
   assert.equal(q('#b1-win').hidden, false);
   assert.equal(q('#b1-win-title').textContent, 'Trace assembled');
   assert.equal(q('#b1-win-stars').textContent, '5 of 5 stars: 0 wrong drops, 0 hints.');
@@ -418,13 +429,15 @@ test('Check mode: moves are free and unmarked; a failed Check costs one, an unch
   assert.equal(q(`[data-span="${B}"]`).hasAttribute('data-verdict'), false, 'no tick without instant feedback');
   click('#b1-check');
   assert.equal(counts.mistakes, 1);
-  assert.equal(q('#b1-feedback').firstChild.textContent, 'Not yet: 2 problems.');
+  assert.equal(fbHead('b1'), 'Not yet: 2 problems.');
+  assert.equal(fbTone(), 'error', 'D7: a failed Check costs a star, so it is the error tone');
   assert.deepEqual(qa('#b1-feedback li').map((li) => li.dataset.code), ['wrong-parent', 'wrong-parent']);
   assert.equal(qa('#b1-feedback li')[1].textContent.startsWith('validate cart (api-gateway) is a root now'), true, 'the specific note, not the generic message');
   assert.equal(focus.last(), '#b1-feedback');
   click('#b1-check');
   assert.equal(counts.mistakes, 1);
-  assert.equal(q('#b1-feedback').firstChild.textContent, 'Same as last time: 2 problems.');
+  assert.equal(fbHead('b1'), 'Same as last time: 2 problems.');
+  assert.equal(fbTone(), 'neutral', 'a free repeat is information');
   pick(C, A);
   pick(C, 'none');
   click('#b1-check');
@@ -470,7 +483,9 @@ test('hint tiers: each costs one ctx.hint(); tier 2 outlines two candidates, tie
   mount();
   assert.equal(q('#b1-hint').textContent, 'Hint 1 of 3');
   assert.equal(q('#b1-hint-cost').textContent, 'costs 1 star');
-  assert.equal(q('#b1-hint-tier').textContent, 'For POST (storefront): 0 of 3 used');
+  // The decorative pips (kit dots, aria-hidden) follow the words after a space.
+  assert.equal(q('#b1-hint-tier').textContent.trim(), 'For POST (storefront): 0 of 3 used');
+  assert.equal(q('#b1-hint-tier [aria-hidden="true"]').getAttribute('data-tone'), 'hint');
   click('#b1-hint');
   assert.equal(counts.hints, 1);
   assert.equal(q('#b1-hint-text').textContent.startsWith('Hint 1 of 3 · POST (storefront)A child starts after its parent starts'), true);
@@ -483,7 +498,7 @@ test('hint tiers: each costs one ctx.hint(); tier 2 outlines two candidates, tie
   assert.equal(label(B).endsWith('parent POST /checkout (storefront), right'), true);
   assert.equal(qa('[data-hint-cand="true"]').length, 0);
   assert.equal(q('#b1-hint').textContent, 'Hint 1 of 3', 'the next arriving span has its own three');
-  assert.equal(q('#b1-hint-tier').textContent, 'For POST /checkout (api-gateway): 0 of 3 used');
+  assert.equal(q('#b1-hint-tier').textContent.trim(), 'For POST /checkout (api-gateway): 0 of 3 used');
 });
 
 test('tier 3 when the answer parent sits below the hinted span: it is lifted out first, then the span is placed; no loop, no wrong drop', () => {
@@ -621,7 +636,7 @@ test('stars are this board only: a penalty on an earlier step is not counted, th
   assert.equal(q('#b1-win-stars').textContent, '5 of 5 stars: 0 wrong drops, 0 hints.');
   assert.equal(q('#b1-stars').getAttribute('aria-label'), '5 of 5 stars');
   assert.deepEqual(qa('#b1-stars [data-star]').map((s) => s.dataset.star), ['earned', 'earned', 'earned', 'earned', 'earned']);
-  assert.equal(q('.help-rule').textContent.startsWith('Stars count this board only'), true);
+  assert.equal(q('aside[aria-label="Result, score and hints"]').textContent.includes('Stars count this board only'), true);
 
   const slip = setup(withHelps(ALL));
   slip.counts.mistakes = 1;
@@ -723,12 +738,12 @@ test('a recheck with the same links in another order is free', () => {
   click(`[data-link="${C}"]`);
   click('#b1-check');
   assert.equal(counts.mistakes, 1);
-  assert.equal(q('#b1-feedback').firstChild.textContent, 'Not yet: 3 problems.');
+  assert.equal(fbHead('b1'), 'Not yet: 3 problems.');
   click(`[data-link="${B}"]`);
   click(`[data-link="${B}"]`);
   click('#b1-check');
   assert.equal(counts.mistakes, 1, 'links {B, C} added as C then B are the same graded state');
-  assert.equal(q('#b1-feedback').firstChild.textContent, 'Same as last time: 3 problems.');
+  assert.equal(fbHead('b1'), 'Same as last time: 3 problems.');
 });
 
 test('V5 a recheck after attaching the same records in another order is free', () => {
@@ -743,7 +758,7 @@ test('V5 a recheck after attaching the same records in another order is free', (
   attach('l-cart', S2);
   click('#l1-check');
   assert.equal(counts.mistakes, 1);
-  assert.equal(q('#l1-feedback').firstChild.textContent, 'Same as last time: 1 problem.');
+  assert.equal(fbHead('l1'), 'Same as last time: 1 problem.');
 });
 
 // ---- markup hygiene, escaping, errors -------------------------------------------------
@@ -815,8 +830,8 @@ test('every focus target could take focus', () => {
 test('styles: tokens only; services and traces from tokens.css; the selected bar outlined; ERROR a stroke; no focus ring on the success heading', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const strip = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
-  // The .wf-* rules live in widgets.css (#158); the build-* and help-* ones still in base.css.
-  const css = strip(['base.css', 'widgets.css'].map((f) => readFileSync(join(root, 'styles', f), 'utf8')).join('\n'));
+  // The .wf-* rules live in widgets.css; the side column is the kit's (kit.css, #158).
+  const css = strip(['kit.css', 'widgets.css'].map((f) => readFileSync(join(root, 'styles', f), 'utf8')).join('\n'));
   const tokens = strip(readFileSync(join(root, 'styles', 'tokens.css'), 'utf8'));
   const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, sel, body]) => ({ sels: sel.split(',').map((s) => s.trim()), body: body.replace(/\s+/g, ' ') }));
   const bodyOf = (sel) => rules.filter((r) => r.sels.includes(sel)).map((r) => r.body).join(';');
@@ -827,8 +842,8 @@ test('styles: tokens only; services and traces from tokens.css; the selected bar
   for (const t of [0, 1]) assert.equal(new RegExp(`--color-trace-${t}:\\s*light-dark\\(`).test(tokens), true, `--color-trace-${t}`);
   assert.equal(/stroke:\s*var\(--color-error\)/.test(bodyOf('.wf-row[data-error="true"] .wf-bar')), true, 'ERROR is a stroke, not the fill');
   assert.equal(/outline|stroke/.test(bodyOf('.wf-row[aria-pressed="true"] .wf-bar')), true, 'the selected bar is outlined');
-  assert.equal(/outline:\s*none/.test(bodyOf('.help-win-title:focus')), true);
-  const mine = rules.filter((r) => r.sels.some((s) => /\.(wf|build|help)-/.test(s))).map((r) => r.body).join(' ');
+  assert.equal(/outline:\s*none/.test(bodyOf('.ui-win-title:focus')), true);
+  const mine = rules.filter((r) => r.sels.some((s) => /\.(wf|ui)-/.test(s))).map((r) => r.body).join(' ');
   assert.equal(/#[0-9a-fA-F]{3,8}\b|rgb\(|hsl\(|oklch\(/.test(mine), false, 'tokens only, so both themes follow');
 });
 
@@ -876,7 +891,7 @@ test('V1 selecting a record presses it and offers "No span context" first, then 
   mount();
   click('[data-log="l-worker"]');
   assert.deepEqual(qa('[data-log]').map((b) => b.getAttribute('aria-pressed')), ['false', 'false', 'false', 'false', 'true']);
-  assert.equal(q('[data-build-panel] .build-editing').textContent, 'Span context for "Retry worker gave up on charge" (payments, 75 ms)');
+  assert.equal(q('[data-build-panel] [data-panel-title="log"]').textContent, 'Span context for "Retry worker gave up on charge" (payments, 75 ms)');
   assert.deepEqual(qa('[data-attach]').map((b) => b.textContent), [
     'No span context',
     'POST /checkout (checkout) · 0–100 ms',
@@ -919,12 +934,12 @@ test('V5 penalties: a failing Check costs one with a specific note per record, t
   attach('l-cart', S2);
   click('#l1-check');
   assert.equal(counts.mistakes, 1);
-  assert.equal(q('#l1-feedback').firstChild.textContent, 'Not yet: 2 problems.');
+  assert.equal(fbHead('l1'), 'Not yet: 2 problems.');
   assert.deepEqual(qa('#l1-feedback li').map((li) => li.dataset.code), ['log-not-attached', 'log-not-attached']);
   assert.equal(qa('#l1-feedback li')[0].textContent.startsWith('"Order accepted" (checkout, 60 ms) has no span context yet'), true);
   click('#l1-check');
   assert.equal(counts.mistakes, 1);
-  assert.equal(q('#l1-feedback').firstChild.textContent, 'Same as last time: 2 problems.');
+  assert.equal(fbHead('l1'), 'Same as last time: 2 problems.');
   attach('l-other', S3);
   click('#l1-check');
   assert.equal(counts.mistakes, 2, 'a changed record is a new state');
@@ -951,8 +966,8 @@ test('V7 the reverse view: a span shows its attributes read-only and the records
   const { mount } = setup(logsSpec());
   mount();
   click(`[data-span="${S3}"]`);
-  assert.equal(q('[data-build-panel] .build-editing').textContent, `POST /charge (payments), trace 4bf92f35, span_id ${S3}`);
-  assert.deepEqual(qa('[data-build-panel] .build-attrs li').map((li) => li.textContent), ['thread.name=http-exec-1']);
+  assert.equal(q('[data-build-panel] [data-panel-title="span"]').textContent, `POST /charge (payments), trace 4bf92f35, span_id ${S3}`);
+  assert.deepEqual(qa('[data-build-panel] li').map((li) => li.textContent), ['thread.name=http-exec-1']);
   attach('l-charge', S3);
   click(`[data-span="${S3}"]`);
   click('[data-show-log="l-charge"]');
