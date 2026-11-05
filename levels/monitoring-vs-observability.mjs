@@ -59,7 +59,7 @@ const ANSWERABLE = [
     key: 'rich',
     label: 'Telemetry with many attributes you can slice after the fact',
     right: true,
-    why: 'New questions need data that still carries the details, such as app version, country, customer ID and cart size, so you can group and filter by them once the question exists.',
+    why: 'New questions need data that still carries the details, such as app version, country, user ID and cart size, so you can group and filter by them once the question exists.',
   },
   {
     key: 'dash',
