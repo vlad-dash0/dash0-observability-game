@@ -261,7 +261,7 @@ canAnswer(s, st)   // the ONE unlock rule: not solved and cluesFound >= answerAf
                    // neutral and herring opens never count (#120)
 answer(s, st, id) → right|wrong|repeat|locked|unknown|closed
 ```
-Every incident boss burns 25 minutes (`startPct: 100`, `burnPctPerMin: 4`); a scenario may use any rate.
+Each incident boss sets its own rate: 5%/min (20 min) for who-is-talking, the-bill, the-3am-errors and silence; 6%/min (16.7 min) for errors-tripled; 4%/min (25 min) for checkout-is-slow. A scenario may use any rate.
 
 Hints, `lib/widgets/incident-help.mjs` (pure): `hintFor(s, st, tier)` → `{html, views, hypothesis}`. Tier 1 is
 the scenario's `hint` (authored HTML) or one generic rule that names no view; tier 2 names two clue views
@@ -672,4 +672,4 @@ herring). Hypotheses: n-plus-one (right), provider, redis, replicas.
   `setParent` cycle/self; `checkBuild` codes incl. `cross-trace-parent`; view penalties, recheck,
   escaping, SVG attributes only, focus.
 - P10/P11: budget arithmetic (repeat free, clamp at 0, `exhaustedNow` once), answer outcomes,
-  view penalties, meter value/text from one source; triage percentages and `null` for empty sets.
+  view penalties, the minutes-left headline, plus the kit meter's spent line and cells, all from `boardView`'s budget fields; triage percentages and `null` for empty sets.
