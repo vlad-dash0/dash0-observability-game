@@ -572,13 +572,13 @@ test('cardinality: the spotted attributes are exactly the unbounded ones; the bo
   const text = (id) => spec.lines.find((l) => l.id === id).text;
   assert.equal(/url_path="\/recommendations\/\d+"/.test(text('url-path')), true, 'a raw URL with an id in it');
   assert.equal(text('route').includes('http_route="/recommendations/{id}"'), true, 'the template, not the URL');
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['method', 'node', 'region', 'route', 'status']);
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['method', 'port', 'region', 'route', 'status']);
   assert.equal(/low-cardinality/.test(plain(spec.whyNot.route)) && /placeholder/.test(plain(spec.whyNot.route)), true);
   assert.equal(/_OTHER/.test(plain(spec.whyNot.method)), true);
   assert.equal(/not what they look like/.test(plain(spec.whyNot.status)), true, 'a number-looking attribute is not the problem');
   // #190: a digit-heavy decoy, so "the lines with the most digits" is not the answer.
-  assert.equal(/\d.*\d.*\d.*\d.*\d/.test(text('node')), true, 'the node name carries digits');
-  assert.equal(/not how many digits it has/.test(plain(spec.whyNot.node)), true, 'a digit-heavy id is not the problem');
+  assert.equal(/\d.*\d.*\d.*\d/.test(text('port')), true, 'the port id carries four digits');
+  assert.equal(/not how many digits it has/.test(plain(spec.whyNot.port)), true, 'a digit-heavy id is not the problem');
   assert.equal(/short, published list of regions/.test(plain(spec.whyNot.region)), true);
 });
 
@@ -856,7 +856,7 @@ test('exemplars: puzzle shortcuts fail the real grader: all, none, every line th
   const mentionsTrace = spec.lines.filter((l) => /trace_id/.test(l.text)).map((l) => l.id);
   assert.equal(mentionsTrace.length, 4, 'three exemplars and the trace_id label');
   assert.equal(spotGrade(spec, mentionsTrace).outcome, 'wrong', 'a trace id in a label is not an exemplar');
-  const sums = spec.lines.map((l) => [l.id, Number(/sum=(\d+\.\d)s/.exec(l.text)?.[1] ?? 0)]);
+  const sums = spec.lines.map((l) => [l.id, Number(/sum=(\d+\.\d+)s/.exec(l.text)?.[1] ?? 0)]);
   const spike = sums.filter(([, v]) => v > 30).map(([id]) => id);
   assert.deepEqual(spike.length, 3, 'three high points');
   assert.equal(spotGrade(spec, spike).outcome, 'wrong', 'the spike alone is not the answer: a spike does not bring an exemplar');
@@ -866,7 +866,7 @@ test('exemplars: puzzle shortcuts fail the real grader: all, none, every line th
 
 test('exemplars: one exemplar is on a point that is not on the spike, and one spike point has none', () => {
   const spec = exmSpot();
-  const sum = (id) => Number(/sum=(\d+\.\d)s/.exec(spec.lines.find((l) => l.id === id).text)[1]);
+  const sum = (id) => Number(/sum=(\d+\.\d+)s/.exec(spec.lines.find((l) => l.id === id).text)[1]);
   assert.equal(sum('pay-0914-15') < 10, true, 'an exemplar on an ordinary point');
   assert.equal(sum('pay-0914-45') > 30 && !spec.faults.includes('pay-0914-45'), true, 'a spike point without one');
 });
