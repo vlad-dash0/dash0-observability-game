@@ -31,6 +31,7 @@ import distributions from './distributions.mjs';
 import errorsTripled from './errors-tripled.mjs';
 import eventsAndLinks from './events-and-links.mjs';
 import exemplars from './exemplars.mjs';
+import goodAlerts from './good-alerts.mjs';
 import headSampling from './head-sampling.mjs';
 import histograms from './histograms.mjs';
 import instruments from './instruments.mjs';
@@ -116,6 +117,14 @@ export const ACTS = [
     sub: 'You can\'t keep everything',
     levels: [headSampling, tailSampling, whatCostsMoney],
     boss: errorsTripled,
+  },
+  {
+    id: 'act-7',
+    no: 7,
+    name: 'Alerting and SLOs',
+    sub: 'Wake me only when it matters',
+    levels: [goodAlerts],
+    boss: null,
   },
   {
     id: 'act-9',
