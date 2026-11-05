@@ -1,7 +1,7 @@
 // lib/widgets/incident-help.mjs (#143 P2a): the incident board's three hint tiers, pure.
 // hintFor(s, st, tier) -> {html, views, hypothesis}: `views` are the tiles to outline, and
 // `hypothesis` the cause to outline (or null). Tier 1 is the scenario's authored hint, else a
-// generic rule; tier 2 names two clue views, unopened first, and outlines only the unopened;
+// generic rule; tier 2 names up to two clue views, only the unopened while any remain;
 // tier 3 outlines the right cause and unlocks nothing. Everything derives from clueIds and
 // the state: there is no second statement of which views are clues. Strings, arrays and
 // booleans only.
@@ -32,29 +32,28 @@ test('H1 tier 1: the authored hint when the scenario has one, else one generic r
   assert.equal(a.hypothesis, null);
 });
 
-test('H2 tier 2: two clue views, unopened first; only the unopened are outlined', () => {
+test('H2 tier 2: up to two clue views, only the unopened while any remain, all outlined', () => {
   const s = incidentScenario();
   const fresh = hintFor(s, newIncident(s), 2);
   assert.deepEqual(fresh.views, ['traces', 'db-metrics'], 'both unopened: both outlined, in scenario order');
   assert.equal(fresh.hypothesis, null);
-  for (const l of ['Traces', 'Database metrics']) assert.equal(plain(fresh.html).includes(l), true, l);
+  assert.equal(plain(fresh.html), 'Worth opening: Traces and Database metrics (outlined in Step 1).');
   assert.equal(plain(fresh.html).includes('Deploy log'), false, 'never a herring');
   assert.equal(plain(fresh.html).includes('Status page'), false, 'never a neutral view');
 
   const one = hintFor(s, open(s, newIncident(s), 'traces'), 2);
-  assert.deepEqual(one.views, ['db-metrics'], 'the opened clue is named but not outlined');
-  const text = plain(one.html);
-  assert.equal(text.includes('Traces') && text.includes('Database metrics'), true);
-  assert.equal(text.indexOf('Database metrics') < text.indexOf('Traces'), true, 'the unopened clue comes first');
+  assert.deepEqual(one.views, ['db-metrics'], 'one clue unopened, one opened: only the unopened is outlined');
+  assert.equal(plain(one.html), 'Worth opening: Database metrics (outlined in Step 1).', 'and only the unopened is named');
+  assert.equal(plain(one.html).includes('Traces'), false, 'the opened clue is not named');
 
   const both = hintFor(s, open(s, newIncident(s), 'traces', 'db-metrics'), 2);
   assert.deepEqual(both.views, []);
-  assert.equal(plain(both.html).includes('you have both open'), true, plain(both.html));
+  assert.equal(plain(both.html), 'Worth opening: Traces and Database metrics (you have both open).', 'none left: the two clues, already open');
 
   const t = threeClues();
   const three = hintFor(t, open(t, newIncident(t), 'traces'), 2);
   assert.deepEqual(three.views, ['db-metrics', 'logs'], 'three clues, one open: the two unopened, not the opened one');
-  assert.equal(plain(three.html).includes('Traces'), false, 'only two views are named');
+  assert.equal(plain(three.html), 'Worth opening: Database metrics and Logs (outlined in Step 1).');
 });
 
 test('H3 tier 3: outlines the right cause, says how to unlock only while locked, and changes nothing', () => {

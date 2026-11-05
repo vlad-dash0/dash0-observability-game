@@ -9,17 +9,22 @@ import { readFileSync } from 'node:fs';
 import { makeDom, q, qa, click } from './helpers/dom.mjs';
 import { recordFocus } from './helpers/focus.mjs';
 import {
-  alertTitle, budget, card, cards, causeState, clues, cluesOn, fire, hinted, locked, lockLine, minutesShown, region, spentOn, tally,
+  alertTitle, budget, card, cards, causeState, clues, cluesOn, fire, hinted, locked, lockLine, minutesShown, region, spentOn, tally, text,
 } from './helpers/incident-board.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { frac, incidentScenario, rightLast, slow, threeClues, tight, zero } from './fixtures/incident-scenario.mjs';
 import { budgetLeft, newIncident, openView } from '../lib/widgets/incident.mjs';
 import { boardStars, starsLabel } from '../lib/widgets/help-ladder.mjs';
-import { mountIncident, renderIncident } from '../lib/widgets/incident-view.mjs';
+import { incidentOrder, mountIncident, renderIncident } from '../lib/widgets/incident-view.mjs';
 
 const ID = 'checkout-slow';
 
-function setup(s = incidentScenario()) {
+/**
+ * Render and mount `s`. `shuffle` is ctx.shuffle (identity unless a test needs another order;
+ * the tests below select tiles and causes by id). `order` is incidentOrder's result, passed to
+ * both renderIncident and mountIncident, as a level would.
+ */
+function setup(s = incidentScenario(), { shuffle = (a) => [...a], order } = {}) {
   const dom = makeDom();
   const focus = recordFocus(dom.window);
   const counts = { mistakes: 0, hints: 0, done: 0 };
@@ -29,10 +34,11 @@ function setup(s = incidentScenario()) {
     escapeHtml,
     reduceMotion: true,
     signal: new AbortController().signal,
+    shuffle,
     mistake() { counts.mistakes += 1; },
     hint() { counts.hints += 1; },
   };
-  dom.body.innerHTML = renderIncident(s, newIncident(s), { escapeHtml });
+  dom.body.innerHTML = renderIncident(s, newIncident(s), order ?? {});
   dom.actions.innerHTML = '<button id="next" disabled>Next</button>';
   const onComplete = () => {
     counts.done += 1;
@@ -40,7 +46,7 @@ function setup(s = incidentScenario()) {
     next.disabled = false;
     return next;
   };
-  mountIncident(ctx, s, { onComplete, swirl: () => {} });
+  mountIncident(ctx, s, { onComplete, swirl: () => {}, ...order });
   return { counts, focus, s };
 }
 
@@ -396,6 +402,20 @@ test('V11 D7 tones: opens speak in the status bar, picks in the feedback; error 
   assert.equal(feedback().tone, 'success');
 });
 
+test('V11 the open that unlocks the causes says so in success; an open after that, or on a board open from the start, is neutral', () => {
+  setup();
+  open('traces');
+  assert.deepEqual(status(), { text: 'Opened Traces (3 min). Its card is at the top of Evidence.', tone: 'neutral', hidden: false }, 'one clue of two: still locked');
+  open('db-metrics');
+  assert.deepEqual(status(), { text: 'Opened Database metrics. That is 2 clues: the causes in Step 3 are unlocked below.', tone: 'success', hidden: false });
+  open('status-page');
+  assert.deepEqual(status(), { text: 'Opened Status page (2 min). Its card is at the top of Evidence.', tone: 'neutral', hidden: false }, 'already unlocked: no second unlock line');
+
+  setup(zero());
+  open('traces');
+  assert.deepEqual(status(), { text: 'Opened Traces (3 min). Its card is at the top of Evidence.', tone: 'neutral', hidden: false }, 'never locked, so a clue unlocks nothing');
+});
+
 // ---- V12 hints ---------------------------------------------------------------------------
 
 test('V12 three hint tiers: the rule, then two clue tiles outlined, then the right cause outlined while locked', () => {
@@ -441,6 +461,102 @@ test('V13 the right cause: done once, the board closes, the win card shows and t
   assert.equal(q(`[id="${ID}-hint"]`).disabled, true);
   assert.equal(q(`[id="${ID}-stars"]`).getAttribute('aria-label'), '5 of 5 stars');
   assert.deepEqual(focus.unfocusable(), []);
+});
+
+const winLine = () => text(`[id="${ID}-win-stars"]`);
+
+test('V13 the win card sums up the run: stars, wrong picks, misleading views, hints, minutes used; "budget run out" only when it did', () => {
+  setup();
+  open('traces');
+  open('db-metrics');
+  pick('slow-query');
+  assert.equal(winLine(), '5 of 5 stars: 0 wrong picks, 0 misleading, 0 hints. 7 min used.');
+
+  setup(tight());
+  open('a');
+  open('h');
+  click(`[id="${ID}-hint"]`);
+  pick('bad-deploy');
+  pick('slow-query');
+  assert.equal(winLine(), '2 of 5 stars: 1 wrong pick, 1 misleading, 1 hint, budget run out. 2 min used.', 'four penalties; the singulars');
+});
+
+test('V13 a solved board previews no cost: hovering a tile after the win leaves the meter alone', () => {
+  setup();
+  open('traces');
+  open('db-metrics');
+  pick('slow-query');
+  fire(tile('deploys'), 'pointerenter');
+  assert.equal(budget(ID).look, null);
+  assert.equal(budget(ID).cells.preview, 0);
+  assert.equal(budget(ID).left, '13 min left.');
+});
+
+// ---- V15 shuffled order -------------------------------------------------------------------
+
+const tileOrder = () => qa(`[data-incident="${ID}"] [data-view]`).map((b) => b.getAttribute('data-view'));
+const causeOrder = () => qa(`[data-incident="${ID}"] [data-hypothesis]`).map((b) => b.getAttribute('data-hypothesis'));
+const REVERSED_TILES = ['status-page', 'deploys', 'db-metrics', 'traces'];
+const REVERSED_CAUSES = ['network', 'bad-deploy', 'slow-query'];
+
+/** A non-identity ctx.shuffle (reverse) that counts its calls. */
+function reversing() {
+  const calls = [];
+  const shuffle = (a) => {
+    calls.push(a.map((e) => e.id).join());
+    return [...a].reverse();
+  };
+  return { shuffle, calls };
+}
+
+test('V15 incidentOrder shuffles the views and the causes once each through ctx.shuffle; authored order without one', () => {
+  const s = incidentScenario();
+  const r = reversing();
+  assert.deepEqual(incidentOrder({ shuffle: r.shuffle }, s), { viewOrder: REVERSED_TILES, causeOrder: REVERSED_CAUSES });
+  assert.deepEqual(r.calls, ['traces,db-metrics,deploys,status-page', 'slow-query,bad-deploy,network']);
+  assert.deepEqual(incidentOrder({}, s), {
+    viewOrder: ['traces', 'db-metrics', 'deploys', 'status-page'],
+    causeOrder: ['slow-query', 'bad-deploy', 'network'],
+  });
+  assert.equal(s.views[0].id, 'traces', 'the scenario is not reordered');
+});
+
+test('V15 the mounted board lists tiles and causes in the shuffled order, shuffled once, and keeps it through an open, a hint and a pick', () => {
+  const r = reversing();
+  const { focus } = setup(incidentScenario(), { shuffle: r.shuffle });
+  assert.deepEqual(tileOrder(), REVERSED_TILES);
+  assert.deepEqual(causeOrder(), REVERSED_CAUSES);
+  assert.equal(r.calls.length, 2, 'one shuffle per list per mount');
+  open('status-page');
+  assert.deepEqual([tileOrder(), causeOrder()], [REVERSED_TILES, REVERSED_CAUSES], 'after an open');
+  click(`[id="${ID}-hint"]`);
+  click(`[id="${ID}-hint"]`);
+  assert.deepEqual([tileOrder(), causeOrder()], [REVERSED_TILES, REVERSED_CAUSES], 'after the hints');
+  assert.deepEqual(hinted(ID), ['view:db-metrics', 'view:traces'], 'outlines follow the shown order');
+  open('traces');
+  open('db-metrics');
+  pick('network');
+  assert.deepEqual([tileOrder(), causeOrder()], [REVERSED_TILES, REVERSED_CAUSES], 'after a wrong pick');
+  assert.equal(focus.last(), 'hypothesis:bad-deploy', 'focus moves to the next cause as listed, not as authored');
+  assert.equal(r.calls.length, 2, 'redraws never reshuffle');
+  assert.deepEqual(cards(ID), ['db-metrics:open', 'traces:closed', 'status-page:closed'], 'the evidence log stays in open order, newest first');
+  assert.deepEqual(spentOn(ID), [['Status page', 2], ['Traces', 3], ['Database metrics', 4]], 'Spent on stays in open order');
+  pick('slow-query');
+  assert.deepEqual([tileOrder(), causeOrder()], [REVERSED_TILES, REVERSED_CAUSES], 'after the win');
+});
+
+test('V15 an order from incidentOrder, given to render and mount, is the one order of the board: the first paint matches and mount does not reshuffle', () => {
+  const s = incidentScenario();
+  const r = reversing();
+  const order = incidentOrder({ shuffle: r.shuffle }, s);
+  const again = reversing();
+  setup(s, { shuffle: again.shuffle, order });
+  assert.deepEqual(again.calls, [], 'mount uses the order it is given');
+  assert.deepEqual(tileOrder(), REVERSED_TILES);
+  assert.deepEqual(causeOrder(), REVERSED_CAUSES);
+  const dom = makeDom();
+  dom.body.innerHTML = renderIncident(s, newIncident(s), order);
+  assert.deepEqual([tileOrder(), causeOrder()], [REVERSED_TILES, REVERSED_CAUSES], 'the rendered markup, before any mount');
 });
 
 // ---- V14 contract ------------------------------------------------------------------------
