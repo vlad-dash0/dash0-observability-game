@@ -266,6 +266,29 @@ test('Escape closes the reward, or the level unless the player is typing', () =>
   game.onEscape({ target: null }); // nothing open: a no-op
 });
 
+test('an Escape a widget already handled leaves the level open; an unhandled one closes it', () => {
+  const { game, dom } = setup();
+  game.openLevel('x');
+  ctxs.x.renderStep('<div id="wd" tabindex="0"></div><button id="pl">plain</button>');
+  // A widget (Build it's pick, say) owns its Escape and marks it handled.
+  dom.document.getElementById('wd').addEventListener('keydown', (ev) => ev.preventDefault());
+  const press = (id) => {
+    const ev = new dom.window.Event('keydown', { bubbles: true, cancelable: true });
+    ev.key = 'Escape';
+    dom.document.getElementById(id).dispatchEvent(ev);
+    return ev;
+  };
+  const handled = press('wd');
+  assert.equal(handled.defaultPrevented, true, 'the widget handled it');
+  game.onEscape(handled);
+  assert.equal(game.overlayOpen, true, 'a handled Escape keeps the level open');
+  assert.equal(ctxs.x.signal.aborted, false);
+  const unhandled = press('pl');
+  assert.equal(unhandled.defaultPrevented, false);
+  game.onEscape(unhandled);
+  assert.equal(game.overlayOpen, false, 'an unhandled Escape still closes the level');
+});
+
 test('focus returns to the level card after closing the level and after the reward', () => {
   const { game, dom } = setup();
   const focused = [];

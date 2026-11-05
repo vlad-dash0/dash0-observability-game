@@ -10,7 +10,6 @@ import { fileURLToPath } from 'node:url';
 import { makeDom, q, qa, click } from './helpers/dom.mjs';
 import { recordFocus } from './helpers/focus.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
-import { scoreStars } from '../lib/scoring.mjs';
 import { newBuildState, setParent } from '../lib/widgets/build-it.mjs';
 import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
 import { A, B, C, D, E, b1Spec } from './fixtures/build-b1.mjs';
@@ -19,7 +18,7 @@ import { S1, S2, S3, S4, T2, logsSpec } from './fixtures/build-logs.mjs';
 const ALL = { queue: true, tint: true, guide: true, instant: true, hints: true };
 const CHECK = { hints: true }; // context-propagation's ladder: Check button, hints on
 
-/** A counting ctx on a fresh DOM with the widget rendered; peekStars follows the real rule over the whole level (the board must not use it). */
+/** A counting ctx on a fresh DOM with the widget rendered. */
 function setup(spec = b1Spec(), { reduceMotion = false } = {}) {
   const dom = makeDom();
   const focus = recordFocus(dom.window);
@@ -35,8 +34,6 @@ function setup(spec = b1Spec(), { reduceMotion = false } = {}) {
     hint() {
       counts.hints += 1;
     },
-    peekStars: (extra = 0) =>
-      scoreStars({ mistakes: counts.mistakes, hintsUsed: counts.hints + extra, elapsedMs: 0 }, { scored: true, scoring: { parMs: null } }),
   };
   dom.body.innerHTML = renderBuild(spec, newBuildState(spec), { escapeHtml });
   dom.actions.innerHTML = '<button id="finish" disabled>Finish</button>';
@@ -309,6 +306,23 @@ test('Escape cancels a pick', () => {
   assert.equal(cleanMarkup(dom.body.innerHTML), true);
 });
 
+test('Escape during a pick is marked handled so the level stays open; with nothing picked it is left to the app', () => {
+  const { mount } = setup(withHelps(ALL));
+  mount();
+  const esc = () => {
+    const e = { key: 'Escape', defaultPrevented: false };
+    e.preventDefault = () => {
+      e.defaultPrevented = true;
+    };
+    q('[data-build="b1"]').onkeydown(e);
+    return e.defaultPrevented;
+  };
+  click(`[data-span="${B}"]`);
+  assert.equal(esc(), true, 'the pick owns this Escape');
+  assert.equal(status(), 'Cancelled.');
+  assert.equal(esc(), false, 'nothing picked: the app may close the level');
+});
+
 // ---- completion, success card and swirl ----------------------------------------------
 
 test('instant feedback: placing the last span right assembles the trace, once, with no Check button', () => {
@@ -494,9 +508,8 @@ test('status and links in Check mode with no helps: edits are free, Check grades
 // ---- findings of the review of c7f2f6c (#146) ---------------------------------------------
 test('stars are this board only: a penalty on an earlier step is not counted, the board\'s own wrong drop is', () => {
   const clean = setup(withHelps(ALL));
-  clean.counts.mistakes = 1; // a slip on an earlier step of the level: ctx.peekStars() says 4
+  clean.counts.mistakes = 1; // a slip on an earlier step of the level (the level's own stars would be 4)
   clean.mount();
-  assert.equal(clean.ctx.peekStars(), 4);
   assert.equal(q('#b1-stars').getAttribute('aria-label'), '5 of 5 stars still possible');
   solveQueue();
   assert.equal(q('#b1-win-stars').textContent, '5 of 5 stars: 0 wrong drops, 0 hints.');
@@ -571,6 +584,17 @@ test('pick path on the rows: a descendant row is refused as a loop, free; the ro
   click(`[data-span="${A}"]`);
   assert.equal(q(`[data-span="${E}"]`).getAttribute('aria-pressed'), 'false', 'a row click after Escape picks, it does not move');
   assert.equal(label(E).endsWith('root'), true);
+});
+
+test('after a wrong graded move the span stays selected but not picked: the root zone moves nothing', () => {
+  const { counts, mount } = setup(withHelps({ ...ALL, queue: false }));
+  mount();
+  click(`[data-span="${C}"]`);
+  click(`[data-span="${E}"]`);
+  assert.equal(counts.mistakes, 1, 'a wrong parent row');
+  const before = [label(C), status()];
+  click('[data-drop="root"]');
+  assert.deepEqual([label(C), status(), counts.mistakes], [...before, 1], 'no move, no cost');
 });
 
 test('pick path on the rows with the queue: the arriving span is not a parent yet', () => {

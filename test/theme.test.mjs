@@ -406,3 +406,32 @@ test('trace waterfall (#146): bar text on every service fill, trace chips, hint 
     assert.equal(new Set(fills).size, 6, theme);
   }
 });
+
+test('parent-coloured text (the "its parent" tag, the queue heading) reaches 4.5:1 on every row fill it can sit on, both themes', () => {
+  for (const [sel, prop] of [['.wf-tag[data-tag="par"]', 'color'], ['.wf-queue-head strong', 'color']]) {
+    assert.equal(last(declsFor(sel), prop), 'var(--color-parent)', `${sel} is set in --color-parent`);
+  }
+  // Each row state's background, read from base.css: a flat token or a token tint over transparent.
+  const rowFills = ['.wf-row:hover', '.wf-row[aria-pressed="true"]', '.wf-row[data-mark="likely"]', '.wf-row[data-mark="valid"]', '.wf-row[data-arriving]']
+    .map((sel) => [sel, last(declsFor(sel), 'background') ?? '']);
+  for (const theme of ['light', 'dark']) {
+    const fg = luminance(resolveColor('var(--color-parent)', theme));
+    for (const under of ['--color-surface', '--color-bg']) {
+      const u = resolveColor(`var(${under})`, theme);
+      const fills = [[under, u], ['--color-surface-2', resolveColor('var(--color-surface-2)', theme)]];
+      for (const [sel, bg] of rowFills) {
+        const tint = /^color-mix\(in srgb, (var\(--color-[\w-]+\)) ([\d.]+)%, transparent\)$/.exec(bg);
+        if (tint) fills.push([`${sel} on ${under}`, resolveColor(tint[1], theme).map((c, i) => c * tint[2] / 100 + u[i] * (1 - tint[2] / 100))]);
+        else {
+          assert.match(bg, /^var\(--color-[\w-]+\)$/, `${sel} background is a token or a token tint`);
+          fills.push([sel, resolveColor(bg, theme)]);
+        }
+      }
+      for (const [name, rgb] of fills) {
+        const b = luminance(rgb);
+        const r = (Math.max(fg, b) + 0.05) / (Math.min(fg, b) + 0.05);
+        assert.ok(r >= 4.5, `${theme}: --color-parent text on ${name} is ${r.toFixed(2)}, needs 4.5`);
+      }
+    }
+  }
+});

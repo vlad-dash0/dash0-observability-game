@@ -6,7 +6,6 @@ import assert from 'node:assert/strict';
 import { makeDom, q, qa } from './helpers/dom.mjs';
 import { recordFocus } from './helpers/focus.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
-import { scoreStars } from '../lib/scoring.mjs';
 import { chipsHtml, hintCost, mountSide, sideHtml, starsLabel, validateHelps } from '../lib/widgets/help-ladder.mjs';
 
 const KEYS = ['queue', 'hints'];
@@ -43,31 +42,22 @@ test('hintCost follows the star rule: what one more penalty would cost now', () 
   assert.equal(hintCost(3, 1), 'costs 2 stars');
 });
 
-/** A ctx whose peekStars follows the real rule over its own counts. */
+/** The right column on a fresh DOM; its stars come from the board's own counts passed to score(). */
 function sideSetup({ hints = true } = {}) {
   const dom = makeDom();
   const focus = recordFocus(dom.window);
-  const counts = { mistakes: 0, hints: 0 };
-  const ctx = {
-    ovBody: dom.body,
-    escapeHtml,
-    reduceMotion: false,
-    peekStars: (extra = 0) =>
-      scoreStars({ mistakes: counts.mistakes, hintsUsed: counts.hints + extra, elapsedMs: 0 }, { scored: true, scoring: { parMs: null } }),
-  };
+  const ctx = { ovBody: dom.body, escapeHtml, reduceMotion: false };
   dom.body.innerHTML = `<div id="box">${sideHtml('s1', { hints, title: 'Trace assembled' })}</div>`;
   const swirls = [];
   const side = mountSide(ctx, q('#box'), 's1', { swirl: (host, opts) => swirls.push(opts.reduced) });
-  return { counts, ctx, side, swirls, focus };
+  return { ctx, side, swirls, focus };
 }
 
-test('the score card: counts, five stars from ctx.peekStars, muted until success, then earned', () => {
-  const { counts, side } = sideSetup();
+test('the score card: counts, five stars from this board\'s own wrong count and hints (boardStars), muted until success, then earned', () => {
+  const { side } = sideSetup();
   side.score({ wrong: 0, wrongLabel: 'wrong drops', hints: 0, done: false });
   assert.equal(q('#s1-stars').getAttribute('aria-label'), '5 of 5 stars still possible');
   assert.deepEqual(qa('#s1-stars [data-star]').map((s) => s.dataset.star), ['possible', 'possible', 'possible', 'possible', 'possible']);
-  counts.mistakes = 1;
-  counts.hints = 1;
   side.score({ wrong: 1, wrongLabel: 'wrong drops', hints: 1, done: false });
   assert.equal(q('#s1-wrong').textContent, '1');
   assert.equal(q('#s1-wrong-label').textContent, 'wrong drops');
@@ -101,7 +91,7 @@ test('the swirl gets ctx.reduceMotion, and a swirl that throws leaves the card s
   const dom = makeDom();
   recordFocus(dom.window);
   dom.body.innerHTML = `<div id="box">${sideHtml('s2', { hints: false, title: 'Every span checks out' })}</div>`;
-  const ctx = { ovBody: dom.body, escapeHtml, reduceMotion: true, peekStars: () => 5 };
+  const ctx = { ovBody: dom.body, escapeHtml, reduceMotion: true };
   const got = [];
   mountSide(ctx, q('#box'), 's2', { swirl: (host, opts) => got.push(opts.reduced) }).succeed({ line: 'x', closing: '' });
   assert.deepEqual(got, [true]);

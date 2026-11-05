@@ -272,20 +272,3 @@ test('createLevelContext refuses missing deps', () => {
   assert.throws(() => createLevelContext({ ...base, ovActions: null }), TypeError);
   assert.throws(() => createLevelContext({ ...base, reportError: 'log' }), TypeError);
 });
-
-test('peekStars: what a finish now would give, by the one rule, with optional extra penalties; it changes nothing', () => {
-  let t = NOW;
-  const { ctx, calls } = setup({ level: { id: 'lvl-p', scored: true, scoring: { parMs: 60_000 } }, now: () => t });
-  assert.equal(ctx.peekStars(), 5);
-  assert.equal(ctx.peekStars(1), 4, 'one more hint or mistake');
-  ctx.mistake();
-  ctx.hint();
-  assert.equal(ctx.peekStars(), 3);
-  assert.equal(ctx.peekStars(2), 2);
-  t += 61_000;
-  assert.equal(ctx.peekStars(), 2, 'over par counts too');
-  assert.equal(calls.length, 0, 'peeking never finishes');
-  assert.equal(ctx.finish().stars, 2, 'finish agrees with the peek');
-  const unscored = setup({ level: { id: 'lvl-u', scored: false, scoring: { parMs: null } } }).ctx;
-  assert.equal(unscored.peekStars(), 0);
-});

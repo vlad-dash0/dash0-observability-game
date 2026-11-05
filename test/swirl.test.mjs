@@ -167,7 +167,11 @@ test('with motion and WebGL it plays once, then settles to the static frame and 
   assert.equal(qa('#swirl svg circle').length, SWIRL_DOTS, 'the settled frame stays');
 });
 
-test('an aborted signal (the overlay closed) stops it and releases the context', async () => {
+// A missed abort leaves playSwirl's promise pending for good (the fake loop is never driven
+// again), so these tests carry a timeout: a regression goes red in seconds, not at the CI limit.
+const SETTLES = { timeout: 2000 };
+
+test('an aborted signal (the overlay closed) stops it and releases the context', SETTLES, async () => {
   const { el } = host();
   const { rec, importThree } = fakeThree();
   const ac = new AbortController();
@@ -181,7 +185,7 @@ test('an aborted signal (the overlay closed) stops it and releases the context',
   assert.equal(qa('#swirl canvas').length, 0);
 });
 
-test('an abort that lands while three.js loads: stopped, no renderer, no loop, nothing in the host', async () => {
+test('an abort that lands while three.js loads: stopped, no renderer, no loop, nothing in the host', SETTLES, async () => {
   const { el } = host();
   const { rec, importThree } = fakeThree();
   const ac = new AbortController();
@@ -197,7 +201,7 @@ test('an abort that lands while three.js loads: stopped, no renderer, no loop, n
   assert.equal(qa('#swirl svg').length, 0, 'nothing is drawn for a card that is gone');
 });
 
-test('an abort that lands as the renderer is made: stopped, the context released, no loop, no canvas', async () => {
+test('an abort that lands as the renderer is made: stopped, the context released, no loop, no canvas', SETTLES, async () => {
   const { el } = host();
   const { rec, importThree } = fakeThree();
   const ac = new AbortController();

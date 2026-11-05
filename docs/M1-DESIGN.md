@@ -138,10 +138,13 @@ View `lib/widgets/build-it-view.mjs` (redesigned in #146 from the owner-approved
   are coloured by service (`--color-svc-0..5`, muted, light and dark, legend below); ERROR is a
   stroke, not the fill. The selected row and bar are outlined, its current parent dashed.
 - **Moving a span.** Drag a row onto a span or the root zone (HTML drag and drop, `el.on*`), or
-  pick it and use the panel (`data-parent`: root, then the placed spans; itself and its
-  descendants disabled), the keyboard and touch path. Both call `setParent`; a loop refused
-  there stays free. While a span moves, itself and its descendants are marked invalid and are
-  not drop targets. Kind, status, links and logs-mode attach keep their panel controls.
+  pick it (click or Enter on its row), then click its parent row or the root zone, as in the
+  prototype; clicking the picked span again, or Escape, cancels (the widget marks that Escape
+  handled, so the app's Escape does not also close the level). The panel stays as an extra
+  keyboard and screen-reader path (`data-parent`: root, then the placed spans; itself and its
+  descendants disabled). All call `setParent`; a loop refused there stays free. While a span
+  moves, itself and its descendants are marked invalid and are not drop targets. Kind, status,
+  links and logs-mode attach keep their panel controls.
 - **Help ladder.** A step declares `helps` (`queue`, `tint`, `guide`, `instant`, `hints`;
   validated by `validateBuildHelps`, `lib/widgets/build-it-help.mjs`); `renderBuild` is the one
   renderer and a chips row says which are on. Queue: the first root is placed, spans arrive in
@@ -166,8 +169,10 @@ View `lib/widgets/build-it-view.mjs` (redesigned in #146 from the owner-approved
   300px and sticky beside the board from about 960px of widget width (a container query), else
   stacked under it: the success card (hidden until success; heading focused, no focus ring;
   stars line; the spec's `closing`), the score card (wrong drops or failed Checks, hints, five
-  stars from `ctx.peekStars()`: muted outlines while still possible, filled once earned), the
-  hint tools (button, cost from the star rule, tier line, hint text).
+  stars for this board only, `boardStars`: the star rule over the board's own wrong drops or
+  failed Checks and hint tiers, counted from zero at mount, so earlier steps never show here;
+  muted outlines while still possible, filled once earned; the level's stars stay on the
+  reward screen), the hint tools (button, cost from the star rule, tier line, hint text).
 - **Swirl** (#151, folded in): on the first success only, `lib/swirl-render.mjs` plays a dot
   swirl with the vendored three.js (a few seconds; the canvas and WebGL context are then
   released and the settled frame stays as an SVG ring, `lib/swirl.mjs`). Reduced motion or no
