@@ -245,25 +245,9 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .build-opt[aria-pressed="true"] { border: 3px solid var(--color-text); padding: 5.5px 9px; }
 .build-opt:disabled { opacity: .4; cursor: not-allowed; }
 .build-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-.build-btn {
-  font: 600 14px var(--font-sans); border-radius: 999px; padding: 9px 20px; cursor: pointer;
-  border: 1px solid var(--color-border); background: transparent; color: var(--color-text);
-}
-.build-btn.primary { background: var(--color-primary); color: var(--color-primary-contrast); border-color: transparent; }
-.build-btn:disabled { opacity: .45; cursor: default; }
 .build-issues { margin: 8px 0 0 18px; }
 .build-issues li { max-width: 100%; overflow-wrap: anywhere; }
 .build-code { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-muted); margin-left: 6px; }
-/* Logs mode: a record is a debug-style line in the stream under the waterfall; the pressed
-   record gets a thicker text-coloured border, not colour alone. */
-.build-logs { list-style: none; display: flex; flex-direction: column; gap: 4px; margin: 0 16px 12px; }
-.build-log {
-  width: 100%; text-align: left; border: 1.5px solid var(--color-border); background: var(--color-surface);
-  color: var(--color-text); border-radius: var(--radius-sm); padding: 8px 11.5px; font-family: var(--font-mono);
-  font-size: 13px; font-weight: 500; cursor: pointer; max-width: 100%; overflow-wrap: anywhere;
-}
-.build-log:hover { border-color: var(--color-accent); }
-.build-log[aria-pressed="true"] { border: 3px solid var(--color-text); background: var(--color-surface-2); padding: 6.5px 10px; }
 .build-attrs { list-style: none; margin: 8px 0 0; padding: 0; font-family: var(--font-mono); font-size: 13px; overflow-wrap: anywhere; }
 
 /* ---------- Help ladder and right column (lib/widgets/help-ladder.mjs, #146) ---------- */
@@ -310,11 +294,6 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .help-rule { font-size: 11.5px; color: var(--color-text-muted); }
 .help-h { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-muted); font-weight: 600; }
 .help-hint-row { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
-.help-btn {
-  font: 600 14px var(--font-sans); border-radius: 999px; padding: 9px 20px; cursor: pointer; background: transparent;
-  color: var(--color-hint); border: 1px solid var(--color-hint);
-}
-.help-btn:disabled { opacity: .45; cursor: default; }
 .help-cost { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-muted); }
 .help-tier { font-size: 12.5px; color: var(--color-text-muted); }
 .help-tier b { color: var(--color-text); font-weight: 600; }
