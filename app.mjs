@@ -77,7 +77,7 @@ const CONFETTI = 40;
  * Storage), document, window?, deck?, globe? ((host, view) → Promise of a globe handle or
  * null; lib/globe-render.mjs mountGlobe in the browser), globeMap? ({ACT_REGIONS,
  * LEVEL_COUNTRY, COUNTRY_NAMES, actOf}), dots?, comingSoon? (acts shown but not playable, hub/coming-soon.mjs), now?, rand?, reduceMotion? (() → boolean), reportError?,
- * setTimeout?, clearTimeout?, debug? (boolean, ?mode=debug: every level opens, nothing is saved) }. Without `globe` the hub shows the globe's text fallback.
+ * telemetry? (lib/telemetry.mjs facade; completions emit a level.complete span), setTimeout?, clearTimeout?, debug? (boolean, ?mode=debug: every level opens, nothing is saved) }. Without `globe` the hub shows the globe's text fallback.
  */
 export function createGame(deps) {
   const {
@@ -97,6 +97,7 @@ export function createGame(deps) {
     setTimeout: later = globalThis.setTimeout,
     clearTimeout: cancel = globalThis.clearTimeout,
     debug = false,
+    telemetry = null,
   } = deps;
   const report = (e) => {
     try {
@@ -332,6 +333,7 @@ export function createGame(deps) {
           onFinish: (levelId, result) => this.completeLevel(levelId, result),
           signal: controller.signal,
           reportError: report,
+          telemetry,
         });
         level.run(ctx);
       } catch (e) {
@@ -392,6 +394,28 @@ export function createGame(deps) {
       this.rewardCards = rec.newCards.map((c) => cardFront[c] ?? c);
       this.rewardOpen = true;
       this.focusSoon('#reward-close');
+      this.recordTelemetry(levelId, level, result);
+    },
+
+    // Telemetry never blocks play (docs/DASH0-LAB.md I6): a span for the completion, then a
+    // flush that is not awaited. Any failure is reported and nothing else happens.
+    recordTelemetry(levelId, level, result) {
+      try {
+        if (!telemetry) return;
+        telemetry.emit({
+          name: 'level.complete',
+          attributes: {
+            'game.level.id': levelId,
+            'game.act.id': level?.actId ?? 'unknown',
+            'game.level.stars': result.stars, // the result's stars, never recomputed
+            'game.cards.count': Array.isArray(result.cards) ? result.cards.length : 0,
+            'game.debug': this.debug,
+          },
+        });
+        Promise.resolve(telemetry.flush()).catch(report);
+      } catch (e) {
+        report(e);
+      }
     },
 
     closeReward() {

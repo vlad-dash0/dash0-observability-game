@@ -34,11 +34,19 @@ Absence is never success. Thrown error text is never passed through.
 ## Practice ingress: `lib/otlp/practice-ingress.mjs`
 `createPracticeIngress({token, readOnlyToken})` returns a fetch-compatible fake. Rules in order: foreign host throws TypeError; not POST 405; path other than `/v1/traces` 404; content type not JSON 415; body not an OTLP traces request 400; missing or wrong token 401; the read-only token 403; else 200 `{}`. It goes through the same `sendTraces`, so practice and live cannot diverge. Practice never calls the real fetch.
 
+## Telemetry session: `lib/telemetry.mjs`
+`createTelemetry({fetch, randomBytes, now, setTimeout, clearTimeout, reportError, hosts, allowLocal})` returns the facade `ctx.telemetry` exposes (FOUNDATION §2.6). Everything is injected; `main.mjs` supplies the browser's.
+- Token: only in the closure and the outgoing `Authorization` header. Not in `status()`, an outcome, a span, `reportError` (a message containing it is rewritten to `[token]`) or the DOM.
+- State: `off`, then `configured` (`connect` validated; nothing sent), then `connected` only when `sendTest` is `accepted` for the current config generation. `connect` and `disconnect` bump a generation counter; a late outcome for an older generation changes nothing and is returned as `unreachable/aborted`. A failed re-test demotes `connected` to `configured`.
+- `sendTest` is single-flight per generation (the in-flight promise is returned). Practice goes to `createPracticeIngress` and never calls the injected `fetch`; live never calls the practice ingress. Live needs `INGRESS_HOSTS` non-empty and a `fetch` (`liveAvailable()`), otherwise `connect` returns `{field:'mode', reason:'unavailable'}`.
+- `emit` is a no-op unless connected and never throws (a bad draft is reported and counted dropped). Missing ids and times are filled in. The buffer holds 200 spans; more are dropped and counted. `flush` splices the buffer synchronously, so spans emitted meanwhile go in the next batch; a failed flush drops its snapshot and counts it. `stats()` is `{buffered, dropped}`. `sendBatch` bypasses the buffer and throws on an invalid draft.
+- `app.mjs` `completeLevel` emits `level.complete` (`game.level.id`, `game.act.id`, `game.level.stars` = the result's stars, `game.cards.count`, `game.debug`) and flushes without awaiting, inside try/catch with `reportError`. No request is made unless connected.
+
 ## Phase ledger
 | Phase | Content | State |
 |---|---|---|
-| P1 | encoder, sender, validators, practice ingress, this doc, derived CSP test | this PR |
-| P2 | `lib/telemetry.mjs`, `ctx.telemetry`, completion spans, FOUNDATION §2.6 | planned |
+| P1 | encoder, sender, validators, practice ingress, this doc, derived CSP test | merged (#197) |
+| P2 | `lib/telemetry.mjs`, `ctx.telemetry`, completion spans, FOUNDATION §2.6 | this PR |
 | P4 | `lib/incident-lab.mjs`: seeded incident, `answersFrom`, `gradeAnswer` | planned |
 | P3 | Act 9 level "Connect the game to Dash0" (PNG), secret field kind, connect form | planned |
 | P5 | the lab boss "It's us" | planned |
