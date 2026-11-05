@@ -6,7 +6,7 @@
 // Spec: https://opentelemetry.io/docs/specs/otel/metrics/api/#synchronous-and-asynchronous-instruments , https://opentelemetry.io/docs/specs/otel/metrics/api/#updowncounter , https://opentelemetry.io/docs/specs/otel/metrics/api/#gauge
 // Spec: https://opentelemetry.io/docs/specs/otel/metrics/data-model/#sums , https://opentelemetry.io/docs/specs/otel/metrics/data-model/#gauge
 
-// Step 1. Two measurements per instrument. Labels are checked for tells by test/sort-tells.test.mjs.
+// Step 1. Two measurements per instrument. Label wording must not give the bucket away (test/sort-tells.test.mjs).
 const SORT = {
   id: 'instr-sort',
   buckets: [

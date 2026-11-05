@@ -7,7 +7,7 @@ import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
 import { newSortState } from '../lib/widgets/sort-it.mjs';
 
-// Step 1. Labels are checked for tells by test/sort-tells.test.mjs.
+// Step 1. Label wording must not give the bucket away (test/sort-tells.test.mjs).
 const SORT = {
   id: 'bag-sort',
   buckets: [

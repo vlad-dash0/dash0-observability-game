@@ -472,10 +472,10 @@ notifications, recommendations, redis, postgres.
 ### Act 0
 **0.1 `monitoring-vs-observability`**: sort; cards `[]`. Step 1 Sort into `known` / `new`:
 cpu "Is CPU on db-1 above 90%?" known; 5xx "Has the checkout API 5xx rate stayed under 1%
-for the last 5 minutes?" known; disk "Is the log disk left with less than 8 GB?" known; ios
+for the last 5 minutes?" known; disk "Is the log disk down to 8 GB free space?" known; ios
 "Why are only iOS 5.2 checkouts from Germany slow since 14:05?" new; cust "Which customers hit a
-payment timeout?" new; coupon "Is the coupon path slowing the 10% of carts with over 20 items?" new. No
-blind rule (label length, `%`, a shared word) may sort the labels (`test/sort-tells.test.mjs`). Step 2 choice "What makes the second kind
+payment timeout?" new; coupon "Is the coupon path slowing over 10% of carts with 20+ items?" new. No
+blind rule (label length, `%`, a shared word) may sort these labels; `test/sort-tells.test.mjs` checks that. Step 2 choice "What makes the second kind
 answerable?" → `rich` (telemetry with many attributes you can slice after the fact); decoys
 dash, alerts, retention. Spec: https://opentelemetry.io/docs/concepts/observability-primer/#what-is-observability
 
@@ -545,7 +545,7 @@ edges from CLIENT to SERVER and PRODUCER to CONSUMER pairs." Copy says "backends
 storefront CLIENT `GET /products/999` 404 ERROR → ok; b catalog SERVER 404 ERROR → wrong (SERVER 4xx stays Unset); c
 checkout SERVER 500 UNSET → wrong; d inventory SERVER 200 UNSET → ok; e payments SERVER
 `POST /v1/charge` 503 ERROR → ok (a 5xx SHOULD be Error on a SERVER span). Split 3 ok / 2 wrong, so
-neither "CLIENT right, SERVER wrong" nor "Error is right" gets past one mistake. Step 2 choice: Ok then
+so neither rule sorts all five with fewer than two mistakes. Step 2 choice: Ok then
 setStatus(Error) → stays Ok (Ok is final). Card: "Status starts Unset. A 4xx is Error on the
 CLIENT span but stays Unset on the SERVER span. Ok is a final override." Spec:
 https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status ,

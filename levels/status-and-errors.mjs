@@ -1,6 +1,6 @@
 // Level 2.3: Status and errors. Five spans from one shop, each with an HTTP code and the
 // status its instrumentation set; the player sorts the right statuses from the wrong ones
-// (a 4xx is Error only on the CLIENT span, a 5xx on either), then says what Ok followed by Error leaves.
+// (a 4xx is Error only on the CLIENT span, a 5xx is Error on either span), then says what Ok followed by Error leaves.
 // Spec: docs/M1-DESIGN.md §6 Act 2.
 // Spec: https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status , https://opentelemetry.io/docs/specs/otel/trace/api/#set-status
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';

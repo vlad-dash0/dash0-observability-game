@@ -6,7 +6,7 @@ import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
 import { newSortState } from '../lib/widgets/sort-it.mjs';
 
-// Step 1. Labels are checked for tells by test/sort-tells.test.mjs.
+// Step 1. Label wording must not give the bucket away (test/sort-tells.test.mjs).
 const SORT = {
   id: 'mvo-sort',
   buckets: [
@@ -40,13 +40,13 @@ const SORT = {
     },
     {
       id: 'disk',
-      label: 'Is the log disk left with less than 8 GB?',
+      label: 'Is the log disk down to 8 GB free space?',
       bucket: 'known',
-      why: 'A full disk is a failure mode you know about, with a number you can watch. A dashboard answers it.',
+      why: 'A disk running out of space is a failure mode you know about, with a number you can watch. A dashboard answers it.',
     },
     {
       id: 'coupon',
-      label: 'Is the coupon path slowing the 10% of carts with over 20 items?',
+      label: 'Is the coupon path slowing over 10% of carts with 20+ items?',
       bucket: 'new',
       why: 'This combines two details, the coupon path and the cart size, that nobody thought to chart together. You ask it of the telemetry itself.',
     },

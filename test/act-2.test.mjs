@@ -224,9 +224,9 @@ const PIN = {
         buckets: ['auto', 'manual'],
         items: { server: 'auto', redis: 'auto', client: 'auto', loyalty: 'manual', coupon: 'manual', 'item-count': 'manual' },
         says: {
-          server: ['server spans', 'express route'],
+          server: ['SERVER spans', 'express route'],
           redis: ['Redis'],
-          client: ['fetch', 'client spans'],
+          client: ['fetch', 'CLIENT spans'],
           loyalty: ['applyLoyaltyDiscount()'],
           coupon: ['app.coupon.code'],
           'item-count': ['app.cart.item_count'],

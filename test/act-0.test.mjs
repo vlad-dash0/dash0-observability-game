@@ -33,10 +33,10 @@ const PIN = {
         says: {
           cpu: 'Is CPU on db-1 above 90%?',
           '5xx': 'Has the checkout API 5xx rate stayed under 1% for the last 5 minutes?',
-          disk: 'Is the log disk left with less than 8 GB?',
+          disk: 'Is the log disk down to 8 GB free space?',
           ios: 'Why are only iOS 5.2 checkouts from Germany slow since 14:05?',
           cust: 'Which customers hit a payment timeout?',
-          coupon: 'Is the coupon path slowing the 10% of carts with over 20 items?',
+          coupon: 'Is the coupon path slowing over 10% of carts with 20+ items?',
         },
       },
       { choice: 'mvo', keys: ['alerts', 'dash', 'retention', 'rich'], right: 'rich' },

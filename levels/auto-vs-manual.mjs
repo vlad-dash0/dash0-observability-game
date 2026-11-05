@@ -4,7 +4,7 @@
 // Spec: docs/M1-DESIGN.md §6 Act 2.
 // Spec: https://opentelemetry.io/docs/zero-code/js/ , https://opentelemetry.io/docs/platforms/kubernetes/operator/automatic/
 
-// Step 1. Labels are checked for tells by test/sort-tells.test.mjs.
+// Step 1. Label wording must not give the bucket away (test/sort-tells.test.mjs).
 const SORT = {
   id: 'avm-sort',
   buckets: [
@@ -14,7 +14,7 @@ const SORT = {
   items: [
     {
       id: 'server',
-      label: 'The HTTP server spans, one per <code>express</code> route',
+      label: 'The HTTP SERVER spans, one per <code>express</code> route',
       bucket: 'auto',
       why: 'The HTTP server instrumentation starts a span for every request that reaches an Express route, with no code of yours.',
     },
@@ -38,7 +38,7 @@ const SORT = {
     },
     {
       id: 'client',
-      label: 'Outgoing <code>fetch</code> client spans',
+      label: 'Outgoing <code>fetch</code> CLIENT spans',
       bucket: 'auto',
       why: 'The HTTP client instrumentation starts a CLIENT span for each outgoing call, with no code of yours.',
     },
