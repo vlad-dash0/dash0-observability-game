@@ -553,7 +553,7 @@ Escalate."). Alert "PAGE: checkout p95 > 2 s (firing)". Four looks (Which servic
 when? / Which customers? / Show me a trace), each reveals "No data. …" with the reason and
 drops "Error budget: N% left" by 25. `#pager-escalate` "Escalate" (no `data-finish`) is
 enabled after the first look and moves to part 2; the budget reaching 0 moves to part 2 by
-itself. Part 2, with telemetry: "Same alert, now with telemetry. Ask the same four questions.
+itself. The budget also shows as a 4-cell kit meter ("N of 100 % spent") and a Spent on chip per look, in the order taken. Part 2, with telemetry: "Same alert, now with telemetry. Ask the same four questions.
 The data is made up, for illustration. Ask all four to finish." The same four questions are
 buttons (`data-ask`); clicking one reveals a made-up answer (service.name, a metric over time
 with service.version, a span attribute, a trace; `CONTENT.telemetry` in
