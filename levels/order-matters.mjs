@@ -15,6 +15,7 @@
 const SPOT = {
   id: 'order-spot',
   target: 'config',
+  helps: { hints: false },
   lines: [
     { id: 'traces', text: 'traces: processors: [memory_limiter, k8sattributes, transform/redact, batch]' },
     { id: 'metrics', text: 'metrics: processors: [batch, memory_limiter]' },

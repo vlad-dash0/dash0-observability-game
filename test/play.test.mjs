@@ -58,7 +58,7 @@ function playAll(level, during = () => {}, run = start(level)) {
 
 const stars = (level) => (level.scored ? 5 : 0);
 /** The step types with a side column (a wide split and a success card). */
-const SIDE = ['sort', 'build', 'incident'];
+const SIDE = ['sort', 'build', 'incident', 'spot'];
 
 for (const level of LEVELS) {
   const steps = stepsOf(level);
@@ -99,7 +99,7 @@ for (const level of LEVELS) {
       if (i > 0) click(advanceId(level, i - 1));
       assert.equal(focus.names()[before], driver.first(spec), `step ${i + 1} starts here`);
       for (const sel of driver.solve(spec)) click(sel);
-      // A solved Build it step, incident board or Sort it step focuses its success heading (#146, #143, #156); its Next is enabled.
+      // A solved Build it step, incident board, Sort it or Spot it step focuses its success heading (#146, #143, #156, #160); its Next is enabled.
       const handOff = SIDE.includes(key) ? `#${spec.id}-win-title` : advanceId(level, i);
       assert.equal(focus.last(), handOff, `step ${i + 1} hands off to its button`);
       assert.equal(q(advanceId(level, i)).disabled, false, `step ${i + 1} opens its button`);
@@ -164,12 +164,12 @@ test('code is plain text: an <img onerror> in it renders escaped', () => {
 
 // ---- T12 (#158): the step frame comes from the kit; the step type decides its width -------
 
-test('P3 T12 every step type says whether its step is wide; Sort it, Build it and the incident board are the wide ones', () => {
+test('P3 T12 every step type says whether its step is wide; Sort it, Build it, the incident board and Spot it are the wide ones', () => {
   for (const [key, type] of Object.entries(STEP_TYPES)) assert.equal(typeof type.wide, 'boolean', `${key}.wide`);
   assert.deepEqual(Object.keys(STEP_TYPES).filter((k) => STEP_TYPES[k].wide), SIDE);
 });
 
-test('T12 each step renders one kit step, wide by its type: a sort, build or incident step holds the board and its side column', () => {
+test('T12 each step renders one kit step, wide by its type: a sort, build, incident or spot step holds the board and its side column', () => {
   const seen = [];
   playAll(FX, (i, { key }) => {
     const wide = STEP_TYPES[key].wide;
@@ -184,7 +184,7 @@ test('T12 each step renders one kit step, wide by its type: a sort, build or inc
       assert.equal(qa('.ui-split-side [id$="-win"]').length, 1, `${key}: the side column holds the success card`);
     }
   });
-  assert.deepEqual(['sort', 'build', 'incident', 'choice'].every((k) => seen.includes(k)), true);
+  assert.deepEqual(['sort', 'build', 'incident', 'spot', 'choice'].every((k) => seen.includes(k)), true);
 });
 
 const HOW = 'ol[aria-label="How this board works"]';
@@ -371,6 +371,20 @@ test('validatePlay names each configure step problem, with the step and widget i
   for (const [edit, want] of cases) {
     const got = problems(edit);
     assert.ok(got.includes(want), `${want}\n  got: ${JSON.stringify(got)}`);
+  }
+});
+
+test('a spot step may declare its helps and a hint; a misspelt helps key, or a hint with hints off, is named', () => {
+  assert.deepEqual(problems((p) => { Object.assign(p.steps[4].spot, { helps: { hints: true }, hint: 'Ask which value set is unbounded.' }); }), []);
+  assert.deepEqual(problems((p) => { p.steps[4].spot.helps = { hints: false }; }), []);
+  const cases = [
+    [(p) => { p.steps[4].spot.helpz = { hints: true }; }, 'step 5 (spot "fx-spot"): unknown key "helpz" on spec (did you mean "helps"?)'],
+    [(p) => { p.steps[4].spot.hint = 'Never shown.'; }, 'step 5 (spot "fx-spot"): hint: shown only when helps.hints is on'],
+    [(p) => { p.steps[4].spot.helps = { hints: 'yes' }; }, 'step 5 (spot "fx-spot"): helps: "hints" is not true or false'],
+  ];
+  for (const [edit, want] of cases) {
+    const got = problems(edit);
+    assert.deepEqual(got, [want], want);
   }
 });
 

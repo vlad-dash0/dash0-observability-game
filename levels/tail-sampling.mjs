@@ -139,6 +139,7 @@ const BUDGET = {
 const SPOT = {
   id: 'ts-spot',
   target: 'config',
+  helps: { hints: false },
   lines: [
     { id: 'traces', text: 'traces: receivers: [otlp] processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0, span_metrics]' },
     { id: 'metrics-spans', text: 'metrics/spans: receivers: [span_metrics] processors: [batch] exporters: [otlp_grpc/dash0]' },

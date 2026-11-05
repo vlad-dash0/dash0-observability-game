@@ -44,6 +44,7 @@ const RENAME = [
 const SPOT = {
   id: 'ottl-spot',
   target: 'config',
+  helps: { hints: false },
   lines: [
     { id: 'delete-email', text: 'delete_key(span.attributes, "user.email")' },
     { id: 'resource-map', text: 'delete_key(resource.attributes, "user.email")' },
