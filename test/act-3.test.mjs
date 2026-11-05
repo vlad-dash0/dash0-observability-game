@@ -572,11 +572,14 @@ test('cardinality: the spotted attributes are exactly the unbounded ones; the bo
   const text = (id) => spec.lines.find((l) => l.id === id).text;
   assert.equal(/url_path="\/recommendations\/\d+"/.test(text('url-path')), true, 'a raw URL with an id in it');
   assert.equal(text('route').includes('http_route="/recommendations/{id}"'), true, 'the template, not the URL');
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['method', 'route', 'status', 'tier']);
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['method', 'node', 'region', 'route', 'status']);
   assert.equal(/low-cardinality/.test(plain(spec.whyNot.route)) && /placeholder/.test(plain(spec.whyNot.route)), true);
   assert.equal(/_OTHER/.test(plain(spec.whyNot.method)), true);
   assert.equal(/not what they look like/.test(plain(spec.whyNot.status)), true, 'a number-looking attribute is not the problem');
-  assert.equal(/3 tiers/.test(plain(spec.whyNot.tier)), true);
+  // #190: a digit-heavy decoy, so "the lines with the most digits" is not the answer.
+  assert.equal(/\d.*\d.*\d.*\d.*\d/.test(text('node')), true, 'the node name carries digits');
+  assert.equal(/not how many digits it has/.test(plain(spec.whyNot.node)), true, 'a digit-heavy id is not the problem');
+  assert.equal(/short, published list of regions/.test(plain(spec.whyNot.region)), true);
 });
 
 test('cardinality: the spot step teaches the nuance: http.route, the Prometheus guidance and the SDK overflow', () => {

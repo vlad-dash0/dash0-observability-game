@@ -28,6 +28,8 @@ async function specsOf(kind) {
 }
 
 const plain = (html) => html.replace(/<[^>]+>/g, '').replace(/&[a-z]+;|&#\d+;/g, ' ').replace(/\s+/g, ' ').trim();
+/** Text as a player reads it out: `_`, `.` and `-` are spaces, so `user_id` and "user id" are one name. */
+const spoken = (text) => text.replace(/[_.-]+/g, ' ').replace(/\s+/g, ' ').trim();
 const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** `needle` in `hay` as a whole word or phrase, case-insensitive (bounded by anything but a letter, digit, _ or -). */
 const mentions = (hay, needle) => new RegExp(`(?<![A-Za-z0-9_-])${escRe(needle)}(?![A-Za-z0-9_-])`, 'i').test(hay);
@@ -43,7 +45,7 @@ test('the hints-on Sort and Spot steps are exactly the ones listed here', async 
   assert.deepEqual(spotOn, [...SPOT_ON].sort());
 });
 
-test('every hints-on Sort step declares an authored hint, and tier 1 shows it instead of SORT_RULE', async () => {
+test('every hints-on Sort step declares an authored hint, and tier 1 shows that hint, not the generic rule', async () => {
   const missing = [];
   for (const { key, spec } of await specsOf('sort')) {
     if (!sortHelps(spec).hints) continue;
@@ -58,7 +60,7 @@ test('every hints-on Sort step declares an authored hint, and tier 1 shows it in
   assert.deepEqual(missing, [], 'hints-on Sort steps with no authored hint');
 });
 
-test('every hints-on Spot step declares an authored hint, and tier 1 shows it instead of SPOT_RULE', async () => {
+test('every hints-on Spot step declares an authored hint, and tier 1 shows that hint, not the generic rule', async () => {
   const missing = [];
   for (const { key, spec } of await specsOf('spot')) {
     if (!spotHelps(spec).hints) continue;
@@ -86,8 +88,10 @@ test('the authored hints are inline HTML: no block tags, since tier 1 wraps them
 });
 
 // A Sort hint is for the whole board, so it must not name a bucket (its visible label, or its
-// id where the id is not simply a word of that label) or quote an item.
-test('no Sort hint names a bucket or quotes an item', async () => {
+// id where the id is not simply a word of that label), use a label word that tells the buckets
+// apart (right/wrong in "Status is right"/"Status is wrong"; a word every label shares, like
+// "Status", tells nothing), or quote an item.
+test('no Sort hint names a bucket, uses a word that tells the bucket labels apart, or quotes an item', async () => {
   const leaks = {};
   for (const { key, spec } of await specsOf('sort')) {
     if (spec.hint === undefined) continue;
@@ -99,21 +103,32 @@ test('no Sort hint names a bucket or quotes an item', async () => {
       const labelWords = label.toLowerCase().split(/[^a-z0-9]+/);
       if (!labelWords.includes(b.id.toLowerCase()) && mentions(text, b.id)) found.push(`bucket id "${b.id}"`);
     }
+    const wordsOf = (b) => new Set(spoken(plain(b.label)).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+    const labelSets = spec.buckets.map(wordsOf);
+    for (const w of new Set(labelSets.flatMap((ws) => [...ws]))) {
+      if (!labelSets.every((ws) => ws.has(w)) && mentions(spoken(text), w)) found.push(`label word "${w}"`);
+    }
     for (const it of spec.items) if (text.toLowerCase().includes(plain(it.label).toLowerCase())) found.push(`item "${plain(it.label)}"`);
     if (found.length) leaks[key] = [...new Set(found)];
   }
   assert.deepEqual(leaks, {});
 });
 
-/** Quoted values and label/attribute keys of a line: `user_id`, `"u-31402"` -> user_id, u-31402. */
+/**
+ * What names a line, read out (spoken): its leading token (a timestamp, a metric or pipeline
+ * name), its quoted values and its label/attribute keys.
+ * `09:14:15 payments.charge.duration{...}` -> 09:14:15; `x{user_id="u-31402"}` -> x, user id, u 31402.
+ */
 const marks = (text) => [
+  text.match(/^[^\s{(\[]+/)?.[0].replace(/[:,]+$/, ''),
   ...[...text.matchAll(/"([^"]+)"/g)].map((m) => m[1]),
   ...[...text.matchAll(/([A-Za-z_][\w.]*)\s*=/g)].map((m) => m[1]),
-];
+].filter(Boolean).map(spoken).filter(Boolean);
 
 // A Spot hint must not point at an answer line: not its text, not its id (as written, or with
-// _ for -), and not a quoted value or key that only answer lines have (delta, user_id ...).
-test('no Spot hint names an answer line, its id, or a value or key only the answers carry', async () => {
+// _ for -), and not a leading token, quoted value or key that only answer lines have (a
+// timestamp, delta, user_id ...), written as in the line or in plain words ("the user id").
+test('no Spot hint names an answer line, its id, or a timestamp, name, value or key only the answers carry', async () => {
   const leaks = {};
   for (const { key, spec } of await specsOf('spot')) {
     if (spec.hint === undefined) continue;
@@ -124,7 +139,7 @@ test('no Spot hint names an answer line, its id, or a value or key only the answ
     for (const l of faults) {
       if (text.includes(l.text)) found.push(`line "${l.text}"`);
       for (const id of new Set([l.id, l.id.replaceAll('-', '_')])) if (mentions(text, id)) found.push(`id "${id}"`);
-      for (const m of new Set(marks(l.text))) if (!decoyMarks.has(m) && mentions(text, m)) found.push(`answer-only "${m}"`);
+      for (const m of new Set(marks(l.text))) if (!decoyMarks.has(m) && mentions(spoken(text), m)) found.push(`answer-only "${m}"`);
     }
     if (found.length) leaks[key] = [...new Set(found)];
   }

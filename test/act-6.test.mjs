@@ -347,7 +347,7 @@ test('spot: the lines are valid, five of them, and exactly one, the traces pipel
   assert.equal(spec.target, 'config');
   const ids = spec.lines.map((l) => l.id);
   assert.deepEqual([...ids].sort(), ['connector-def', 'logs', 'metrics-spans', 'sampler-def', 'traces']);
-  // #190: the answer is not the focused first line (nor the last), and sits below the two lines it is read against.
+  // #190: the answer is not the focused first line (nor the last), and sits below metrics-spans and connector-def, the two lines it refers to.
   assert.equal(ids.indexOf('traces') > 0 && ids.indexOf('traces') < ids.length - 1, true, `traces is neither first nor last: ${ids}`);
   assert.equal(ids.indexOf('traces') > ids.indexOf('metrics-spans') && ids.indexOf('traces') > ids.indexOf('connector-def'), true, `traces below metrics-spans and connector-def: ${ids}`);
   const rule = (l) => /processors: \[[^\]]*tail_sampling[^\]]*\]/.test(l.text) && /exporters: \[[^\]]*span_metrics[^\]]*\]/.test(l.text);
