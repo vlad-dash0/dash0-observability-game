@@ -6,7 +6,7 @@ import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
 import { newSortState } from '../lib/widgets/sort-it.mjs';
 
-// Step 1. Items interleave the buckets so their order gives nothing away.
+// Step 1. Label wording must not give the bucket away (test/sort-tells.test.mjs).
 const SORT = {
   id: 'mvo-sort',
   buckets: [
@@ -22,31 +22,31 @@ const SORT = {
     },
     {
       id: 'ios',
-      label: 'Why are only iOS 5.2 checkouts from Germany slow since 14:05?',
+      label: 'Why are only iOS 5.2 checkouts from Germany slow since 14:05 UTC?',
       bucket: 'new',
       why: 'Nobody builds a dashboard for iOS 5.2 in Germany. You answer it by slicing telemetry by app version, country and time after the fact.',
     },
     {
       id: '5xx',
-      label: 'Is the 5xx rate above 1%?',
+      label: 'Has the checkout API 5xx rate stayed under 1% for the last 5 minutes?',
       bucket: 'known',
       why: 'An error-rate threshold is a classic alert: decided in advance, checked all the time.',
     },
     {
       id: 'cust',
-      label: 'Which customer IDs hit a payment timeout in the last hour?',
+      label: 'Is this one user hitting API timeouts?',
       bucket: 'new',
-      why: 'No chart lists customers one by one. You need telemetry that still carries the customer ID, so you can filter by it when the question comes up.',
+      why: 'No chart follows one user. You need telemetry that carries the user ID, so you can filter by it when the question comes up.',
     },
     {
       id: 'disk',
-      label: 'Is the log disk full?',
+      label: 'Is the log disk down to 8 GB free space?',
       bucket: 'known',
-      why: 'A full disk is a failure mode you know about, with a number you can watch. A dashboard answers it.',
+      why: 'A disk running out of space is a failure mode you know about, with a number you can watch. A dashboard answers it.',
     },
     {
       id: 'coupon',
-      label: 'Did the coupon path slow carts with over 20 items?',
+      label: 'Is the coupon path slowing over 10% of carts with 20+ items?',
       bucket: 'new',
       why: 'This combines two details, the coupon path and the cart size, that nobody thought to chart together. You ask it of the telemetry itself.',
     },
@@ -59,7 +59,7 @@ const ANSWERABLE = [
     key: 'rich',
     label: 'Telemetry with many attributes you can slice after the fact',
     right: true,
-    why: 'New questions need data that still carries the details, such as app version, country, customer ID and cart size, so you can group and filter by them once the question exists.',
+    why: 'New questions need data that still carries the details, such as app version, country, user ID and cart size, so you can group and filter by them once the question exists.',
   },
   {
     key: 'dash',
@@ -74,7 +74,7 @@ const ANSWERABLE = [
   {
     key: 'retention',
     label: 'Keeping data for longer',
-    why: 'Keeping data longer helps only if it has the detail you need. Months of CPU averages still cannot say which customers timed out.',
+    why: 'Keeping data longer helps only if it has the detail you need. Months of CPU averages still cannot say whether that user timed out.',
   },
 ];
 

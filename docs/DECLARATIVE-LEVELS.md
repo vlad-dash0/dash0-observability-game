@@ -14,13 +14,13 @@ Design for M2's first item (OUTLINE §8). It builds on FOUNDATION §2 and §3 an
 
 Evidence:
 - In 2.7 the whole `run()` is this pattern three times: `levels/auto-vs-manual.mjs:117-196`, which is 80 of the file's 197 lines.
-- Same pattern in `status-and-errors.mjs:82-137`, `monitoring-vs-observability.mjs:97-150` and `spans-and-traces.mjs:93-173`.
+- Same pattern in the `run()` of `status-and-errors.mjs:88-143`, `monitoring-vs-observability.mjs:97-150` and `spans-and-traces.mjs:93-173`.
 - Authors already began factoring it out: `the-signals.mjs:135-146` (`sortStep`), and the `next(onclick)` helper in `spans-and-traces.mjs:95-99`, `context-propagation.mjs:118-122` and `events-and-links.mjs:103-107`.
 
 **The data is already declarative.** `CONTENT.steps` is `{sort}`, `{build}` or `{id, question, choices}` (`auto-vs-manual.mjs:98-104`, `span-kinds.mjs:72-74`). The tests pin it (`test/act-2.test.mjs:286-318`).
 
 **Facts each level states twice today:**
-- **Cards:** listed on the level and again in `finish`, always the same list. Examples: `auto-vs-manual.mjs:114` and `:191`; `status-and-errors.mjs:79` and `:132`; `span-kinds.mjs:90` and `:149`; `the-pager.mjs:53` and `:96`; `checkout-is-slow.mjs:153` and `:172`.
+- **Cards:** listed on the level and again in `finish`, always the same list. Examples: `auto-vs-manual.mjs:114` and `:191`; `status-and-errors.mjs` (`cards` and `finish`); `span-kinds.mjs:90` and `:149`; `the-pager.mjs:53` and `:96`; `checkout-is-slow.mjs:153` and `:172`.
 - **`mechanics`:** written by hand, and always equal to the non-choice widgets the level uses. No UI reads it; the only reader is `lib/registry.mjs`.
 
 **Bespoke:**
