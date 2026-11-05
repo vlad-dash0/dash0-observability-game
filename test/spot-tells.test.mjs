@@ -135,7 +135,9 @@ function fields(text) {
 }
 
 /** The fields every board is read for when present, beside any other numeric field it has. */
-const NAMED_FIELDS = ['count', 'sum', 'value'];
+const NAMED_FIELDS = ['count', 'sum'];
+// Not read: an exemplar's `value=` is there or `exemplar: none` is, and that presence is what 3.6 teaches.
+const SKIPPED_FIELDS = ['value'];
 
 /**
  * The rule table for one board: name -> score (higher ranks first). Each text measure and each
@@ -148,7 +150,7 @@ function scoresFor(spec) {
     scores[`most ${name}`] = (l) => f(l.text);
     scores[`fewest ${name}`] = (l) => -f(l.text);
   }
-  const present = new Set(spec.lines.flatMap((l) => Object.keys(fields(l.text))));
+  const present = new Set(spec.lines.flatMap((l) => Object.keys(fields(l.text))).filter((n) => !SKIPPED_FIELDS.includes(n)));
   for (const name of [...NAMED_FIELDS.filter((n) => present.has(n)), ...[...present].filter((n) => !NAMED_FIELDS.includes(n)).sort()]) {
     const read = (l) => fields(l.text)[name];
     scores[`highest ${name}=`] = (l) => (read(l) === undefined ? MISSING : read(l));
@@ -239,7 +241,7 @@ test('the rules see every Spot board, read its fields, each board is solved by i
   assert.equal(labelKeys(line), 3, 'route, az, n; {id} inside a quoted value is no key');
   assert.deepEqual(fields(line), { count: 12, sum: 3.5, value: 0.25, p95_s: 0.61 });
   // A missing field ranks last for the highest and for the lowest alike.
-  const spec = { id: 'f', lines: [{ id: 'none', text: 'no fields' }, { id: 'lo', text: 'count=1' }, { id: 'hi', text: 'count=9' }] };
+  const spec = { id: 'f', lines: [{ id: 'none', text: 'no fields' }, { id: 'lo', text: 'count=1' }, { id: 'hi', text: 'count=9 value=2s' }] };
   const scores = scoresFor(spec);
   assert.deepEqual(rankings(spec, scores['highest count=']), [['hi', 'lo', 'none']]);
   assert.deepEqual(rankings(spec, scores['lowest count=']), [['lo', 'hi', 'none']]);
