@@ -87,3 +87,20 @@ test('does not mutate registry or progress, and the result is plain data', () =>
   assert.equal(Object.getPrototypeOf(s.countries), null);
   assert.equal(s.countries.constructor, undefined, 'no prototype keys');
 });
+
+// ---- coming-soon acts (#177 P7) -------------------------------------------------------
+
+const SOON = [
+  { id: 's7', no: 7, name: 'Later', sub: '', teaser: 't' },
+  { id: 's8', no: 8, name: 'Unmapped', sub: '', teaser: 't' },
+];
+const MAP2 = { ...MAP, ACT_REGIONS: { ...MAP.ACT_REGIONS, s7: { region: 'Seven' } } };
+
+test('coming-soon acts get their own entry, outside regions', () => {
+  const s = globeState(REG, progress({ a: 1 }), MAP2, SOON);
+  assert.deepEqual({ ...s.soon }, { s7: { region: 'Seven', no: 7, name: 'Later' } }, 's8 has no region: left out');
+  assert.equal(Object.getPrototypeOf(s.soon), null);
+  assert.deepEqual(s.regions, state({ a: 1 }).regions, 'a soon act is never a region');
+  assert.deepEqual(s.countries, state({ a: 1 }).countries);
+  assert.deepEqual(Object.keys(globeState(REG, progress({}), MAP2).soon), [], 'no list, no soon entries');
+});

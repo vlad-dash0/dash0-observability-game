@@ -55,13 +55,15 @@ const REG = buildRegistry(
   { deck: [CARD], nodeIds: ['checkout', 'payments'] },
 );
 const EMPTY = buildRegistry([], { deck: [], nodeIds: [] });
-// A tiny globe: act a0 is region Zero (countries XXX, YYY and AAA, which has no level), a1 is One.
+// A tiny globe: act a0 is region Zero (countries XXX, YYY and AAA, which has no level), a1 is One,
+// and the coming-soon act s7 is Seven (country SSS; only fixtures that pass S7 use it).
 const GLOBE_MAP = {
-  ACT_REGIONS: { a0: { region: 'Zero' }, a1: { region: 'One' } },
+  ACT_REGIONS: { a0: { region: 'Zero' }, a1: { region: 'One' }, s7: { region: 'Seven' } },
   LEVEL_COUNTRY: { x: 'XXX', y: 'YYY', z: 'ZZZ' },
   COUNTRY_NAMES: { XXX: 'Xland' },
-  actOf: (iso) => ({ XXX: 'a0', YYY: 'a0', AAA: 'a0', ZZZ: 'a1' })[iso] ?? null,
+  actOf: (iso) => ({ XXX: 'a0', YYY: 'a0', AAA: 'a0', ZZZ: 'a1', SSS: 's7' })[iso] ?? null,
 };
+const S7 = { id: 's7', no: 7, name: 'Later', sub: 'Not yet', teaser: 'Soon.' };
 const DOTS = [[10, 0, 'XXX', ''], [12, 2, 'XXX', ''], [0, 20, 'YYY', ''], [5, 10, 'AAA', ''], [-30, 120, 'ZZZ', ''], [40, -60, 'QQQ', '']];
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -83,7 +85,7 @@ function fakeGlobe(result = 'handle') {
   return { mount, log };
 }
 
-function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true, globe, window, debug } = {}) {
+function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true, globe, window, debug, comingSoon = [], dots = DOTS } = {}) {
   const dom = makeDom(read('index.html'));
   const store = fakeStorage({ initial, throwOn });
   const timers = [];
@@ -102,7 +104,8 @@ function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true,
     clearTimeout: () => {},
     globe,
     globeMap: GLOBE_MAP,
-    dots: DOTS,
+    dots,
+    comingSoon,
     window,
     debug,
   });
@@ -483,6 +486,49 @@ test('the globe text alternative counts levels done and names the lit regions', 
   assert.deepEqual(game.globeLines(), ['Act 0, First act (Zero): 1 of 4 done', 'Act 1, Second act (One): 0 of 1 done']);
 });
 
+test('acts list registry and soon acts in act order; a soon act has no level ids', () => {
+  const REG9 = buildRegistry(
+    [
+      { id: 'a0', no: 0, name: 'First act', sub: 'Begin', levels: [L('x', '0.1')], boss: null },
+      { id: 'a9', no: 9, name: 'Last act', levels: [L('n', '9.1')], boss: null },
+    ],
+    { deck: [], nodeIds: [] },
+  );
+  assert.deepEqual(setup({ registry: REG9, comingSoon: [S7] }).game.acts, [
+    { id: 'a0', no: 0, name: 'First act', sub: 'Begin', ids: ['x'], soon: false, teaser: '' },
+    { id: 's7', no: 7, name: 'Later', sub: 'Not yet', ids: [], soon: true, teaser: 'Soon.' },
+    { id: 'a9', no: 9, name: 'Last act', sub: '', ids: ['n'], soon: false, teaser: '' },
+  ]);
+});
+
+test('a soon act changes nothing: not playable, not counted, nothing saved', () => {
+  for (const debug of [false, true]) {
+    const g = setup({ comingSoon: [S7], debug });
+    assert.equal(g.game.levelState('s7'), 'locked', `debug ${debug}`);
+    assert.equal(g.game.openLevel('s7'), false, `debug ${debug}`);
+    assert.equal(g.game.nudgeId, null);
+    assert.equal(g.game.overlayOpen, false);
+    assert.deepEqual(g.errors, [], 'nothing thrown');
+    const plain = setup({ debug }).game;
+    assert.deepEqual(g.game.stars, plain.stars);
+    assert.deepEqual(g.game.cards, plain.cards);
+    assert.equal(g.store.data.has(STORAGE_KEY), false, 'nothing saved');
+  }
+});
+
+test('the globe draws a soon region dimmed and names it', () => {
+  const { game } = setup({ comingSoon: [S7], dots: [...DOTS, [20, 100, 'SSS', '']] });
+  const view = game.globeView();
+  assert.deepEqual([...view.states], [0, 0, 0, 0, 0, 0, 3]);
+  assert.equal(view.target.actId, 'a0', 'the globe never turns to a soon act');
+  assert.equal(game.mapLabel(), 'World map: 0 of 5 levels done. Coming soon: Seven.');
+  assert.deepEqual(game.globeLines(), [
+    'Act 0, First act (Zero): 0 of 4 done',
+    'Act 1, Second act (One): 0 of 1 done',
+    'Act 7, Later (Seven): coming soon',
+  ]);
+});
+
 test('the globe mounts on init with the dot states, the current act and the motion preference', async () => {
   const { mount, log } = fakeGlobe();
   const { game } = setup({ globe: mount, reduceMotion: false });
@@ -820,13 +866,27 @@ test('index.html: the globe stage is a named image, with a legend and a text fal
   assert.equal(stage.getAttribute(':aria-label'), 'mapLabel()');
   assert.equal(shell.querySelector('.globe').getAttribute('x-show'), '!globeFallback');
   const legend = shell.querySelector('.globe-legend').textContent.replace(/\s+/g, ' ').trim();
-  assert.equal(legend, 'Lit: level completed Pulsing: incident open Not reached');
+  assert.equal(legend, 'Lit: level completed Pulsing: incident open Not reached Coming soon');
   const fallback = shell.querySelector('ul.globe-fallback');
   assert.equal(fallback.getAttribute('x-show'), 'globeFallback');
   assert.equal(fallback.querySelector('template').getAttribute('x-for'), 'line in globeLines()');
   for (const el of [shell.querySelector('.map-panel'), ...shell.querySelectorAll('.map-panel *')]) {
     assert.ok(!el.hasAttribute('style') && !el.hasAttribute(':style'), 'no style on the map panel');
   }
+});
+
+test('index.html: a soon act shows the kit chip and teaser; the legend has a soon key', () => {
+  const soon = deepQuery(shell, '.act-soon');
+  assert.ok(soon, '.act-soon in the act template');
+  assert.equal(soon.getAttribute('x-show'), 'act.soon');
+  const chip = soon.querySelector('span.ui-chip[data-tone="neutral"]');
+  assert.ok(chip, 'a neutral kit chip');
+  assert.equal(chip.textContent.trim(), 'Coming soon');
+  assert.ok(soon.querySelector('[x-text="act.teaser"]'), 'the teaser, escaped by x-text');
+  assert.equal(deepQuery(shell, '.act').getAttribute(':class'), "act.soon ? 'soon' : ''");
+  const legend = shell.querySelector('.globe-legend').textContent.replace(/\s+/g, ' ').trim();
+  assert.equal(legend, 'Lit: level completed Pulsing: incident open Not reached Coming soon');
+  assert.ok(shell.querySelector('.globe-legend .globe-key.soon'), 'the soon key has its swatch');
 });
 
 test('index.html: the map heading can take focus and a polite live region carries the lit note', () => {
