@@ -79,6 +79,34 @@ function bestByToken(spec) {
   return best;
 }
 
+/**
+ * All-caps words of a label, case kept (CPU, SERVER, UTC): 2+ letters or digits with at least one
+ * letter, none lower-case. `tokens` lower-cases everything, so it cannot see these tells.
+ */
+const capsWords = (it) =>
+  new Set(plain(it.label).split(/[^A-Za-z0-9]+/).filter((w) => w.length >= 2 && /[A-Z]/.test(w) && w === w.toUpperCase()));
+
+/** Wrong placements when items with an all-caps word go to the bucket at `capsIndex`, the rest to the other (two buckets only). */
+function byCaps(spec, capsIndex) {
+  return mistakes(spec, (it) => spec.buckets[capsWords(it).size > 0 ? capsIndex : 1 - capsIndex].id);
+}
+
+/** Like bestByToken, case-sensitive: each all-caps word found in two or more labels, either way round. */
+function bestByCapsWord(spec) {
+  const ids = spec.buckets.map((b) => b.id);
+  const counts = new Map();
+  for (const it of spec.items) for (const w of capsWords(it)) counts.set(w, (counts.get(w) ?? 0) + 1);
+  let best = { wrong: Infinity, token: null };
+  for (const [token, n] of counts) {
+    if (n < 2) continue;
+    for (const [yes, no] of [ids, [...ids].reverse()]) {
+      const wrong = mistakes(spec, (it) => (capsWords(it).has(token) ? yes : no));
+      if (wrong < best.wrong) best = { wrong, token };
+    }
+  }
+  return best;
+}
+
 /** Items with `<code>` to the bucket at `codeIndex`, the rest to the other (two buckets only). */
 function byCode(spec, codeIndex) {
   return mistakes(spec, (it) => spec.buckets[/<code>/.test(it.label) ? codeIndex : 1 - codeIndex].id);
@@ -153,6 +181,24 @@ test('Sort it: "a word or a % shared by labels goes to one bucket" never earns 4
     if (spec.buckets.length !== 2) continue;
     const { wrong, token } = bestByToken(spec);
     assert.equal(wrong >= MIN_WRONG, true, `${level} ${spec.id}: the token "${token}" alone gets ${wrong} wrong`);
+  }
+});
+
+test('Sort it: "the labels with an all-caps word go in one bucket" never earns 4 stars', async () => {
+  for (const { level, spec } of await allSortSpecs()) {
+    if (spec.buckets.length !== 2) continue;
+    for (const capsIndex of [0, 1]) {
+      const wrong = byCaps(spec, capsIndex);
+      assert.equal(wrong >= MIN_WRONG, true, `${level} ${spec.id}: an all-caps word alone gets ${wrong} wrong (to bucket ${capsIndex})`);
+    }
+  }
+});
+
+test('Sort it: "one all-caps word shared by labels goes to one bucket" never earns 4 stars', async () => {
+  for (const { level, spec } of await allSortSpecs()) {
+    if (spec.buckets.length !== 2) continue;
+    const { wrong, token } = bestByCapsWord(spec);
+    assert.equal(wrong >= MIN_WRONG, true, `${level} ${spec.id}: the all-caps word "${token}" alone gets ${wrong} wrong`);
   }
 });
 
