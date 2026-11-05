@@ -485,3 +485,14 @@ test('#146 a build step may declare its helps and a closing line; bad helps are 
   assert.deepEqual(problems((p) => { p.steps[2].build.helps = { hints: 'yes' }; }), ['step 3 (build "fx-tree"): helps: "hints" is not true or false']);
   assert.deepEqual(problems((p) => { p.steps[2].build.closing = ''; }), ['step 3 (build "fx-tree"): closing: not non-empty text']);
 });
+
+test('19 #156 a sort step may declare its helps and a hint; a typo is named with a did-you-mean; bad helps are refused with the widget\'s message', () => {
+  assert.deepEqual(problems((p) => { p.steps[1].sort.helps = { hints: true }; p.steps[1].sort.hint = 'Ask what shape the data has.'; }), []);
+  assert.deepEqual(problems((p) => { p.steps[1].sort.helps = { hints: false }; }), []);
+  assert.deepEqual(problems((p) => { p.steps[1].sort.helpz = { hints: true }; }),
+    ['step 2 (sort "fx-sort"): unknown key "helpz" on spec (did you mean "helps"?)']);
+  assert.deepEqual(problems((p) => { p.steps[1].sort.hnit = 'x'; }),
+    ['step 2 (sort "fx-sort"): unknown key "hnit" on spec (did you mean "hint"?)']);
+  assert.deepEqual(problems((p) => { p.steps[1].sort.helps = { hints: 'yes' }; }), ['step 2 (sort "fx-sort"): helps: "hints" is not true or false']);
+  assert.deepEqual(problems((p) => { p.steps[1].sort.hint = 'Never shown.'; }), ['step 2 (sort "fx-sort"): hint: shown only when helps.hints is on']);
+});

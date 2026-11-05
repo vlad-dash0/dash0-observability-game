@@ -576,3 +576,121 @@ test('lib/widgets uses no timers (I2)', () => {
     assert.deepEqual(hits, [], f);
   }
 });
+
+// ---- P3b 16-18 the help ladder on the board (#156) ------------------------------------------
+
+const withHints = (extra = {}) => ({ ...fixture(), helps: { hints: true }, ...extra });
+const hintedBuckets = () => qa('[data-bucket][data-hinted]').map((b) => b.dataset.bucket);
+const chips = () => text('#signals-helps');
+
+test('16 three hint tiers on i2: three hints and no mistake, two outlined candidates at tier 2, then i2 placed in Log and the outlines gone', () => {
+  const { counts, mount } = setup(withHints());
+  mount();
+  click('[data-item="i2"]');
+  click('#signals-hint'); // tier 1: the rule
+  assert.deepEqual(counts, { mistakes: 0, hints: 1, done: 0 });
+  assert.equal(q('#signals-hints').textContent, '1');
+  assert.deepEqual(hintedBuckets(), [], 'tier 1 outlines nothing');
+  assert.equal(pressed('i2'), 'true');
+  click('#signals-hint'); // tier 2: identity shuffle, decoy metric, listed metric then log
+  assert.deepEqual(counts, { mistakes: 0, hints: 2, done: 0 });
+  assert.equal(q('#signals-hints').textContent, '2');
+  assert.deepEqual(hintedBuckets(), ['metric', 'log'], 'exactly the two candidates, in spec order');
+  assert.equal(pressed('i2'), 'true', 'the hinted item stays selected');
+  assert.deepEqual(enabledBuckets(), ['metric', 'log', 'trace'], 'a hint tries nothing');
+  click('#signals-hint'); // tier 3: placed for you
+  assert.deepEqual(counts, { mistakes: 0, hints: 3, done: 0 }, 'a placed hint costs a hint, never a mistake');
+  assert.equal(q('#signals-hints').textContent, '3');
+  assert.equal(q('#signals-wrong').textContent, '0');
+  assert.equal(placed('log'), 'Stack trace text');
+  assert.deepEqual(items(), ['i1', 'i3', 'i4']);
+  assert.deepEqual(hintedBuckets(), [], 'the outlines clear once the item is placed');
+  assert.equal(sorted(), 'Sorted 1 of 4');
+});
+
+test('16 the outlines clear when the player places the item after tier 2', () => {
+  const { counts, mount } = setup(withHints());
+  mount();
+  click('[data-item="i2"]');
+  click('#signals-hint');
+  click('#signals-hint');
+  assert.deepEqual(hintedBuckets(), ['metric', 'log']);
+  click('[data-bucket="log"]');
+  assert.equal(placed('log'), 'Stack trace text');
+  assert.deepEqual(hintedBuckets(), []);
+  assert.deepEqual(counts, { mistakes: 0, hints: 2, done: 0 });
+});
+
+test('17 tier 3 on the last remaining item completes the board once; the win line counts the hints', () => {
+  const { counts, swirls, mount } = setup(withHints());
+  mount();
+  sortTo('i1', 'metric');
+  sortTo('i2', 'log');
+  sortTo('i3', 'trace');
+  click('[data-item="i4"]');
+  click('#signals-hint');
+  click('#signals-hint');
+  assert.equal(counts.done, 0);
+  click('#signals-hint');
+  assert.deepEqual(counts, { mistakes: 0, hints: 3, done: 1 });
+  assert.equal(placed('metric'), 'Request rateQueue depth');
+  assert.equal(q('#signals-win').hasAttribute('hidden'), false, 'the success card is shown');
+  assert.equal(text('#signals-win-stars'), '2 of 5 stars: 0 wrong placements, 3 hints.');
+  assert.deepEqual(swirls, [false]);
+  assert.equal(q('#finish').disabled, false);
+  assert.equal(q('#signals-hint').disabled, true);
+  q('#signals-hint').onclick?.({});
+  assert.deepEqual(counts, { mistakes: 0, hints: 3, done: 1 }, 'nothing after done');
+});
+
+test('18 the Hint button: tier and cost before use; with nothing selected it picks the first item shown; disabled with nothing to hint after done', () => {
+  const r = reversing();
+  const { counts, mount } = setup(withHints(), { shuffle: r.shuffle });
+  mount();
+  assert.equal(chips(), 'Helps: Instant feedback on Hints on');
+  assert.equal(text('#signals-hint'), 'Hint 1 of 3');
+  assert.equal(q('#signals-hint').disabled, false);
+  assert.equal(text('#signals-hint-cost'), 'costs 1 star');
+  click('#signals-hint'); // nothing selected: the target is the first item SHOWN (i4, reversed), not i1
+  assert.equal(pressed('i4'), 'true');
+  assert.equal(pressed('i1'), 'false');
+  assert.equal(text('#signals-hint'), 'Hint 2 of 3');
+  assert.deepEqual(counts, { mistakes: 0, hints: 1, done: 0 });
+  // Finish the board by hand: the button is disabled and says there is nothing to hint.
+  sortTo('i4', 'metric');
+  sortTo('i3', 'trace');
+  sortTo('i2', 'log');
+  sortTo('i1', 'metric');
+  assert.equal(counts.done, 1);
+  assert.equal(q('#signals-hint').disabled, true);
+  assert.equal(text('#signals-hint-tier'), 'Nothing to hint right now.');
+  q('#signals-hint').onclick?.({});
+  assert.deepEqual(counts, { mistakes: 0, hints: 1, done: 1 }, 'a click that gets through anyway costs nothing');
+});
+
+test('18 hints off (and no helps key): no Hint button, the tier line says so, the chips say hints off', () => {
+  for (const spec of [{ ...fixture(), helps: { hints: false } }, fixture()]) {
+    const { counts, mount } = setup(spec);
+    mount();
+    assert.equal(qa('[id="signals-hint"]').length, 0, JSON.stringify(spec.helps));
+    assert.equal(text('#signals-hint-tier'), 'No hints on this level.');
+    assert.equal(chips(), 'Helps: Instant feedback on Hints off');
+    sortTo('i1', 'metric');
+    assert.deepEqual(counts, { mistakes: 0, hints: 0, done: 0 });
+  }
+});
+
+test('16 the tier-2 decoy is drawn through ctx.shuffle: a reversing draw picks Trace, not Metric', () => {
+  // The first call shuffles the pool (kept in authored order here); later calls draw the decoy reversed.
+  let calls = 0;
+  const shuffle = (a) => (calls++ === 0 ? [...a] : [...a].reverse());
+  const { counts, mount } = setup(withHints(), { shuffle });
+  mount();
+  assert.deepEqual(items(), ['i1', 'i2', 'i3', 'i4']);
+  click('[data-item="i2"]');
+  click('#signals-hint');
+  click('#signals-hint'); // untried wrong for i2: metric, trace; reversed, the decoy is trace
+  assert.deepEqual(hintedBuckets(), ['log', 'trace'], 'the decoy came from ctx.shuffle; listed in spec order');
+  assert.equal(calls >= 2, true, 'ctx.shuffle drew the decoy');
+  assert.deepEqual(counts, { mistakes: 0, hints: 2, done: 0 });
+});
