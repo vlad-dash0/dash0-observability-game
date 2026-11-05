@@ -11,6 +11,7 @@
 // Step 1. Four resource attributes and four signal attributes, interleaved so order gives nothing away.
 const SORT = {
   id: 'res-sort',
+  helps: { hints: true },
   buckets: [
     { id: 'resource', label: 'Resource attribute' },
     { id: 'signal', label: 'Signal attribute' },

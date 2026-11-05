@@ -9,6 +9,7 @@ import { newSortState } from '../lib/widgets/sort-it.mjs';
 // Step 1. Items do not follow the bucket order.
 const PARTS = {
   id: 'otel-parts',
+  helps: { hints: true },
   buckets: [
     { id: 'api', label: 'API' },
     { id: 'sdk', label: 'SDK' },

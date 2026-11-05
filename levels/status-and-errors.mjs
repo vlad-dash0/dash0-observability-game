@@ -11,6 +11,7 @@ import { newSortState } from '../lib/widgets/sort-it.mjs';
 // that does not exist.
 const SORT = {
   id: 'status-sort',
+  helps: { hints: true },
   buckets: [
     { id: 'ok', label: 'Status is right' },
     { id: 'wrong', label: 'Status is wrong' },
