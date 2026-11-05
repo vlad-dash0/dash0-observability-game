@@ -271,3 +271,18 @@ test('createLevelContext refuses missing deps', () => {
   assert.throws(() => createLevelContext({ ...base, ovActions: null }), TypeError);
   assert.throws(() => createLevelContext({ ...base, reportError: 'log' }), TypeError);
 });
+
+test('ctx.telemetry is the injected facade, null when absent', () => {
+  const facade = { sessionId: 's-1', status: () => ({ state: 'off', mode: null, host: null }) };
+  const dom = makeDom();
+  const base = {
+    level: LEVEL_A,
+    ovBody: dom.body,
+    ovActions: dom.actions,
+    signal: new AbortController().signal,
+    onFinish: () => {},
+  };
+  assert.equal(createLevelContext({ ...base, telemetry: facade }).telemetry, facade);
+  assert.equal(createLevelContext(base).telemetry, null);
+  assert.equal(createLevelContext({ ...base, telemetry: undefined }).telemetry, null);
+});

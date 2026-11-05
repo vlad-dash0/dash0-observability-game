@@ -16,6 +16,8 @@ import { THEME_KEY } from '../lib/theme.mjs';
 import { createGame, liveRegistry } from '../app.mjs';
 import { endSentence } from '../lib/text.mjs';
 import { litText } from '../lib/globe-ignite.mjs';
+import { MAX_STARS } from '../lib/scoring.mjs';
+import { createTelemetry } from '../lib/telemetry.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
@@ -87,7 +89,7 @@ function fakeGlobe(result = 'handle') {
   return { mount, log };
 }
 
-function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true, globe, window, debug, comingSoon = [], dots = DOTS } = {}) {
+function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true, globe, window, debug, comingSoon = [], dots = DOTS, telemetry } = {}) {
   const dom = makeDom(read('index.html'));
   const store = fakeStorage({ initial, throwOn });
   const timers = [];
@@ -110,6 +112,7 @@ function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true,
     comingSoon,
     window,
     debug,
+    telemetry,
   });
   return { game, store, dom, timers, errors };
 }
@@ -375,6 +378,101 @@ test('completeLevel credits the id the ctx captured, not the level open now', ()
   game.completeLevel('a', { stars: 3, cards: [], text: 'from a', at: AT });
   assert.equal(game.levelState('a'), 'done');
   assert.equal(game.levelState('b'), 'open');
+});
+
+// ---- telemetry (#195) --------------------------------------------------------------
+
+const TEL_HOST = 'ingress.eu-west-1.aws.dash0.com';
+const TEL_TOKEN = 'auth_Tk9secretValue42xyz';
+// A real telemetry session on a fake fetch; `answer` decides each response.
+function telemetrySession(answer = () => 200) {
+  const calls = [];
+  let k = 0;
+  const telemetry = createTelemetry({
+    fetch: async (url, init) => {
+      calls.push({ url, body: JSON.parse(init.body) });
+      const status = answer(calls.length);
+      return { status, text: async () => '' };
+    },
+    randomBytes: (n) => Uint8Array.from({ length: n }, () => (k++ * 37 + 11) & 0xff),
+    now: () => NOW,
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+    hosts: [TEL_HOST],
+  });
+  telemetry.connect({ mode: 'live', endpoint: `https://${TEL_HOST}`, token: TEL_TOKEN, dataset: '' });
+  return { telemetry, calls };
+}
+const spansOf = (body) => body.resourceSpans.flatMap((r) => r.scopeSpans.flatMap((s) => s.spans));
+const attrsOf = (span) => Object.fromEntries(span.attributes.map((a) => [a.key, a.value]));
+
+test('completing a level while connected sends one level.complete span with the result\'s stars', async () => {
+  const { telemetry, calls } = telemetrySession();
+  assert.equal((await telemetry.sendTest()).kind, 'accepted');
+  assert.equal(calls.length, 1, 'the test span');
+  // Stored best 4, this run 3, MAX_STARS 5: three distinct values, so only the result's stars pass.
+  const { game, store } = setup({ telemetry, initial: { [STORAGE_KEY]: v1({ x: { stars: 4, at: AT } }) } });
+  assert.notEqual(3, MAX_STARS);
+  game.openLevel('x');
+  assert.equal(ctxs.x.telemetry, telemetry, 'the level gets the same facade');
+  ctxs.x.mistake();
+  ctxs.x.mistake();
+  const result = ctxs.x.finish({ text: 'done', cards: ['c1'] });
+  assert.equal(result.stars, 3);
+  assert.equal(stored(store).levels.x.stars, 4, 'the stored best is not the run');
+  await tick();
+  assert.equal(calls.length, 2, 'one flush request');
+  assert.equal(calls[1].url, `https://${TEL_HOST}/v1/traces`);
+  const spans = spansOf(calls[1].body);
+  assert.deepEqual(spans.map((s) => s.name), ['level.complete']);
+  const attrs = attrsOf(spans[0]);
+  assert.deepEqual(attrs['game.level.stars'], { intValue: '3' });
+  assert.deepEqual(attrs['game.level.id'], { stringValue: 'x' });
+  assert.deepEqual(attrs['game.act.id'], { stringValue: 'a0' });
+  assert.deepEqual(attrs['game.cards.count'], { intValue: '1' });
+  assert.deepEqual(attrs['game.debug'], { boolValue: false });
+  assert.deepEqual(attrs['session.id'], { stringValue: telemetry.sessionId });
+  assert.equal(JSON.stringify(calls[1].body).includes(TEL_TOKEN), false);
+});
+
+test('not connected: completion makes no request', async () => {
+  const { telemetry, calls } = telemetrySession(() => 401);
+  assert.equal((await telemetry.sendTest()).kind, 'rejected');
+  assert.equal(telemetry.status().state, 'configured');
+  const { game, errors } = setup({ telemetry });
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'done' });
+  await tick();
+  assert.equal(calls.length, 1, 'only the test span ever went out');
+  assert.equal(game.rewardOpen, true);
+  assert.deepEqual(errors, []);
+});
+
+test('a throwing telemetry never breaks completion: progress saved, reward open, error reported', async () => {
+  const emitError = new Error('emit broke');
+  const flushError = new Error('flush broke');
+  const throwing = { emit: () => { throw emitError; }, flush: () => Promise.resolve() };
+  {
+    const { game, store, errors } = setup({ telemetry: throwing });
+    game.openLevel('x');
+    assert.doesNotThrow(() => game.completeLevel('x', { stars: 3, cards: ['c1'], text: 'saved', at: AT }));
+    assert.deepEqual(stored(store).levels.x, { stars: 3, at: AT });
+    assert.equal(game.levelState('x'), 'done');
+    assert.equal(game.rewardOpen, true);
+    assert.equal(game.rewardStars, 3);
+    assert.deepEqual(errors, [emitError]);
+  }
+  {
+    const rejecting = { emit: () => {}, flush: () => Promise.reject(flushError) };
+    const { game, store, errors } = setup({ telemetry: rejecting });
+    game.openLevel('x');
+    const result = ctxs.x.finish({ text: 'saved' });
+    assert.equal(result.stars, 5);
+    assert.equal(stored(store).levels.x.stars, 5);
+    assert.equal(game.rewardOpen, true);
+    await tick();
+    assert.deepEqual(errors, [flushError], 'a rejected flush is reported, never unhandled');
+  }
 });
 
 // ---- other tabs ------------------------------------------------------------------
