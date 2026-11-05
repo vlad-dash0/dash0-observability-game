@@ -69,7 +69,7 @@ const KINDS_MAP = [
 ];
 
 // 2.3: a storefront CLIENT 404 Error ok; b catalog SERVER 404 Error wrong; c checkout SERVER
-// 500 Unset wrong; d inventory SERVER 200 Unset ok. 2.5: what may ride in baggage.
+// 500 Unset wrong; d inventory SERVER 200 Unset ok; e payments SERVER 503 Error ok. 2.5: what may ride in baggage.
 const STATUS_SORT = [['a', 'ok'], ['b', 'wrong'], ['c', 'wrong'], ['d', 'ok'], ['e', 'ok']];
 const BAG_SORT = [['variant', 'ok'], ['tier', 'ok'], ['email', 'never'], ['token', 'never'], ['last4', 'never']];
 // 2.4: checkout's SERVER span under storefront's CLIENT span 00f067aa0ba902b7 (the parent-id).

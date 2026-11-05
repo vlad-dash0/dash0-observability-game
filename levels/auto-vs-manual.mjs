@@ -4,7 +4,7 @@
 // Spec: docs/M1-DESIGN.md §6 Act 2.
 // Spec: https://opentelemetry.io/docs/zero-code/js/ , https://opentelemetry.io/docs/platforms/kubernetes/operator/automatic/
 
-// Step 1. Items interleave the buckets so their order gives nothing away.
+// Step 1. Labels are checked for tells by test/sort-tells.test.mjs.
 const SORT = {
   id: 'avm-sort',
   buckets: [
@@ -20,13 +20,13 @@ const SORT = {
     },
     {
       id: 'loyalty',
-      label: 'A span around <code>applyLoyaltyDiscount()</code>',
+      label: 'Spans around <code>applyLoyaltyDiscount()</code> calls',
       bucket: 'manual',
       why: 'Instrumentation knows nothing about your business functions. You start that span yourself with the API.',
     },
     {
       id: 'redis',
-      label: 'Redis command spans',
+      label: 'A span for each Redis command',
       bucket: 'auto',
       why: 'The Redis instrumentation wraps the client and starts a span for each command.',
     },

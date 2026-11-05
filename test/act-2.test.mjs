@@ -105,14 +105,14 @@ const PIN = {
         buckets: ['ok', 'wrong'],
         // a storefront CLIENT 404 ERROR ok; b catalog SERVER 404 ERROR wrong (SERVER 4xx
         // stays Unset); c checkout SERVER 500 UNSET wrong; d inventory SERVER 200 UNSET ok;
-        // e storefront CLIENT 500 ERROR ok (the caller's side of c).
+        // e payments SERVER 503 ERROR ok (a 5xx is Error on a SERVER span).
         items: { a: 'ok', b: 'wrong', c: 'wrong', d: 'ok', e: 'ok' },
         says: {
           a: ['storefront CLIENT', 'GET /products/999', '404', 'status Error'],
           b: ['catalog SERVER', '404', 'status Error'],
           c: ['checkout SERVER', '500', 'status Unset'],
           d: ['inventory SERVER', '200', 'status Unset'],
-          e: ['storefront CLIENT', 'POST /checkout', '500', 'status Error'],
+          e: ['payments SERVER', 'POST /v1/charge', '503', 'status Error'],
         },
       },
       {
@@ -132,7 +132,7 @@ const PIN = {
         buckets: ['ok', 'never'],
         items: { variant: 'ok', tier: 'ok', email: 'never', token: 'never', last4: 'never' },
         says: {
-          variant: ['experiment.variant=checkout-redesign-B'],
+          variant: ['experiment.variant=redesign-B'],
           tier: ['tenant.tier=gold'],
           email: ['user.email'],
           token: ['session.token'],

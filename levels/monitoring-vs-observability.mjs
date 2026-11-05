@@ -6,7 +6,7 @@ import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
 import { newSortState } from '../lib/widgets/sort-it.mjs';
 
-// Step 1. Items interleave the buckets so their order gives nothing away.
+// Step 1. Labels are checked for tells by test/sort-tells.test.mjs.
 const SORT = {
   id: 'mvo-sort',
   buckets: [
@@ -28,7 +28,7 @@ const SORT = {
     },
     {
       id: '5xx',
-      label: 'Has the 5xx rate on the checkout API stayed under 1% for the last 5 minutes?',
+      label: 'Has the checkout API 5xx rate stayed under 1% for the last 5 minutes?',
       bucket: 'known',
       why: 'An error-rate threshold is a classic alert: decided in advance, checked all the time.',
     },
@@ -40,13 +40,13 @@ const SORT = {
     },
     {
       id: 'disk',
-      label: 'Is the log disk on db-1 more than 90% full?',
+      label: 'Is the log disk left with less than 8 GB?',
       bucket: 'known',
       why: 'A full disk is a failure mode you know about, with a number you can watch. A dashboard answers it.',
     },
     {
       id: 'coupon',
-      label: 'Is the coupon path what slowed carts with over 20 items?',
+      label: 'Is the coupon path slowing the 10% of carts with over 20 items?',
       bucket: 'new',
       why: 'This combines two details, the coupon path and the cart size, that nobody thought to chart together. You ask it of the telemetry itself.',
     },

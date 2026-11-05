@@ -1,6 +1,6 @@
 // Level 2.3: Status and errors. Five spans from one shop, each with an HTTP code and the
 // status its instrumentation set; the player sorts the right statuses from the wrong ones
-// (a 4xx is Error only on the CLIENT span), then says what Ok followed by Error leaves.
+// (a 4xx is Error only on the CLIENT span, a 5xx on either), then says what Ok followed by Error leaves.
 // Spec: docs/M1-DESIGN.md §6 Act 2.
 // Spec: https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status , https://opentelemetry.io/docs/specs/otel/trace/api/#set-status
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
@@ -42,9 +42,9 @@ const SORT = {
     },
     {
       id: 'e',
-      label: 'storefront CLIENT span for <code>POST /checkout</code>: 500, status Error',
+      label: 'payments SERVER span for <code>POST /v1/charge</code>: 503, status Error',
       bucket: 'ok',
-      why: 'A 5xx SHOULD be Error, on a CLIENT span too: the call storefront made failed. This is the caller\'s side of the failed checkout span above.',
+      why: 'A 5xx on a SERVER span SHOULD be Error: the server failed the request.',
     },
   ],
 };

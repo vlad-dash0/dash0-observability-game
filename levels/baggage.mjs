@@ -7,7 +7,7 @@ import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
 import { newSortState } from '../lib/widgets/sort-it.mjs';
 
-// Step 1. Items interleave the buckets so their order gives nothing away.
+// Step 1. Labels are checked for tells by test/sort-tells.test.mjs.
 const SORT = {
   id: 'bag-sort',
   buckets: [
@@ -17,7 +17,7 @@ const SORT = {
   items: [
     {
       id: 'variant',
-      label: '<code>experiment.variant=checkout-redesign-B</code>',
+      label: '<code>experiment.variant=redesign-B</code>',
       bucket: 'ok',
       why: 'An experiment arm is no secret, and every service on the path can use it, for example to tag its own spans with the variant.',
     },
