@@ -383,8 +383,10 @@ export function createGame(deps) {
     },
 
     // One window-level Escape handler: closes the reward, else the level, but never the
-    // level while the player is typing in it.
+    // level while the player is typing in it. A widget that handled the Escape (it called
+    // preventDefault, e.g. Build it cancelling a pick) owns it.
     onEscape(e) {
+      if (e?.defaultPrevented) return;
       if (this.rewardOpen) {
         this.closeReward();
         return;

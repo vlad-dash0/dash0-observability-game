@@ -372,3 +372,66 @@ test('globe: legend text reaches 4.5:1 and the lit and pulse colours 3:1 on its 
   assert.notDeepEqual(pulse, lit);
   assert.notDeepEqual(pulse, red);
 });
+
+test('trace waterfall (#146): bar text on every service fill, trace chips, hint text and the success card reach AA, both themes', () => {
+  for (const theme of ['light', 'dark']) {
+    for (let i = 0; i < 6; i++) {
+      const r = contrast('--color-text', `--color-svc-${i}`, theme);
+      assert.ok(r >= 4.5, `${theme}: text on --color-svc-${i} is ${r.toFixed(2)}, needs 4.5`);
+    }
+    for (const t of [0, 1]) {
+      const r = contrast('--color-text', `--color-trace-${t}`, theme);
+      assert.ok(r >= 4.5, `${theme}: text on --color-trace-${t} is ${r.toFixed(2)}, needs 4.5`);
+    }
+    for (const bg of ['--color-surface', '--color-bg']) {
+      const hint = contrast('--color-hint', bg, theme);
+      assert.ok(hint >= 4.5, `${theme}: hint text on ${bg} is ${hint.toFixed(2)}, needs 4.5`);
+      // Used as text in styles/base.css (the "its parent" tag, the queue heading, the muted copy): 4.5.
+      for (const fg of ['--color-parent', '--color-text-muted']) {
+        const r = contrast(fg, bg, theme);
+        assert.ok(r >= 4.5, `${theme}: text in ${fg} on ${bg} is ${r.toFixed(2)}, needs 4.5`);
+      }
+      // Marker only (the failed tick glyph): 3.
+      const note = contrast('--color-note', bg, theme);
+      assert.ok(note >= 3, `${theme}: --color-note on ${bg} is ${note.toFixed(2)}, needs 3 (markers and borders)`);
+    }
+    for (const fg of ['--color-win-text', '--color-win-muted']) {
+      const r = contrast(fg, '--color-win-bg', theme);
+      assert.ok(r >= 4.5, `${theme}: ${fg} on the success card is ${r.toFixed(2)}, needs 4.5`);
+    }
+  }
+  // Six service fills, each its own colour, in each theme.
+  for (const theme of ['light', 'dark']) {
+    const fills = Array.from({ length: 6 }, (_, i) => resolveColor(`var(--color-svc-${i})`, theme).join());
+    assert.equal(new Set(fills).size, 6, theme);
+  }
+});
+
+test('parent-coloured text (the "its parent" tag, the queue heading) reaches 4.5:1 on the unfaded row fills (plain, hover, pressed, likely, valid, arriving), both themes', () => {
+  for (const [sel, prop] of [['.wf-tag[data-tag="par"]', 'color'], ['.wf-queue-head strong', 'color']]) {
+    assert.equal(last(declsFor(sel), prop), 'var(--color-parent)', `${sel} is set in --color-parent`);
+  }
+  // Each row state's background, read from base.css: a flat token or a token tint over transparent.
+  const rowFills = ['.wf-row:hover', '.wf-row[aria-pressed="true"]', '.wf-row[data-mark="likely"]', '.wf-row[data-mark="valid"]', '.wf-row[data-arriving]']
+    .map((sel) => [sel, last(declsFor(sel), 'background') ?? '']);
+  for (const theme of ['light', 'dark']) {
+    const fg = luminance(resolveColor('var(--color-parent)', theme));
+    for (const under of ['--color-surface', '--color-bg']) {
+      const u = resolveColor(`var(${under})`, theme);
+      const fills = [[under, u], ['--color-surface-2', resolveColor('var(--color-surface-2)', theme)]];
+      for (const [sel, bg] of rowFills) {
+        const tint = /^color-mix\(in srgb, (var\(--color-[\w-]+\)) ([\d.]+)%, transparent\)$/.exec(bg);
+        if (tint) fills.push([`${sel} on ${under}`, resolveColor(tint[1], theme).map((c, i) => c * tint[2] / 100 + u[i] * (1 - tint[2] / 100))]);
+        else {
+          assert.match(bg, /^var\(--color-[\w-]+\)$/, `${sel} background is a token or a token tint`);
+          fills.push([sel, resolveColor(bg, theme)]);
+        }
+      }
+      for (const [name, rgb] of fills) {
+        const b = luminance(rgb);
+        const r = (Math.max(fg, b) + 0.05) / (Math.min(fg, b) + 0.05);
+        assert.ok(r >= 4.5, `${theme}: --color-parent text on ${name} is ${r.toFixed(2)}, needs 4.5`);
+      }
+    }
+  }
+});

@@ -92,12 +92,15 @@ for (const level of LEVELS) {
 
   test(`${level.id}: the focus walk starts each step on its first control and ends on Finish`, () => {
     const { focus } = start(level);
-    steps.forEach(({ driver, spec }, i) => {
+    steps.forEach(({ key, driver, spec }, i) => {
       const before = i === 0 ? 0 : focus.names().length;
       if (i > 0) click(advanceId(level, i - 1));
       assert.equal(focus.names()[before], driver.first(spec), `step ${i + 1} starts here`);
       for (const sel of driver.solve(spec)) click(sel);
-      assert.equal(focus.last(), advanceId(level, i), `step ${i + 1} hands off to its button`);
+      // A solved Build it step focuses its success heading (#146); its Next is enabled.
+      const handOff = key === 'build' ? `#${spec.id}-win-title` : advanceId(level, i);
+      assert.equal(focus.last(), handOff, `step ${i + 1} hands off to its button`);
+      assert.equal(q(advanceId(level, i)).disabled, false, `step ${i + 1} opens its button`);
     });
     assert.deepEqual(focus.unfocusable(), []);
     assert.equal(focus.names().includes('body'), false);
@@ -395,4 +398,10 @@ test('P2 logs-mode keys are checked: a typo on the spec or a record is named', (
     const want = `step 10 (build "l1"): ${tail}`;
     assert.ok(got.includes(want), `${want}\n  got: ${JSON.stringify(got)}`);
   }
+});
+
+test('#146 a build step may declare its helps and a closing line; bad helps are refused with the view\'s message', () => {
+  assert.deepEqual(problems((p) => { p.steps[2].build.helps = { hints: true, instant: true }; p.steps[2].build.closing = 'Done.'; }), []);
+  assert.deepEqual(problems((p) => { p.steps[2].build.helps = { hints: 'yes' }; }), ['step 3 (build "fx-tree"): helps: "hints" is not true or false']);
+  assert.deepEqual(problems((p) => { p.steps[2].build.closing = ''; }), ['step 3 (build "fx-tree"): closing: not non-empty text']);
 });

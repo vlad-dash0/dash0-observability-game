@@ -39,7 +39,7 @@ playable end to end. M1b = P10–P11 (incident engine + Act 2 boss "Checkout is 
 |---|---|
 | wrong choice costs one mistake; focus to next enabled choice (wrapping) | `mountChoice` (`lib/widgets/choice.mjs`); 1.2 rewired onto it in P1 |
 | wrong sort placement costs one mistake; repeating it is free | `mountSort` |
-| failed check costs one mistake unless identical to the last failed one | `mountBuild` (1.2 keeps its own copy; follow-up issue extracts it) |
+| Build it: a failed check costs one mistake unless identical to the last failed one; with instant feedback a wrong drop or edit costs one (an unchanged repeat is free); each hint tier costs one hint | `mountBuild` (1.2 keeps its own copy of the check rule; follow-up issue extracts it) |
 | incident budget left | `budgetLeft(s, st)` only; meter value and text both formatted from it |
 | service-map edges from span kinds | `serviceEdges` |
 | attribute share slow vs baseline | `compareAttribute` (`lib/widgets/triage.mjs`); empty set → `null`, never 0% |
@@ -126,12 +126,68 @@ checkBuild(spec, st) → {ok, issues:[{code, spanId, message}]}   // only `edit`
   codes: wrong-parent, wrong-kind, wrong-status, missing-link, extra-link, cross-trace-parent
 applyState(spec, st) → Span[]
 ```
-View `lib/widgets/build-it-view.mjs`: SVG waterfall (`<rect>` x/width/y attributes, never
-`style`) plus an `<ol>` text alternative (`name · service · KIND · status · start–end ms ·
-Parent: …`); a panel for the selected span with only editable controls (`data-parent`,
-`data-kind`, `data-status`, `data-link` + `aria-pressed`); `#ID-check`, optional `#ID-hint`
-(`ctx.hint()` once). A new failing Check costs a mistake; an identical recheck is free
-(`Same as last time: N problems.`); a refused cycle/self is free ("would make a loop").
+View `lib/widgets/build-it-view.mjs` (redesigned in #146 from the owner-approved prototype;
+`checkBuild`, `setParent` and `validateBuildSpec` unchanged):
+- **Board.** A Dash0-style waterfall built as DOM: a metadata line, the one instruction line
+  (`#ID-instr`, every row's `aria-describedby`, not a live region; parent mode: "Drag each span
+  onto its parent, or pick a span and then its parent."), a root drop zone, the move status
+  (`#ID-status`, live), a tick header, then one row per span: name and service, then the trace
+  id (8 hex characters, full id in a tooltip), kind, status and timing; indent elbows. Each row's
+  track is an SVG without a viewBox (real, unstretched text; positions are attributes, CSP):
+  grid lines, connectors from parent to child, the bar labelled with duration and name. Bars
+  are coloured by service (`--color-svc-0..5`, muted, light and dark, legend below); ERROR is a
+  stroke, not the fill. The selected row and bar are outlined, its current parent dashed.
+- **Moving a span.** Drag a row onto a span or the root zone (HTML drag and drop, `el.on*`), or
+  pick it (click or Enter on its row), then click its parent row or the root zone, as in the
+  prototype; clicking the picked span again, or Escape, cancels. The widget takes Escape only
+  while a move is pending (a span picked in parent mode, when the status says "Esc cancels"),
+  and marks it handled so the app's Escape does not also close the level. In every other state
+  (a span left selected after a wrong instant drop, a row selected on a kind, status or link
+  step, a record selected in logs mode, any row after success) Escape is not handled and
+  reaches the app, which closes the level. The panel stays as an extra
+  keyboard and screen-reader path (`data-parent`: root, then the placed spans; itself and its
+  descendants disabled). All call `setParent`; a loop refused there stays free. While a span
+  moves, itself and its descendants are marked invalid and are not drop targets. Kind, status,
+  links and logs-mode attach keep their panel controls.
+- **Help ladder.** A step declares `helps` (`queue`, `tint`, `guide`, `instant`, `hints`;
+  validated by `validateBuildHelps`, `lib/widgets/build-it-help.mjs`); `renderBuild` is the one
+  renderer and a chips row says which are on. Queue: the first root is placed, spans arrive in
+  start order, waiting spans are inert ("hasn't arrived yet"). Guide (parent mode): a band at
+  the moving span's window, spans that contain it highlighted. Tint: one tint per trace id;
+  candidates in another trace fade and say "other trace". Instant: each change is graded at
+  once from `checkBuild`'s issue for that span (a tick, or a specific note), no Check button.
+  Hints: three tiers per span or record (the rule, or the spec's authored `hint`; two
+  candidates outlined; set for you with a reason), derived from the answer (`answerFor`) and
+  `checkBuild`. A hint never contradicts the board: a tier-2 parent candidate that sits below
+  the span (the board refuses it) is named as having to move out first. Tier 3 for a parent
+  always leaves the span under its answer parent: when that parent sits below the span, it
+  moves out first (to its own answer parent if that is placed and outside the span's subtree,
+  else to the root), through `setParent`, graded by `checkBuild` and never charged; the hint
+  and the status say so, and when the lifted span lands wrong they add its note ("is not where
+  it belongs yet: ..."). No `helps`: Check, and hints only when the spec has a `hint`. Ladder: 2.1 all;
+  2.2 tint, instant, hints (the guide needs parent editing); 2.4 Check and hints; 2.6 none;
+  4.2 (logs mode, no edit) the default: Check and three-tier hints with its authored hint as tier 1.
+- **Notes.** Each `checkBuild` code maps to a short, specific note that never names the
+  expected parent or span (`noteFor`): cross-trace names both trace ids; wrong-parent says root,
+  outside the parent's window, or a closer span contains it. Not graded today (no code): a
+  child starting before its parent, and a CLIENT span whose child is not the SERVER span it called.
+- **Scoring (§2).** Instant: a wrong drop or edit costs one `ctx.mistake()`, an unchanged repeat
+  is free. Check: a new failing Check costs one, an identical recheck is free (`Same as last
+  time: N problems.`). Each hint tier costs one `ctx.hint()`. Retrying is free; Reset puts the
+  board back and keeps what was paid.
+- **Right column** (`lib/widgets/help-ladder.mjs`, shared so Sort it can adopt it, #156): about
+  300px and sticky beside the board from about 960px of widget width (a container query), else
+  stacked under it: the success card (hidden until success; heading focused, no focus ring;
+  stars line; the spec's `closing`), the score card (wrong drops or failed Checks, hints, five
+  stars for this board only, `boardStars`: the star rule over the board's own wrong drops or
+  failed Checks and hint tiers, counted from zero at mount, so earlier steps never show here;
+  muted outlines while still possible, filled once earned; the level's stars stay on the
+  reward screen), the hint tools (button, cost from the star rule, tier line, hint text).
+- **Swirl** (#151, folded in): on the first success only, `lib/swirl-render.mjs` plays a dot
+  swirl with the vendored three.js (a few seconds; the canvas and WebGL context are then
+  released and the settled frame stays as an SVG ring, `lib/swirl.mjs`). Reduced motion or no
+  WebGL: the static SVG ring at once, three.js never loads. Decorative: `aria-hidden`, not
+  focusable, no text. Tests inject a fake renderer.
 
 **Logs mode (#113: core in phase A, view in phase B).** `edit: ['logs']` is its own
 mode (exactly that list; a mix with span fields is refused), with the same step type and
@@ -162,18 +218,18 @@ letting an author's text vanish.
 
 Logs mode view (#113 phase B), same `renderBuild` / `mountBuild`, span mode unchanged:
 - **Board.** The read-only waterfall (one row per span, widened by the record times through
-  `waterfall(spans, {times})`), its `<ol>` of span rows (`… · Parent: … · Logs: N` once N >= 1
-  records are attached), then the log stream `<ol class="build-logs">`: one `button.build-log`
+  `waterfall(spans, {times})`; a row's accessible name ends `, N records` once records are
+  attached), then the log stream `<ol class="build-logs">`: one `button.build-log`
   per record with `data-log` first and `aria-pressed`, spec order, text `time ms · SEVERITY ·
   service · trace_id=… · span_id=… · body · k=v, …`; a blank id reads `(none)`.
-- **Select a record.** A dashed `<line class="wf-cursor">` at its time (`timeAxis(...).pct`)
+- **Select a record.** A dashed `<line class="wf-cursor">` at its time in every row's track (`timeAxis(...).pct`)
   and the panel "Span context for "body" (service, time ms)": `data-attach` buttons, "No span
   context" (`data-attach="none"`) first, then every span in row order. Attaching is free and
   says `"body" now carries span_id=… and trace_id=… from <span>.` (or `now has no span context`).
   The ids come from `applyLogs`, never from the view.
-- **Ticks.** A `<line class="wf-log">` on the row of the record's span at the record's time,
-  hanging off the bar when the time is outside it. Positions are SVG attributes; CSS sets
-  `vector-effect: non-scaling-stroke`.
+- **Ticks.** A `<rect class="wf-log">` on the row of the record's span at the record's time,
+  hanging off the bar when the time is outside it. Positions are SVG attributes (#146: the
+  tracks have no viewBox, so nothing is stretched).
 - **Select a span.** Read-only: its attributes (`.build-attrs`) and "Records carrying this
   span_id" as `data-show-log` buttons (from `recordsBySpan`), each opening that record's
   attach panel. A panel with nothing to press focuses its heading (`data-panel-title`).
@@ -465,10 +521,10 @@ could not answer one question. With telemetry, all four took seconds. Time to in
 ### Act 2
 **2.1 `spans-and-traces`**: build; cards `['no-trace-object']`. Step 1 choice "What makes these
 spans one trace?" → shared trace ID (decoy: "the SDK sends a trace object at the end"). Step 2
-Build `edit:['parent']`, trace `4bf92f3577b34da6a3ce929d0e0e4736`: A storefront `POST
-/checkout` SERVER 0–100 root; B storefront `POST api-gateway` CLIENT 10–90 → A; C api-gateway
+Build `edit:['parent']`, trace `4bf92f35` (8-char ids, the full id in a tooltip): A storefront `POST
+/checkout` SERVER 0–100 root; B storefront `POST` CLIENT 10–90 → A; C api-gateway
 `POST /checkout` SERVER 15–85 → B; D api-gateway `validate cart` INTERNAL 20–30 → C; E other
-trace `0af7…` 40–60 stays root (overlaps C on purpose → `cross-trace-parent`). Step 3 choice
+trace `0af76519` 40–60 stays root (overlaps C on purpose → `cross-trace-parent`). Step 3 choice
 about E → another request. Card: "There is no trace object: a trace is just the spans that
 share a trace ID, each exported on its own." Spec:
 https://opentelemetry.io/docs/specs/otel/overview/#traces ,

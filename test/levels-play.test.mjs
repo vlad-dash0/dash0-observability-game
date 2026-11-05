@@ -56,8 +56,10 @@ const SIG_ASK = [['rps', 'metric'], ['slow-call', 'trace'], ['provider', 'log'],
 const OTEL_PARTS = [['start-span', 'api'], ['batch', 'sdk'], ['wire', 'otlp'], ['pipeline', 'collector'], ['method', 'semconv']];
 
 // Act 2 answers (docs/M1-DESIGN.md §6), span ids spelled out here so a wrong id in a level fails.
-// 2.1 (trace 4bf9...): B under A, C under B, D under C; E (trace 0af7...) stays a root.
+// 2.1 (trace 4bf9...): B under A, C under B, D under C; E (trace 0af7...) stays a root. With the
+// arrival queue (#146) the spans arrive in this order and E must be placed too, as a root.
 const SAT_TREE = [['b7ad6b7169203331', '00f067aa0ba902b7'], ['53995c3f42cd8ad8', 'b7ad6b7169203331'], ['1d5c3a2f8e4b6a90', '53995c3f42cd8ad8']];
+const SAT_E = '9e1f2a3b4c5d6e7f';
 // 2.2: checkout POST /checkout, POST payments; payments POST /charge, POST provider/charges;
 // orders publish; shipping orders process. checkout compute totals stays INTERNAL.
 const KINDS_MAP = [
@@ -170,8 +172,7 @@ const DRIVERS = {
     play() {
       click('[data-pick="trace-id"]');
       click('#sat-next');
-      buildAll('parent', SAT_TREE);
-      click('#sat-tree-check');
+      buildAll('parent', [...SAT_TREE, [SAT_E, 'none']]); // instant feedback: the last right drop completes it
       click('#sat-next');
       click('[data-pick="other-request"]');
       click('#sat-finish');
@@ -181,11 +182,9 @@ const DRIVERS = {
       play() {
         click('[data-pick="trace-id"]');
         click('#sat-next');
-        buildAll('parent', [['9e1f2a3b4c5d6e7f', '53995c3f42cd8ad8']]); // E under C: another trace
-        click('#sat-tree-check'); // one failed check
-        click('[data-parent="none"]');
         buildAll('parent', SAT_TREE);
-        click('#sat-tree-check');
+        buildAll('parent', [[SAT_E, '53995c3f42cd8ad8']]); // E under C: another trace, one wrong drop
+        buildAll('parent', [[SAT_E, 'none']]);
         click('#sat-next');
         click('[data-pick="other-request"]');
         click('#sat-finish');
@@ -195,8 +194,7 @@ const DRIVERS = {
   },
   'span-kinds': {
     play() {
-      buildAll('kind', KINDS_MAP);
-      click('#kinds-map-check');
+      buildAll('kind', KINDS_MAP); // instant feedback: the last right kind completes it
       click('#kinds-next');
       click('[data-pick="loses-edge"]');
       click('#kinds-finish');
@@ -205,7 +203,6 @@ const DRIVERS = {
     sloppy: {
       play() {
         buildAll('kind', KINDS_MAP);
-        click('#kinds-map-check');
         click('#kinds-next');
         click('[data-pick="nothing"]'); // one wrong pick
         click('[data-pick="loses-edge"]');

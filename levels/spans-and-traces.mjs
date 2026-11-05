@@ -3,6 +3,9 @@
 // overlapping span that stays a root: it is another request. Its trace is fixture B1
 // (test/fixtures/build-b1.mjs reuses TREE). Spec: docs/M1-DESIGN.md §6 Act 2.
 // Spec: https://opentelemetry.io/docs/specs/otel/overview/#traces , https://opentelemetry.io/docs/specs/otel/trace/sdk/#span-processor
+// Spec: https://opentelemetry.io/docs/specs/semconv/http/http-spans/ (span B: an HTTP client span is named "{method} {target}"
+// only when a low-cardinality target such as url.template is available, else "{method}"; storefront's call names no
+// template, so it is "POST", not "POST api-gateway". No other span here is named POST, so labels stay distinct, #69.)
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
 import { newBuildState } from '../lib/widgets/build-it.mjs';
@@ -35,19 +38,22 @@ const ONE_TRACE = [
   },
 ];
 
-// Step 2: every span arrives as a root; the answer gives B, C and D their parents. E
-// overlaps C in time on purpose: parenting it there is a cross-trace parent.
+// Step 2: the spans arrive one at a time in start order (the queue), A already placed; the
+// answer gives B, C and D their parents. E overlaps C in time on purpose: parenting it there
+// is a cross-trace parent. Every help is on (docs/M1-DESIGN.md §4.2, the help ladder).
 const TREE = {
   id: 'sat-tree',
   spans: [
     span(A, TRACE, 'storefront', 'POST /checkout', 'SERVER', 0, 100),
-    span(B, TRACE, 'storefront', 'POST api-gateway', 'CLIENT', 10, 90),
+    span(B, TRACE, 'storefront', 'POST', 'CLIENT', 10, 90),
     span(C, TRACE, 'api-gateway', 'POST /checkout', 'SERVER', 15, 85),
     span(D, TRACE, 'api-gateway', 'validate cart', 'INTERNAL', 20, 30),
     span(E, OTHER_TRACE, 'storefront', 'GET /products', 'SERVER', 40, 60),
   ],
   edit: ['parent'],
   answer: { [B]: { parentId: A }, [C]: { parentId: B }, [D]: { parentId: C } },
+  helps: { queue: true, tint: true, guide: true, instant: true, hints: true },
+  closing: '<code>GET /products</code> stays a root. The next step asks why.',
 };
 
 // Step 3: the span that stays a root.
@@ -66,7 +72,7 @@ const OTHER = [
     key: 'other-request',
     label: 'A span from another request, in a trace of its own',
     right: true,
-    why: 'Its trace ID starts <code>0af7</code>, not <code>4bf9</code>. It ran at the same time on the same service, but it belongs to another request, so no span of this trace can be its parent.',
+    why: 'Its trace ID is <code>0af76519</code>, not <code>4bf92f35</code>. It ran at the same time on the same service, but it belongs to another request, so no span of this trace can be its parent.',
   },
 ];
 
@@ -123,9 +129,10 @@ export default {
     const stepTree = () => {
       ctx.renderStep(
         `<div class="lesson-intro">${ctx.speech(
-          'The spans of trace <code>4bf9…</code> arrived one by one, and the waterfall shows ' +
-            'every one as a root. Pick each span and give it its parent, so the request reads ' +
-            'top to bottom.',
+          'The spans of trace <code>4bf92f35</code> reach the backend one by one, as each one ends. ' +
+            'The first is already placed. Give each new span its parent as it arrives, so the ' +
+            'request reads top to bottom. A trace id is the request\'s id: every span of one ' +
+            'request carries it, so spans with different trace ids are never parent and child.',
         )}</div>
         <div class="lesson-stage">
           <h3 class="q">Rebuild the request's span tree.</h3>

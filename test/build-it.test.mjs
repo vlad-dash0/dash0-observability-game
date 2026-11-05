@@ -221,7 +221,7 @@ test('applyState: spans in spec order with the state applied, copies that do not
   const st = solved(SPEC);
   const out = applyState(SPEC, st);
   assert.deepEqual(out.map((s) => s.spanId), [A, B, C, D, E]);
-  assert.deepEqual(out.map((s) => s.name), ['POST /checkout', 'POST api-gateway', 'POST /checkout', 'validate cart', 'GET /products']);
+  assert.deepEqual(out.map((s) => s.name), ['POST /checkout', 'POST', 'POST /checkout', 'validate cart', 'GET /products']);
   assert.equal(out[1].parentId, A);
   out[1].parentId = null;
   out[4].links.push(A);
@@ -261,10 +261,10 @@ test('checkBuild: wrong-kind, wrong-status, missing-link and extra-link', () => 
   assert.deepEqual(codes(result), [`extra-link:${A}`, `wrong-status:${B}`, `wrong-kind:${D}`, `missing-link:${E}`, `extra-link:${E}`]);
   assert.deepEqual(result.issues.map((i) => i.message), [
     'POST /checkout (storefront): links POST /checkout (api-gateway), which it should not.',
-    'POST api-gateway (storefront): the status is not right.',
+    'POST (storefront): the status is not right.',
     'validate cart (api-gateway): the kind is not right.',
     'GET /products (storefront): a link is missing.',
-    'GET /products (storefront): links POST api-gateway (storefront), which it should not.',
+    'GET /products (storefront): links POST (storefront), which it should not.',
   ]);
 });
 

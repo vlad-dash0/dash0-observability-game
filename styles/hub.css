@@ -169,6 +169,8 @@
   max-width: 720px; margin: 0 auto;
 }
 .overlay.show { display: flex; flex-direction: column; animation: slideUp .35s ease; }
+/* A Build it step is laptop-first: the waterfall plus its 300px right column (#146). */
+.overlay:has(.build) { max-width: 1320px; }
 .lesson-top {
   flex: 0 0 auto; z-index: 5; display: flex; align-items: center; gap: 12px;
   padding: 16px 18px; background: var(--color-surface); border-bottom: 1px solid var(--color-border);

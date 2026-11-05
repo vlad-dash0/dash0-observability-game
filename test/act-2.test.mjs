@@ -57,8 +57,8 @@ const PIN = {
         edit: ['parent'],
         spans: {
           'storefront POST /checkout': ['SERVER', 0, 100, '4bf9', null, null, 'SERVER', [], 'UNSET', 'UNSET'],
-          'storefront POST api-gateway': ['CLIENT', 10, 90, '4bf9', null, 'storefront POST /checkout', 'CLIENT', [], 'UNSET', 'UNSET'],
-          'api-gateway POST /checkout': ['SERVER', 15, 85, '4bf9', null, 'storefront POST api-gateway', 'SERVER', [], 'UNSET', 'UNSET'],
+          'storefront POST': ['CLIENT', 10, 90, '4bf9', null, 'storefront POST /checkout', 'CLIENT', [], 'UNSET', 'UNSET'],
+          'api-gateway POST /checkout': ['SERVER', 15, 85, '4bf9', null, 'storefront POST', 'SERVER', [], 'UNSET', 'UNSET'],
           'api-gateway validate cart': ['INTERNAL', 20, 30, '4bf9', null, 'api-gateway POST /checkout', 'INTERNAL', [], 'UNSET', 'UNSET'],
           'storefront GET /products': ['SERVER', 40, 60, '0af7', null, null, 'SERVER', [], 'UNSET', 'UNSET'],
         },
@@ -555,13 +555,19 @@ const sortStep = (step) => {
   for (const [item, bucket] of Object.entries(step.items)) put(item, bucket);
 };
 
-/** Make the pinned edits of build step `i` in the DOM (parents, kinds, statuses, links), then Check. */
+/**
+ * Make the pinned edits of build step `i` in the DOM (parents, kinds, statuses, links), then
+ * Check when the step has a Check button (with instant feedback the last right edit completes
+ * it, #146). With the arrival queue, the span arriving now is placed even when its parent stays
+ * the given one (a root); pins list spans in arrival order.
+ */
 function solveBuild(id, i) {
   const pin = PIN[id].steps[i];
   const { ids } = buildOf(id, i);
   for (const [name, [kind, , , , given, parent, wantKind, links, status, wantStatus]] of Object.entries(pin.spans)) {
     const edits = [];
-    if (pin.edit.includes('parent') && parent !== given) edits.push(`[data-parent="${parent === null ? 'none' : ids[parent]}"]`);
+    const arriving = qa('[data-arriving]').some((r) => r.dataset.span === ids[name]);
+    if (pin.edit.includes('parent') && (parent !== given || arriving)) edits.push(`[data-parent="${parent === null ? 'none' : ids[parent]}"]`);
     if (pin.edit.includes('kind') && wantKind !== kind) edits.push(`[data-kind="${wantKind}"]`);
     if (pin.edit.includes('status') && wantStatus !== status) edits.push(`[data-status="${wantStatus}"]`);
     if (pin.edit.includes('links')) for (const l of links) edits.push(`[data-link="${ids[l]}"]`);
@@ -573,7 +579,7 @@ function solveBuild(id, i) {
       if (!linked) click(sel);
     }
   }
-  click(`#${pin.build}-check`);
+  if (qa(`#${pin.build}-check`).length) click(`#${pin.build}-check`);
 }
 
 /**
@@ -599,20 +605,24 @@ const SAT_IDS = () => buildOf('spans-and-traces', 1).ids;
 const SLIPS = {
   'spans-and-traces': {
     'a wrong pick in the first question': { 0: () => click('[data-pick="trace-object"]') },
-    'a failed check (every span left a root)': { 1: () => click('#sat-tree-check') },
-    'a failed check (a cross-trace parent), then undone': {
+    // 2.1 has instant feedback and the arrival queue (#146): no Check button, and GET /products waits.
+    'a wrong drop (the arriving CLIENT span made a root)': {
       1: () => {
-        const ids = SAT_IDS();
-        click(`[data-span="${ids['storefront GET /products']}"]`);
-        click(`[data-parent="${ids['api-gateway POST /checkout']}"]`);
-        click('#sat-tree-check');
+        click(`[data-span="${SAT_IDS()['storefront POST']}"]`);
         click('[data-parent="none"]');
       },
     },
+    'one hint tier': { 1: () => click('#sat-tree-hint') },
     'a wrong pick in the last question': { 2: () => click('[data-pick="lost-parent"]') },
   },
   'span-kinds': {
-    'a failed check (every span left INTERNAL)': { 0: () => click('#kinds-map-check') },
+    // 2.2 has instant feedback (#146): a wrong kind costs at once.
+    'a wrong kind (POST /charge called CLIENT)': {
+      0: () => {
+        click(`[data-span="${buildOf('span-kinds', 0).ids['payments POST /charge']}"]`);
+        click('[data-kind="CLIENT"]');
+      },
+    },
     'a wrong pick in the question': { 1: () => click('[data-pick="nothing"]') },
   },
   'status-and-errors': {
@@ -671,11 +681,23 @@ for (const [id, slips] of Object.entries(SLIPS)) {
   });
 }
 
-test('spans-and-traces: an identical failed recheck is free (one slip, 4 stars)', () => {
+test('context-propagation: an identical failed recheck is free (one slip, 4 stars)', () => {
+  const slip = {
+    2: () => {
+      click('#prop-tree-check');
+      click('#prop-tree-check');
+    },
+  };
+  assert.equal(runWith('context-propagation', slip).stars, 4);
+});
+
+test('spans-and-traces: the same wrong drop twice costs once (one slip, 4 stars)', () => {
   const slip = {
     1: () => {
-      click('#sat-tree-check');
-      click('#sat-tree-check');
+      for (let k = 0; k < 2; k++) {
+        click(`[data-span="${SAT_IDS()['storefront POST']}"]`);
+        click('[data-parent="none"]');
+      }
     },
   };
   assert.equal(runWith('spans-and-traces', slip).stars, 4);
@@ -691,8 +713,21 @@ test('every Act 2 step waits for its answer and states each outcome in words', (
       assert.equal(gate(), true, `${id} step ${i + 1}: gated before the answer`);
       if (step.build) {
         const fb = () => q(`#${step.build}-feedback`).textContent;
-        click(`#${step.build}-check`);
-        assert.match(fb(), /^Not yet: \d+ problems?\./, `${id}: a failed check says so`);
+        if (qa(`#${step.build}-check`).length) {
+          click(`#${step.build}-check`);
+          assert.match(fb(), /^Not yet: \d+ problems?\./, `${id}: a failed check says so`);
+        } else {
+          // Instant feedback (#146): a wrong move is named in the status line at once.
+          if (step.edit.includes('kind')) {
+            const [name, pinned] = Object.entries(step.spans).find(([, p]) => p[6] !== p[0]);
+            click(`[data-span="${buildOf(id, i).ids[name]}"]`);
+            click(`[data-kind="${['SERVER', 'CLIENT', 'PRODUCER'].find((k) => k !== pinned[6] && k !== pinned[0])}"]`);
+          } else {
+            click('[data-arriving]'); // the arriving span made a root; its parent is a placed span
+            click('[data-parent="none"]');
+          }
+          assert.match(q(`#${step.build}-status`).textContent, /but not quite\./, `${id}: a wrong move says so`);
+        }
         assert.equal(gate(), true);
         solveBuild(id, i);
         assert.equal(fb(), 'Right. Every span checks out.', `${id}: a passing check says so`);
@@ -719,15 +754,18 @@ test('every Act 2 step waits for its answer and states each outcome in words', (
   }
 });
 
-test('spans-and-traces: the cross-trace parent is named in words', () => {
+test('spans-and-traces: the cross-trace parent is named in words, with both trace ids', () => {
   start('spans-and-traces');
   click('[data-pick="trace-id"]');
   click('#sat-next');
   const ids = SAT_IDS();
+  for (const [span, parent] of [['storefront POST', 'storefront POST /checkout'], ['api-gateway POST /checkout', 'storefront POST'], ['api-gateway validate cart', 'api-gateway POST /checkout']]) {
+    click(`[data-span="${ids[span]}"]`);
+    click(`[data-parent="${ids[parent]}"]`);
+  }
   click(`[data-span="${ids['storefront GET /products']}"]`);
   click(`[data-parent="${ids['api-gateway POST /checkout']}"]`);
-  click('#sat-tree-check');
-  assert.equal(q('#sat-tree-feedback').textContent.includes('GET /products (storefront): its parent is in another trace.'), true);
+  assert.equal(q('#sat-tree-status').textContent.includes('GET /products (storefront) carries trace id 0af76519, POST /checkout (api-gateway) carries 4bf92f35. Different trace ids'), true);
 });
 
 test('span-kinds: the "Map edges" line is a status region, from serviceEdges before and after', () => {
@@ -746,9 +784,15 @@ test('focus walk: each step starts on its first control, moves on, and ends on F
     steps.forEach((step, i) => {
       const last = i === steps.length - 1;
       if (step.build) {
-        const firstRow = qa('[data-span]')[0].dataset.span;
+        // With the arrival queue the arriving span takes focus (#146), else the first row.
+        const firstRow = (qa('[data-arriving]')[0] ?? qa('[data-span]')[0]).dataset.span;
         assert.equal(focus.last(), `span:${firstRow}`, `${id} step ${i + 1} starts on its first span`);
         solveBuild(id, i);
+        // A solved Build it step focuses its success heading; its Next or Finish is open.
+        assert.equal(focus.last(), `#${step.build}-win-title`, `${id} step ${i + 1} announces the success card`);
+        assert.equal(q(last ? `#${prefix}-finish` : `#${prefix}-next`).disabled, false);
+        if (!last) click(`#${prefix}-next`);
+        return;
       } else if (step.sort) {
         const firstItem = qa('[data-item]')[0].dataset.item;
         assert.equal(focus.last(), `item:${firstItem}`, `${id} step ${i + 1} starts on its first item`);
