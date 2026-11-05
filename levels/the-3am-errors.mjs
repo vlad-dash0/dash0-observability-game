@@ -9,8 +9,8 @@
 // Spec: docs/OUTLINE.md §4 Act 4.
 // Spec: https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-traceid , https://opentelemetry.io/docs/specs/otel/logs/
 // Spec: https://opentelemetry.io/docs/concepts/signals/traces/ , https://opentelemetry.io/docs/specs/semconv/registry/attributes/service/
-// Dash0 docs (not an allowed Spec host): https://www.dash0.com/docs/dash0/telemetry/query-data/query-builder/about-query-builder , https://www.dash0.com/docs/dash0/telemetry/query-data/query-builder/analyze-logs
-// Dash0 docs (not an allowed Spec host): https://www.dash0.com/docs/dash0/telemetry/logging/patterns , https://www.dash0.com/docs/dash0/telemetry/logging/log-ai-processing
+// Dash0 docs: https://www.dash0.com/docs/dash0/telemetry/query-data/query-builder/about-query-builder , https://www.dash0.com/docs/dash0/telemetry/query-data/query-builder/analyze-logs
+// Dash0 docs: https://www.dash0.com/docs/dash0/telemetry/logging/patterns , https://www.dash0.com/docs/dash0/telemetry/logging/log-ai-processing
 //
 // Facts used, each from the pages above: TraceId and SpanId are fields of a log record, which is what lets a
 // backend go from a log to the trace it was written in (logs data model); a trace is the spans that share a

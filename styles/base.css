@@ -47,13 +47,6 @@ kbd { border-bottom-width: 2px; }
   display: flex; flex-direction: column; gap: 12px;
 }
 
-.speech { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 22px; }
-.bubble {
-  background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: 4px 16px 16px 16px; padding: 13px 15px; font-size: 15px;
-  line-height: 1.5; font-weight: 500;
-}
-
 h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: center; }
 
 /* ---------- Buttons ---------- */
@@ -172,7 +165,7 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 /* ---------- Sort it (lib/widgets/sort-it-view.mjs) ---------- */
 /* Labels may hold long <code> names: items, bucket buttons and placed items wrap anywhere
    (as does .feedback above, which quotes them), so no Sort it label overflows at 320px.
-   .choice and .speech are not covered. Only existing text/background pairs (text on surface and surface-2, muted text on
+   .choice is not covered. Only existing text/background pairs (text on surface and surface-2, muted text on
    surface), so test/theme.test.mjs's contrast checks cover them in both themes. */
 .sort-hint { color: var(--color-text-muted); font-size: 13.5px; margin: 0 0 8px; }
 .sort-pool { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; min-height: 8px; }
@@ -206,25 +199,7 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 }
 .sort-placed li::before { content: "\2713 "; content: "\2713 " / ""; color: var(--color-success); }
 
-/* ---------- Build it (retired: lib/widgets/build-it-view.mjs renders through the kit, #158) ---------- */
-/* Nothing emits these build-* and help-* classes any more (test/design-system.test.mjs T7);
-   P7 deletes them. The waterfall (.wf-*) lives in styles/widgets.css, the layout in kit.css. */
-.build-layout { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
-.build-main { min-width: 0; display: grid; gap: 0; align-content: start; }
-.build-frame {
-  background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: var(--radius); overflow: hidden;
-}
-.build-instr { padding: 12px 16px 0; font-size: 14px; }
-.build-status {
-  margin: 8px 16px 0; min-height: 40px; font-size: 13.5px; color: var(--color-text-muted);
-  padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid transparent; overflow-wrap: anywhere;
-}
-.build-status:empty { min-height: 0; padding: 0; border: 0; }
-.build-status b { color: var(--color-text); font-weight: 600; }
-.build-status.ok { border-color: var(--color-success); color: var(--color-text); }
-.build-status.note { border-color: color-mix(in srgb, var(--color-note) 55%, transparent); color: var(--color-text); }
-/* The waterfall's own rules (.wf-*) live in styles/widgets.css (#158). */
+/* The Build it waterfall's own rules (.wf-*) live in styles/widgets.css, its layout in kit.css (#158). */
 
 /* The panel (pick a span, then its parent or field), the log stream and the problems. Rows,
    panel buttons and problems quote span names, so they wrap anywhere like the Sort it labels. */

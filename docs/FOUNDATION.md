@@ -273,10 +273,10 @@ Dash0 tokens in `light-dark()`; carry over reset/body, `.btn` (+`.ghost`, `.smal
 `.bubble`, `.lesson-intro`, `.lesson-stage`, `h3.q`, focus and reduced-motion; system sans,
 Martian Mono for `code, pre, kbd`; every hex → token; `.correct`/`.good` → success,
 `.wrong` → error. Drop lesson-specific classes.
-*(Superseded in part by #158: the kit in `docs/DESIGN-SYSTEM.md` replaces this list for step
-frames; `.btn`, `.speech`, `.bubble`, `.lesson-intro`, `.lesson-stage` and `h3.q` keep their
-`styles/base.css` rules for hand-written levels until #165 retires them (see Retired classes
-there).)*
+*(Superseded in part by #158: the kit in `docs/DESIGN-SYSTEM.md` replaces this list. `.btn`,
+`.lesson-intro`, `.lesson-stage` and `h3.q` keep their `styles/base.css` rules for
+hand-written levels until #165 retires them (see Retired classes there); `.speech` and
+`.bubble` are gone.)*
 
 **F3 level platform (#11)**: `lib/lesson-kit.mjs` (adapt R: keep `escapeHtml` + `'`,
 guarded `prefersReducedMotion`, `speech` without avatar; add `shuffle`; drop Webo/prop/hint

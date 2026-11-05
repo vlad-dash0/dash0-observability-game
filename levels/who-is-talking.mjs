@@ -10,7 +10,7 @@
 // Spec: docs/OUTLINE.md §4 Act 1.
 // Spec: https://opentelemetry.io/docs/specs/semconv/registry/attributes/service/ , https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/
 // Spec: https://opentelemetry.io/docs/concepts/resources/ , https://opentelemetry.io/docs/specs/semconv/resource/k8s/#pod
-// Dash0 docs (not an allowed Spec host): https://www.dash0.com/docs/dash0/monitoring/resources/about-resources , https://www.dash0.com/docs/dash0/monitoring/resources/explore-resources
+// Dash0 docs: https://www.dash0.com/docs/dash0/monitoring/resources/about-resources , https://www.dash0.com/docs/dash0/monitoring/resources/explore-resources
 //
 // Facts used, each from the pages above: service.name, when not specified, falls back to "unknown_service:"
 // plus the process executable name, the value of the process.executable.name resource attribute, for example
