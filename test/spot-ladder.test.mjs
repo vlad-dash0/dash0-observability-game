@@ -9,7 +9,7 @@ import { readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
-import { newSpotState } from '../lib/widgets/spot-it.mjs';
+import { checkSpot, newSpotState, toggleLine } from '../lib/widgets/spot-it.mjs';
 import { renderSpot } from '../lib/widgets/spot-it-view.mjs';
 import { hintFor, spotHelps, validateSpotHelps } from '../lib/widgets/spot-it-help.mjs';
 import { makeDom, qa } from './helpers/dom.mjs';
@@ -72,7 +72,7 @@ test('the board renders the ladder: a Hint button exactly where hints are on', a
 // top of a board, "the earlier outlined line" would be the answer and the hint would give it away.
 // From an empty board, every (missing line, decoy) draw is enumerated through hintFor itself: the
 // first shuffle call rotates the missing lines by i, the second the decoys by j.
-test('tier 2 has no position bias: on each hints-on board the earlier outlined line is the answer in 40% to 60% of draws', async () => {
+test('tier 2 spreads its pair: on each hints-on board the earlier outlined line is the answer in 40% to 60% of draws', async () => {
   const shares = {};
   for (const { no, specs } of await spotLevels()) {
     if (!LADDER[no]) continue;
@@ -106,4 +106,63 @@ test('tier 2 has no position bias: on each hints-on board the earlier outlined l
     }
   }
   assert.deepEqual(Object.keys(shares).map((k) => k.split(' ')[0]).sort(), ['3.2', '3.5', '3.6'], JSON.stringify(shares));
+});
+
+// Answer layout (#160 review round 2): a player who has solved one Spot board must not solve
+// another by its positions alone, and no position rule may solve a board without reading it.
+// Layout = which lines are answers, as a pattern over the lines in authored order ('F' answer,
+// '.' not). Every Spot step is checked, one per level today.
+const layout = (spec) => spec.lines.map((l) => (spec.faults.includes(l.id) ? 'F' : '.')).join('');
+
+/** Pick `ids` one by one through toggleLine, then Check through the real checkSpot. */
+function solvedBy(spec, ids) {
+  let state = newSpotState(spec);
+  for (const id of ids) state = toggleLine(spec, state, id).state;
+  return checkSpot(spec, state).state.solved;
+}
+
+// Position rules over the 1-based line numbers; k = the board's answer count.
+const RULES = {
+  'every odd line': (n) => n % 2 === 1,
+  'every even line': (n) => n % 2 === 0,
+  'the first k lines': (n, len, k) => n <= k,
+  'the last k lines': (n, len, k) => n > len - k,
+};
+
+// Boards a position rule solves today, deferred to #190 (Spot it levels whose lines give the
+// answer away). The test below asserts this is EXACTLY the set that fails, so a fix to any of
+// these levels turns it red until its entry is removed here.
+const KNOWN = {
+  '3.2 temp-spot': ['every even line'],
+  '5.5 ottl-spot': ['every even line'],
+  '6.2 ts-spot': ['the first k lines'],
+};
+
+test('no two Spot boards share an answer layout', async () => {
+  const byLayout = {};
+  for (const { no, specs } of await spotLevels()) {
+    for (const spec of specs) (byLayout[layout(spec)] ??= []).push(`${no} ${spec.id}`);
+  }
+  const shared = Object.entries(byLayout).filter(([, boards]) => boards.length > 1);
+  assert.deepEqual(shared, [], JSON.stringify(byLayout));
+  assert.equal(Object.values(byLayout).flat().length, 6, 'all six Spot boards were compared');
+});
+
+test('no position rule (every odd or even line, the first or last k lines) solves a Spot board through checkSpot, apart from the KNOWN #190 boards', async () => {
+  const solving = {};
+  let boards = 0;
+  for (const { no, specs } of await spotLevels()) {
+    for (const spec of specs) {
+      boards += 1;
+      const k = spec.faults.length;
+      // The real answer does solve it, so a rule that "never solves" is a real result.
+      assert.equal(solvedBy(spec, spec.faults), true, `${no} ${spec.id}: its own answer solves it`);
+      for (const [name, rule] of Object.entries(RULES)) {
+        const ids = spec.lines.filter((l, i) => rule(i + 1, spec.lines.length, k)).map((l) => l.id);
+        if (solvedBy(spec, ids)) (solving[`${no} ${spec.id}`] ??= []).push(name);
+      }
+    }
+  }
+  assert.equal(boards, 6, 'all six Spot boards were tried');
+  assert.deepEqual(solving, KNOWN, 'KNOWN (#190) must be exactly the boards a position rule solves');
 });
