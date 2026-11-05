@@ -13,7 +13,9 @@ import { fakeStorage } from './helpers/fake-storage.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
 import { STORAGE_KEY } from '../lib/storage.mjs';
 import { THEME_KEY } from '../lib/theme.mjs';
-import { createGame } from '../app.mjs';
+import { createGame, liveRegistry } from '../app.mjs';
+import { endSentence } from '../lib/text.mjs';
+import { litText } from '../lib/globe-ignite.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
@@ -475,6 +477,31 @@ test('level labels and classes cover every state', () => {
   assert.equal(game.levelClasses('z'), 'locked nudge');
   assert.equal(game.starText('y'), '★★☆☆☆', 'a saved 2 shows two filled of five');
   assert.equal(game.starSummary(), '2 of 25 stars');
+});
+
+test('endSentence adds a full stop only when the text does not already end a sentence', () => {
+  assert.equal(endSentence('a'), 'a.');
+  assert.equal(endSentence('a?'), 'a?');
+  assert.equal(endSentence('a!'), 'a!');
+  assert.equal(endSentence('a.'), 'a.');
+  assert.equal(endSentence('a? b'), 'a? b.', 'only the last character counts');
+});
+
+test('a name or sub ending in "?" gets no extra full stop: the level label and the lit announcement', () => {
+  const ASK = buildRegistry([{ id: 'a0', no: 0, name: 'First act', levels: [L('q', '0.1', { name: 'Why not?', sub: 'Does it hold?' }), L('p', '0.2', { sub: 'Plain sub' })], boss: null }], { deck: [CARD], nodeIds: [] });
+  const { game } = setup({ registry: ASK });
+  assert.equal(game.levelLabel('q').startsWith('0.1: Why not? Does it hold? '), true, game.levelLabel('q'));
+  assert.equal(game.levelLabel('p').startsWith('0.2: Level p. Plain sub. '), true, game.levelLabel('p'));
+  for (const id of ['q', 'p']) assert.equal(game.levelLabel(id).includes('?.'), false, id);
+  const live = setup({ registry: liveRegistry() }).game;
+  const label92 = live.levelLabel('the-34-percent-error-rate');
+  assert.equal(label92.startsWith('9.2: The 34% error rate. Does that answer hold? '), true, label92);
+  assert.equal(label92.includes('?.'), false, label92);
+  const map = { ACT_REGIONS: { a0: { region: 'Zero' } }, LEVEL_COUNTRY: {}, COUNTRY_NAMES: { CCC: 'C' } };
+  assert.equal(litText({ countryIds: ['CCC'], regionIds: [] }, { name: 'X?' }, map), 'C is now lit: X?');
+  assert.equal(litText({ countryIds: ['CCC'], regionIds: ['a0'] }, { name: 'X?' }, map), 'C is now lit: X? Zero is complete.');
+  assert.equal(litText({ countryIds: [], regionIds: ['a0'] }, { name: 'X?' }, map), 'Zero is now lit: X?', 'a boss names its region');
+  assert.equal(litText({ countryIds: ['CCC'], regionIds: [] }, { name: 'X' }, map), 'C is now lit: X.');
 });
 
 test('the globe text alternative counts levels done and names the lit regions', () => {
