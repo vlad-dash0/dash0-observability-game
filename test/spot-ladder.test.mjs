@@ -11,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { newSpotState } from '../lib/widgets/spot-it.mjs';
 import { renderSpot } from '../lib/widgets/spot-it-view.mjs';
-import { spotHelps, validateSpotHelps } from '../lib/widgets/spot-it-help.mjs';
+import { hintFor, spotHelps, validateSpotHelps } from '../lib/widgets/spot-it-help.mjs';
 import { makeDom, qa } from './helpers/dom.mjs';
 
 const LADDER = {
@@ -66,4 +66,44 @@ test('the board renders the ladder: a Hint button exactly where hints are on', a
       assert.equal(qa(`[id="${spec.id}-hint"]`).length, LADDER[no] ? 1 : 0, `${file} ${spec.id}`);
     }
   }
+});
+
+// Position bias (#160 review): tier 2 lists its pair in spec order, so if the answers sat at the
+// top of a board, "the earlier outlined line" would be the answer and the hint would give it away.
+// From an empty board, every (missing line, decoy) draw is enumerated through hintFor itself: the
+// first shuffle call rotates the missing lines by i, the second the decoys by j.
+test('tier 2 has no position bias: on each hints-on board the earlier outlined line is the answer in 40% to 60% of draws', async () => {
+  const shares = {};
+  for (const { no, specs } of await spotLevels()) {
+    if (!LADDER[no]) continue;
+    for (const spec of specs) {
+      const faults = new Set(spec.faults);
+      const nMissing = spec.faults.length;
+      const nDecoys = spec.lines.length - nMissing;
+      let earlier = 0;
+      let total = 0;
+      const seen = new Set();
+      for (let i = 0; i < nMissing; i += 1) {
+        for (let j = 0; j < nDecoys; j += 1) {
+          const turns = [i, j];
+          let call = 0;
+          const shuffle = (list) => {
+            const k = turns[call++] % list.length;
+            return [...list.slice(k), ...list.slice(0, k)];
+          };
+          const h = hintFor(spec, newSpotState(spec), 2, { shuffle, e: escapeHtml });
+          assert.equal(h.hinted.length, 2, `${no} ${spec.id}: a pair`);
+          assert.equal(h.hinted.filter((id) => faults.has(id)).length, 1, `${no} ${spec.id}: one answer, one decoy`);
+          seen.add(h.hinted.join('+'));
+          total += 1;
+          if (faults.has(h.hinted[0])) earlier += 1;
+        }
+      }
+      assert.equal(seen.size, nMissing * nDecoys, `${no} ${spec.id}: every pair is drawn once`);
+      const share = earlier / total;
+      shares[`${no} ${spec.id}`] = share;
+      assert.ok(share >= 0.4 && share <= 0.6, `${no} ${spec.id}: the earlier line is the answer in ${share.toFixed(3)} of tier-2 pairs`);
+    }
+  }
+  assert.deepEqual(Object.keys(shares).map((k) => k.split(' ')[0]).sort(), ['3.2', '3.5', '3.6'], JSON.stringify(shares));
 });

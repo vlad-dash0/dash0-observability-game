@@ -80,6 +80,11 @@ test('hintFor tier 1: the authored hint, else the generic rule, in a <p>; the sa
   }
 });
 
+test('SPOT_RULE is honest about the cost: a hint costs a star too, not only a wrong Check', () => {
+  assert.match(SPOT_RULE, /hint costs a star/);
+  assert.doesNotMatch(SPOT_RULE, /only a wrong Check/);
+});
+
 // ---- tier 2 ----------------------------------------------------------------------------
 
 test('hintFor tier 2 with faults unpicked: an unpicked fault and an unpicked decoy, listed in spec order, both drawn through the shuffle', () => {
@@ -87,7 +92,7 @@ test('hintFor tier 2 with faults unpicked: an unpicked fault and an unpicked dec
   assert.deepEqual(none.hinted, ['s1', 's2'], 'identity: fault s2 and decoy s1, listed s1 first (spec order, not fault-first)');
   assert.equal(none.apply, null);
   assert.equal(none.html,
-    `<p>One of these two lines, outlined, belongs in your answer and is not picked yet: ${code('s1')} or ${code('s2')}.</p>`);
+    `<p>One of these two outlined lines belongs and is not picked yet: ${code('s1')} or ${code('s2')}.</p>`);
   assert.deepEqual(tier2([], reverse).hinted, ['s3', 's4'], 'reverse: fault s4 and decoy s3');
 });
 
@@ -110,15 +115,15 @@ test('hintFor tier 2 with no unpicked decoy left: only the missing fault, in its
   const h = tier2(['s1', 's3']);
   assert.deepEqual(h.hinted, ['s2']);
   assert.equal(h.apply, null);
-  assert.equal(h.html, `<p>${code('s2')} belongs in your answer and is not picked yet.</p>`);
-  assert.match(h.html, /belongs in your answer and is not picked yet/);
+  assert.equal(h.html, `<p>${code('s2')} belongs and is not picked yet.</p>`);
+  assert.match(h.html, /belongs and is not picked yet/);
   assert.deepEqual(tier2(['s1', 's3'], reverse).hinted, ['s4']);
 });
 
 test('hintFor tier 2 with nothing missing but a wrong pick: one wrong pick and one right pick, spec order, from the shuffle', () => {
   const one = tier2(['s1', 's2', 's4']);
   assert.deepEqual(one.hinted, ['s1', 's2']);
-  assert.equal(one.html, `<p>One of these two picks, outlined, does not belong in your answer: ${code('s1')} or ${code('s2')}.</p>`);
+  assert.equal(one.html, `<p>One of these two outlined picks does not belong: ${code('s1')} or ${code('s2')}.</p>`);
   assert.match(one.html, /does not belong/);
   assert.deepEqual(tier2(['s1', 's2', 's4'], reverse).hinted, ['s1', 's4']);
   // Two wrong picks: which one is offered also comes from the shuffle.

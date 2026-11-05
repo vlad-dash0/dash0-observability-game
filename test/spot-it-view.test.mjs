@@ -235,7 +235,7 @@ test('a wrong pick costs one mistake, counts on the score card, is an error, and
   assert.equal(q('#bomb-wrong').textContent, '1');
   assert.equal(q('#bomb-wrong-label').textContent, 'failed Check');
   assert.equal(q('#bomb-stars').getAttribute('aria-label'), '4 of 5 stars still possible');
-  assert.equal(feedback(), 'Not quite. 1 of your picks is not a fault. A route is a small, fixed set.');
+  assert.equal(feedback(), 'Not quite. 1 of your picks does not belong. A route is a small, fixed set.');
   assert.equal(tone(), 'error', 'a wrong answer is an error (D7), not information');
   assert.equal(counts.done, 0);
 });
@@ -245,7 +245,7 @@ test('a wrong pick without whyNot gets only the generic line; missing faults are
   mount();
   pickAll('s3');
   check();
-  assert.equal(feedback(), 'Not quite. 1 of your picks is not a fault.');
+  assert.equal(feedback(), 'Not quite. 1 of your picks does not belong.');
   click('[data-line="s3"]');
   pickAll('s2');
   check();
@@ -253,7 +253,7 @@ test('a wrong pick without whyNot gets only the generic line; missing faults are
   assert.equal(q('#bomb-wrong').textContent, '2');
   assert.equal(q('#bomb-wrong-label').textContent, 'failed Checks');
   assert.equal(q('#bomb-stars').getAttribute('aria-label'), '3 of 5 stars still possible');
-  assert.equal(feedback(), 'Not quite. Everything you picked is a fault, but there is more.');
+  assert.equal(feedback(), 'Not quite. Everything you picked belongs, but there is more.');
   assert.equal(tone(), 'error');
 });
 
@@ -435,4 +435,49 @@ test('no line carries its answer: before success, a line has only type, class, d
   click('#bomb-hint');
   click('#bomb-hint');
   look('hinted');
+});
+
+// ---- the copy says "belongs", never "fault" (#160 review) -------------------------------
+
+test('no player-facing Spot string says "fault": the instruction says "belongs", and so do a wrong, a partial Check and the hints', () => {
+  const { mount } = setup(withHints());
+  const board = () => q('[data-spot="bomb"]').textContent;
+  assert.equal(text('#bomb-instr'), 'Pick every line that belongs, then press Check. Picking is free.');
+  mount();
+  assert.doesNotMatch(board(), /fault/i, 'rendered board');
+  pickAll('s1', 's2');
+  check(); // wrong: one pick does not belong
+  assert.equal(feedback(), 'Not quite. 1 of your picks does not belong. A route is a small, fixed set.');
+  assert.doesNotMatch(board(), /fault/i, 'after a wrong Check');
+  click('[data-line="s1"]');
+  check(); // partial: s2 only
+  assert.equal(feedback(), 'Not quite. Everything you picked belongs, but there is more.');
+  assert.doesNotMatch(board(), /fault/i, 'after a partial Check');
+  click('#bomb-hint');
+  click('#bomb-hint');
+  assert.match(hintText(), /belongs and is not picked yet/);
+  assert.doesNotMatch(board(), /fault/i, 'after tier 1 and tier 2 hints');
+});
+
+// ---- the hint panel on success (#160 review) ---------------------------------------------
+
+test('after the player\'s own win the hint panel is emptied; after a tier-3 solve it keeps "Picked for you."', () => {
+  const own = setup(withHints());
+  own.mount();
+  click('#bomb-hint');
+  click('#bomb-hint'); // tier 2: "s1 or s2 ... not picked yet"
+  assert.match(hintText(), /not picked yet/);
+  pickAll('s2', 's4');
+  check();
+  assert.equal(tone(), 'success');
+  assert.equal(hintText(), '', 'a stale "not picked yet" no longer matches the solved board');
+
+  const via = setup(withHints());
+  via.mount();
+  click('#bomb-hint');
+  click('#bomb-hint');
+  click('#bomb-hint'); // tier 3: picked for you
+  assert.equal(feedback(), 'Picked for you.');
+  assert.equal(hintText().startsWith('Hint 3 of 3'), true, hintText());
+  assert.match(hintText(), /Picked for you: every line that belongs, and nothing else\./);
 });
