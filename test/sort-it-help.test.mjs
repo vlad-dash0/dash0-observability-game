@@ -112,8 +112,8 @@ test('hintFor tier 2: the right bucket and one untried wrong decoy, in SPEC orde
     assert.equal(ids(h.cands).includes('a'), false, 'the tried bucket a is never offered');
     assert.equal(ids(h.cands).includes('c'), true, 'the right bucket is always a candidate');
   }
-  assert.equal(one.html, '<p>It is one of these two, outlined on the board: <b>Bucket B</b> or <b>Bucket C</b>.</p>');
-  assert.equal(two.html, '<p>It is one of these two, outlined on the board: <b>Bucket C</b> or <b>Bucket D</b>.</p>');
+  assert.equal(one.html, '<p>It is one of these two: <b>Bucket B</b> or <b>Bucket C</b>.</p>');
+  assert.equal(two.html, '<p>It is one of these two: <b>Bucket C</b> or <b>Bucket D</b>.</p>');
 });
 
 // ---- hintLadder ----------------------------------------------------------------------
