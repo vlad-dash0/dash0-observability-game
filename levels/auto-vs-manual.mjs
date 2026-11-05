@@ -22,7 +22,7 @@ const SORT = {
       id: 'loyalty',
       label: 'INTERNAL spans around <code>applyLoyaltyDiscount()</code> calls',
       bucket: 'manual',
-      why: 'Instrumentation knows nothing about your business functions. You start that span yourself with the API, and a manually started span defaults to kind INTERNAL.',
+      why: 'Instrumentation knows nothing about your business functions. You start that span yourself with the API. Its span kind defaults to INTERNAL, though instrumentation libraries emit INTERNAL spans too.',
     },
     {
       id: 'redis',

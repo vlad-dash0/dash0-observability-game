@@ -34,9 +34,9 @@ const SORT = {
     },
     {
       id: 'cust',
-      label: 'Which customers hit an API timeout?',
+      label: 'Is a user hitting API timeouts?',
       bucket: 'new',
-      why: 'No chart lists customers one by one. You need telemetry that still carries the customer ID, so you can filter by it when the question comes up.',
+      why: 'No chart follows one user. You need telemetry that carries the customer ID, so you can filter by it when the question comes up.',
     },
     {
       id: 'disk',
