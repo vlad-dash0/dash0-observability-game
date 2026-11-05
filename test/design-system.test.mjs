@@ -341,12 +341,23 @@ const subjects = (list) => list.flatMap((r) => splitTop(r.selector).map((s) => (
 const rowAlpha = (list, isRow) => Math.min(1, ...subjects(list)
   .filter(({ cs }) => isRow(cs.at(-1)))
   .flatMap(({ body }) => decls(body)).filter(([p]) => p === 'opacity').map(([, v]) => Number(v)));
+// The row parts that carry no text (styles/widgets.css, lib/widgets/build-it-view.mjs rowHtml
+// and trackHtml): bars, connector lines, swatches, the grip, the elbow, grid lines and the
+// verdict icon. Anything else inside a row may hold its words (.wf-txt, .wf-name, .wf-svc,
+// .wf-track with its .wf-bar-label), so a fade on it fades text.
+const NON_TEXT = ['wf-bar', 'wf-conn', 'wf-sw', 'wf-grip', 'wf-elbow', 'wf-grid', 'wf-mark'];
+/** The lowest opacity a rule puts on a possibly-text element inside the matched row (row as a non-last compound). */
+const innerAlpha = (list, isRow) => Math.min(1, ...subjects(list)
+  .filter(({ cs }) => cs.slice(0, -1).some(isRow) && !cs.at(-1).classes.some((c) => NON_TEXT.includes(c)))
+  .flatMap(({ body }) => decls(body)).filter(([p]) => p === 'opacity').map(([, v]) => Number(v)));
+/** What the row's text is drawn at: the row's own fade times the lowest fade on a text-bearing child. */
+const textAlpha = (list, isRow) => rowAlpha(list, isRow) * innerAlpha(list, isRow);
 /** Opacities put on a .wf-bar inside the matched row. */
 const barOpacities = (list, isRow) => subjects(list)
   .filter(({ cs }) => cs.at(-1).classes.includes('wf-bar') && cs.slice(0, -1).some(isRow))
   .flatMap(({ body }) => decls(body)).filter(([p]) => p === 'opacity').map(([, v]) => Number(v));
 
-test('T13 harness: a row fade is found in any quote, value or ancestor form; a bar fade is not a row fade', () => {
+test('T13 harness: a row fade is found in any quote, value or ancestor form; a fade on text inside the row counts; a bar fade does not', () => {
   for (const css of ['.wf-row[data-other="true"] { opacity: .35 }', ".wf-row[data-other='true'] { opacity: .35 }",
     '.wf .wf-row[data-other] { opacity: .35 }', '.wf-row[data-other]:hover { opacity: .35 }', '.wf-row[ data-other = true ] { opacity: .35 }']) {
     assert.equal(rowAlpha(rules(css), FADED_ROWS.other), 0.35, css);
@@ -359,6 +370,16 @@ test('T13 harness: a row fade is found in any quote, value or ancestor form; a b
     assert.equal(rowAlpha(rules(css), FADED_ROWS.other), 1, css);
     assert.equal(rowAlpha(rules(css), FADED_ROWS.overflow), 1, css);
   }
+  // A fade on the text inside the row is a text fade, alone or on a shared rule with the marks.
+  for (const css of ['.wf-row[data-other] .wf-bar, .wf-row[data-other] .wf-txt { opacity: .35 }',
+    '.wf-row[data-other] .wf-name { opacity: .35 }', '.wf .wf-row[data-other] > .wf-track { opacity: .35 }']) {
+    assert.equal(textAlpha(rules(css), FADED_ROWS.other), 0.35, css);
+  }
+  assert.equal(textAlpha(rules('.wf-row[data-mark="overflow"] { opacity: .5 } .wf-row[data-mark="overflow"] .wf-txt { opacity: .5 }'), FADED_ROWS.overflow), 0.25);
+  for (const css of ['.wf-row[data-other] .wf-bar, .wf-row[data-other] .wf-conn, .wf-row[data-other] .wf-sw, .wf-row[data-other] .wf-grip { opacity: .35 }',
+    '.wf-row[data-other] .wf-elbow, .wf-row[data-other] .wf-mark { opacity: .35 }', '.wf-txt { opacity: .35 }', '.wf-row[data-mark="invalid"] .wf-txt { opacity: .3 }']) {
+    assert.equal(textAlpha(rules(css), FADED_ROWS.other), 1, css);
+  }
   assert.deepEqual(barOpacities(rules(".wf .wf-row[data-other='1'] .wf-bar { opacity: .35 }"), FADED_ROWS.other), [0.35]);
   assert.deepEqual(barOpacities(rules('.wf-row[data-other] { opacity: .35 }'), FADED_ROWS.other), []);
 });
@@ -369,14 +390,14 @@ test('T13 harness: a row fade is found in any quote, value or ancestor form; a b
 test('T13 faded waterfall rows fade the bars, not the text: row text keeps 4.5:1 on the board, both themes', () => {
   const list = sheetRules('widgets.css');
   for (const [row, isRow] of Object.entries(FADED_ROWS)) {
-    const alpha = rowAlpha(list, isRow);
+    const alpha = textAlpha(list, isRow);
     for (const theme of ['light', 'dark']) {
       for (const bg of ['--color-surface', '--color-bg']) {
         const under = resolveColor(`var(${bg})`, theme);
         for (const fg of ['--color-text', '--color-text-muted', '--color-parent']) {
           const seen = resolveColor(`var(${fg})`, theme).map((c, i) => c * alpha + under[i] * (1 - alpha));
           const r = ratio(seen, under);
-          assert.ok(r >= 4.5, `${theme}: ${fg} in the ${row} row on ${bg} is ${r.toFixed(2)} (row opacity ${alpha}), needs 4.5`);
+          assert.ok(r >= 4.5, `${theme}: ${fg} in the ${row} row on ${bg} is ${r.toFixed(2)} (text opacity ${alpha}), needs 4.5`);
         }
       }
     }

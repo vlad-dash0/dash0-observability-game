@@ -286,6 +286,10 @@ test('pick path: picking a span offers root and every placed span, itself and it
   click(`[data-span="${B}"]`);
   assert.equal(q(`[data-span="${B}"]`).getAttribute('aria-pressed'), 'true');
   assert.deepEqual(qa('[data-parent]').map((b) => `${b.dataset.parent}${b.disabled ? ' disabled' : ''}`), ['none', A, `${B} disabled`, `${C} disabled`, D, E]);
+  // One name for root: the panel's choice reads the same as the board's root drop target.
+  const rootText = q('.wf-root[data-drop="root"]').textContent.trim();
+  assert.ok(rootText, 'the root drop target has a label');
+  assert.equal(q('[data-parent="none"]').textContent.trim(), rootText, 'the panel names root as the drop target does');
   assert.equal(q(`[data-span="${A}"]`).getAttribute('data-parent-of-selected'), 'true', 'its current parent is marked');
   assert.equal(marks()[0], `${A}:likely`, 'targets show while a span is picked');
   click(`[data-parent="${E}"]`);
@@ -609,7 +613,7 @@ test('kind editing with instant feedback: a wrong kind costs one and says why it
   assert.equal(q('#b1-win-stars').textContent, '4 of 5 stars: 1 wrong pick, 0 hints.');
 });
 
-test('a tier-3 kind hint on a span still wrong in its status is neutral and free: the hint fixed one field, not the move', () => {
+test('a tier-3 kind hint on a span still wrong in its status is neutral and charges no mistake: the hint set the kind, the status is still UNSET', () => {
   const spec = { ...b1Spec(), edit: ['kind', 'status'], answer: { [B]: { kind: 'SERVER', status: 'ERROR' } }, helps: { tint: true, instant: true, hints: true } };
   const { counts, mount } = setup(spec);
   mount();
