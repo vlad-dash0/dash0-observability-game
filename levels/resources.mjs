@@ -6,7 +6,7 @@
 // Spec: https://opentelemetry.io/docs/concepts/resources/ , https://opentelemetry.io/docs/specs/otel/resource/sdk/ , https://opentelemetry.io/docs/specs/otel/resource/
 // Spec: https://opentelemetry.io/docs/specs/semconv/resource/k8s/#pod , https://opentelemetry.io/docs/specs/semconv/resource/cloud/ , https://opentelemetry.io/docs/specs/semconv/resource/host/ , https://opentelemetry.io/docs/specs/semconv/resource/#service
 // Spec: https://opentelemetry.io/docs/specs/semconv/http/http-spans/
-// Dash0 docs (not an allowed Spec host): https://www.dash0.com/docs/dash0/monitoring/resources/about-resources , https://www.dash0.com/docs/dash0/monitoring/resources/explore-resources
+// Dash0 docs: https://www.dash0.com/docs/dash0/monitoring/resources/about-resources , https://www.dash0.com/docs/dash0/monitoring/resources/explore-resources
 
 // Step 1. Four resource attributes and four signal attributes, interleaved so order gives nothing away.
 const SORT = {
