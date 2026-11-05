@@ -34,9 +34,9 @@ const SORT = {
     },
     {
       id: 'cust',
-      label: 'Is a user hitting API timeouts?',
+      label: 'Is this one user hitting API timeouts?',
       bucket: 'new',
-      why: 'No chart follows one user. You need telemetry that carries the customer ID, so you can filter by it when the question comes up.',
+      why: 'No chart follows one user. You need telemetry that carries the user ID, so you can filter by it when the question comes up.',
     },
     {
       id: 'disk',
@@ -74,7 +74,7 @@ const ANSWERABLE = [
   {
     key: 'retention',
     label: 'Keeping data for longer',
-    why: 'Keeping data longer helps only if it has the detail you need. Months of CPU averages still cannot say which customers timed out.',
+    why: 'Keeping data longer helps only if it has the detail you need. Months of CPU averages still cannot say whether that user timed out.',
   },
 ];
 

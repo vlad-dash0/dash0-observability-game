@@ -35,7 +35,7 @@ const PIN = {
           '5xx': 'Has the checkout API 5xx rate stayed under 1% for the last 5 minutes?',
           disk: 'Is the log disk down to 8 GB free space?',
           ios: 'Why are only iOS 5.2 checkouts from Germany slow since 14:05 UTC?',
-          cust: 'Is a user hitting API timeouts?',
+          cust: 'Is this one user hitting API timeouts?',
           coupon: 'Is the coupon path slowing over 10% of carts with 20+ items?',
         },
       },
