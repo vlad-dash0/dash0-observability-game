@@ -7,7 +7,7 @@ only they emit `ui-` classes, only `styles/kit.css` styles them, and colours com
 
 Status: P1b moved the step frame (`lib/play.mjs`), `ctx.speech`, Choice, the help ladder, Build it
 and the `index.html` buttons onto the kit; P2 (#143) moved the incident board (and added `fold`);
-P3a (#156) moved Sort it (kit markup and side column; its hint ladder followed in #156);
+P3a (#156) moved Sort it (kit markup, side column and hint ladder);
 P3b (#160) moved Spot it (kit, hint ladder); the other widgets and the hand-written levels move in
 later phases (until then `base.css` keeps their wrappers narrow); the last phase deletes the
 retired CSS.
