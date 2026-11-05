@@ -12,6 +12,7 @@ import {
   globeTarget, parseColor, readColors, regionCentre, spherePoint,
 } from '../lib/globe-view.mjs';
 import { mountGlobe } from '../lib/globe-render.mjs';
+import * as render from '../lib/globe-render.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
 
@@ -548,4 +549,62 @@ test('a failure part way through setup frees what was made, loses the context an
     assert.equal(dom.host.children.length, 0, `${where}: nothing left in the host`);
     assert.equal(balanced(dom.document) && balanced(dom.host), true, `${where}: no listener left`);
   }
+});
+
+// ---- coming-soon acts (#177 P7) -------------------------------------------------------
+
+const REG3 = buildRegistry(
+  [
+    { id: 'g0', no: 0, name: 'Zeroth', levels: [L('a', '0.1')], boss: null },
+    { id: 'g9', no: 9, name: 'Ninth', levels: [L('n', '9.1')], boss: null },
+  ],
+  { deck: [], nodeIds: [] },
+);
+const MAP3 = {
+  ACT_REGIONS: { g0: { region: 'Zero' }, g9: { region: 'Nine' }, s7: { region: 'Seven' } },
+  LEVEL_COUNTRY: { a: 'AAA', n: 'NNN' },
+};
+const S7 = { id: 's7', no: 7, name: 'Later', sub: '', teaser: 't' };
+
+test('DOT.SOON is a fourth state and a soon region\'s dots take it', () => {
+  assert.equal(DOT.SOON, 3);
+  assert.equal(new Set(Object.values(DOT)).size, Object.values(DOT).length, 'DOT values are unique');
+  const dots = [[0, 0, 'AAA', 'x'], [1, 1, 'SSS', 'y'], [2, 2, 'QQQ', 'z']];
+  const actOf = (iso) => ({ AAA: 'g0', SSS: 's7' })[iso] ?? null;
+  const countries = { AAA: { lit: true, pulse: false } };
+  const regions = { g0: { pulse: false } };
+  assert.deepEqual([...dotStates({ countries, regions, soon: { s7: { region: 'Seven' } } }, dots, actOf)], [1, 3, 0]);
+  assert.deepEqual([...dotStates({ countries, regions }, dots, actOf)], [1, 0, 0], 'no soon key: nothing is soon');
+});
+
+test('the text fallback lists soon acts in act order', () => {
+  assert.deepEqual(globeLines(REG3, globeState(REG3, progressOf([]), MAP3, [S7])), [
+    'Act 0, Zeroth (Zero): 0 of 1 done',
+    'Act 7, Later (Seven): coming soon',
+    'Act 9, Ninth (Nine): 0 of 1 done',
+  ]);
+});
+
+test('the accessible name names soon regions and leaves them out of the count', () => {
+  assert.equal(
+    globeLabel(globeState(REG3, progressOf(['a']), MAP3, [S7])),
+    'World map: 1 of 2 levels done. Lit: Zero 1 of 1. Coming soon: Seven.',
+  );
+  assert.equal(globeLabel(globeState(REG3, progressOf(['a']), MAP3)), 'World map: 1 of 2 levels done. Lit: Zero 1 of 1.');
+  // Given out of order, the soon regions are still named by act number.
+  const map8 = { ...MAP3, ACT_REGIONS: { ...MAP3.ACT_REGIONS, s8: { region: 'Eight' } } };
+  const S8 = { id: 's8', no: 8, name: 'Later still', sub: '', teaser: 't' };
+  assert.equal(
+    globeLabel(globeState(REG3, progressOf([]), map8, [S8, S7])),
+    'World map: 0 of 2 levels done. Coming soon: Seven, Eight.',
+  );
+});
+
+test('the dot shader draws SOON dim and static, outside the wave', () => {
+  // Structural only: the browser check is the real visual one.
+  const m = /else if \(aState > 2\.5\) \{([^}]*)\}/.exec(render.DOT_VS);
+  assert.ok(m, 'a branch for aState > 2.5');
+  assert.ok(m[1].includes('uDim'), 'drawn in the dim colour');
+  assert.equal(m[1].includes('uTime'), false, 'static: no time term');
+  assert.match(render.DOT_VS, /aState > 0\.5 && aState < 2\.5/, 'the wave skips SOON dots');
 });

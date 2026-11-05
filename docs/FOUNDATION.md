@@ -146,8 +146,8 @@ region while it is open. Data: `hub/globe-map.mjs` (`ACT_REGIONS`, `LEVEL_COUNTR
 `actOfCountry`), `hub/globe-data.mjs` (generated `DOTS`, `[lat, lon, iso3, subregion]`).
 State: `lib/globe.mjs` `globeState` (country lit when its level is completed; region
 `{done, total, pulse}`, pulse while the act's boss is `'open'`).
-View, pure (`lib/globe-view.mjs`): `dotStates` (per dot UNLIT / LIT / PULSE; a pulsing region
-outranks lit), `currentActId` (lowest unlocked act not complete, else the last) and
+View, pure (`lib/globe-view.mjs`): `dotStates` (per dot UNLIT / LIT / PULSE / SOON; a pulsing region
+outranks lit; a coming-soon region's dots are SOON, static and dim, and never lit), `currentActId` (lowest unlocked act not complete, else the last) and
 `globeTarget` (rotation facing that act's region centre), `globeLabel` (the accessible name)
 and `globeLines` (the no-WebGL text, one line per act), `readColors` (the `--color-globe-*`
 tokens via computed style), `createLoop` (rAF loop: stops while the tab is hidden or the
@@ -158,6 +158,14 @@ halos, slow spin, drag to rotate, pixel ratio capped at 2, canvas sized by CSS a
 disposes it while a level covers the hub and on `pagehide`, and shows the text fallback when
 three.js, the colours or WebGL are unavailable. Level `lights` stay level data, validated
 against `hub/map-data.mjs` `NODE_IDS`, and are no longer drawn.
+
+Coming soon (#177 P7): `hub/coming-soon.mjs` `COMING_SOON` lists Acts 7 and 8 (`{id, no, name,
+sub, teaser}`, frozen). It is never passed to `buildRegistry`, so unlock, progress, stars, cards
+and ignite cannot see those acts. `createGame` (`comingSoon` dep) merges them into `acts` by
+`no` (`soon: true`, `ids: []`, no level to open, even in debug); `globeState` returns them in
+`soon` (never in `regions`, so they count for nothing); their region's dots are `DOT.SOON`
+(dim, static, outside the wave), and `globeLines` / `globeLabel` name them. Moving an act into
+`ACTS` means deleting its entry.
 
 Ignite (#161). Pure, `lib/globe-ignite.mjs`: `freshlyLit(prev, next, registry, map)` gives
 `{countryIds, regionIds}` (a level's country on its first completion only, never on a replay;
@@ -216,7 +224,7 @@ builds run side by side, only the current build's registry is protected at the c
 | `isCompleted`, `isActComplete`, `isActUnlocked`, `levelState`, `lockReason` | `lib/unlock.mjs` |
 | `loadProgress(storageGetter, registry)` → `{status, progress}` (`TypeError` before any read without a registry), `saveProgress(storageGetter, progress, registry)` → `{saved, reason?, progress}` (`progress` is always the registry view; `TypeError` before any storage access without a registry) | `lib/storage.mjs` |
 | `resolveTheme`, `readTheme(getter)`, `writeTheme(getter, t)` | `lib/theme.mjs` |
-| `globeState(registry, progress, map?)` | `lib/globe.mjs` |
+| `globeState(registry, progress, map?, soon?)` | `lib/globe.mjs` |
 | `dotStates`, `currentActId`, `regionCentre`, `facingRotation`, `globeTarget`, `globeLines`, `globeLabel`, `parseColor`, `readColors`, `createLoop` | `lib/globe-view.mjs` |
 | `parseEnv`, `effectiveResource`, `checkConfig` | `lib/widgets/env-config.mjs` |
 

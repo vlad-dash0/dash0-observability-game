@@ -100,6 +100,7 @@
   background: var(--color-globe-pulse);
   box-shadow: 0 0 8px 2px color-mix(in srgb, var(--color-globe-pulse) 50%, transparent);
 }
+.globe-key.soon { background: transparent; border: 1px dashed var(--color-globe-dim); }
 /* Colour probes: the renderer reads each role's computed colour once at mount. */
 .globe-probe { position: absolute; width: 0; height: 0; overflow: hidden; visibility: hidden; }
 .globe-probe.sky { color: var(--color-globe-sky); }
@@ -125,6 +126,12 @@
 .act + .act { margin-top: 18px; }
 .act-title { font-size: 16px; font-weight: 700; margin: 0 6px 2px; }
 .act-sub { font-size: 13px; color: var(--color-text-muted); margin: 0 6px 10px; }
+.act.soon .act-title, .act.soon .act-sub { color: var(--color-text-muted); }
+.act-soon {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 6px;
+  font-size: 13px; color: var(--color-text-muted);
+}
+.act-soon-chip, .act-soon-teaser { margin: 0; }
 .level-list { display: flex; flex-direction: column; gap: 12px; }
 .level-card {
   display: flex; align-items: center; gap: 14px;
