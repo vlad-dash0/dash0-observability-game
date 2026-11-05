@@ -29,14 +29,15 @@
 
 // Step 1. Eight points of payments.charge.duration (a histogram, seconds), as a debug view would print
 // them: time, route, count and sum of the window, and the point's exemplar field. Five windows of
-// /pay show a spike at 09:14:30 to 09:15:00; a scheduler-run job and a series that has a trace id as
-// a label are on the list too. The faults are the three points whose exemplar field holds a value,
-// a trace_id and a span_id. `whyNot` is shown for a picked point that has none. The text never says why
+// /pay show a spike at 09:14:30 to 09:15:00; a scheduler-run job and a series that has a trace id and span id as
+// labels are on the list too. The faults are the three points whose exemplar field holds a value,
+// a trace_id and a span_id (in a decoy, the same ids sit in a series label, so the longest lines are not the answers). `whyNot` is shown for a picked point that has none. The text never says why
 // a point has none; step 2 asks.
 const SPOT = {
   id: 'exm-spot',
   target: 'config',
   helps: { hints: true },
+  hint: 'Read each point\'s exemplar field, not its count or sum: a link needs a trace_id and a span_id in that field.',
   lines: [
     { id: 'pay-0914-00', text: '09:14:00 payments.charge.duration{route="/pay"} count=9 sum=2.9s exemplar: none' },
     {
@@ -50,7 +51,7 @@ const SPOT = {
     },
     {
       id: 'pay-label',
-      text: '09:14:45 payments.charge.duration{route="/pay", trace_id="4bf92f3577b34da6a3ce929d0e0e4736"} count=1 sum=5.4s exemplar: none',
+      text: '09:14:45 payments.charge.duration{route="/pay", trace_id="4bf92f3577b34da6a3ce929d0e0e4736", span_id="00f067aa0ba902b7", env="prod"} count=1 sum=5.4s exemplar: none',
     },
     { id: 'pay-0914-45', text: '09:14:45 payments.charge.duration{route="/pay"} count=9 sum=41.8s exemplar: none' },
     {
@@ -65,13 +66,13 @@ const SPOT = {
     'pay-0914-45': 'This point is on the spike and its exemplar field says none. A high value does not bring an exemplar with it, so there is no trace to jump to from this point.',
     'pay-0915-15': 'The spike is over and the field says none: no exemplar, so no link from this point.',
     'refund-batch': 'A job started by a scheduler, not by a request, and its point says none: no exemplar, so no link.',
-    'pay-label': 'The trace id here is a label of the series, not an exemplar: a label makes a series of its own for every value, and an exemplar sits beside the point, in its own field. This point\'s field says none.',
+    'pay-label': 'The trace id and span id here are labels of the series, not an exemplar: a label makes a series of its own for every value, and an exemplar sits beside the point, in its own field. This point\'s field says none.',
   },
   explain:
     'Three points carry an exemplar: one measurement recorded in that window, with its value, the <code>trace_id</code> and the ' +
     '<code>span_id</code> of the span it was recorded in. The value is one measurement, not the point\'s sum, and an exemplar can sit on an ' +
     'ordinary point as well as on the spike: the point at 09:14:15 has one, and the spike point at 09:14:45 with count=9 has none. The ' +
-    'trace id in a series label does not link anything, and the scheduled job has no exemplar either.',
+    'trace id and span id in series labels do not link anything, and the scheduled job has no exemplar either.',
 };
 
 // Step 2: why the other points have none. `why` follows "Right." or "Not quite.".

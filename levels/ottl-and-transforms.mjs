@@ -48,8 +48,8 @@ const SPOT = {
   lines: [
     { id: 'delete-email', text: 'delete_key(span.attributes, "user.email")' },
     { id: 'resource-map', text: 'delete_key(resource.attributes, "user.email")' },
-    { id: 'mask-set', text: 'set(span.attributes["user.email"], "REDACTED")' },
     { id: 'copy-only', text: 'set(span.attributes["customer.email"], span.attributes["user.email"])' },
+    { id: 'mask-set', text: 'set(span.attributes["user.email"], "REDACTED")' },
     { id: 'keep-keys', text: 'keep_keys(span.attributes, ["http.route", "http.request.method", "http.response.status_code"])' },
     { id: 'admin-only', text: 'delete_key(span.attributes, "user.email") where span.attributes["http.route"] == "/admin"' },
     { id: 'delete-matching', text: 'delete_matching_keys(span.attributes, "(?i).*email.*")' },

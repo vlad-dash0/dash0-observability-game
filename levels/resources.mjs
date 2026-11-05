@@ -12,6 +12,7 @@
 const SORT = {
   id: 'res-sort',
   helps: { hints: true },
+  hint: 'Is it the same on every span this process sends, or does it change per request?',
   buckets: [
     { id: 'resource', label: 'Resource attribute' },
     { id: 'signal', label: 'Signal attribute' },

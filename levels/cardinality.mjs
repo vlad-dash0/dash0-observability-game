@@ -52,6 +52,7 @@ const SPOT = {
   id: 'cdn-spot',
   target: 'metric',
   helps: { hints: true },
+  hint: 'Ask how many different values each label takes over a month, not what one value looks like.',
   lines: [
     { id: 'route', text: 'http_server_requests_total{http_route="/recommendations/{id}"}' },
     { id: 'method', text: 'http_server_requests_total{http_request_method="POST"}' },

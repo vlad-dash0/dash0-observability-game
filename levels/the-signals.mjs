@@ -17,6 +17,7 @@ const SIGNALS = [
 const DATA = {
   id: 'sig-data',
   helps: { hints: true },
+  hint: 'Look at the shape of the data: what does one piece of it hold, and how would you read it?',
   buckets: SIGNALS,
   items: [
     {
@@ -56,6 +57,7 @@ const DATA = {
 const ASK = {
   id: 'sig-ask',
   helps: { hints: true },
+  hint: 'Ask what you would have to look at to answer it, and how long that data would have to be kept.',
   buckets: SIGNALS,
   items: [
     {

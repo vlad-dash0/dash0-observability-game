@@ -141,10 +141,10 @@ const SPOT = {
   target: 'config',
   helps: { hints: false },
   lines: [
-    { id: 'traces', text: 'traces: receivers: [otlp] processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0, span_metrics]' },
     { id: 'metrics-spans', text: 'metrics/spans: receivers: [span_metrics] processors: [batch] exporters: [otlp_grpc/dash0]' },
     { id: 'logs', text: 'logs: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp_grpc/dash0]' },
     { id: 'connector-def', text: 'connectors: span_metrics:' },
+    { id: 'traces', text: 'traces: receivers: [otlp] processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0, span_metrics]' },
     { id: 'sampler-def', text: 'processors: tail_sampling: decision_wait: 30s policies: [{name: errors, type: status_code, status_code: {status_codes: [ERROR]}}, {name: slow, type: latency, latency: {threshold_ms: 2000}}, {name: baseline, type: probabilistic, probabilistic: {sampling_percentage: 5}}]' },
   ],
   faults: ['traces'],

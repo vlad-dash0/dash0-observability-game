@@ -10,6 +10,7 @@ import { newSortState } from '../lib/widgets/sort-it.mjs';
 const PARTS = {
   id: 'otel-parts',
   helps: { hints: true },
+  hint: 'Ask who touches it: a library author, the application that installs it, or nobody, because it is a format, a process or a name.',
   buckets: [
     { id: 'api', label: 'API' },
     { id: 'sdk', label: 'SDK' },
