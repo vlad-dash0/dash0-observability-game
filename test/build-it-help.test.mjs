@@ -162,6 +162,24 @@ test('hint tiers for a parent: the rule, two candidates outlined, then placed wi
   assert.equal(text(e3.html), 'Placed for you. Its trace id is 0af76519, unlike the others, so no span of this trace can be its parent.');
 });
 
+test('tier 3 for a parent that sits below the span: lift it out first, to its own answer parent if that is free and placed, else to the root', () => {
+  const spec = b1Spec();
+  const all = new Set([A, B, C, D, E]);
+  const st = newBuildState(spec);
+  setParent(spec, st, B, C); // C's answer parent B is now C's child
+  const h = hintFor(spec, st, C, 3, { placed: all, e: escapeHtml });
+  assert.deepEqual(h.apply, { field: 'parent', value: B, lift: { id: B, to: A } });
+  assert.equal(text(h.html).startsWith('Placed for you. POST (storefront) sat below it, so it moves out first, under POST /checkout (storefront). '), true);
+  assert.deepEqual(hintFor(spec, st, C, 3, { placed: new Set([B, C]), e: escapeHtml }).apply.lift, { id: B, to: null }, 'its answer parent has not arrived');
+  const deep = newBuildState(spec);
+  setParent(spec, deep, D, C);
+  setParent(spec, deep, A, D);
+  setParent(spec, deep, B, A); // B's answer parent A is below C too
+  const d = hintFor(spec, deep, C, 3, { placed: all, e: escapeHtml });
+  assert.deepEqual(d.apply.lift, { id: B, to: null });
+  assert.equal(text(d.html).startsWith('Placed for you. POST (storefront) sat below it, so it moves out first, to the root. '), true);
+});
+
 test('hint tiers for a kind and for a record follow the same three steps', () => {
   const spec = { ...b1Spec(), edit: ['kind'], answer: { [B]: { kind: 'CLIENT' }, [E]: { kind: 'CONSUMER' } } };
   const st = newBuildState(spec);

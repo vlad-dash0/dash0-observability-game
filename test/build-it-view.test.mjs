@@ -484,6 +484,38 @@ test('hint tiers: each costs one ctx.hint(); tier 2 outlines two candidates, tie
   assert.equal(q('#b1-hint-tier').textContent, 'For POST /checkout (api-gateway): 0 of 3 used');
 });
 
+test('tier 3 when the answer parent sits below the hinted span: it is lifted out first, then the span is placed; no loop, no wrong drop', () => {
+  // 2.4's ladder: Check mode. B dragged onto C, then C picked: C's answer parent B is C's child.
+  const check = setup(withHelps({ hints: true }));
+  check.mount();
+  drag(B, C);
+  click(`[data-span="${C}"]`);
+  click('#b1-hint');
+  click('#b1-hint');
+  click('#b1-hint');
+  assert.deepEqual([check.counts.hints, check.counts.mistakes], [3, 0]);
+  assert.equal(label(C).endsWith('parent POST (storefront)'), true, 'C sits under B');
+  assert.equal(label(B).endsWith('parent POST /checkout (storefront)'), true, 'B lifted to its own answer parent, A');
+  assert.equal(q('#b1-hint-text').textContent.includes('Placed for you. POST (storefront) sat below it, so it moves out first, under POST /checkout (storefront).'), true);
+  assert.equal(status(), 'POST (storefront) moves out first, under POST /checkout (storefront); POST /checkout (api-gateway) now sits under POST (storefront).');
+  click('#b1-check');
+  assert.deepEqual(qa('#b1-feedback li').map((li) => li.dataset.code), ['wrong-parent'], 'only D is left (C has no issue)');
+  assert.equal(check.counts.mistakes, 1, 'that Check failed on D, the only cost');
+
+  // The same with instant feedback (no queue): the wrong drop costs one, the hint none.
+  const instant = setup(withHelps({ ...ALL, queue: false }));
+  instant.mount();
+  drag(B, C);
+  assert.equal(instant.counts.mistakes, 1, 'the wrong drop');
+  click(`[data-span="${C}"]`);
+  click('#b1-hint');
+  click('#b1-hint');
+  click('#b1-hint');
+  assert.deepEqual([instant.counts.hints, instant.counts.mistakes], [3, 1]);
+  assert.equal(label(C).endsWith('parent POST (storefront), right'), true, 'C under B, and checkBuild finds nothing wrong with it');
+  assert.equal(label(B).endsWith('parent POST /checkout (storefront), right'), true);
+});
+
 test('hints stop at three per span; with no hints on the level there is no button', () => {
   const { counts, mount } = setup(withHelps({ ...ALL, queue: false }));
   mount();
