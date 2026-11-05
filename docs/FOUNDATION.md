@@ -146,8 +146,8 @@ region while it is open. Data: `hub/globe-map.mjs` (`ACT_REGIONS`, `LEVEL_COUNTR
 `actOfCountry`), `hub/globe-data.mjs` (generated `DOTS`, `[lat, lon, iso3, subregion]`).
 State: `lib/globe.mjs` `globeState` (country lit when its level is completed; region
 `{done, total, pulse}`, pulse while the act's boss is `'open'`).
-View, pure (`lib/globe-view.mjs`): `dotStates` (per dot UNLIT / LIT / PULSE; a pulsing region
-outranks lit), `currentActId` (lowest unlocked act not complete, else the last) and
+View, pure (`lib/globe-view.mjs`): `dotStates` (per dot UNLIT / LIT / PULSE / SOON; a pulsing region
+outranks lit; a coming-soon region's dots are SOON, static and dim, and never lit), `currentActId` (lowest unlocked act not complete, else the last) and
 `globeTarget` (rotation facing that act's region centre), `globeLabel` (the accessible name)
 and `globeLines` (the no-WebGL text, one line per act), `readColors` (the `--color-globe-*`
 tokens via computed style), `createLoop` (rAF loop: stops while the tab is hidden or the

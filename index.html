@@ -84,7 +84,7 @@
         <div class="act" :class="act.soon ? 'soon' : ''">
           <h3 class="act-title"><span x-text="'Act ' + act.no"></span>: <span x-text="act.name"></span></h3>
           <p class="act-sub" x-show="act.sub" x-text="act.sub"></p>
-          <p class="act-soon" x-show="act.soon"><span class="ui-chip" data-tone="neutral">Coming soon</span> <span x-text="act.teaser"></span></p>
+          <div class="act-soon" x-show="act.soon"><p class="act-soon-chip"><span class="ui-chip" data-tone="neutral">Coming soon</span></p><p class="act-soon-teaser" x-text="act.teaser"></p></div>
           <div class="level-list">
             <template x-for="id in act.ids" :key="id">
               <div class="level-card"

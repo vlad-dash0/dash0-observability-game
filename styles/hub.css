@@ -131,6 +131,7 @@
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 6px;
   font-size: 13px; color: var(--color-text-muted);
 }
+.act-soon-chip, .act-soon-teaser { margin: 0; }
 .level-list { display: flex; flex-direction: column; gap: 12px; }
 .level-card {
   display: flex; align-items: center; gap: 14px;

@@ -1,4 +1,4 @@
-// Acts 7 and 8 as "coming soon" on the live data (epic #177 P7). They live in hub/coming-soon.mjs,
+// Acts 7 and 8 as "coming soon" on the live data (#177 P7). They live in hub/coming-soon.mjs,
 // never in levels/index.mjs ACTS, so the registry, unlock, progress, stars and cards cannot see
 // them; only the hub's act list and the globe read them.
 import { test } from 'node:test';
