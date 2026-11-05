@@ -4,7 +4,9 @@
 // checked for fork safety: the job that can write a status runs main's code only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load } from '../vendor/js-yaml-5.5.0.mjs';
@@ -246,11 +248,69 @@ test('report posts pending first, with gh only, before any checkout or install',
   assert.equal(first.uses, undefined, 'no action before the pending post');
   assert.match(first.run, /gh api "repos\/\$REPO\/pulls\/\$PR"/);
   assert.match(first.run, /\^\[0-9a-f\]\{40\}\$/, 'checks the head sha');
-  assert.match(first.run, /\[ "\$state" = open \]/, 'a closed PR gets no status');
   assert.match(first.run, /-f state=pending/);
   assert.match(first.run, /statuses\/\$sha"/);
   assert.match(first.run, /echo "sha=\$sha" >> "\$GITHUB_OUTPUT"/);
   assert.equal(job.env.CONTEXT, CONTEXT, 'the shell steps post the same context as the tool');
+});
+
+// The head step run for real, under the shell Actions uses (bash -e -o pipefail), with a
+// fake `gh` and `sleep` first on PATH. `gh api` prints the error body on a non-2xx and exits
+// 1: the step must decide from the exit code, never from having output.
+function runHead(replies) {
+  const dir = mkdtempSync(join(tmpdir(), 'pr-findings-head-'));
+  try {
+    // Each reply is "<exit> <stdout>", one per call; POSTs always succeed and are logged.
+    writeFileSync(join(dir, 'replies'), replies.join('\n') + '\n');
+    writeFileSync(join(dir, 'gh'), [
+      '#!/usr/bin/env bash',
+      'd=$(dirname "$0")',
+      'if [ "$2" = -X ]; then echo "$*" >> "$d/posts"; exit 0; fi',
+      'n=$(cat "$d/n" 2>/dev/null || echo 0); echo $((n + 1)) > "$d/n"',
+      'line=$(sed -n "$((n + 1))p" "$d/replies")',
+      'echo "${line#* }"; exit "${line%% *}"',
+    ].join('\n'), { mode: 0o755 });
+    writeFileSync(join(dir, 'sleep'), '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 });
+    writeFileSync(join(dir, 'out'), '');
+    const r = spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', FINDINGS.jobs.report.steps[0].run], {
+      env: { PATH: `${dir}:${process.env.PATH}`, REPO: 'acme/game', PR: '7', CONTEXT, RUN_URL: 'u', GITHUB_OUTPUT: join(dir, 'out') },
+      encoding: 'utf8',
+    });
+    const read = (f) => { try { return readFileSync(join(dir, f), 'utf8'); } catch { return ''; } };
+    return { code: r.status, output: read('out'), posts: read('posts'), log: r.stdout + r.stderr };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+const HEAD = 'b'.repeat(40);
+
+test('head step: every read failing (an error body on stdout) fails the step, with no sha', () => {
+  const r = runHead(['1 {"message":"Server Error"}', '1 {"message":"Server Error"}', '1 {"message":"Server Error"}']);
+  assert.notEqual(r.code, 0, r.log);
+  assert.equal(r.output, '');
+  assert.equal(r.posts, '');
+  // Even output that reads like an open PR is not a success when gh exited non-zero.
+  const lookalike = runHead(Array(3).fill(`1 open ${HEAD}`));
+  assert.notEqual(lookalike.code, 0, lookalike.log);
+  assert.equal(lookalike.posts, '');
+});
+
+test('head step: a read that fails, then succeeds, posts pending on the head and writes the sha', () => {
+  const r = runHead(['1 {"message":"Server Error"}', `0 open ${HEAD}`]);
+  assert.equal(r.code, 0, r.log);
+  assert.equal(r.output, `sha=${HEAD}\n`);
+  assert.match(r.posts, new RegExp(`statuses/${HEAD} -f state=pending -f context=PR findings`));
+});
+
+test('head step: only a literal "closed" skips the PR; anything unreadable fails the step', () => {
+  const closed = runHead([`0 closed ${HEAD}`]);
+  assert.equal(closed.code, 0, closed.log);
+  assert.equal(closed.posts, '');
+  for (const reply of ['0 garbage', '0 ', `0 OPEN ${HEAD}`, '0 open not-a-sha']) {
+    const r = runHead([reply]);
+    assert.notEqual(r.code, 0, `${reply}: ${r.log}`);
+    assert.equal(r.posts, '', reply);
+  }
 });
 
 test('report posts error on the head when any later step fails', () => {

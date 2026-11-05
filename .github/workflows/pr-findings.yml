@@ -77,15 +77,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Retried: until the head is known, a failure can't be posted on it.
-          out=
+          # Retried: until the head is known, a failure can't be posted on it. Success is gh's
+          # exit code, never having output (on a non-2xx gh prints the error body and exits 1).
+          ok=
           for wait in 5 15 0; do
-            out=$(gh api "repos/$REPO/pulls/$PR" --jq '.state + " " + .head.sha') && break
+            if out=$(gh api "repos/$REPO/pulls/$PR" --jq '.state + " " + .head.sha'); then ok=1; break; fi
             sleep "$wait"
           done
-          [ -n "$out" ] || { echo "PR #$PR: could not read the PR; the status is unchanged, re-run"; exit 1; }
+          [ -n "$ok" ] || { echo "PR #$PR: could not read the PR; the status is unchanged, re-run"; exit 1; }
           read -r state sha <<< "$out"
-          [ "$state" = open ] || { echo "PR #$PR is $state: no status posted"; exit 0; }
+          if [ "$state" = closed ]; then echo "PR #$PR is closed: no status posted"; exit 0; fi
+          [ "$state" = open ] || { echo "PR #$PR: unreadable state: $state"; exit 1; }
           [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "PR #$PR: no usable head sha: $sha"; exit 1; }
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           gh api -X POST "repos/$REPO/statuses/$sha" -f state=pending -f "context=$CONTEXT" \
