@@ -2,7 +2,7 @@
 // Spec: docs/DASH0-LAB.md §Sender. Fake fetch and fake timers; nothing touches the network.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DATASET_HEADER, MESSAGE_CAP, TIMEOUT_MS, classifyResponse, sendTraces } from '../lib/otlp/send.mjs';
+import { BODY_CAP, DATASET_HEADER, MESSAGE_CAP, TIMEOUT_MS, classifyResponse, sendTraces } from '../lib/otlp/send.mjs';
 
 const T = 'auth_Tk9secretValue42';
 const URL_ = 'https://ingress.eu-west-1.aws.dash0.com/v1/traces';
@@ -353,4 +353,33 @@ test('missing setTimeout or clearTimeout throws before any listener is attached 
     assert.equal(timers.delays.length, 0, `no timer armed when ${missing} is missing`);
   }
   assert.equal(calls.length, 0);
+});
+
+test('a response over 64 KiB is never inspected: no message on an error status, unreadable on a 2xx; just under the cap still surfaces a clean message', async () => {
+  assert.equal(BODY_CAP, 65_536);
+  // Pathological body: unpatched escape stripping is quadratic on this.
+  const started = performance.now();
+  const slow = await classifyResponse(res(500, '\\'.repeat(200 * 1024)), { token: T });
+  assert.ok(performance.now() - started < 1000, `took ${performance.now() - started} ms`);
+  assert.deepEqual(slow, { kind: 'rejected', status: 500, auth: false });
+
+  const over = JSON.stringify({ message: 'clean words', pad: 'x'.repeat(BODY_CAP) });
+  assert.ok(over.length > BODY_CAP);
+  assert.deepEqual(await classifyResponse(res(400, over), { token: T }), { kind: 'rejected', status: 400, auth: false });
+  assert.deepEqual(await classifyResponse(res(200, over), { token: T }), {
+    kind: 'rejected',
+    status: 200,
+    auth: false,
+    message: 'Unreadable response body',
+  });
+
+  const pad = BODY_CAP - JSON.stringify({ message: 'clean words', pad: '' }).length;
+  const under = JSON.stringify({ message: 'clean words', pad: 'x'.repeat(pad) });
+  assert.equal(under.length, BODY_CAP);
+  assert.deepEqual(await classifyResponse(res(400, under), { token: T }), {
+    kind: 'rejected',
+    status: 400,
+    auth: false,
+    message: 'clean words',
+  });
 });
