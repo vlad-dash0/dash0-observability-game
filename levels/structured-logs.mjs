@@ -23,7 +23,7 @@
 // Dash0 tie-in: none for this level (docs/OUTLINE.md §4 Act 4: n/a).
 
 // Step 1. One record from Kettle & Co's payments service, as twelve pieces. Buckets are the fields of the
-// data model. Interleaved so order gives nothing away. `whyNot` is shown for the buckets an item is
+// data model. Labels must not give the bucket away (test/sort-tells.test.mjs). `whyNot` is shown for the buckets an item is
 // likely to be confused with.
 const SORT = {
   id: 'sl-sort',

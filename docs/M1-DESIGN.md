@@ -558,10 +558,11 @@ notifications, recommendations, redis, postgres.
 
 ### Act 0
 **0.1 `monitoring-vs-observability`**: sort; cards `[]`. Step 1 Sort into `known` / `new`:
-cpu "Is CPU on db-1 above 90%?" known; 5xx "Is the 5xx rate above 1%?" known; disk "Is the log
-disk full?" known; ios "Why are only iOS 5.2 checkouts from Germany slow since 14:05?" new;
-cust "Which customer IDs hit a payment timeout in the last hour?" new; coupon "Did the coupon
-path slow carts with over 20 items?" new. Step 2 choice "What makes the second kind
+cpu "Is CPU on db-1 above 90%?" known; 5xx "Has the checkout API 5xx rate stayed under 1%
+for the last 5 minutes?" known; disk "Is the log disk down to 8 GB free space?" known; ios
+"Why are only iOS 5.2 checkouts from Germany slow since 14:05 UTC?" new; cust "Is this one user hitting API
+timeouts?" new; coupon "Is the coupon path slowing over 10% of carts with 20+ items?" new. No
+blind rule (label length, `%`, a shared word) may sort these labels; `test/sort-tells.test.mjs` checks that. Step 2 choice "What makes the second kind
 answerable?" → `rich` (telemetry with many attributes you can slice after the fact); decoys
 dash, alerts, retention. Spec: https://opentelemetry.io/docs/concepts/observability-primer/#what-is-observability
 
@@ -597,7 +598,7 @@ Escalate."). Alert "PAGE: checkout p95 > 2 s (firing)". Four looks (Which servic
 when? / Which customers? / Show me a trace), each reveals "No data. …" with the reason and
 drops "Error budget: N% left" by 25. `#pager-escalate` "Escalate" (no `data-finish`) is
 enabled after the first look and moves to part 2; the budget reaching 0 moves to part 2 by
-itself. Part 2, with telemetry: "Same alert, now with telemetry. Ask the same four questions.
+itself. The budget also shows as a 4-cell kit meter ("N of 100 % spent") and a Spent on chip per look, in the order taken. Part 2, with telemetry: "Same alert, now with telemetry. Ask the same four questions.
 The data is made up, for illustration. Ask all four to finish." The same four questions are
 buttons (`data-ask`); clicking one reveals a made-up answer (service.name, a metric over time
 with service.version, a span attribute, a trace; `CONTENT.telemetry` in
@@ -629,7 +630,8 @@ edges from CLIENT to SERVER and PRODUCER to CONSUMER pairs." Copy says "backends
 
 **2.3 `status-and-errors`**: cards `['span-status']`. Sort into `ok` / `wrong`: a
 storefront CLIENT `GET /products/999` 404 ERROR → ok; b catalog SERVER 404 ERROR → wrong (SERVER 4xx stays Unset); c
-checkout SERVER 500 UNSET → wrong; d inventory SERVER 200 UNSET → ok. Step 2 choice: Ok then
+checkout SERVER 500 UNSET → wrong; d inventory SERVER 200 UNSET → ok; e payments SERVER
+`POST /v1/charge` 503 ERROR → ok (a 5xx SHOULD be Error on a SERVER span). Split 3 ok / 2 wrong. No single rule sorts all five with fewer than two mistakes. Step 2 choice: Ok then
 setStatus(Error) → stays Ok (Ok is final). Card: "Status starts Unset. A 4xx is Error on the
 CLIENT span but stays Unset on the SERVER span. Ok is a final override." Spec:
 https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status ,
@@ -643,7 +645,7 @@ parent is `00f067aa0ba902b7`. Card: "When a hop drops the traceparent header, on
 becomes two traces: look for unexpected root spans." Spec:
 https://www.w3.org/TR/trace-context/#traceparent-header
 
-**2.5 `baggage`**: cards `['baggage-leaks']`. Sort `ok` / `never`: `experiment.variant=B` ok;
+**2.5 `baggage`**: cards `['baggage-leaks']`. Sort `ok` / `never`: `experiment.variant=redesign-B` ok;
 `tenant.tier=gold` ok; `user.email` never; `session.token` never; `card.last4` never. Step 2 choice: do
 recommendations' spans carry `tenant.tier` from baggage? → no, only if copied (e.g. a baggage
 span processor). Card: "Baggage is not copied onto spans for you, and it travels in plain
@@ -676,7 +678,7 @@ https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/
 
 **2.7 `auto-vs-manual`**: cards `['double-instrumentation']`. Step 1 Sort `auto` / `manual`:
 HTTP server spans per route auto; Redis command spans auto; outgoing HTTP client spans auto;
-span around `applyLoyaltyDiscount()` manual; `app.coupon.code` on checkout span manual;
+"INTERNAL spans around `applyLoyaltyDiscount()` calls" manual; `app.coupon.code` on checkout span manual;
 `app.cart.item_count` manual. Step 2 choice: each of cart's outgoing `fetch` calls shows two
 CLIENT spans (operator-injected
 `NODE_OPTIONS=--require @opentelemetry/auto-instrumentations-node/register` plus `tracing.js`

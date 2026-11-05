@@ -1,6 +1,6 @@
-// Level 2.3: Status and errors. Four spans from one shop, each with an HTTP code and the
+// Level 2.3: Status and errors. Five spans from one shop, each with an HTTP code and the
 // status its instrumentation set; the player sorts the right statuses from the wrong ones
-// (a 4xx is Error only on the CLIENT span), then says what Ok followed by Error leaves.
+// (a 4xx is Error only on the CLIENT span, a 5xx is Error on either span), then says what Ok followed by Error leaves.
 // Spec: docs/M1-DESIGN.md §6 Act 2.
 // Spec: https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status , https://opentelemetry.io/docs/specs/otel/trace/api/#set-status
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
@@ -40,6 +40,12 @@ const SORT = {
       label: 'inventory SERVER span for <code>GET /stock</code>: 200, status Unset',
       bucket: 'ok',
       why: 'A 2xx is a success, and instrumentation leaves it Unset. Unset is the normal status of a span that did not fail; nobody needs to set Ok.',
+    },
+    {
+      id: 'e',
+      label: 'payments SERVER span for <code>POST /v1/charge</code>: 503, status Error',
+      bucket: 'ok',
+      why: 'A 5xx on a SERVER span SHOULD be Error: the server failed the request.',
     },
   ],
 };
@@ -88,7 +94,7 @@ export default {
         `<div class="lesson-intro">${ctx.speech(
           'Every span\'s status starts as Unset. Instrumentation sets Error when an operation ' +
             'fails, following the semantic conventions, and for HTTP the rule depends on the ' +
-            'span\'s kind. Check four spans from this morning.',
+            'span\'s kind. Check five spans from this morning.',
         )}</div>
         <div class="lesson-stage">
           <h3 class="q" id="status-q-sort">Pick a span, then say whether its status is right.</h3>

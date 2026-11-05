@@ -8,7 +8,7 @@
 // Spec: https://opentelemetry.io/docs/specs/semconv/http/http-spans/
 // Dash0 docs: https://www.dash0.com/docs/dash0/monitoring/resources/about-resources , https://www.dash0.com/docs/dash0/monitoring/resources/explore-resources
 
-// Step 1. Four resource attributes and four signal attributes, interleaved so order gives nothing away.
+// Step 1. Four resource attributes and four signal attributes. Label wording must not give the bucket away (test/sort-tells.test.mjs).
 const SORT = {
   id: 'res-sort',
   helps: { hints: true },
@@ -82,7 +82,7 @@ const SORT = {
     },
     {
       id: 'url-path',
-      label: 'url.path = /checkout/8841',
+      label: 'url.path = /cart/8841',
       bucket: 'signal',
       why: 'The path of this one request, with its real id in it. A different request has a different path, so it is a span attribute.',
       whyNot: {

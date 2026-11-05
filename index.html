@@ -65,6 +65,7 @@
           <span><i class="globe-key lit" aria-hidden="true"></i>Lit: level completed</span>
           <span><i class="globe-key pulse" aria-hidden="true"></i>Pulsing: incident open</span>
           <span><i class="globe-key" aria-hidden="true"></i>Not reached</span>
+          <span><i class="globe-key soon" aria-hidden="true"></i>Coming soon</span>
         </p>
       </div>
       <ul class="globe-fallback" x-show="globeFallback" x-cloak>
@@ -80,9 +81,10 @@
         Levels coming soon. Each one you finish lights up part of the map.
       </p>
       <template x-for="act in acts" :key="act.id">
-        <div class="act">
+        <div class="act" :class="act.soon ? 'soon' : ''">
           <h3 class="act-title"><span x-text="'Act ' + act.no"></span>: <span x-text="act.name"></span></h3>
           <p class="act-sub" x-show="act.sub" x-text="act.sub"></p>
+          <div class="act-soon" x-show="act.soon"><p class="act-soon-chip"><span class="ui-chip" data-tone="neutral">Coming soon</span></p><p class="act-soon-teaser" x-text="act.teaser"></p></div>
           <div class="level-list">
             <template x-for="id in act.ids" :key="id">
               <div class="level-card"

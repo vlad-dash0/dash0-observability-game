@@ -9,6 +9,7 @@
 // markup must not use Alpine attributes (x-*, @*, :*). test/levels-play.test.mjs checks.
 import { DECK } from './cards/deck.mjs';
 import { DOTS } from './hub/globe-data.mjs';
+import { COMING_SOON } from './hub/coming-soon.mjs';
 import { ACT_REGIONS, actOfCountry, COUNTRY_NAMES, LEVEL_COUNTRY } from './hub/globe-map.mjs';
 import { NODE_IDS } from './hub/map-data.mjs';
 import { ACTS } from './levels/index.mjs';
@@ -74,7 +75,7 @@ const CONFETTI = 40;
  * The Alpine component data for the hub. deps: { registry (§2.4), storage (getter for a
  * Storage), document, window?, deck?, globe? ((host, view) → Promise of a globe handle or
  * null; lib/globe-render.mjs mountGlobe in the browser), globeMap? ({ACT_REGIONS,
- * LEVEL_COUNTRY, COUNTRY_NAMES, actOf}), dots?, now?, rand?, reduceMotion? (() → boolean), reportError?,
+ * LEVEL_COUNTRY, COUNTRY_NAMES, actOf}), dots?, comingSoon? (acts shown but not playable, hub/coming-soon.mjs), now?, rand?, reduceMotion? (() → boolean), reportError?,
  * setTimeout?, clearTimeout?, debug? (boolean, ?mode=debug: every level opens, nothing is saved) }. Without `globe` the hub shows the globe's text fallback.
  */
 export function createGame(deps) {
@@ -87,6 +88,7 @@ export function createGame(deps) {
     globe: mountGlobe = null,
     globeMap = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES, actOf: actOfCountry },
     dots = DOTS,
+    comingSoon = COMING_SOON,
     now = Date.now,
     rand = Math.random,
     reduceMotion = () => false,
@@ -123,13 +125,26 @@ export function createGame(deps) {
     progress: loaded.progress,
     notice: loaded.status === 'fresh' || loaded.status === 'ok' ? null : loaded.status,
     theme: readTheme(storage),
-    acts: registry.acts.map((a) => ({
-      id: a.id,
-      no: a.no,
-      name: a.name,
-      sub: a.sub,
-      ids: [...a.levelIds, ...(a.bossId ? [a.bossId] : [])],
-    })),
+    acts: [
+      ...registry.acts.map((a) => ({
+        id: a.id,
+        no: a.no,
+        name: a.name,
+        sub: a.sub,
+        ids: [...a.levelIds, ...(a.bossId ? [a.bossId] : [])],
+        soon: false,
+        teaser: '',
+      })),
+      ...comingSoon.map((a) => ({
+        id: a.id,
+        no: a.no,
+        name: a.name,
+        sub: a.sub,
+        ids: [],
+        soon: true,
+        teaser: a.teaser,
+      })),
+    ].sort((a, b) => a.no - b.no),
     overlayOpen: false,
     overlayTitle: '',
     currentLevelId: null,
@@ -213,7 +228,7 @@ export function createGame(deps) {
     },
     // ---------- globe ----------
     mapState() {
-      return globeState(registry, this.progress, globeMap);
+      return globeState(registry, this.progress, globeMap, comingSoon);
     },
     // The globe's accessible name: levels done, regions lit, any open incident.
     mapLabel() {

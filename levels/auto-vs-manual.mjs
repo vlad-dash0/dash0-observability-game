@@ -2,9 +2,9 @@
 // from what only their own code adds, finds why each of cart's fetch calls shows two CLIENT
 // spans (an injected agent plus a tracing.js NodeSDK), and picks the fix.
 // Spec: docs/M1-DESIGN.md §6 Act 2.
-// Spec: https://opentelemetry.io/docs/zero-code/js/ , https://opentelemetry.io/docs/platforms/kubernetes/operator/automatic/
+// Spec: https://opentelemetry.io/docs/zero-code/js/ , https://opentelemetry.io/docs/platforms/kubernetes/operator/automatic/ , https://opentelemetry.io/docs/specs/otel/trace/api/#spankind , https://opentelemetry.io/docs/concepts/signals/traces/
 
-// Step 1. Items interleave the buckets so their order gives nothing away.
+// Step 1. Label wording must not give the bucket away (test/sort-tells.test.mjs).
 const SORT = {
   id: 'avm-sort',
   helps: { hints: false },
@@ -15,19 +15,19 @@ const SORT = {
   items: [
     {
       id: 'server',
-      label: 'The HTTP server spans, one per route',
+      label: 'The HTTP SERVER spans, one per <code>express</code> route',
       bucket: 'auto',
       why: 'The HTTP server instrumentation starts a span for every request that reaches an Express route, with no code of yours.',
     },
     {
       id: 'loyalty',
-      label: 'A span around <code>applyLoyaltyDiscount()</code>',
+      label: 'INTERNAL spans around <code>applyLoyaltyDiscount()</code> calls',
       bucket: 'manual',
-      why: 'Instrumentation knows nothing about your business functions. You start that span yourself with the API.',
+      why: 'Instrumentation knows nothing about your business functions. You start that span yourself with the API. Its span kind defaults to INTERNAL, though instrumentation libraries may emit INTERNAL spans too.',
     },
     {
       id: 'redis',
-      label: 'Redis command spans',
+      label: 'A span for each Redis command',
       bucket: 'auto',
       why: 'The Redis instrumentation wraps the client and starts a span for each command.',
     },
@@ -39,7 +39,7 @@ const SORT = {
     },
     {
       id: 'client',
-      label: 'Outgoing HTTP client spans',
+      label: 'Outgoing <code>fetch</code> CLIENT spans',
       bucket: 'auto',
       why: 'The HTTP client instrumentation starts a CLIENT span for each outgoing call, with no code of yours.',
     },

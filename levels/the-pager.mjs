@@ -2,8 +2,10 @@
 // every look the player takes finds no data and burns a quarter of the error budget,
 // until they escalate or the budget hits 0. Part 2: the same four questions, each answered
 // from a small instrumented view. It cannot be won and is not scored: it is the reason to
-// instrument. The budget is plain text in fixed 25% steps, not the incident engine (§4.3). Spec: docs/M1-DESIGN.md §6 Boss the-pager.
+// The budget is a percent of the error budget, not minutes, in fixed 25% steps. The screen shows a kit meter of 4 cells, the percent left as the headline, and a Spent on chip per look. It is not the incident engine (§4.3). Spec: docs/M1-DESIGN.md §6 Boss the-pager.
 // Spec: https://opentelemetry.io/docs/concepts/observability-primer/#what-is-observability
+
+import { chip, meter } from '../lib/ui/index.mjs';
 
 const ALERT = 'PAGE: checkout p95 > 2 s (firing)';
 const BUDGET = { startPct: 100, stepPct: 25 };
@@ -82,6 +84,24 @@ export const CONTENT = {
 };
 
 const budgetText = (pct) => `Error budget: ${pct}% left`;
+const CELLS = BUDGET.startPct / BUDGET.stepPct;
+
+/** The kit meter: spent cells fill as looks are taken; its text line counts the percent spent. */
+const meterHtml = (left) =>
+  meter({
+    id: 'pager-meter',
+    label: 'Error budget',
+    value: BUDGET.startPct - left,
+    max: BUDGET.startPct,
+    cells: CELLS,
+    unit: '% spent',
+  });
+
+/** One Spent on chip per look taken, in the order taken. */
+const spentHtml = (taken) =>
+  taken.length
+    ? `Spent on: ${taken.map((l) => chip({ text: `${l.label} ${BUDGET.stepPct}%` })).join(' ')}`
+    : '';
 
 export default {
   id: 'the-pager',
@@ -139,6 +159,8 @@ export default {
       <div class="lesson-stage">
         ${alert}
         <p id="pager-budget" role="status" aria-live="polite">${budgetText(BUDGET.startPct)}</p>
+        <div id="pager-meter-slot">${meterHtml(BUDGET.startPct)}</div>
+        <p id="pager-spent"></p>
         <div class="choices" role="group" aria-labelledby="pager-alert">${looks}</div>
         <div id="pager-feedback" role="status" aria-live="polite"></div>
       </div>`,
@@ -147,7 +169,10 @@ export default {
     const body = ctx.ovBody;
     const escalate = ctx.ovActions.querySelector('#pager-escalate');
     const budgetEl = body.querySelector('#pager-budget');
+    const meterSlot = body.querySelector('#pager-meter-slot');
+    const spentEl = body.querySelector('#pager-spent');
     const feedback = body.querySelector('#pager-feedback');
+    const taken = [];
     const buttons = [...body.querySelectorAll('[data-look]')];
     let left = BUDGET.startPct;
 
@@ -158,6 +183,9 @@ export default {
         b.disabled = true;
         left = Math.max(0, left - BUDGET.stepPct);
         budgetEl.textContent = budgetText(left);
+        taken.push(look);
+        meterSlot.innerHTML = meterHtml(left);
+        spentEl.innerHTML = spentHtml(taken);
         feedback.insertAdjacentHTML(
           'beforeend',
           `<p class="feedback info show" data-said="${look.key}"><strong>${look.label}</strong> ${look.reason}</p>`,

@@ -44,8 +44,10 @@ test('act-6 "Sampling and cost" holds 6.1 to 6.3 after Act 5, then its boss "Err
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
     { no: 6, name: 'Sampling and cost', sub: 'You can\'t keep everything', levelIds: ['head-sampling', 'tail-sampling', 'what-costs-money'], bossId: 'errors-tripled' },
   );
-  assert.deepEqual(LIVE.acts.map((a) => a.id).slice(-2), ['act-5', 'act-6']);
-  assert.deepEqual(LIVE.order.slice(-5), ['silence', 'head-sampling', 'tail-sampling', 'what-costs-money', 'errors-tripled']);
+  const ids = LIVE.acts.map((a) => a.id);
+  assert.equal(ids[ids.indexOf('act-6') - 1], 'act-5', 'act-6 follows act-5');
+  const at = LIVE.order.indexOf('silence');
+  assert.deepEqual(LIVE.order.slice(at, at + 5), ['silence', 'head-sampling', 'tail-sampling', 'what-costs-money', 'errors-tripled']);
 });
 
 test('act-6 unlocks like the acts before it: every earlier act complete (Act 5 and its boss included), or entered', () => {
