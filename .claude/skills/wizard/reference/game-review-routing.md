@@ -28,7 +28,7 @@ parallel** every reviewer whose row matches:
 | `content-fact-checker` | sonnet | level content (`levels/`), `cards/`, or a technical claim in `docs/` (docs-only PRs included) | Is every claim true, cited on an allowed host, and every shown Collector config validated? |
 | `browser-verifier` | sonnet | view code (`lib/widgets/*-view.mjs`, `lib/globe-render.mjs`, `lib/swirl-render.mjs`, any module that writes markup), `styles/`, `index.html`, `main.mjs`, `app.mjs` | Does the real browser give the player focus, keyboard, contrast, a clean console and released WebGL? |
 | `ui-copy-lens` | haiku | any player-facing text, `docs/`, `.claude/`, or the PR body | Are the words plain, consistent, free of em dashes and attribution, and true to the code? |
-| `doc-librarian` | sonnet | a docs-only or `.claude`-only PR (and any PR its own trigger in the SKILL already engages it for) | Is the doc corpus reachable, current and inside its budget? |
+| `doc-librarian` | sonnet | any diff touching `README.md`, `docs/` or `.claude/` (docs-only and `.claude`-only PRs included) | Is the doc corpus reachable, current and inside its budget? |
 
 **A docs-only or `.claude`-only PR gets `ui-copy-lens` and `doc-librarian`, plus
 `content-fact-checker` when it changes a technical claim in `docs/`; no other reviewer.** A PR that
@@ -48,7 +48,7 @@ Each reviewer gets the same base, then its one-line focus from the table above:
 - Test runs use `NODE_OPTIONS=--max-old-space-size=2048`; probes carry timeouts.
 - **Stay in your lane**: a finding in another reviewer's lane goes in your notes as one line,
   never in your table. Reviewers commit nothing and post nothing; `qa-engineer` in a review
-  dispatch returns findings and reverts its mutations (its own rule) without committing.
+  dispatch returns findings and reverts its mutations without committing (`qa-engineer.md`, "Review dispatch").
 - Return the review table, then a section headed **Notes for the orchestrator (not posted)**.
 
 ## The budget
