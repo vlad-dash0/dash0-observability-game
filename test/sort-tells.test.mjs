@@ -107,6 +107,39 @@ function bestByCapsWord(spec) {
   return best;
 }
 
+/** A board whose every label is a question (ends with "?"), two buckets only. */
+const questionBoard = (spec) => spec.buckets.length === 2 && spec.items.every((it) => plain(it.label).trim().endsWith('?'));
+
+/** First word of a label, lower-cased. */
+const opener = (it) => (plain(it.label).trim().match(/^[A-Za-z]+/)?.[0] ?? '').toLowerCase();
+
+const YES_NO = new Set(['is', 'are', 'has', 'have', 'does', 'do', 'did', 'can', 'was', 'were', 'will', 'should']);
+
+/** Wrong placements when yes/no questions go to the bucket at `yesNoIndex`, every other question to the other. */
+function byYesNo(spec, yesNoIndex) {
+  return mistakes(spec, (it) => spec.buckets[YES_NO.has(opener(it)) ? yesNoIndex : 1 - yesNoIndex].id);
+}
+
+/**
+ * Fewest wrong placements when one opener word shared by two or more labels sends those items to
+ * one bucket and the rest to the other, either way round. Not the token rule: that one also
+ * matches the word mid-label ("Why is ..." has "is" but opens with "why").
+ */
+function bestByOpener(spec) {
+  const ids = spec.buckets.map((b) => b.id);
+  const counts = new Map();
+  for (const it of spec.items) counts.set(opener(it), (counts.get(opener(it)) ?? 0) + 1);
+  let best = { wrong: Infinity, token: null };
+  for (const [token, n] of counts) {
+    if (n < 2) continue;
+    for (const [yes, no] of [ids, [...ids].reverse()]) {
+      const wrong = mistakes(spec, (it) => (opener(it) === token ? yes : no));
+      if (wrong < best.wrong) best = { wrong, token };
+    }
+  }
+  return best;
+}
+
 /** Items with `<code>` to the bucket at `codeIndex`, the rest to the other (two buckets only). */
 function byCode(spec, codeIndex) {
   return mistakes(spec, (it) => spec.buckets[/<code>/.test(it.label) ? codeIndex : 1 - codeIndex].id);
@@ -194,11 +227,33 @@ test('Sort it: "the labels with an all-caps word go in one bucket" never earns 4
   }
 });
 
+// Guards the mixed-case case (SERVER in one label beside server in another), which the lower-cased token test cannot see.
 test('Sort it: "one all-caps word shared by labels goes to one bucket" never earns 4 stars', async () => {
   for (const { level, spec } of await allSortSpecs()) {
     if (spec.buckets.length !== 2) continue;
     const { wrong, token } = bestByCapsWord(spec);
     assert.equal(wrong >= MIN_WRONG, true, `${level} ${spec.id}: the all-caps word "${token}" alone gets ${wrong} wrong`);
+  }
+});
+
+test('Sort it: "yes/no questions go in one bucket, other questions in the other" never earns 4 stars', async () => {
+  let boards = 0;
+  for (const { level, spec } of await allSortSpecs()) {
+    if (!questionBoard(spec)) continue;
+    boards++;
+    for (const yesNoIndex of [0, 1]) {
+      const wrong = byYesNo(spec, yesNoIndex);
+      assert.equal(wrong >= MIN_WRONG, true, `${level} ${spec.id}: the question form alone gets ${wrong} wrong (yes/no to bucket ${yesNoIndex})`);
+    }
+  }
+  assert.equal(boards > 0, true, 'no all-question Sort it board to check');
+});
+
+test('Sort it: "questions with the same opening word go in one bucket" never earns 4 stars', async () => {
+  for (const { level, spec } of await allSortSpecs()) {
+    if (!questionBoard(spec)) continue;
+    const { wrong, token } = bestByOpener(spec);
+    assert.equal(wrong >= MIN_WRONG, true, `${level} ${spec.id}: the opening word "${token}" alone gets ${wrong} wrong`);
   }
 });
 
