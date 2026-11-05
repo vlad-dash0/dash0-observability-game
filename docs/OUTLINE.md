@@ -237,4 +237,5 @@ Decided 2026-10-31: platform before content, so later acts are mostly content.
 4. **M3, content**: Acts 1, 3, 4, 5.
 5. **M4, content**: Acts 6 to 8; game instrumented into Dash0 (dogfooding); final boss.
 
-Separate tracks: Ask the guide (#17) and Act 9.
+Separate track: Ask the guide (#17).
+Endgame: Act 9 (Live Demo), chained after the earlier acts (foundation: [LIVE-DEMO.md](LIVE-DEMO.md), §7).
