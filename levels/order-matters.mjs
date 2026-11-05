@@ -19,7 +19,7 @@ const SPOT = {
   lines: [
     { id: 'traces', text: 'traces: processors: [memory_limiter, k8sattributes, transform/redact, batch]' },
     { id: 'metrics', text: 'metrics: processors: [batch, memory_limiter]' },
-    { id: 'logs', text: 'logs: processors: [memory_limiter, filter/health, batch]' },
+    { id: 'logs', text: 'logs: processors: [memory_limiter, filter/health-checks, batch]' },
     { id: 'traces-checkout', text: 'traces/checkout: processors: [memory_limiter, batch, k8sattributes]' },
     { id: 'logs-audit', text: 'logs/audit: processors: [k8sattributes, memory_limiter, batch]' },
     { id: 'metrics-infra', text: 'metrics/infra: processors: [memory_limiter, batch]' },

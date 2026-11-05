@@ -18,7 +18,7 @@ const SPOT = {
     { id: 'emails-sent', text: 'emails_sent_total{service="notifications", temporality="delta"}' },
     { id: 'queue-length', text: 'orders_queue_length{service="orders", temporality="cumulative"}' },
     { id: 'warehouse-temp', text: 'warehouse_temperature_celsius{site="rotterdam"}' },
-    { id: 'checkout-duration', text: 'checkout_duration_seconds{service="checkout", temporality="delta"}' },
+    { id: 'checkout-duration', text: 'checkout_duration_seconds{service="checkout", region="eu-west-1", temporality="delta"}' },
     { id: 'payments-declined', text: 'payments_declined_total{service="payments", temporality="delta"}' },
     { id: 'request-duration', text: 'http_server_request_duration_seconds{service="storefront", temporality="cumulative"}' },
   ],
