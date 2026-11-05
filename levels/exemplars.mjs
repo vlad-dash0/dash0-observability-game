@@ -70,8 +70,8 @@ const SPOT = {
   explain:
     'Three points carry an exemplar: one measurement recorded in that window, with its value, the <code>trace_id</code> and the ' +
     '<code>span_id</code> of the span it was recorded in. The value is one measurement, not the point\'s sum, and an exemplar can sit on an ' +
-    'ordinary point as well as on the spike: the point at 09:14:15 has one, and the spike point at 09:14:45 has none. The ' +
-    'trace id in the label of the last point does not link anything, and the scheduled job has no exemplar either.',
+    'ordinary point as well as on the spike: the point at 09:14:15 has one, and the spike point at 09:14:45 with count=9 has none. The ' +
+    'trace id in a series label does not link anything, and the scheduled job has no exemplar either.',
 };
 
 // Step 2: why the other points have none. `why` follows "Right." or "Not quite.".
