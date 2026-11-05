@@ -75,9 +75,9 @@ each function's JSDoc for the exact markup.
 | `option({attr, value, labelHtml, metaHtml, kind, pressed, state, disabled, hinted, name})`, `options({id, labelledBy, layout, itemsHtml})` | option | Selectable card and its group (list, grid, wrap). |
 | `feedback({id, bar})`, `setFeedback(el, tone, bodyHtml)`, `clearFeedback(el)` | feedback | The one feedback region; tones neutral, success, error (D7). |
 | `meter({id, label, value, max, cells, unit, previewCells, over})` | meter | Cells (20 by default) plus a text line that is the accessible value. |
-| `fold({value, titleHtml, metaHtml, bodyHtml, open, fresh})` | fold | Evidence card that folds to one line: a native `<details>` (caret, an h4 title that takes focus by script, optional meta chips) around its body. `open` starts it open, `fresh` marks the newest (`data-fresh`). Approved by the owner for #143 (2026-11-05); its look is signed off from that PR's screenshots (D5). |
+| `fold({value, titleHtml, metaHtml, bodyHtml, open, fresh})` | fold | Evidence card that folds to one line: a native `<details>` (caret, an h4 title that takes focus by script, optional meta chips) around its body. `open` starts it open, `fresh` marks the newest (`data-fresh`). Approved by the owner for #143 (2026-11-05); its look awaits the owner's D5 sign-off from that PR's screenshots. |
 | `field({id, label, kind, rows, value, readonly, noteHtml})`, `radio({...})`, `checkbox({...})` | field | Labelled text or code input; radio and checkbox rows (`id, name, value, labelHtml, checked, disabled`). |
-| `table({caption, head, rows, numeric})` | table | Data table in a scroll wrap; same look inside `prose`. |
+| `table({caption, head, rows, numeric})` | table | Data table in a scroll wrap; same look inside `prose`; a table in `prose` scrolls sideways in its own block. |
 | `stats([{label, value}])`, `dots({total, on, label, decorative, tone})` | stats | Label/value row; dots, spoken by `label` or `decorative` (aria-hidden beside a text line). |
 | `helpChips(id, rows)`, `stars(n, done)`, `sideColumn({id, titleHtml, counts, hints, ruleHtml})` | side | Helps row, five stars, the success, score and hints column. |
 

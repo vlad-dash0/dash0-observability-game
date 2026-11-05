@@ -106,8 +106,8 @@ links level text to these anchors. "(Act N)" is where it's taught.
 - **SLI**: a measured indicator of service quality (for example, the share of requests
   under 300 ms). (Act 7)
 - **SLO**: a target for an SLI over a window (99.9% over 30 days).
-- **Error budget**: the allowed failure under an SLO (0.1%). In the game's incident boards, the minutes of investigation you
-  can spend before the budget runs out.
+- **Error budget**: the allowed failure under an SLO (0.1%). In the game's incident boards, the minutes of
+  investigation you can spend before the budget runs out.
 - **Burn rate**: how fast the error budget is being used relative to plan.
 - **Synthetic check**: a scripted probe from outside the system.
 - **Alert fatigue**: ignoring alerts because too many are noise.

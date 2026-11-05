@@ -264,15 +264,19 @@ answer(s, st, id) → right|wrong|repeat|locked|unknown|closed
 Each incident boss sets its own rate: 5%/min (20 min) for who-is-talking, the-bill, the-3am-errors and silence; 6%/min (16.7 min) for errors-tripled; 4%/min (25 min) for checkout-is-slow. A scenario may use any rate.
 
 Hints, `lib/widgets/incident-help.mjs` (pure): `hintFor(s, st, tier)` → `{html, views, hypothesis}`. Tier 1 is
-the scenario's `hint` (authored HTML) or one generic rule that names no view; tier 2 names two clue views
-(from `clueIds`), the unopened ones first, and outlines the unopened (`views`); tier 3 names the right cause,
+the scenario's `hint` (authored HTML) or one generic rule that names no view; tier 2 names up to two clue views
+(from `clueIds`): the unopened ones while any remain, else the first two clues as already open (then the text
+reads "You have X and Y open."); it outlines only the unopened (`views`); tier 3 names the right cause,
 outlines it (`hypothesis`) and says how many clues unlock it only while it is locked. A hint never changes
 the state. Each tier costs one `ctx.hint()`.
 
 View `lib/widgets/incident-view.mjs`, all of it kit helpers (`lib/ui`, no class of its own), rendered inside a
 wide step as a kit split (board, side column). `boardView(s, st, ui)` is the one typed contract every template
-renders (`ui`: preview, fresh, hintViews, hintCause): the alert, the budget, the tiles, the Spent-on row, the
+renders (`ui`: preview, fresh, hintViews, hintCause, viewOrder, causeOrder): the alert, the budget, the tiles, the Spent-on row, the
 evidence log, the clue counter, the lock line and the causes. No `data-kind` reaches the markup.
+- **Shuffle:** `incidentOrder(ctx, s)` returns `{viewOrder, causeOrder}`; tiles and causes are shuffled once per
+  board through `ctx.shuffle`, as Choice does; `renderIncident` and `mountIncident` take the order; the focus hop
+  after a wrong pick follows the displayed order; the evidence log and Spent on keep open order.
 - **Alert:** a kit alert panel with a "Firing" eyebrow, the title as its h3 and the alert html.
 - **Budget:** the headline is minutes LEFT (`18 min left.`, `Budget spent.` once `budgetLeft` is 0) and counts
   down with each look; the kit meter under it reads `S of T min spent` with one cell per minute (rounded up,
