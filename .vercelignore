@@ -3,6 +3,7 @@
 # tools/serve.mjs reads this file and 404s the same paths locally; it supports only
 # `dir/`, `name` and `*.ext` (any depth) and `/dir/`, `/name`, `a/b` (anchored to the
 # root). Top-level tooling dirs are anchored so a future lib/test/ or api/tools/ deploys.
+/.claude/
 /.github/
 /docs/
 /test/
