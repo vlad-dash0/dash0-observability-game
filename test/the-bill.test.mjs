@@ -2,7 +2,7 @@
 // rate, answerAfterViews), the engine's validator and budget arithmetic on it, the numbers the three
 // clues share (one series count from the volume view to the label breakdown, one label, one deploy
 // time before the step), the reference path within budget (I7), one penalty per run (herring, exhaustion,
-// wrong hypothesis), and a focus walk that ends on Finish; the board is read in minutes (25 at 4%/min,
+// wrong hypothesis), and a focus walk that ends on Finish; the board is read in minutes (20 at 5%/min,
 // #143) through test/helpers/incident-board.mjs. The scenario is designed for this game
 // (docs/OUTLINE.md §4 Act 3 defines no boss; decided on #16); the structure mirrors The 3 a.m. errors
 // (test/the-3am-errors.test.mjs). The happy and sloppy runs are generated from the level's data
@@ -37,7 +37,7 @@ const ACT_3 = ['instruments', 'temporality', 'histograms', 'promql-basics', 'car
 test('the-bill: scenario pin: id, budget, burn rate, answerAfterViews, views with kinds and costs, hypotheses', () => {
   assert.equal(S.id, ID);
   assert.equal(S.alert.title, 'The bill');
-  assert.deepEqual(S.budget, { startPct: 100, burnPctPerMin: 4 });
+  assert.deepEqual(S.budget, { startPct: 100, burnPctPerMin: 5 });
   assert.equal(S.answerAfterViews, 2);
   assert.deepEqual(
     S.views.map((v) => `${v.id}|${v.kind}|${v.costMin}`),
@@ -53,13 +53,15 @@ test('the-bill: scenario pin: id, budget, burn rate, answerAfterViews, views wit
   );
 });
 
-test('the-bill: valid; 25 minutes; clues plus neutrals cost 19 and leave 6, so only the herrings can exhaust the budget', () => {
+test('the-bill: valid; 20 minutes; clues plus neutrals cost 19 min and leave 5% (1 min), so any one herring exhausts the budget', () => {
   assert.deepEqual(validateScenario(S), []);
-  assert.equal(S.budget.startPct / S.budget.burnPctPerMin, 25);
+  assert.equal(S.budget.startPct / S.budget.burnPctPerMin, 20);
   assert.equal(cost('clue'), 12);
   assert.equal(cost('neutral'), 7);
-  assert.equal(25 - (cost('clue') + cost('neutral')), 6);
-  assert.equal(cost('herring'), 7, 'both herrings on top spend more than the 6 minutes left');
+  assert.equal(S.budget.startPct - (cost('clue') + cost('neutral')) * S.budget.burnPctPerMin, 5);
+  for (const h of S.views.filter((v) => v.kind === 'herring')) {
+    assert.equal(h.costMin > 1, true, `${h.id} alone spends more than the 1 min that is left`);
+  }
   assert.equal(S.views.every((v) => v.kind === 'clue' || v.costMin <= 4), true, 'no view is a long wait');
 });
 
@@ -242,8 +244,8 @@ const finish = () => {
 test('the-bill: the first screen shows the alert, a full budget, eight views, locked hypotheses, a disabled Next and no Finish', () => {
   start();
   assert.equal(alertTitle(ID), 'The bill');
-  assert.equal(budget(), '25 min left. 0 of 25 min spent');
-  assert.equal(board(ID).cells.total, 25);
+  assert.equal(budget(), '20 min left. 0 of 20 min spent');
+  assert.equal(board(ID).cells.total, 20);
   assert.equal(qa('[data-view]').length, 8);
   assert.equal(locked(), 'true,true,true,true');
   assert.equal(q('#tbl-next').disabled, true);
@@ -271,7 +273,7 @@ test('the-bill: neutral and herring views never unlock the answers; only clue vi
 
 // ---- reference path (I7) -------------------------------------------------------------
 
-test('the-bill: the reference path (volume, labels, deploy, then user-id-label) solves with 52% of the budget (13 min) left and no penalty', () => {
+test('the-bill: the reference path (volume, labels, deploy, then user-id-label) solves with 40% of the budget (8 min) left and no penalty', () => {
   let st = newIncident(S);
   let mistakes = 0;
   for (const id of ['volume-by-metric', 'label-breakdown', 'deploys']) {
@@ -279,20 +281,20 @@ test('the-bill: the reference path (volume, labels, deploy, then user-id-label) 
     st = r.state;
     mistakes += Number(r.herring) + Number(r.exhaustedNow);
   }
-  assert.equal(budgetLeft(S, st), 52);
+  assert.equal(budgetLeft(S, st), 40);
   assert.equal(canAnswer(S, st), true);
   assert.equal(answer(S, st, 'user-id-label').outcome, 'right');
   assert.equal(mistakes, 0);
 });
 
-test('the-bill: the shortest path is two clues (volume, labels); it solves with 16 of 25 min left and no penalty', () => {
+test('the-bill: the shortest path is two clues (volume, labels); it solves with 11 of 20 min left and no penalty', () => {
   const { finished, slips } = start();
   open('volume-by-metric');
   open('label-breakdown');
   assert.equal(q('#tbl-next').disabled, true, 'Next waits for the right answer');
   guess('user-id-label');
   assert.equal(slips.mistakes, 0);
-  assert.equal(budget(), '16 min left. 9 of 25 min spent');
+  assert.equal(budget(), '11 min left. 9 of 20 min spent');
   finish();
   assert.equal(finished.length, 1);
   assert.equal(finished[0].stars, 5);
@@ -348,23 +350,20 @@ for (const id of ['traffic-growth', 'new-service-metrics', 'export-interval-chan
   });
 }
 
-test('the-bill: every clue and neutral leaves 6 min and no mistake; one herring leaves 3; the second spends the rest, a herring mistake and an exhaustion mistake in one open', () => {
+test('the-bill: every clue and neutral leaves 1 min and no mistake; a herring then spends the rest, a herring mistake and an exhaustion mistake in one open', () => {
   const { slips, finished } = start();
   for (const id of ['volume-by-metric', 'label-breakdown', 'deploys', 'request-rate', 'export-interval', 'collector-health']) open(id);
-  assert.equal(slips.mistakes, 0, '19 min in: 6 left, nothing spent yet');
-  assert.equal(budget(), '6 min left. 19 of 25 min spent');
+  assert.equal(slips.mistakes, 0, '19 min in: 1 left, nothing spent yet');
+  assert.equal(budget(), '1 min left. 19 of 20 min spent');
   open('new-service');
-  assert.equal(slips.mistakes, 1, 'one herring alone does not exhaust');
-  assert.equal(budget(), '3 min left. 22 of 25 min spent');
-  open('biggest-metric');
-  assert.equal(slips.mistakes, 3);
+  assert.equal(slips.mistakes, 2, 'one herring (3 min) alone runs the 1 min out');
   assert.equal(board(ID).left, 'Budget spent.');
-  assert.equal(board(ID).cells.over, 25);
+  assert.deepEqual(board(ID).cells, { total: 20, spent: 0, over: 20, preview: 0, left: 0 });
   assert.deepEqual([status().tone, status().text.includes('was misleading, and the error budget is spent')], ['error', true]);
   assert.equal(causeState(ID, 'user-id-label'), null, 'still answerable at 0');
   guess('user-id-label');
   finish();
-  assert.equal(finished[0].stars, 2, 'three penalties leave 2 stars (the star rule: 3 or 4 penalties)');
+  assert.equal(finished[0].stars, 3, 'two penalties leave 3 stars (the star rule: 2 penalties)');
 });
 
 test('the-bill: opening a view again costs neither time nor a mistake, so repeat opens cannot exhaust the budget', () => {
@@ -372,7 +371,7 @@ test('the-bill: opening a view again costs neither time nor a mistake, so repeat
   for (const id of ['volume-by-metric', 'label-breakdown', 'deploys', 'request-rate', 'export-interval', 'collector-health']) open(id);
   for (const id of ['volume-by-metric', 'deploys', 'collector-health']) open(id);
   assert.equal(slips.mistakes, 0);
-  assert.equal(budget(), '6 min left. 19 of 25 min spent');
+  assert.equal(budget(), '1 min left. 19 of 20 min spent');
 });
 
 // ---- the closing step: the fix -------------------------------------------------------
