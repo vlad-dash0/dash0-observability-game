@@ -227,7 +227,7 @@ const PIN = {
           server: ['SERVER spans', 'express route'],
           redis: ['Redis'],
           client: ['fetch', 'CLIENT spans'],
-          loyalty: ['applyLoyaltyDiscount()'],
+          loyalty: ['INTERNAL spans', 'applyLoyaltyDiscount()'],
           coupon: ['app.coupon.code'],
           'item-count': ['app.cart.item_count'],
         },

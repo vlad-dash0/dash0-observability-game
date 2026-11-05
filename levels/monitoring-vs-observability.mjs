@@ -22,7 +22,7 @@ const SORT = {
     },
     {
       id: 'ios',
-      label: 'Why are only iOS 5.2 checkouts from Germany slow since 14:05?',
+      label: 'Why are only iOS 5.2 checkouts from Germany slow since 14:05 UTC?',
       bucket: 'new',
       why: 'Nobody builds a dashboard for iOS 5.2 in Germany. You answer it by slicing telemetry by app version, country and time after the fact.',
     },
@@ -34,7 +34,7 @@ const SORT = {
     },
     {
       id: 'cust',
-      label: 'Which customers hit a payment timeout?',
+      label: 'Which customers hit an API timeout?',
       bucket: 'new',
       why: 'No chart lists customers one by one. You need telemetry that still carries the customer ID, so you can filter by it when the question comes up.',
     },
