@@ -90,6 +90,7 @@ export default {
   icon: '\u{1F500}',
   rewardTitle: 'Map maker',
   mechanics: ['build'],
+  widgets: ['build', 'choice'],
   cards: ['span-kind-edges'],
   lights: ['payments'],
   scoring: { parMs: null },

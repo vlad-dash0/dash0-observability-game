@@ -150,6 +150,7 @@ export default {
   icon: '\u{1F6A8}',
   rewardTitle: 'On-call hero',
   mechanics: ['incident'],
+  widgets: ['incident'],
   cards: [],
   lights: ['inventory'],
   scored: true,

@@ -112,6 +112,7 @@ export default {
   icon: '\u{1F517}',
   rewardTitle: 'Header hunter',
   mechanics: ['build'],
+  widgets: ['choice', 'build'],
   cards: ['broken-propagation'],
   lights: ['orders'],
   scoring: { parMs: null },

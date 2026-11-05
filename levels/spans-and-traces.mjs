@@ -93,6 +93,7 @@ export default {
   icon: '\u{1F9F5}',
   rewardTitle: 'Trace reader',
   mechanics: ['build'],
+  widgets: ['choice', 'build'],
   cards: ['no-trace-object'],
   lights: ['storefront', 'api-gateway'],
   scoring: { parMs: null },
