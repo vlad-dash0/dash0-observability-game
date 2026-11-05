@@ -14,7 +14,7 @@ const SORT = {
   items: [
     {
       id: 'server',
-      label: 'The HTTP server spans, one per route',
+      label: 'The HTTP server spans, one per <code>express</code> route',
       bucket: 'auto',
       why: 'The HTTP server instrumentation starts a span for every request that reaches an Express route, with no code of yours.',
     },
@@ -38,7 +38,7 @@ const SORT = {
     },
     {
       id: 'client',
-      label: 'Outgoing HTTP client spans',
+      label: 'Outgoing <code>fetch</code> client spans',
       bucket: 'auto',
       why: 'The HTTP client instrumentation starts a CLIENT span for each outgoing call, with no code of yours.',
     },

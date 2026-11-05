@@ -17,7 +17,7 @@ const SORT = {
   items: [
     {
       id: 'variant',
-      label: '<code>experiment.variant=B</code>',
+      label: '<code>experiment.variant=checkout-redesign-B</code>',
       bucket: 'ok',
       why: 'An experiment arm is no secret, and every service on the path can use it, for example to tag its own spans with the variant.',
     },

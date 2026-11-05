@@ -104,13 +104,15 @@ const PIN = {
         sort: 'status-sort',
         buckets: ['ok', 'wrong'],
         // a storefront CLIENT 404 ERROR ok; b catalog SERVER 404 ERROR wrong (SERVER 4xx
-        // stays Unset); c checkout SERVER 500 UNSET wrong; d inventory SERVER 200 UNSET ok.
-        items: { a: 'ok', b: 'wrong', c: 'wrong', d: 'ok' },
+        // stays Unset); c checkout SERVER 500 UNSET wrong; d inventory SERVER 200 UNSET ok;
+        // e storefront CLIENT 500 ERROR ok (the caller's side of c).
+        items: { a: 'ok', b: 'wrong', c: 'wrong', d: 'ok', e: 'ok' },
         says: {
           a: ['storefront CLIENT', 'GET /products/999', '404', 'status Error'],
           b: ['catalog SERVER', '404', 'status Error'],
           c: ['checkout SERVER', '500', 'status Unset'],
           d: ['inventory SERVER', '200', 'status Unset'],
+          e: ['storefront CLIENT', 'POST /checkout', '500', 'status Error'],
         },
       },
       {
@@ -130,7 +132,7 @@ const PIN = {
         buckets: ['ok', 'never'],
         items: { variant: 'ok', tier: 'ok', email: 'never', token: 'never', last4: 'never' },
         says: {
-          variant: ['experiment.variant=B'],
+          variant: ['experiment.variant=checkout-redesign-B'],
           tier: ['tenant.tier=gold'],
           email: ['user.email'],
           token: ['session.token'],
@@ -222,9 +224,9 @@ const PIN = {
         buckets: ['auto', 'manual'],
         items: { server: 'auto', redis: 'auto', client: 'auto', loyalty: 'manual', coupon: 'manual', 'item-count': 'manual' },
         says: {
-          server: ['server spans'],
+          server: ['server spans', 'express route'],
           redis: ['Redis'],
-          client: ['client spans'],
+          client: ['fetch', 'client spans'],
           loyalty: ['applyLoyaltyDiscount()'],
           coupon: ['app.coupon.code'],
           'item-count': ['app.cart.item_count'],
