@@ -139,6 +139,8 @@ the placement. The ladder is `[1, 2?, 3]`; the button reads "Hint `done+1` of `t
 side line "For X: `done` of `tiers.length` used", where `done` counts the rule once it was read for
 any item (so a 2-bucket board after the rule reads "Hint 2 of 2"). The old "Only X is left to
 try" tier 2 line is gone: with fewer than 3 untried buckets the view skips tier 2.
+An item's total can therefore shrink mid-ladder ("Hint 2 of 3" becomes "Hint 2 of 2") when a wrong
+try leaves fewer than three untried buckets and tier 2 was not yet taken.
 Each click is one `ctx.hint()` and one hint on the score card; nothing happens after the last item.
 Ladder: 0.1 and 0.2 hints on (both sorts), 0.3, 1.1 and 2.3 hints on, 2.5, 2.7, 3.1, 4.1 and 5.6
 hints off.
