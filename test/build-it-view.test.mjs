@@ -815,7 +815,8 @@ test('every focus target could take focus', () => {
 test('styles: tokens only; services and traces from tokens.css; the selected bar outlined; ERROR a stroke; no focus ring on the success heading', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const strip = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
-  const css = strip(readFileSync(join(root, 'styles', 'base.css'), 'utf8'));
+  // The .wf-* rules live in widgets.css (#158); the build-* and help-* ones still in base.css.
+  const css = strip(['base.css', 'widgets.css'].map((f) => readFileSync(join(root, 'styles', f), 'utf8')).join('\n'));
   const tokens = strip(readFileSync(join(root, 'styles', 'tokens.css'), 'utf8'));
   const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, sel, body]) => ({ sels: sel.split(',').map((s) => s.trim()), body: body.replace(/\s+/g, ' ') }));
   const bodyOf = (sel) => rules.filter((r) => r.sels.includes(sel)).map((r) => r.body).join(';');

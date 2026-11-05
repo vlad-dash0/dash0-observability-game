@@ -1,0 +1,321 @@
+/* The UI kit (#158, docs/DESIGN-SYSTEM.md): the only stylesheet for ui- classes, and every
+   selector here names one (test/design-system.test.mjs T4). Markup comes from lib/ui/*.mjs.
+   Colours only from --color-* tokens; sizes from the scale tokens where one fits. Static
+   variants are modifier classes (ui-btn--ghost); runtime states are attributes (aria-pressed,
+   disabled, hidden, data-state, data-tone). Tone colours go on borders, icons, markers and
+   dots, never on text (T14); no shadows or glows on controls, only inset rings. */
+
+/* ---------- Step layout (layout.mjs) ---------- */
+/* A step is the `level` container: a split inside it gets its side column from 960px of the
+   step's own width (a literal: custom properties do not work in container conditions). */
+.ui-step {
+  container: level / inline-size;
+  inline-size: 100%; max-inline-size: var(--layout-narrow); margin-inline: auto;
+  display: flex; flex-direction: column; gap: var(--space-5);
+}
+.ui-step--wide { max-inline-size: var(--layout-wide); }
+.ui-split { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+.ui-split-main { min-width: 0; display: grid; gap: var(--space-4); align-content: start; }
+.ui-split-side { min-width: 0; }
+@container level (min-width: 960px) {
+  .ui-split { grid-template-columns: minmax(0, 1fr) var(--side-width); column-gap: var(--space-6); align-items: start; }
+  .ui-split-side { position: sticky; top: 0; }
+}
+.ui-actions {
+  inline-size: 100%; max-inline-size: var(--layout-narrow); margin-inline: auto;
+  display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-3);
+}
+.ui-actions--wide { max-inline-size: var(--layout-wide); }
+
+/* ---------- Lesson glow card (text.mjs) ---------- */
+/* Borderless, an amber glow top left and a dot top right over the surface; the eyebrow is
+   decoration (empty alt text), so screen readers read the lesson only. */
+.ui-lesson {
+  position: relative; overflow: hidden; border-radius: 16px; padding: 18px 18px 20px;
+  font-size: var(--text-lesson); line-height: 1.6; font-weight: var(--weight-regular); color: var(--color-lesson);
+  background:
+    radial-gradient(circle at 1.5px 1.5px, var(--color-lesson-dot) 1px, transparent 1.5px) right 14px top 14px / 14px 14px no-repeat,
+    radial-gradient(120% 110% at 0% 0%, var(--color-lesson-glow), transparent 62%),
+    var(--color-surface);
+}
+.ui-lesson::before {
+  content: "Lesson"; content: "Lesson" / ""; display: block; margin-bottom: 10px;
+  font: var(--weight-regular) 11px/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--color-lesson-eyebrow);
+}
+.ui-lesson p, .ui-lesson ul, .ui-lesson ol { max-inline-size: var(--measure); }
+.ui-lesson p + p, .ui-lesson p + ul, .ui-lesson p + ol { margin-top: var(--space-3); }
+.ui-lesson ul, .ui-lesson ol { padding-left: 1.4em; }
+.ui-lesson code {
+  font-family: var(--font-mono); font-size: .8em; border: 0; border-radius: var(--radius-xs); padding: 2px 6px;
+  background: var(--color-code-bg); color: var(--color-lesson-code);
+}
+@media (max-width: 520px) {
+  .ui-lesson { font-size: 16px; }
+}
+
+/* ---------- Question, step heading, eyebrow, note, prose, code (text.mjs) ---------- */
+/* D4: centred in a narrow step, left-aligned in a wide one. */
+.ui-question { font-size: var(--text-q); font-weight: var(--weight-semibold); line-height: 1.35; text-align: center; }
+.ui-step--wide .ui-question { text-align: left; }
+.ui-eyebrow {
+  font-family: var(--font-mono); font-size: 11px; font-weight: var(--weight-semibold); letter-spacing: .08em;
+  text-transform: uppercase; color: var(--color-text-muted);
+}
+.ui-step-head { display: flex; flex-wrap: wrap; gap: var(--space-1) 14px; align-items: baseline; }
+.ui-step-title { font-size: var(--text-base); font-weight: var(--weight-semibold); }
+.ui-step-note { font-size: 13.5px; color: var(--color-text-muted); }
+.ui-note { font-size: 13.5px; color: var(--color-text-muted); overflow-wrap: anywhere; }
+.ui-prose { display: grid; gap: var(--space-3); font-size: var(--text-md); line-height: 1.55; min-width: 0; }
+.ui-prose p, .ui-prose li { max-inline-size: var(--measure); }
+.ui-prose ul, .ui-prose ol { padding-left: 1.4em; display: grid; gap: 6px; }
+/* A deletion keeps text colour; the strike carries the error tone. */
+.ui-prose del { text-decoration-color: var(--color-error); text-decoration-thickness: 2px; }
+.ui-prose pre, .ui-code { font-size: 12px; line-height: 1.6; overflow-x: auto; }
+
+/* ---------- Panel (panel.mjs) ---------- */
+.ui-panel {
+  background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius);
+  overflow: hidden; min-width: 0;
+}
+.ui-panel-head {
+  display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: center;
+  padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border);
+}
+.ui-panel-sec { display: grid; gap: var(--space-3); padding: var(--space-4); min-width: 0; }
+.ui-panel-sec + .ui-panel-sec { border-top: 1px solid var(--color-border); }
+.ui-panel--inset { background: var(--color-bg); border-radius: var(--radius-sm); }
+.ui-panel--alert { border-color: color-mix(in srgb, var(--color-alert) 55%, var(--color-border)); }
+/* Dashed means one thing: a drop zone. */
+.ui-panel--drop { border-style: dashed; }
+@media (max-width: 520px) {
+  .ui-panel-sec { padding: 14px var(--space-3); }
+}
+
+/* ---------- Chip (chip.mjs, side.mjs) ---------- */
+.ui-chip {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.6; font-variant-numeric: tabular-nums;
+  padding: 1px var(--space-2); border-radius: var(--radius-pill); border: 1px solid var(--color-border);
+  color: var(--color-text-muted); white-space: nowrap;
+}
+.ui-chip--dashed { border-style: dashed; }
+.ui-chip-dot { inline-size: 7px; block-size: 7px; border-radius: 50%; flex: none; background: var(--color-text-muted); }
+.ui-chip-swatch { inline-size: 8px; block-size: 8px; border-radius: 2px; flex: none; background: var(--color-text-muted); }
+.ui-chip-swatch[data-svc="0"] { background: var(--color-svc-0); }
+.ui-chip-swatch[data-svc="1"] { background: var(--color-svc-1); }
+.ui-chip-swatch[data-svc="2"] { background: var(--color-svc-2); }
+.ui-chip-swatch[data-svc="3"] { background: var(--color-svc-3); }
+.ui-chip-swatch[data-svc="4"] { background: var(--color-svc-4); }
+.ui-chip-swatch[data-svc="5"] { background: var(--color-svc-5); }
+.ui-chip[data-tone="success"] { border-color: color-mix(in srgb, var(--color-success) 50%, transparent); color: var(--color-text); }
+.ui-chip[data-tone="success"] .ui-chip-dot { background: var(--color-success); }
+.ui-chip[data-tone="error"] { border-color: color-mix(in srgb, var(--color-error) 50%, transparent); color: var(--color-text); }
+.ui-chip[data-tone="error"] .ui-chip-dot { background: var(--color-error); }
+.ui-chip[data-tone="hint"] { border-color: color-mix(in srgb, var(--color-hint) 50%, transparent); color: var(--color-text); }
+.ui-chip[data-tone="hint"] .ui-chip-dot { background: var(--color-hint); }
+.ui-chip[data-tone="attention"] { border-color: color-mix(in srgb, var(--color-parent) 50%, transparent); color: var(--color-text); }
+.ui-chip[data-tone="attention"] .ui-chip-dot { background: var(--color-parent); }
+/* A help that is off is struck through, in words as well ("off"). */
+.ui-chip[data-on="false"] { text-decoration: line-through; }
+
+/* ---------- Buttons (button.mjs) ---------- */
+/* D2: the primary is a red pill, 14px/600, no glow, never full width. */
+.ui-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  font: var(--weight-semibold) var(--text-md)/1.3 var(--font-sans); padding: 9px 20px;
+  border-radius: var(--radius-pill); border: 1px solid transparent; background: transparent; color: var(--color-text);
+  cursor: pointer; transition: background-color var(--dur-fast), border-color var(--dur-fast);
+}
+.ui-btn--primary { background: var(--color-primary); color: var(--color-primary-contrast); }
+.ui-btn--ghost { border-color: var(--color-border); }
+.ui-btn--hint { color: var(--color-hint); border-color: color-mix(in srgb, var(--color-hint) 55%, transparent); }
+.ui-btn--icon {
+  inline-size: 36px; block-size: 36px; padding: 0; flex: none; font-size: 18px;
+  border-radius: var(--radius-sm); border-color: var(--color-border); background: var(--color-surface-2);
+}
+
+/* ---------- Option cards (option.mjs) ---------- */
+.ui-options { display: flex; gap: 10px; min-width: 0; }
+.ui-options--list { flex-direction: column; }
+.ui-options--grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.ui-options--wrap { flex-wrap: wrap; gap: var(--space-2); }
+/* The right padding reserves the marker's room, so marking never rewraps the text; a state
+   never changes the border width, so nothing moves. */
+.ui-option {
+  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px 10px;
+  max-width: 100%; text-align: left; font: inherit; font-size: var(--text-md); font-weight: var(--weight-regular);
+  color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius); padding: 14px 40px 14px 15px; cursor: pointer; overflow-wrap: anywhere;
+  transition: border-color var(--dur-fast), background-color var(--dur-fast);
+}
+.ui-option-label { min-width: 0; }
+.ui-option-meta {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  font-size: var(--text-sm); font-weight: var(--weight-regular); color: var(--color-text-muted);
+}
+.ui-option--choice { font-size: var(--text-base); font-weight: var(--weight-semibold); }
+.ui-option--tile {
+  grid-template-columns: minmax(0, 1fr); align-content: space-between; min-height: 92px;
+  padding: var(--space-3) var(--space-3) 10px; border-radius: var(--radius-sm); background: var(--color-bg);
+  font-weight: var(--weight-semibold);
+}
+.ui-option--hypothesis { padding: var(--space-3) 40px var(--space-3) 14px; border-radius: var(--radius-sm); background: var(--color-bg); }
+.ui-option--toggle { padding: 9px 13px; border-radius: var(--radius-sm); font-weight: var(--weight-semibold); }
+.ui-option--line { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 13px; }
+.ui-option--radio { grid-template-columns: auto minmax(0, 1fr) auto; padding: var(--space-3) 14px; border-radius: var(--radius-sm); }
+.ui-option[aria-pressed="true"] { border-color: var(--color-text); box-shadow: inset 0 0 0 1px var(--color-text); background: var(--color-surface-2); }
+.ui-option[data-state="correct"] { border-color: var(--color-success); box-shadow: inset 0 0 0 1px var(--color-success); }
+.ui-option[data-state="wrong"] { border-color: color-mix(in srgb, var(--color-error) 55%, transparent); color: var(--color-text-muted); }
+.ui-option[data-state="wrong"] .ui-option-label { text-decoration: line-through; }
+/* Non-colour cue (WCAG 1.4.1): a check or cross marker, announced as "correct" / "wrong".
+   Plain content first: browsers without alt-text support drop the second line. */
+.ui-option[data-state="correct"]::after, .ui-option[data-state="wrong"]::after {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  font-weight: var(--weight-bold); font-size: 17px; line-height: 1;
+}
+.ui-option[data-state="correct"]::after { content: "\2713"; content: "\2713" / "correct"; color: var(--color-success); }
+.ui-option[data-state="wrong"]::after { content: "\2717"; content: "\2717" / "wrong"; color: var(--color-error); }
+.ui-option[data-state="locked"] { border-style: dashed; background: transparent; color: var(--color-text-muted); cursor: not-allowed; }
+.ui-option[data-state="opened"] { background: var(--color-surface-2); }
+.ui-option[data-state="opened"] .ui-option-label { color: var(--color-text-muted); }
+.ui-option[data-hinted] { outline: 2px solid var(--color-hint); outline-offset: 2px; }
+.ui-option:disabled { cursor: default; }
+
+/* ---------- Feedback (feedback.mjs) ---------- */
+/* One live region, three tones: the icon and its alt text say the tone, the border echoes it. */
+.ui-feedback {
+  display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  color: var(--color-text); font-size: var(--text-md); line-height: 1.5; overflow-wrap: anywhere;
+}
+.ui-feedback[hidden] { display: none; }
+.ui-feedback:focus { outline: none; }
+.ui-feedback--bar { padding: 6px var(--space-3); font-size: 13.5px; }
+.ui-feedback-ico { flex: none; inline-size: 18px; text-align: center; font-weight: var(--weight-bold); color: var(--color-text-muted); }
+.ui-feedback-ico::before { content: "i"; content: "i" / "Note"; }
+.ui-feedback-text { min-width: 0; }
+.ui-feedback[data-tone="success"] { border-color: color-mix(in srgb, var(--color-success) 50%, transparent); }
+.ui-feedback[data-tone="success"] .ui-feedback-ico { color: var(--color-success); }
+.ui-feedback[data-tone="success"] .ui-feedback-ico::before { content: "\2713"; content: "\2713" / "Correct"; }
+.ui-feedback[data-tone="error"] { border-color: color-mix(in srgb, var(--color-error) 50%, transparent); }
+.ui-feedback[data-tone="error"] .ui-feedback-ico { color: var(--color-error); }
+.ui-feedback[data-tone="error"] .ui-feedback-ico::before { content: "\2717"; content: "\2717" / "Wrong"; }
+
+/* ---------- Meter (meter.mjs) ---------- */
+.ui-meter { display: grid; gap: var(--space-2); }
+.ui-meter-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--space-1) var(--space-4); }
+.ui-meter-label {
+  font-family: var(--font-mono); font-size: 11px; font-weight: var(--weight-semibold); letter-spacing: .08em;
+  text-transform: uppercase; color: var(--color-text-muted);
+}
+.ui-meter-value { font-family: var(--font-mono); font-size: 13px; font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+.ui-meter-cells { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; }
+.ui-meter-cells i { block-size: 14px; border-radius: 3px; background: var(--color-meter-left); }
+.ui-meter-cells i[data-cell="spent"] { background: color-mix(in srgb, var(--color-border) 60%, transparent); }
+.ui-meter-cells i[data-cell="preview"] { background: transparent; box-shadow: inset 0 0 0 1px var(--color-parent); }
+.ui-meter-cells i[data-cell="over"] { background: transparent; box-shadow: inset 0 0 0 1px var(--color-error); }
+@media (max-width: 520px) {
+  .ui-meter-cells { gap: 2px; }
+}
+
+/* ---------- Form fields (field.mjs) ---------- */
+.ui-field { display: grid; gap: 6px; }
+.ui-field-label { font-size: var(--text-md); font-weight: var(--weight-semibold); }
+.ui-input {
+  display: block; inline-size: 100%; font: inherit; font-size: var(--text-base); color: var(--color-text);
+  background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px 10px;
+}
+.ui-input--code {
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.6; background: var(--color-code-bg);
+  padding: var(--space-3) 14px; resize: vertical;
+}
+.ui-input[readonly] { color: var(--color-text-muted); }
+.ui-check { display: flex; gap: 10px; align-items: center; cursor: pointer; }
+.ui-check-label { min-width: 0; overflow-wrap: anywhere; }
+.ui-check-input, .ui-option-input {
+  appearance: none; inline-size: 16px; block-size: 16px; margin: 0; flex: none; cursor: pointer;
+  border: 1px solid var(--color-text-muted); border-radius: 50%; background: var(--color-surface);
+}
+.ui-check-input[type="checkbox"] { border-radius: 4px; }
+.ui-check-input:checked, .ui-option-input:checked { border-color: var(--color-text); background: var(--color-text); box-shadow: inset 0 0 0 3px var(--color-surface); }
+
+/* ---------- Table (table.mjs; the same look inside prose) ---------- */
+.ui-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: 8px; }
+.ui-table, .ui-prose table { border-collapse: collapse; inline-size: 100%; font-size: var(--text-sm); }
+.ui-table caption, .ui-prose caption { caption-side: top; text-align: left; font-size: 11px; color: var(--color-text-muted); padding: 7px 10px 0; }
+.ui-table th, .ui-prose th {
+  text-align: left; font-size: 11px; font-weight: var(--weight-semibold); color: var(--color-text-muted);
+  padding: 6px 10px; border-bottom: 1px solid var(--color-border);
+}
+.ui-table td, .ui-prose td {
+  padding: 5px 10px; border-top: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
+  font-family: var(--font-mono); font-size: 11.5px; vertical-align: top;
+}
+.ui-table [data-num] { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------- Stats and dots (stats.mjs) ---------- */
+.ui-stats { display: flex; flex-wrap: wrap; gap: var(--space-1) 22px; }
+.ui-stats div { display: grid; gap: 1px; }
+.ui-stats dt { font-size: 11px; color: var(--color-text-muted); }
+.ui-stats dd { margin: 0; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ui-dots { display: inline-flex; gap: 5px; align-items: center; vertical-align: middle; }
+.ui-dots i { inline-size: 9px; block-size: 9px; border-radius: 50%; border: 1px solid var(--color-text-muted); }
+.ui-dots i[data-on="true"] { background: var(--color-success); border-color: var(--color-success); }
+
+/* ---------- Side column (side.mjs) ---------- */
+/* The helps chips, then the column: the success card (the globe's night in both themes,
+   hidden until success; its heading takes focus by script and shows no ring), the score card
+   and the hint tools. Stars are outlines until success, then the earned ones fill. */
+.ui-help-chips { display: flex; flex-wrap: wrap; gap: 6px var(--space-2); align-items: center; font-size: 12px; color: var(--color-text-muted); }
+.ui-help-chips-title { white-space: nowrap; }
+.ui-side {
+  display: grid; gap: 10px; align-content: start; min-width: 0; padding: 14px var(--space-4);
+  background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius);
+}
+.ui-win { display: grid; overflow: hidden; margin-bottom: var(--space-1); border-radius: var(--radius); background: var(--color-win-bg); color: var(--color-win-text); }
+.ui-win[hidden] { display: none; }
+.ui-win-swirl {
+  aspect-ratio: 1 / 1; inline-size: 100%; max-inline-size: 200px; justify-self: center; color: var(--color-swirl-dot);
+  background: radial-gradient(circle at 50% 52%, color-mix(in srgb, var(--color-swirl-dot) 30%, transparent) 0%, color-mix(in srgb, var(--color-swirl-dot) 12%, transparent) 32%, transparent 62%);
+}
+.ui-win-swirl canvas, .ui-win-swirl svg { display: block; inline-size: 100%; block-size: 100%; }
+.ui-win-text { display: grid; padding: 0 14px 14px; }
+.ui-win-title { font-size: 18px; font-weight: var(--weight-semibold); }
+.ui-win-title:focus { outline: none; }
+.ui-win-stars { margin-top: 10px; font-size: var(--text-md); color: var(--color-win-muted); }
+.ui-win-closing { margin-top: 14px; font-size: var(--text-md); color: var(--color-win-muted); }
+.ui-win-closing:empty { display: none; }
+.ui-win code { color: var(--color-win-text); background: color-mix(in srgb, var(--color-win-text) 10%, transparent); border-color: color-mix(in srgb, var(--color-win-text) 25%, transparent); }
+.ui-score { display: grid; gap: 6px; padding: 0 0 var(--space-3); border-bottom: 1px solid var(--color-border); }
+.ui-score-counts { display: flex; flex-wrap: wrap; gap: 18px; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ui-score-count b { display: block; font-size: 16px; font-weight: var(--weight-semibold); }
+.ui-score-stars { display: flex; gap: 3px; }
+.ui-star svg { display: block; inline-size: 13px; block-size: 13px; }
+.ui-star path { fill: none; stroke: var(--color-parent); stroke-width: 1.1; stroke-linejoin: round; }
+.ui-star[data-star="possible"] path { stroke: color-mix(in srgb, var(--color-parent) 55%, transparent); }
+.ui-star[data-star="lost"] path { stroke: var(--color-border); stroke-dasharray: 1.6 1.4; }
+.ui-star[data-star="earned"] path { fill: var(--color-parent); }
+.ui-score-rule { font-size: 11.5px; color: var(--color-text-muted); }
+.ui-hints { display: grid; gap: 10px; }
+.ui-hints-head {
+  font-family: var(--font-mono); font-size: var(--text-xs); font-weight: var(--weight-semibold); letter-spacing: .08em;
+  text-transform: uppercase; color: var(--color-text-muted);
+}
+.ui-hints-row { display: flex; flex-wrap: wrap; gap: var(--space-2) 10px; align-items: center; }
+.ui-hints-cost { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); }
+.ui-hints-tier { font-size: var(--text-sm); color: var(--color-text-muted); }
+.ui-hints-tier b { color: var(--color-text); font-weight: var(--weight-semibold); }
+.ui-hints-text {
+  display: grid; gap: 6px; padding: 2px 0 2px var(--space-3); border-left: 2px solid var(--color-hint);
+  font-size: var(--text-md); overflow-wrap: anywhere;
+}
+.ui-hints-text:empty { display: none; }
+.ui-hints-text:focus { outline: none; }
+
+/* ---------- One rule each: hover, focus, disabled ---------- */
+.ui-btn--ghost:hover:not(:disabled), .ui-option:hover:not(:disabled, [aria-disabled="true"]) { border-color: var(--color-text-muted); }
+.ui-btn:focus-visible, .ui-option:focus-visible, .ui-input:focus-visible, .ui-check-input:focus-visible, .ui-option-input:focus-visible {
+  outline: 2px solid var(--color-focus); outline-offset: 2px;
+}
+.ui-btn:disabled, .ui-input:disabled, .ui-check-input:disabled, .ui-option-input:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }

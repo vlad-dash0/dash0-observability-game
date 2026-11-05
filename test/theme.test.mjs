@@ -1,128 +1,15 @@
 // Theme tokens, base styles and the theme helper. Spec: docs/FOUNDATION.md §6 F2.
-// The CSS is read as text: a tiny block parser, var() and color-mix() resolution and
-// WCAG contrast are done here in plain JS (no CSS engine dependency).
+// The CSS is read as text: the block parser, var() and color-mix() resolution and WCAG
+// contrast live in test/helpers/css.mjs (plain JS, no CSS engine dependency).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { readTheme, resolveTheme, writeTheme } from '../lib/theme.mjs';
-
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
-const stripComments = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
-
-/** Flat list of {selector, body} for every innermost rule (at-rule wrappers unwrapped). */
-function rules(css) {
-  const out = [];
-  const walk = (src) => {
-    let i = 0;
-    while (i < src.length) {
-      const open = src.indexOf('{', i);
-      if (open === -1) break;
-      let depth = 1;
-      let j = open + 1;
-      for (; j < src.length && depth; j++) {
-        if (src[j] === '{') depth++;
-        else if (src[j] === '}') depth--;
-      }
-      const selector = src.slice(i, open).replace(/^[\s\S]*;/, '').trim();
-      const body = src.slice(open + 1, j - 1);
-      if (body.includes('{')) walk(body);
-      else out.push({ selector, body });
-      i = j;
-    }
-  };
-  walk(stripComments(css));
-  return out;
-}
-
-/** Declarations of a rule body as [prop, value] pairs (order kept). */
-function decls(body) {
-  return body.split(';').map((d) => d.trim()).filter(Boolean).map((d) => {
-    const k = d.indexOf(':');
-    return [d.slice(0, k).trim(), d.slice(k + 1).trim()];
-  });
-}
-
-/** Split on commas at parenthesis depth 0. */
-function splitTop(s) {
-  const parts = [];
-  let depth = 0;
-  let start = 0;
-  for (let i = 0; i < s.length; i++) {
-    if (s[i] === '(') depth++;
-    else if (s[i] === ')') depth--;
-    else if (s[i] === ',' && depth === 0) {
-      parts.push(s.slice(start, i).trim());
-      start = i + 1;
-    }
-  }
-  parts.push(s.slice(start).trim());
-  return parts;
-}
-
-/** Inner text of a single `name(...)` call spanning the whole value, else null. */
-function call(name, value) {
-  const v = value.trim();
-  return v.startsWith(`${name}(`) && v.endsWith(')') ? v.slice(name.length + 1, -1) : null;
-}
-
-const tokensCss = read('styles/tokens.css');
-const tokenRules = rules(tokensCss);
-const rootRule = tokenRules.find((r) => r.selector === ':root');
-const ROOT_DECLS = rootRule ? decls(rootRule.body) : [];
-const VARS = Object.fromEntries(ROOT_DECLS.filter(([k]) => k.startsWith('--')));
-
-/** Resolve a value to [r,g,b] (0-255) for one theme, following var() and light-dark(). */
-function resolveColor(value, theme, seen = new Set()) {
-  const v = value.trim();
-  const ref = call('var', v);
-  if (ref !== null) {
-    const name = splitTop(ref)[0];
-    assert.ok(!seen.has(name), `var() cycle at ${name}`);
-    assert.ok(name in VARS, `undefined token ${name}`);
-    return resolveColor(VARS[name], theme, new Set(seen).add(name));
-  }
-  const ld = call('light-dark', v);
-  if (ld !== null) {
-    const [light, dark] = splitTop(ld);
-    return resolveColor(theme === 'light' ? light : dark, theme, seen);
-  }
-  const mix = call('color-mix', v);
-  if (mix !== null) {
-    const [space, a, b] = splitTop(mix);
-    assert.equal(space, 'in srgb', `only srgb color-mix is resolved: ${v}`);
-    const part = (p) => {
-      const m = p.match(/^(.*?)\s+([\d.]+)%$/);
-      return m ? [m[1], Number(m[2]) / 100] : [p, null];
-    };
-    const [ca, pa] = part(a);
-    const [cb, pb] = part(b);
-    assert.ok(pa === null || pb === null, `give one percentage only (no normalising): ${v}`);
-    const wa = pa ?? (pb === null ? 0.5 : 1 - pb);
-    const A = resolveColor(ca, theme, seen);
-    const B = resolveColor(cb, theme, seen);
-    return A.map((x, i) => x * wa + B[i] * (1 - wa));
-  }
-  const hex = v.match(/^#([0-9a-f]{6})$/i);
-  assert.ok(hex, `cannot resolve colour value: ${v}`);
-  return [0, 2, 4].map((i) => parseInt(hex[1].slice(i, i + 2), 16));
-}
-
-function luminance([r, g, b]) {
-  const lin = (c) => {
-    const s = c / 255;
-    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-  };
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-}
-
-function contrast(fg, bg, theme) {
-  const a = luminance(resolveColor(`var(${fg})`, theme));
-  const b = luminance(resolveColor(`var(${bg})`, theme));
-  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-}
+import {
+  call, contrast, decls, luminance, read, resolveColor, ROOT, ROOT_DECLS, rules, splitTop, stripComments,
+  tokenRules, tokensCss, VARS,
+} from './helpers/css.mjs';
 
 test('brand primitives are the exact dash0.com values', () => {
   const brand = {
@@ -197,8 +84,9 @@ test('WCAG 1.4.11: success and error borders reach 3:1 on bg and surface, both t
   }
 });
 
-const baseRules = rules(read('styles/base.css'));
-/** Declarations, in cascade order, of every base.css rule whose selector list has `sel`. */
+// base.css then widgets.css, in cascade order (the waterfall's .wf-* rules moved there, #158).
+const baseRules = rules(read('styles/base.css') + read('styles/widgets.css'));
+/** Declarations, in cascade order, of every base.css / widgets.css rule whose selector list has `sel`. */
 const declsFor = (...sels) => sels.flatMap((sel) => baseRules
   .filter((r) => r.selector.split(',').map((s) => s.trim()).includes(sel))
   .flatMap((r) => decls(r.body)));
@@ -386,7 +274,7 @@ test('trace waterfall (#146): bar text on every service fill, trace chips, hint 
     for (const bg of ['--color-surface', '--color-bg']) {
       const hint = contrast('--color-hint', bg, theme);
       assert.ok(hint >= 4.5, `${theme}: hint text on ${bg} is ${hint.toFixed(2)}, needs 4.5`);
-      // Used as text in styles/base.css (the "its parent" tag, the queue heading, the muted copy): 4.5.
+      // Used as text in styles/widgets.css (the "its parent" tag, the queue heading, the muted copy): 4.5.
       for (const fg of ['--color-parent', '--color-text-muted']) {
         const r = contrast(fg, bg, theme);
         assert.ok(r >= 4.5, `${theme}: text in ${fg} on ${bg} is ${r.toFixed(2)}, needs 4.5`);
@@ -411,7 +299,7 @@ test('parent-coloured text (the "its parent" tag, the queue heading) reaches 4.5
   for (const [sel, prop] of [['.wf-tag[data-tag="par"]', 'color'], ['.wf-queue-head strong', 'color']]) {
     assert.equal(last(declsFor(sel), prop), 'var(--color-parent)', `${sel} is set in --color-parent`);
   }
-  // Each row state's background, read from base.css: a flat token or a token tint over transparent.
+  // Each row state's background, read from widgets.css: a flat token or a token tint over transparent.
   const rowFills = ['.wf-row:hover', '.wf-row[aria-pressed="true"]', '.wf-row[data-mark="likely"]', '.wf-row[data-mark="valid"]', '.wf-row[data-arriving]']
     .map((sel) => [sel, last(declsFor(sel), 'background') ?? '']);
   for (const theme of ['light', 'dark']) {

@@ -11,8 +11,12 @@
      on a third-party CDN being reachable. -->
 <script type="module" src="/main.mjs"></script>
 <script defer src="/vendor/alpine-3.14.1.min.js"></script>
+<!-- Stylesheets in cascade order: tokens, reset and legacy components, the UI kit
+     (docs/DESIGN-SYSTEM.md), widget layouts around it, then the hub shell. -->
 <link rel="stylesheet" href="/styles/tokens.css">
 <link rel="stylesheet" href="/styles/base.css">
+<link rel="stylesheet" href="/styles/kit.css">
+<link rel="stylesheet" href="/styles/widgets.css">
 <link rel="stylesheet" href="/styles/hub.css">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 </head>
