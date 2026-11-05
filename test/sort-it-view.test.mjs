@@ -1,5 +1,7 @@
-// lib/widgets/sort-it-view.mjs: the Sort it view and mount (render, penalties, drop path,
-// focus). Spec: docs/M1-DESIGN.md §4.1, §7 P2. Asserts strings, numbers and booleans only.
+// lib/widgets/sort-it-view.mjs on the kit (#156 P3a): the Sort it view model (sortView), its
+// markup (a wide split: the board, then the kit side column with the score card and the
+// success card), the mount (penalties, the drop path, the shuffled pool, focus). Spec:
+// docs/M1-DESIGN.md §4.1; the P3a RED spec S1-S10. Asserts strings, numbers and booleans only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -7,9 +9,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { makeDom, q, qa, click } from './helpers/dom.mjs';
 import { recordFocus } from './helpers/focus.mjs';
+import { decls, read, rules } from './helpers/css.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { newSortState, place } from '../lib/widgets/sort-it.mjs';
-import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
+import { mountSort, renderSort, sortView } from '../lib/widgets/sort-it-view.mjs';
 
 // The core's fixture: i1 -> metric, i2 -> log, i3 -> trace, i4 -> metric.
 function fixture() {
@@ -29,17 +32,37 @@ function fixture() {
   };
 }
 
-/** A counting stub ctx on a fresh DOM with the widget rendered; `finish` is onComplete's target. */
-function setup(spec = fixture(), opts = {}) {
+/** A ctx.shuffle that reverses (never the authored order) and counts its calls. */
+function reversing() {
+  const calls = [];
+  const shuffle = (a) => {
+    calls.push(a.length);
+    return [...a].reverse();
+  };
+  return { shuffle, calls };
+}
+
+/**
+ * A counting stub ctx on a fresh DOM with the widget rendered; `finish` is onComplete's target.
+ * `shuffle` is ctx.shuffle (identity unless a test needs another order: the tests below select
+ * items by id). The swirl is injected and records the `reduced` flag of each call.
+ */
+function setup(spec = fixture(), { shuffle = (a) => [...a], ...opts } = {}) {
   const dom = makeDom();
   const focus = recordFocus(dom.window);
-  const counts = { mistakes: 0, done: 0 };
+  const counts = { mistakes: 0, hints: 0, done: 0 };
+  const swirls = [];
   const ctx = {
     ovBody: dom.body,
     ovActions: dom.actions,
     escapeHtml,
+    signal: new AbortController().signal,
+    shuffle,
     mistake() {
       counts.mistakes += 1;
+    },
+    hint() {
+      counts.hints += 1;
     },
   };
   const fresh = spec ?? fixture();
@@ -51,19 +74,30 @@ function setup(spec = fixture(), opts = {}) {
     fin.disabled = false;
     return fin;
   };
-  const mount = (extra = {}) => mountSort(ctx, spec, { onComplete, ...extra });
-  return { ctx, dom, focus, counts, mount };
+  const swirl = (host, o) => {
+    swirls.push(o.reduced);
+  };
+  const mount = (extra = {}) => mountSort(ctx, spec, { onComplete, swirl, ...extra });
+  return { ctx, dom, focus, counts, swirls, mount };
 }
 
 const items = () => qa('[data-item]').map((b) => b.dataset.item);
 const enabledBuckets = () => qa('[data-bucket]').filter((b) => !b.disabled).map((b) => b.dataset.bucket);
 const pressed = (id) => q(`[data-item="${id}"]`).getAttribute('aria-pressed');
-const feedback = () => q('#signals-feedback').textContent;
+const feedback = () => q('#signals-feedback [data-feedback-text]').textContent;
+const tone = () => q('#signals-feedback').getAttribute('data-tone');
 const placed = (bucket) => q(`[data-bucket-list="${bucket}"]`).textContent;
+const text = (sel) => q(sel).textContent.replace(/\s+/g, ' ').trim();
+/** The "Sorted N of M" line, read from the widget's text (dt/dd or one line), normalised. */
+function sorted() {
+  const m = q('[data-sort]').textContent.replace(/\s+/g, ' ').match(/Sorted\s*(\d+) of (\d+)/);
+  return m ? `Sorted ${m[1]} of ${m[2]}` : null;
+}
 const sortTo = (item, bucket) => {
   click(`[data-item="${item}"]`);
   click(`[data-bucket="${bucket}"]`);
 };
+const ids = (list) => list.map((x) => (typeof x === 'string' ? x : x.id));
 
 /** Drag `item` (null: drag nothing of ours) onto `bucket`'s drop zone; true if dragover allowed the drop. */
 function drop(item, bucket) {
@@ -78,64 +112,108 @@ function drop(item, bucket) {
 }
 
 const ALPINE = /\s(?:x-[\w.:-]+|@[\w.:-]+|:[\w.:-]+)=/;
+// test/design-system.test.mjs RETIRED: classes the kit replaced; the Sort it markup emits none.
+const RETIRED = [
+  'back-btn', 'btn', 'bubble', 'build', 'build-btn', 'build-editing', 'build-group-title', 'build-layout',
+  'build-log', 'build-logs', 'build-main', 'build-opt', 'build-pick', 'build-status', 'choice', 'choices', 'configure-inactive',
+  'configure-input', 'configure-label', 'configure-more', 'configure-note', 'env-editor', 'env-label', 'env-note',
+  'feedback', 'ghost', 'good', 'help-btn', 'help-chip', 'help-chips', 'help-chips-title', 'help-cost', 'help-count',
+  'help-counts', 'help-h', 'help-hint-head', 'help-hint-row', 'help-hint-text', 'help-pips', 'help-rule',
+  'help-score', 'help-side', 'help-star', 'help-stars', 'help-swirl', 'help-tier', 'help-win', 'help-win-closing',
+  'help-win-stars', 'help-win-text', 'help-win-title', 'info', 'lesson-intro', 'lesson-stage', 'primary', 'q',
+  'query-data', 'query-input', 'query-label', 'query-note', 'show', 'small', 'sort-bucket-btn', 'sort-hint',
+  'sort-item', 'speech', 'spot-line', 'tradeoff-keeps', 'tradeoff-option',
+];
+const INSTR = 'Drag each item into the right bucket, or pick an item and then a bucket.';
 
-test('renderSort: one draggable, unpressed button per item, one disabled button and list per bucket, a live feedback region', () => {
+// ---- S1, S2 sortView: the board as data -------------------------------------------------
+
+test('S1 sortView: the pool is the remaining items in display order, the buckets in spec order with their placed items; placed plus left is total', () => {
+  const spec = fixture();
+  let { state } = place(spec, newSortState(spec), 'i1', 'metric');
+  ({ state } = place(spec, state, 'i2', 'metric'));
+  // The display order is deliberately not the spec order, so a pool built from spec.items fails.
+  const v = sortView(spec, state, { order: ['i3', 'i1', 'i4', 'i2'], selected: 'i2' });
+  assert.deepEqual(ids(v.pool), ['i3', 'i4', 'i2'], 'remaining items, in display order');
+  assert.deepEqual(v.pool.filter((p) => p.pressed).map((p) => p.id), ['i2'], 'only the selected item is pressed');
+  assert.deepEqual(v.buckets.map((b) => b.id), ['metric', 'log', 'trace'], 'buckets in spec order');
+  assert.deepEqual(v.buckets.map((b) => b.enabled), [false, true, true], 'i2 already tried metric');
+  assert.deepEqual(ids(v.buckets[0].placed), ['i1']);
+  assert.deepEqual(ids(v.buckets[1].placed), []);
+  assert.deepEqual(ids(v.buckets[2].placed), []);
+  assert.equal(v.left, 3);
+  assert.equal(v.total, 4);
+  assert.equal(v.done, false);
+  assert.equal(v.buckets.reduce((n, b) => n + b.placed.length, 0) + v.left, v.total, 'placed plus left is total');
+});
+
+test('S2 sortView: with no selection, or once done, no bucket is enabled', () => {
+  const spec = fixture();
+  const order = ['i3', 'i1', 'i4', 'i2'];
+  const fresh = sortView(spec, newSortState(spec), { order, selected: null });
+  assert.deepEqual(fresh.buckets.map((b) => b.enabled), [false, false, false], 'nothing selected');
+  assert.deepEqual(fresh.pool.map((p) => p.pressed), [false, false, false, false]);
+  assert.equal(fresh.left, 4);
+  let state = newSortState(spec);
+  for (const it of spec.items) ({ state } = place(spec, state, it.id, it.bucket));
+  const done = sortView(spec, state, { order, selected: 'i1' });
+  assert.deepEqual(done.buckets.map((b) => b.enabled), [false, false, false], 'done');
+  assert.deepEqual(ids(done.pool), []);
+  assert.equal(done.left, 0);
+  assert.equal(done.done, true);
+  assert.deepEqual(done.buckets.map((b) => ids(b.placed)), [['i1', 'i4'], ['i2'], ['i3']]);
+});
+
+// ---- S3 kit markup ------------------------------------------------------------------------
+
+test('S3 renderSort: kit markup in one split; the side column with a hidden success card and zeroed score; toggle items; buckets in drop zones; no retired class', () => {
   setup();
+  assert.equal(qa('.ui-split').length, 1, 'one board-and-side split');
+  assert.equal(qa('.ui-split-side [id="signals-win"]').length, 1, 'the success card is in the side column');
+  assert.equal(q('#signals-win').hasAttribute('hidden'), true, 'hidden until success');
+  assert.equal(q('#signals-wrong').textContent, '0');
+  assert.equal(q('#signals-hints').textContent, '0');
   assert.deepEqual(items(), ['i1', 'i2', 'i3', 'i4']);
-  assert.deepEqual(qa('[data-item]').map((b) => b.getAttribute('aria-pressed')), ['false', 'false', 'false', 'false']);
-  assert.deepEqual(qa('[data-item]').map((b) => b.getAttribute('draggable')), ['true', 'true', 'true', 'true']);
+  for (const b of qa('[data-item]')) {
+    assert.equal(b.localName, 'button', b.dataset.item);
+    assert.equal(b.classList.contains('ui-option--toggle'), true, `${b.dataset.item} is a kit toggle option`);
+    assert.equal(b.getAttribute('aria-pressed'), 'false', b.dataset.item);
+  }
+  const group = q('[data-item="i1"]').closest('[role="group"]');
+  assert.ok(group, 'the items are in a group');
+  assert.equal(Boolean(group.getAttribute('aria-label') || group.getAttribute('aria-labelledby')), true, 'the group is named');
   assert.deepEqual(qa('[data-bucket]').map((b) => b.dataset.bucket), ['metric', 'log', 'trace']);
-  assert.deepEqual(qa('[data-bucket]').map((b) => b.textContent), ['Metric', 'Log', 'Trace']);
+  assert.deepEqual(qa('[data-bucket]').map((b) => b.textContent.trim()), ['Metric', 'Log', 'Trace']);
+  for (const b of qa('[data-bucket]')) {
+    assert.equal(b.closest('[data-drop]')?.getAttribute('data-drop'), b.dataset.bucket, `${b.dataset.bucket} sits in its drop zone`);
+  }
   assert.deepEqual(enabledBuckets(), [], 'nothing selected: every bucket is disabled');
   assert.deepEqual(qa('[data-bucket-list]').map((l) => `${l.getAttribute('data-bucket-list')}:${l.textContent}`), ['metric:', 'log:', 'trace:']);
-  assert.equal(qa('[data-drop]').length, 3);
+  assert.equal(qa('[id="signals-instr"]').length, 1, 'one instruction line');
+  assert.equal(q('#signals-instr').innerHTML, INSTR, 'plain text');
+  assert.equal(q('#signals-instr').hasAttribute('aria-live'), false, 'not live');
   assert.equal(qa('[id="signals-feedback"]').length, 1);
   const fb = q('#signals-feedback');
+  assert.equal(fb.classList.contains('ui-feedback'), true, 'the kit feedback region');
+  assert.equal(fb.hasAttribute('hidden'), true, 'hidden until something happens');
   assert.equal(fb.getAttribute('role'), 'status');
-  assert.equal(fb.getAttribute('aria-live'), 'polite');
-  assert.equal(fb.getAttribute('tabindex'), '-1');
-  assert.equal(fb.className, 'feedback');
-  assert.equal(q('.sort').hasAttribute('role'), false, 'no labelledBy, no group');
+  const hint = qa('[id="signals-hint"]');
+  assert.equal(hint.length <= 1, true, 'the instruction no longer takes the side column\'s #<id>-hint');
+  if (hint.length) assert.equal(hint[0].localName, 'button', '#signals-hint is the hint button');
+  assert.equal(sorted(), 'Sorted 0 of 4');
+  const classes = qa('[data-sort], [data-sort] *').flatMap((el) => (el.getAttribute('class') ?? '').split(/\s+/)).filter(Boolean);
+  assert.deepEqual(classes.filter((c) => RETIRED.includes(c)), [], 'no retired class');
 });
 
-const HINT = 'Drag each item into the right bucket, or pick an item and then a bucket.';
-
-test('renderSort: one plain-text instruction line, not a live region, describes the item list, before and during play', () => {
-  const { dom, mount } = setup();
-  const check = (when) => {
-    assert.equal(qa('#signals-hint').length, 1, `${when}: one hint`);
-    assert.equal(q('#signals-hint').textContent, HINT, `${when}: text`);
-    assert.equal(q('#signals-hint').innerHTML, HINT, `${when}: plain text, no markup`);
-    assert.equal(q('#signals-hint').className, 'sort-hint', `${when}: class`);
-    assert.equal(q('#signals-hint').hasAttribute('role'), false, `${when}: no role`);
-    assert.equal(q('#signals-hint').hasAttribute('aria-live'), false, `${when}: not live`);
-    assert.equal(q('.sort-pool').getAttribute('role'), 'group', `${when}: the pool is a group`);
-    assert.equal(q('.sort-pool').getAttribute('aria-label'), 'Items to sort', `${when}: the group is named`);
-    assert.equal(q('.sort-pool').getAttribute('aria-describedby'), 'signals-hint', `${when}: pool described by the hint`);
-  };
-  check('rendered');
-  mount();
-  check('mounted');
-  click(q('[data-item="i1"]'));
-  check('item selected');
-  click(q('[data-bucket="log"]'));
-  check('after a wrong try');
-  click(q('[data-item="i1"]'));
-  click(q('[data-bucket="metric"]'));
-  check('after a right placement');
-  assert.equal(dom.body.querySelectorAll('[data-sort] > .sort-hint').length, 1, 'the hint sits outside the redrawn board');
-});
-
-test('renderSort: the hint id follows the spec id and is escaped', () => {
+test('S3 the instruction id follows the spec id', () => {
   makeDom();
-  const spec = fixture();
-  const html = renderSort({ ...spec, id: 'a"b' }, newSortState(spec), { selected: null, escapeHtml });
-  globalThis.document.body.innerHTML = html;
-  assert.equal(q('.sort-hint').id, 'a"b-hint');
-  assert.equal(q('.sort-pool').getAttribute('aria-describedby'), 'a"b-hint');
+  const spec = { ...fixture(), id: 'other-sort' };
+  globalThis.document.body.innerHTML = renderSort(spec, newSortState(spec), { selected: null, escapeHtml });
+  assert.equal(q('#other-sort-instr').textContent, INSTR);
+  assert.equal(qa('#signals-instr').length, 0);
 });
 
-test('renderSort: the selected item is pressed and only its untried buckets are enabled; placed items move to their list', () => {
+test('S3 renderSort: the selected item is pressed and only its untried buckets are enabled; placed items move to their list', () => {
   const spec = fixture();
   let { state } = place(spec, newSortState(spec), 'i1', 'metric');
   ({ state } = place(spec, state, 'i2', 'metric'));
@@ -147,19 +225,20 @@ test('renderSort: the selected item is pressed and only its untried buckets are 
   assert.deepEqual(enabledBuckets(), ['log', 'trace']);
   assert.equal(placed('metric'), 'Request rate');
   assert.equal(placed('log'), '');
+  assert.equal(sorted(), 'Sorted 1 of 4');
 });
 
-test('renderSort: labels are trusted HTML, ids are escaped, labelledBy makes a group', () => {
+test('renderSort: labels are trusted HTML, labelledBy makes [data-sort] a group, a bad labelledBy is a TypeError', () => {
   const spec = fixture();
   spec.items[0].label = '<code>http.server.request.count</code>';
   makeDom();
-  const html = renderSort({ ...spec, id: 'a"b' }, newSortState(spec), { selected: null, escapeHtml, labelledBy: 'sort-q' });
-  globalThis.document.body.innerHTML = html;
+  globalThis.document.body.innerHTML = renderSort(spec, newSortState(spec), { selected: null, escapeHtml, labelledBy: 'sort-q' });
   assert.equal(q('[data-item="i1"] code') === null, false, 'label markup is kept');
-  assert.equal(q('.sort').getAttribute('data-sort'), 'a"b', 'the id round-trips through an attribute');
-  assert.equal(html.includes('data-sort="a"b"'), false);
-  assert.equal(q('.sort').getAttribute('role'), 'group');
-  assert.equal(q('.sort').getAttribute('aria-labelledby'), 'sort-q');
+  assert.equal(q('[data-sort]').getAttribute('data-sort'), 'signals');
+  assert.equal(q('[data-sort]').getAttribute('role'), 'group');
+  assert.equal(q('[data-sort]').getAttribute('aria-labelledby'), 'sort-q');
+  globalThis.document.body.innerHTML = renderSort(spec, newSortState(spec), { selected: null, escapeHtml });
+  assert.equal(q('[data-sort]').hasAttribute('aria-labelledby'), false, 'no labelledBy, no label');
   for (const bad of ['', 'a"b', 'two words']) {
     assert.throws(() => renderSort(spec, newSortState(spec), { selected: null, escapeHtml, labelledBy: bad }), { name: 'TypeError', message: /labelledBy/ }, JSON.stringify(bad));
   }
@@ -183,13 +262,35 @@ test('no Alpine attributes, no style= and no on*= attributes, before and during 
   check('right');
 });
 
+// ---- S4 the pool is shuffled once per mount ----------------------------------------------
+
+test('S4 the pool is shuffled once through ctx.shuffle and keeps that order through a wrong try and a right placement', () => {
+  const r = reversing();
+  const { focus, mount } = setup(fixture(), { shuffle: r.shuffle });
+  mount();
+  assert.deepEqual(items(), ['i4', 'i3', 'i2', 'i1'], 'the shuffled order, not the authored one');
+  assert.equal(focus.last(), 'item:i4', 'focus starts on the first item shown');
+  sortTo('i2', 'metric'); // wrong
+  assert.deepEqual(items(), ['i4', 'i3', 'i2', 'i1']);
+  click('[data-bucket="log"]'); // right
+  assert.deepEqual(items(), ['i4', 'i3', 'i1'], 'still reversed, minus the placed item');
+  sortTo('i3', 'trace');
+  assert.deepEqual(items(), ['i4', 'i1']);
+  assert.equal(r.calls.length, 1, 'shuffled exactly once; redraws never reshuffle');
+});
+
+// ---- S5-S7 penalties and feedback --------------------------------------------------------
+
 test('mounting focuses the first item and changes nothing else', () => {
-  const { focus, counts, mount } = setup();
+  const { focus, counts, swirls, mount } = setup();
   mount();
   assert.equal(focus.last(), 'item:i1');
-  assert.deepEqual(counts, { mistakes: 0, done: 0 });
-  assert.equal(feedback(), '');
+  assert.deepEqual(qa('[data-item]').map((b) => b.getAttribute('draggable')), ['true', 'true', 'true', 'true'], 'the mount makes items draggable');
+  assert.deepEqual(counts, { mistakes: 0, hints: 0, done: 0 });
+  assert.deepEqual(swirls, []);
+  assert.equal(q('#signals-feedback').hasAttribute('hidden'), true);
   assert.deepEqual(enabledBuckets(), []);
+  assert.equal(q('#signals-win').hasAttribute('hidden'), true);
 });
 
 test('choosing an item presses it and enables its buckets', () => {
@@ -202,33 +303,56 @@ test('choosing an item presses it and enables its buckets', () => {
   assert.equal(focus.last(), 'bucket:metric');
 });
 
-test('a wrong placement costs one mistake, says so without the answer, and disables that bucket', () => {
+test('S5 a wrong placement costs one mistake, is an error, counts on the score card, says so without the answer, and disables that bucket', () => {
   const { counts, mount } = setup();
   mount();
   sortTo('i2', 'metric');
   assert.equal(counts.mistakes, 1);
+  assert.equal(q('#signals-wrong').textContent, '1');
+  assert.equal(q('#signals-stars').getAttribute('aria-label'), '4 of 5 stars still possible');
+  assert.equal(tone(), 'error', 'a wrong answer is an error (D7), not information');
+  assert.equal(q('#signals-feedback').hasAttribute('hidden'), false);
   assert.equal(feedback(), 'Not quite. Stack trace text is not Metric. Not a number.');
-  assert.equal(q('#signals-feedback').className, 'feedback info show');
+  assert.equal(feedback().includes('Log'), false, 'the right bucket is not named');
   assert.equal(pressed('i2'), 'true', 'the item stays selected');
   assert.deepEqual(enabledBuckets(), ['log', 'trace']);
   assert.equal(placed('metric'), '');
+  assert.equal(sorted(), 'Sorted 0 of 4');
   sortTo('i1', 'log');
+  assert.equal(counts.mistakes, 2);
+  assert.equal(q('#signals-wrong').textContent, '2');
   assert.equal(feedback(), 'Not quite. Request rate is not Log.', 'no whyNot, no extra text');
   assert.equal(feedback().includes('Metric'), false, 'the right bucket is not revealed');
 });
 
-test('then the right placement costs nothing, says why and lists the item in its bucket', () => {
+test('S6 a repeated drop on a tried bucket is free and neutral', () => {
+  const { counts, mount } = setup();
+  mount();
+  assert.equal(drop('i2', 'metric'), true, 'dragover allows the drop');
+  assert.equal(counts.mistakes, 1);
+  drop('i2', 'metric');
+  assert.equal(counts.mistakes, 1, 'repeating a tried bucket is free');
+  assert.equal(q('#signals-wrong').textContent, '1');
+  assert.equal(tone(), 'neutral');
+  assert.equal(feedback(), 'You already tried Metric for Stack trace text.');
+});
+
+test('S7 then the right placement costs nothing, is a success, says why, lists the item in its bucket and counts it sorted', () => {
   const { counts, mount } = setup();
   mount();
   sortTo('i2', 'metric');
   click('[data-bucket="log"]');
   assert.equal(counts.mistakes, 1);
+  assert.equal(tone(), 'success');
   assert.equal(feedback(), 'Right. Stack trace text goes in Log. A timestamped record.');
-  assert.equal(q('#signals-feedback').className, 'feedback good show');
   assert.equal(placed('log').includes('Stack trace text'), true);
+  assert.equal(sorted(), 'Sorted 1 of 4');
   assert.deepEqual(items(), ['i1', 'i3', 'i4']);
   assert.deepEqual(enabledBuckets(), [], 'nothing is selected after a right placement');
   assert.equal(counts.done, 0);
+  assert.equal(q('#signals-win').hasAttribute('hidden'), true);
+  sortTo('i4', 'metric');
+  assert.equal(sorted(), 'Sorted 2 of 4');
 });
 
 test('choosing a different item re-enables the buckets the first one tried', () => {
@@ -249,10 +373,13 @@ test('two wrongs on different items cost two mistakes', () => {
   sortTo('i2', 'metric');
   sortTo('i3', 'log');
   assert.equal(counts.mistakes, 2);
+  assert.equal(q('#signals-wrong').textContent, '2');
 });
 
-test('onComplete is called once, only after the last right placement', () => {
-  const { counts, mount } = setup();
+// ---- S8 completion -----------------------------------------------------------------------
+
+test('S8 completion: onComplete once, the success card shown and focused, the swirl once, and nothing after done', () => {
+  const { counts, focus, swirls, mount } = setup();
   mount();
   sortTo('i1', 'metric');
   sortTo('i2', 'log');
@@ -262,14 +389,25 @@ test('onComplete is called once, only after the last right placement', () => {
   assert.equal(counts.done, 0, 'a wrong last try does not complete');
   click('[data-bucket="metric"]');
   assert.equal(counts.done, 1);
+  assert.equal(counts.mistakes, 1);
   assert.equal(feedback(), 'Right. Queue depth goes in Metric. A gauge.');
   assert.deepEqual(items(), []);
+  assert.equal(q('#signals-win').hasAttribute('hidden'), false, 'the success card is shown');
+  assert.equal(text('#signals-win-stars'), '4 of 5 stars: 1 wrong placement, 0 hints.');
+  assert.equal(focus.last(), '#signals-win-title');
+  assert.deepEqual(swirls, [false], 'the swirl plays once, motion allowed');
+  assert.equal(q('#finish').disabled, false);
+  assert.equal(sorted(), 'Sorted 4 of 4');
   drop(null, 'trace');
+  for (const b of qa('[data-bucket]')) b.onclick?.({});
   assert.equal(counts.done, 1, 'nothing after completion calls it again');
   assert.equal(counts.mistakes, 1);
+  assert.deepEqual(swirls, [false]);
+  assert.equal(feedback(), 'Right. Queue depth goes in Metric. A gauge.', 'nothing after done says anything');
+  assert.equal(focus.last(), '#signals-win-title');
 });
 
-test('the focus sequence: item, bucket, next untried bucket, next item, onComplete target', () => {
+test('the focus sequence: item, bucket, next untried bucket, next item, the success heading', () => {
   const { focus, mount } = setup();
   mount();
   sortTo('i2', 'metric'); // wrong
@@ -282,7 +420,7 @@ test('the focus sequence: item, bucket, next untried bucket, next item, onComple
     'bucket:metric', 'bucket:log', 'item:i3',
     'bucket:metric', 'item:i4',
     'bucket:metric', 'item:i1',
-    'bucket:metric', '#finish',
+    'bucket:metric', '#signals-win-title',
   ]);
   assert.deepEqual(focus.unfocusable(), [], 'focused only enabled, connected elements');
 });
@@ -301,22 +439,24 @@ test('the drop path is the click path: a wrong drop costs a mistake, a right dro
   mount();
   assert.equal(drop('i2', 'metric'), true, 'dragover allows the drop');
   assert.equal(counts.mistakes, 1);
+  assert.equal(tone(), 'error');
   assert.equal(feedback(), 'Not quite. Stack trace text is not Metric. Not a number.');
   assert.equal(pressed('i2'), 'true', 'the dropped item becomes the selection');
   assert.deepEqual(enabledBuckets(), ['log', 'trace']);
-  drop('i2', 'metric');
-  assert.equal(counts.mistakes, 1, 'repeating a tried bucket is free');
   drop('i2', 'log');
   assert.equal(counts.mistakes, 1);
+  assert.equal(tone(), 'success');
   assert.equal(feedback(), 'Right. Stack trace text goes in Log. A timestamped record.');
   assert.equal(placed('log'), 'Stack trace text');
 });
 
-test('a bucket with nothing selected costs nothing and asks for an item first', () => {
+test('a bucket with nothing selected costs nothing, is neutral and asks for an item first', () => {
   const { counts, focus, mount } = setup();
   mount();
   drop(null, 'metric');
   assert.equal(counts.mistakes, 0);
+  assert.equal(q('#signals-wrong').textContent, '0');
+  assert.equal(tone(), 'neutral');
   assert.equal(feedback(), 'Pick an item first.');
   assert.equal(focus.last(), 'item:i1');
   assert.deepEqual(items(), ['i1', 'i2', 'i3', 'i4']);
@@ -326,24 +466,48 @@ test('a disabled bucket ignores a click that gets through anyway', () => {
   const { counts, mount } = setup();
   mount();
   q('[data-bucket="metric"]').onclick({});
-  assert.equal(feedback(), '', 'nothing selected');
+  assert.equal(q('#signals-feedback').hasAttribute('hidden'), true, 'nothing selected, nothing said');
   sortTo('i2', 'metric');
   q('[data-bucket="metric"]').onclick({});
   assert.equal(counts.mistakes, 1);
 });
 
-test('onComplete returning nothing or an unfocusable element hands focus to the feedback', () => {
-  for (const [name, target] of [['nothing', () => undefined], ['disabled', () => q('#finish')]]) {
+test('the success heading takes focus whatever onComplete returns', () => {
+  for (const [name, target] of [['nothing', () => undefined], ['disabled', () => q('#finish')], ['enabled', () => {
+    q('#finish').disabled = false;
+    return q('#finish');
+  }]]) {
     const { focus, mount } = setup();
     mount({ onComplete: target });
     sortTo('i1', 'metric');
     sortTo('i2', 'log');
     sortTo('i3', 'trace');
     sortTo('i4', 'metric');
-    assert.equal(focus.last(), '#signals-feedback', name);
+    assert.equal(focus.last(), '#signals-win-title', name);
     assert.deepEqual(focus.unfocusable(), [], name);
   }
 });
+
+// ---- S9 no answer in the markup ----------------------------------------------------------
+
+test('S9 no item carries its answer: no attribute of a [data-item] equals its bucket id, before and during play', () => {
+  const spec = fixture();
+  const answer = Object.fromEntries(spec.items.map((it) => [it.id, it.bucket]));
+  const { mount } = setup(spec);
+  const check = (when) => {
+    for (const b of qa('[data-item]')) {
+      const leaks = [...b.getAttributeNames()].filter((n) => b.getAttribute(n) === answer[b.dataset.item]);
+      assert.deepEqual(leaks, [], `${when}: ${b.dataset.item}`);
+    }
+  };
+  check('rendered');
+  mount();
+  check('mounted');
+  sortTo('i2', 'metric');
+  check('after a wrong try');
+});
+
+// ---- the mount's contract ----------------------------------------------------------------
 
 test('an invalid spec is a TypeError naming the id and its problems, and nothing is wired', () => {
   const spec = fixture();
@@ -381,18 +545,16 @@ test('whyNot is read for its own keys only: a "constructor" bucket never shows O
   assert.equal(feedback().includes('native code'), false);
 });
 
-test('long labels wrap: .sort-item, the bucket button and placed items cap their width; they and feedback break anywhere', () => {
-  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-  const css = readFileSync(join(root, 'styles', 'base.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-  const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, sel, body]) => ({
-    sels: sel.split(',').map((s) => s.trim()),
-    body: body.replace(/\s+/g, ' '),
-  }));
-  for (const sel of ['.sort-item', '.sort-bucket-btn', '.sort-placed li', '.feedback']) {
-    const body = rules.filter((r) => r.sels.includes(sel)).map((r) => r.body).join(';');
-    if (sel !== '.feedback') assert.equal(/max-width:\s*100%/.test(body), true, `${sel} max-width: 100%`);
-    assert.equal(/overflow-wrap:\s*anywhere/.test(body), true, `${sel} overflow-wrap: anywhere`);
+test('long labels wrap: kit options and feedback break anywhere; placed items cap their width (widgets.css); base.css has no Sort rule left', () => {
+  const body = (file, sel) => rules(read(file)).filter((r) => r.selector.split(',').map((s) => s.trim()).includes(sel))
+    .flatMap((r) => decls(r.body)).map(([k, v]) => `${k}:${v}`);
+  for (const [file, sel, cap] of [['styles/kit.css', '.ui-option', true], ['styles/kit.css', '.ui-feedback', false], ['styles/widgets.css', '.sort-placed li', true]]) {
+    const d = body(file, sel);
+    assert.equal(d.some((x) => /^overflow-wrap:\s*anywhere$/.test(x)), true, `${file} ${sel} overflow-wrap: anywhere`);
+    if (cap) assert.equal(d.some((x) => /^max-width:\s*100%$/.test(x)), true, `${file} ${sel} max-width: 100%`);
   }
+  const base = rules(read('styles/base.css')).map((r) => r.selector).filter((s) => /\.sort[-\w]*/.test(s));
+  assert.deepEqual(base, [], 'the retired base.css Sort rules are gone');
 });
 
 test('lib/widgets uses no timers (I2)', () => {

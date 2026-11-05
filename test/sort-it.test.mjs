@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  bucketOf,
   isComplete,
   newSortState,
   place,
@@ -259,4 +260,29 @@ test('isComplete: wrong placements and a shared bucket do not count as right', (
   st = place(SPEC, st, 'i4', 'log').state;
   assert.equal(isComplete(SPEC, st), false);
   assert.equal(remaining(SPEC, st).join(','), 'i2,i3,i4');
+});
+
+// ---- S11 (#156 P3a): bucketOf is the one reader of an item's answer -----------------------
+
+test('S11 bucketOf reads an item\'s answer bucket; unknown or inherited ids give undefined', () => {
+  const spec = fixture();
+  // i2's answer is the second bucket, so "the first bucket" or "the first item's bucket" fails.
+  assert.equal(bucketOf(spec, 'i2'), 'log');
+  assert.equal(bucketOf(spec, 'i3'), 'trace');
+  assert.equal(bucketOf(spec, 'i1'), 'metric');
+  for (const id of ['nope', 'constructor', '__proto__', '', undefined]) assert.equal(bucketOf(spec, id), undefined, String(id));
+});
+
+test('S11 place grades by bucketOf: right exactly in the answer bucket, wrong everywhere else', () => {
+  const spec = fixture();
+  const got = [];
+  for (const it of spec.items) {
+    for (const b of spec.buckets) got.push(`${it.id}>${b.id}=${place(spec, newSortState(spec), it.id, b.id).outcome}`);
+  }
+  assert.deepEqual(got, [
+    'i1>metric=right', 'i1>log=wrong', 'i1>trace=wrong',
+    'i2>metric=wrong', 'i2>log=right', 'i2>trace=wrong',
+    'i3>metric=wrong', 'i3>log=wrong', 'i3>trace=right',
+    'i4>metric=right', 'i4>log=wrong', 'i4>trace=wrong',
+  ]);
 });
