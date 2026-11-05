@@ -50,7 +50,7 @@ const SCENARIO = {
       `<p>PAGE 07:30: the checkout error ratio is ${AFTER}, up from ${BEFORE} yesterday: it tripled overnight, since 02:05. ` +
       'The alert names no cause. Find it before the error budget runs out.</p>',
   },
-  budget: { startPct: 100, burnPctPerMin: 4 },
+  budget: { startPct: 100, burnPctPerMin: 6 },
   views: [
     {
       id: 'rate-vs-lb',

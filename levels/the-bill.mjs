@@ -50,7 +50,7 @@ const SCENARIO = {
       `<p>PAGE 10:12: metric data points reaching Dash0 are at about 131,000 a minute, more than 10 times the 12,400 a minute of this morning, and dashboards are timing out. ` +
       'It began at 09:42. The alert names no cause. Find it before the dashboards\' query error budget runs out.</p>',
   },
-  budget: { startPct: 100, burnPctPerMin: 4 },
+  budget: { startPct: 100, burnPctPerMin: 5 },
   views: [
     {
       id: 'volume-by-metric',

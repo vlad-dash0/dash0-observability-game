@@ -59,7 +59,7 @@ const SCENARIO = {
       '<p>PAGE 14:21: no telemetry from the eu-west cluster for 19 minutes. Its services are missing from every dashboard. ' +
       'The other three clusters are normal. The data stopped at 14:02. The alert names no cause. Find it before the error budget runs out.</p>',
   },
-  budget: { startPct: 100, burnPctPerMin: 4 },
+  budget: { startPct: 100, burnPctPerMin: 5 },
   views: [
     {
       id: 'arrival-by-cluster',
