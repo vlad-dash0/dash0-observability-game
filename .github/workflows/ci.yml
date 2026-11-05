@@ -31,7 +31,8 @@ jobs:
       - run: npm test
 
   # The merge gate (#35): branch protection is unavailable on this plan, so merges wait on
-  # this one status. It must need every other job (test/ci.test.mjs checks) and run even
+  # this status, plus `PR findings` from pr-findings.yml (it re-runs on comments, so it
+  # cannot be a job here). It must need every other job (test/ci.test.mjs checks) and run even
   # when one fails, so a failed or skipped dependency reports as a failed `All checks`.
   all-checks:
     name: All checks

@@ -1,0 +1,24 @@
+name: PR findings relay
+
+# Every PR event that can change the findings verdict (a push, draft or ready, a review, a
+# review comment, a thread resolved). This runs the PR's own copy of this file, with a
+# read-only token on a fork, so it does nothing: when it completes, pr-findings.yml runs
+# (workflow_run, main's copy, allowed to post the status) and evaluates the PR from scratch.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+  pull_request_review_thread:
+    types: [resolved, unresolved]
+
+permissions: {}
+
+jobs:
+  relay:
+    name: relay
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "PR findings is evaluated by the PR findings workflow on main"

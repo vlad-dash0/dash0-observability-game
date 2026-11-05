@@ -74,6 +74,18 @@ export const LEVEL_COUNTRY = Object.freeze({
   'what-costs-money': 'PAK',
 });
 
+// ADM0_A3 code -> display name, for every country in LEVEL_COUNTRY (the ignite announcement,
+// "Germany is now lit: ..."; test/globe-ignite.test.mjs checks each one has a name).
+export const COUNTRY_NAMES = Object.freeze({
+  FRA: 'France', DEU: 'Germany', ESP: 'Spain',
+  NOR: 'Norway', SWE: 'Sweden', FIN: 'Finland',
+  USA: 'the United States', CAN: 'Canada', MEX: 'Mexico', GRL: 'Greenland', CUB: 'Cuba', GTM: 'Guatemala', HND: 'Honduras',
+  BRA: 'Brazil', ARG: 'Argentina', PER: 'Peru', COL: 'Colombia', BOL: 'Bolivia', VEN: 'Venezuela', CHL: 'Chile',
+  DZA: 'Algeria', COD: 'the Democratic Republic of the Congo', ZAF: 'South Africa',
+  KAZ: 'Kazakhstan', SAU: 'Saudi Arabia', TUR: 'Turkey', UZB: 'Uzbekistan', TKM: 'Turkmenistan', IRQ: 'Iraq',
+  IND: 'India', IRN: 'Iran', PAK: 'Pakistan',
+});
+
 /** The act id whose region a country (ADM0_A3 code, Natural Earth SUBREGION) is in, else null. */
 export function actOfCountry(iso3, subregion) {
   if (Object.hasOwn(COUNTRY_ACT, iso3)) return COUNTRY_ACT[iso3];
