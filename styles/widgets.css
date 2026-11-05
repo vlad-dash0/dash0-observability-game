@@ -4,14 +4,23 @@
    one block per widget, marked with its module.
 
    ---------- Trace waterfall (lib/widgets/build-it-view.mjs, #146) ----------
-   Moved unchanged from styles/base.css (#158 P1a); styles/base.css's Build it comment
-   describes it. The `build` container it queries is still declared there. */
-.wf-meta { display: flex; flex-wrap: wrap; gap: 8px 28px; padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
-.wf-meta div { display: grid; gap: 1px; }
-.wf-meta dt { font-size: 11px; color: var(--color-text-muted); }
-.wf-meta dd { margin: 0; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+   A Dash0-style waterfall as DOM rows: a label column (name and service first, then trace id,
+   kind, status, timing) and a track, an SVG without a viewBox, so its text never stretches and
+   every position is an attribute (CSP). Bars are coloured by service from --color-svc-*;
+   ERROR is a stroke, never the fill; the selected bar gets a text-coloured stroke. Highlights
+   follow data-* attributes the view sets: data-mark while a span moves, data-other (another
+   trace), data-parent-of-selected, data-hint-cand, data-arriving, data-waiting. A faded row
+   fades its bars and marks, never its text (T13). The board sits in a kit panel inside the
+   step's split (#158); below 600px of step width (the `level` container) a row stacks. */
+.wf-instr { font-size: var(--text-md); }
+.wf-board { display: grid; gap: var(--space-3); min-width: 0; }
+.wf-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.wf-group { display: grid; gap: var(--space-2); }
+.wf-logs { list-style: none; display: grid; gap: var(--space-1); }
+.wf-logs li { display: grid; }
+.wf-attrs { list-style: none; font-family: var(--font-mono); font-size: 13px; overflow-wrap: anywhere; }
 .wf-root {
-  margin: 10px 16px 6px; display: flex; align-items: center; justify-content: center; gap: 10px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
   border: 1px dashed var(--color-border); border-radius: var(--radius-sm); padding: 10px 12px;
   color: var(--color-text-muted); font: 600 12px var(--font-mono); letter-spacing: .03em;
 }
@@ -19,7 +28,7 @@
 .wf-root[data-active] { border-color: var(--color-success); color: var(--color-text); background: color-mix(in srgb, var(--color-success) 8%, transparent); }
 .wf-root[data-over], .wf-row[data-over] { outline: 2px solid var(--color-success); outline-offset: 1px; }
 
-.wf { position: relative; padding: 0 16px 14px; }
+.wf { position: relative; }
 .wf-axis, .wf-row { display: grid; grid-template-columns: minmax(0, 40%) minmax(0, 1fr); gap: 14px; }
 .wf-axis { height: 30px; border-bottom: 1px solid var(--color-border); margin-bottom: 4px; }
 .wf-trackcell { position: relative; display: block; min-width: 0; }
@@ -37,9 +46,12 @@
 .wf-row[data-parent-of-selected] { border-color: var(--color-parent); border-style: dashed; }
 .wf-row[data-mark="likely"] { background: color-mix(in srgb, var(--color-success) 8%, transparent); border-color: var(--color-success); border-style: solid; }
 .wf-row[data-mark="valid"] { background: color-mix(in srgb, var(--color-success) 8%, transparent); border-color: var(--color-success); border-style: dashed; }
-.wf-row[data-mark="overflow"] { border-color: var(--color-success); border-style: dashed; opacity: .55; }
+.wf-row[data-mark="overflow"] { border-color: var(--color-success); border-style: dashed; }
 .wf-row[data-mark="invalid"] { opacity: .3; cursor: not-allowed; }
-.wf-row[data-other] { opacity: .45; }
+/* Faded targets (contains it in time only partly; another trace): the bars, connectors and
+   swatches fade, the words stay at full contrast (T13). */
+.wf-row[data-mark="overflow"] .wf-bar, .wf-row[data-mark="overflow"] .wf-conn, .wf-row[data-mark="overflow"] .wf-sw { opacity: .45; }
+.wf-row[data-other] .wf-bar, .wf-row[data-other] .wf-conn, .wf-row[data-other] .wf-sw, .wf-row[data-other] .wf-grip { opacity: .35; }
 .wf-row[data-hint-cand], .wf-root[data-hint-cand] { outline: 2px solid var(--color-hint); outline-offset: 2px; }
 .wf-row[data-arriving] { background: color-mix(in srgb, var(--color-parent) 7%, transparent); border-color: var(--color-parent); }
 .wf-row[data-waiting] { opacity: .5; cursor: not-allowed; }
@@ -58,6 +70,7 @@
 .wf-l1 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-width: 0; }
 .wf-name { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
 .wf-svc-wrap { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--color-text-muted); }
+.wf-svc { overflow-wrap: anywhere; }
 .wf-sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
 .wf-elbow { display: inline-block; width: 9px; height: 9px; border-left: 1px solid var(--color-text-muted); border-bottom: 1px solid var(--color-text-muted); transform: translateY(-3px); flex: none; }
 .wf-l2 { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
@@ -111,7 +124,7 @@
 .wf-qdots i[data-dot="arriving"] { background: var(--color-parent); border-color: var(--color-parent); }
 .wf-queue-list { list-style: none; margin: 0; padding: 0; display: grid; }
 
-.wf-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 10px 16px 14px; border-top: 1px solid var(--color-border); font-size: 12px; color: var(--color-text-muted); }
+.wf-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; padding-top: 12px; border-top: 1px solid var(--color-border); font-size: 12px; color: var(--color-text-muted); }
 .wf-legend-item { display: inline-flex; align-items: center; gap: 7px; }
 .wf-key { display: inline-block; width: 22px; height: 12px; border-radius: 3px; background: var(--color-surface-2); flex: none; }
 .wf-key[data-key="sel"] { outline: 2px solid var(--color-text); outline-offset: 1px; }
@@ -123,7 +136,7 @@
 .wf-key[data-key="cursor"] { background: transparent; border-left: 1.5px dashed var(--color-accent); width: 2px; }
 .wf-key[data-key="err"] { box-shadow: inset 0 0 0 2px var(--color-error); }
 
-@container build (max-width: 600px) {
+@container level (max-width: 600px) {
   .wf-axis, .wf-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .wf-axis-gap { display: none; }
   .wf-trackcell { min-height: 30px; }

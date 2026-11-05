@@ -214,3 +214,45 @@ export function emittedClasses(src) {
   }
   return out;
 }
+
+/**
+ * One complex selector (no top-level commas) as its compound selectors, left to right, split
+ * on the descendant, child and sibling combinators outside brackets, parens and strings.
+ * Each compound is {classes, attrs, pseudos}; an attribute is {name, op, value} with the
+ * quotes taken off the value (op and value are null for a bare `[name]`).
+ */
+export function compounds(selector) {
+  const parts = [];
+  let cur = '';
+  let depth = 0;
+  let quote = null;
+  for (const ch of selector.trim()) {
+    if (quote) {
+      cur += ch;
+      if (ch === quote) quote = null;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      cur += ch;
+    } else if (ch === '[' || ch === '(') {
+      depth++;
+      cur += ch;
+    } else if (ch === ']' || ch === ')') {
+      depth--;
+      cur += ch;
+    } else if (depth === 0 && /[\s>+~]/.test(ch)) {
+      if (cur) parts.push(cur);
+      cur = '';
+    } else cur += ch;
+  }
+  if (cur) parts.push(cur);
+  return parts.map((c) => {
+    const attrs = [...c.matchAll(/\[\s*([\w-]+)\s*(?:([~|^$*]?=)\s*(?:"([^"]*)"|'([^']*)'|([^\]\s]+))\s*(?:[is]\s*)?)?\]/g)]
+      .map((m) => ({ name: m[1], op: m[2] ?? null, value: m[3] ?? m[4] ?? m[5] ?? null }));
+    const bare = c.replace(/"[^"]*"|'[^']*'/g, '').replace(/\[[^\]]*\]/g, '').replace(/\([^)]*\)/g, '');
+    return {
+      classes: [...bare.matchAll(/\.(-?[A-Za-z_][\w-]*)/g)].map((m) => m[1]),
+      attrs,
+      pseudos: [...bare.matchAll(/::?(-?[A-Za-z_][\w-]*)/g)].map((m) => m[1]),
+    };
+  });
+}

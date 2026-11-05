@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { escapeHtml, speech, shuffle, prefersReducedMotion } from '../lib/lesson-kit.mjs';
+import { lesson } from '../lib/ui/index.mjs';
 
 test('escapeHtml encodes & < > " and the single quote', () => {
   assert.equal(escapeHtml('<b>"x"</b> & y'), '&lt;b&gt;&quot;x&quot;&lt;/b&gt; &amp; y');
@@ -17,11 +18,10 @@ test('escapeHtml turns null and undefined into empty text and stringifies number
   assert.equal(escapeHtml(0), '0');
 });
 
-test('speech wraps trusted HTML in a bubble without escaping it', () => {
-  const html = speech('<b>hi</b>');
-  assert.ok(html.includes('<b>hi</b>'));
-  assert.ok(html.includes('class="speech"'));
-  assert.ok(html.includes('class="bubble"'));
+test('speech is the kit lesson card around trusted HTML, not escaped (#158)', () => {
+  assert.equal(speech('<b>hi</b>'), lesson('<b>hi</b>'));
+  assert.ok(speech('<b>hi</b>').includes('<b>hi</b>'));
+  assert.throws(() => speech(undefined), { name: 'TypeError', message: /^lesson:/ });
 });
 
 test('shuffle returns a new permutation and leaves a frozen input alone', () => {

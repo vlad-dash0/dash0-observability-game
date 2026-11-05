@@ -47,13 +47,15 @@ const picks = () => qa('[data-pick]').map((b) => b.dataset.pick);
 const enabled = () => qa('[data-pick]').filter((b) => !b.disabled).map((b) => b.dataset.pick);
 const feedback = (id = 'q1') => q(`#${id}-feedback`).textContent;
 
-test('choiceHtml renders the choices in ctx.shuffle order and a live, focusable feedback region', () => {
+test('choiceHtml renders the choices in ctx.shuffle order and a live, focusable feedback region, hidden until set', () => {
   setup();
-  assert.equal(q('.choices').getAttribute('data-choice'), 'q1');
   assert.deepEqual(picks(), ['d', 'c', 'b', 'a']);
-  assert.deepEqual(qa('[data-choice="q1"] button.choice').map((b) => b.textContent), ['Delta', 'Charlie', 'Bravo', 'Alpha']);
+  assert.deepEqual(qa('#q1-choices [data-pick]').map((b) => b.textContent), ['Delta', 'Charlie', 'Bravo', 'Alpha']);
+  assert.deepEqual(qa('[data-pick]').map((b) => b.getAttribute('type')), ['button', 'button', 'button', 'button']);
+  assert.deepEqual(qa('[data-pick]').map((b) => b.hasAttribute('data-state')), [false, false, false, false]);
   const fb = q('#q1-feedback');
-  assert.equal(fb.className, 'feedback');
+  assert.equal(fb.hidden, true);
+  assert.equal(fb.hasAttribute('data-tone'), false);
   assert.equal(fb.getAttribute('role'), 'status');
   assert.equal(fb.getAttribute('aria-live'), 'polite');
   assert.equal(fb.getAttribute('tabindex'), '-1');
@@ -75,11 +77,12 @@ test('a wrong pick costs one mistake, is marked and disabled, and says why in wo
   assert.equal(counts.mistakes, 1);
   assert.equal(counts.onRight, 0);
   assert.equal(q('[data-pick="c"]').disabled, true);
-  assert.equal(q('[data-pick="c"]').classList.contains('wrong'), true);
-  assert.equal(q('[data-pick="c"]').classList.contains('correct'), false);
+  assert.equal(q('[data-pick="c"]').getAttribute('data-state'), 'wrong');
   assert.deepEqual(enabled(), ['d', 'b', 'a'], 'only the wrong pick is disabled');
   assert.equal(feedback(), 'Not quite. c is not it.');
-  assert.equal(q('#q1-feedback').className, 'feedback info show');
+  // D7: a wrong answer costs a star, so it is the error tone, not neutral information.
+  assert.equal(q('#q1-feedback').getAttribute('data-tone'), 'error');
+  assert.equal(q('#q1-feedback').hidden, false);
   assert.equal(focus.last(), 'pick:b', 'focus moves to the next enabled choice');
   assert.equal(q('#next').disabled, true, 'a wrong pick does not unlock Next');
 });
@@ -91,10 +94,9 @@ test('the right pick locks every choice, says why, calls onRight once and focuse
   click('[data-pick="b"]');
   assert.deepEqual(counts, { mistakes: 1, onRight: 1 });
   assert.deepEqual(enabled(), [], 'every choice is disabled');
-  assert.equal(q('[data-pick="b"]').classList.contains('correct'), true);
-  assert.equal(q('[data-pick="b"]').classList.contains('wrong'), false);
+  assert.deepEqual(qa('[data-pick]').map((b) => `${b.dataset.pick}:${b.getAttribute('data-state') ?? ''}`), ['d:', 'c:', 'b:correct', 'a:wrong']);
   assert.equal(feedback(), 'Right. b is it.');
-  assert.equal(q('#q1-feedback').className, 'feedback good show');
+  assert.equal(q('#q1-feedback').getAttribute('data-tone'), 'success');
   assert.equal(focus.last(), '#next');
   assert.deepEqual(focus.unfocusable(), [], 'focused only enabled, connected elements');
 });
@@ -220,11 +222,11 @@ test('focus goes to the feedback when onRight returns a disabled, detached or no
 
 test('labelledBy names the choices as a group; without it there is no group role', () => {
   setup(CHOICES, 'q1', { labelledBy: 'q1-question' });
-  assert.equal(q('.choices').getAttribute('role'), 'group');
-  assert.equal(q('.choices').getAttribute('aria-labelledby'), 'q1-question');
+  assert.equal(q('#q1-choices').getAttribute('role'), 'group');
+  assert.equal(q('#q1-choices').getAttribute('aria-labelledby'), 'q1-question');
   setup();
-  assert.equal(q('.choices').hasAttribute('role'), false);
-  assert.equal(q('.choices').hasAttribute('aria-labelledby'), false);
+  assert.equal(q('#q1-choices').hasAttribute('role'), false);
+  assert.equal(q('#q1-choices').hasAttribute('aria-labelledby'), false);
 });
 
 test('level 1.2 labels both of its choice groups with their question', () => {
@@ -239,7 +241,7 @@ test('level 1.2 labels both of its choice groups with their question', () => {
     signal: new AbortController().signal,
   });
   nys.run(ctx);
-  const question = () => q(`#${q('.choices').getAttribute('aria-labelledby')}`)?.textContent;
+  const question = () => q(`#${q('#nys-choices').getAttribute('aria-labelledby')}`)?.textContent;
   assert.equal(question(), 'What service name does its telemetry show up under?');
   click('[data-pick="fallback"]');
   click('#nys-next');
@@ -249,10 +251,11 @@ test('level 1.2 labels both of its choice groups with their question', () => {
   assert.equal(question(), 'Which service name does the SDK report?');
 });
 
-test('mountChoice refuses a key that is not a non-empty string', () => {
+test('choiceHtml and mountChoice refuse a key that is not a non-empty string', () => {
   for (const [name, bad] of [['number', 1], ['empty', '']]) {
     const choices = CHOICES.map((c) => (c.key === 'c' ? { ...c, key: bad } : c));
-    const { ctx, onRight } = setup(choices);
+    const { ctx, onRight } = setup();
+    assert.throws(() => choiceHtml(ctx, choices, { id: 'q1' }), { name: 'TypeError', message: /^choice "q1": .*non-empty string/ }, name);
     assert.throws(() => mountChoice(ctx, choices, { id: 'q1', onRight }), { name: 'TypeError', message: /non-empty string/ }, name);
   }
 });

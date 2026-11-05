@@ -273,6 +273,10 @@ Dash0 tokens in `light-dark()`; carry over reset/body, `.btn` (+`.ghost`, `.smal
 `.bubble`, `.lesson-intro`, `.lesson-stage`, `h3.q`, focus and reduced-motion; system sans,
 Martian Mono for `code, pre, kbd`; every hex → token; `.correct`/`.good` → success,
 `.wrong` → error. Drop lesson-specific classes.
+*(Superseded in part by #158: the kit in `docs/DESIGN-SYSTEM.md` replaces this list. `.btn`,
+`.lesson-intro`, `.lesson-stage` and `h3.q` keep their `styles/base.css` rules for
+hand-written levels until #165 retires them (see Retired classes there); `.speech` and
+`.bubble` are gone.)*
 
 **F3 level platform (#11)**: `lib/lesson-kit.mjs` (adapt R: keep `escapeHtml` + `'`,
 guarded `prefersReducedMotion`, `speech` without avatar; add `shuffle`; drop Webo/prop/hint
@@ -354,7 +358,8 @@ Mutations: `p < 2`; `>=` against par; drop the `scored` check.
 ### F3 `test/level-context.test.mjs`
 - `renderStep('<p>x</p>')` → body `'<p>x</p>'`, actions `''`, `scrollTop` 0 after being 50.
   Mutation: drop `|| ''`.
-- `speech('<b>hi</b>')` contains `<b>hi</b>`, `class="speech"`, `class="bubble"`.
+- `speech('<b>hi</b>')` contains `<b>hi</b>`, `class="ui-lesson"` (since #158, `speech(...)` returns `lesson(...)`; M0 had `class="speech"` and
+  `class="bubble"`).
 - `shuffle` returns a new array; frozen input unchanged.
 - `mistake()` ×2 then `finish({cards:['c1']})` → `{stars:3, cards:['c1'], text:''}`;
   `onFinish` once with `('lvl-a', {stars:3, cards:['c1'], text:'', at:'2026-01-01T00:00:00.000Z'})`

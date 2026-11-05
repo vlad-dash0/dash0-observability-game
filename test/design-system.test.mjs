@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  classesInSelector, contrast, decls, emittedClasses, overlay, ratio, read, resolveColor, rules,
+  classesInSelector, compounds, contrast, decls, emittedClasses, overlay, ratio, read, resolveColor, rules,
   splitTop, styleFiles, stripComments, VARS, walk,
 } from './helpers/css.mjs';
 
@@ -117,18 +117,11 @@ test('T4 kit.css selectors use only ui- classes, elements and attributes (no ids
 
 // ---- T5 no :has() and no !important ------------------------------------------------------
 
-// Shrinks only: P1b deletes .overlay:has(.build) and this entry.
-const HAS_ALLOW = ['hub.css .overlay:has(.build)'];
-
-test('T5 no :has() (listed legacy only) and no !important outside reduced motion and [x-cloak]', () => {
-  const seen = new Set();
+// P1b deleted the last one (.overlay:has(.build)); the step type now decides the width (T12).
+test('T5 no :has() and no !important outside reduced motion and [x-cloak]', () => {
   for (const f of SHEETS) {
     for (const r of sheetRules(f)) {
-      if (r.selector.includes(':has(')) {
-        const key = `${f} ${r.selector}`;
-        assert.ok(HAS_ALLOW.includes(key), `${key}: no :has(); give the element a class or a data-* state`);
-        seen.add(key);
-      }
+      assert.ok(!r.selector.includes(':has('), `styles/${f} ${r.selector}: no :has(); give the element a class or a data-* state`);
       const reduced = r.at.some((a) => /prefers-reduced-motion:\s*reduce/.test(a));
       for (const [prop, value] of decls(r.body)) {
         if (!value.includes('!important')) continue;
@@ -136,7 +129,64 @@ test('T5 no :has() (listed legacy only) and no !important outside reduced motion
       }
     }
   }
-  for (const key of HAS_ALLOW) assert.ok(seen.has(key), `stale HAS_ALLOW entry: ${key}`);
+});
+
+// ---- T12 the generic layout: one container, named by the kit ------------------------------
+
+// The legacy hand-written step's stage is the one other `level` container (base.css, until
+// #165 moves those levels onto the kit step). Only shrinks.
+const CONTAINER_ALLOW = ['base.css .lesson-stage'];
+
+test('T12 the split shows its side column from 960px of the level container: minmax(0, 1fr) and a 300px side', () => {
+  const at = sheetRules('kit.css').filter((r) => r.at.includes('@container level (min-width: 960px)'));
+  const split = at.find((r) => r.selector === '.ui-split');
+  assert.ok(split, 'kit.css has @container level (min-width: 960px) { .ui-split { ... } }');
+  assert.equal(Object.fromEntries(decls(split.body))['grid-template-columns'], 'minmax(0, 1fr) var(--side-width)');
+  assert.equal(VARS['--side-width'], '300px');
+  const kitStep = sheetRules('kit.css').find((r) => r.selector === '.ui-step');
+  assert.equal(Object.fromEntries(decls(kitStep.body)).container, 'level / inline-size', 'every kit step is the level container');
+});
+
+/** `file .class` when the selector is that one class alone (no ancestor, attribute or state), else null. */
+const containerKey = (f, selector) => {
+  const cs = splitTop(selector).length === 1 ? compounds(selector) : [];
+  const [c] = cs;
+  return cs.length === 1 && c.classes.length === 1 && !c.attrs.length && !c.pseudos.length && selector.trim() === `.${c.classes[0]}`
+    ? `${f} .${c.classes[0]}` : null;
+};
+const CONTAINER_PROP = /^container(?:-name|-type)?$/;
+
+test('T12 harness: a container is keyed only by a lone class, and its declaration is read with its value', () => {
+  assert.equal(containerKey('base.css', '.lesson-stage'), 'base.css .lesson-stage');
+  for (const sel of ['.x .lesson-stage', '.lesson-stage:hover', '.lesson-stage[data-x]', '.lesson-stage, .y', '.lesson-stage.y']) {
+    assert.equal(containerKey('base.css', sel), null, sel);
+  }
+  const [r] = rules('.lesson-stage { container: other / size; }');
+  assert.deepEqual(decls(r.body).filter(([p]) => CONTAINER_PROP.test(p)), [['container', 'other / size']]);
+});
+
+test('T12 every container query names level; only the kit step (and the listed legacy stage) declares a container, as level / inline-size', () => {
+  const seen = new Set();
+  let queries = 0;
+  for (const f of SHEETS) {
+    for (const r of sheetRules(f)) {
+      for (const a of r.at.filter((x) => x.startsWith('@container'))) {
+        queries++;
+        assert.match(a, /^@container level \(/, `styles/${f} "${a}": query the step's level container`);
+      }
+      for (const [prop, value] of decls(r.body)) {
+        if (!CONTAINER_PROP.test(prop)) continue;
+        const key = containerKey(f, r.selector) ?? `${f} ${r.selector}`;
+        assert.ok(key === 'kit.css .ui-step' || CONTAINER_ALLOW.includes(key),
+          `${key} declares a container; the step type decides the layout (STEP_TYPES[*].wide)`);
+        assert.equal(`${prop}: ${value}`, 'container: level / inline-size', `${key} must be the level container, by the container shorthand`);
+        seen.add(key);
+      }
+    }
+  }
+  assert.ok(queries >= 2, 'kit.css and widgets.css query the level container');
+  assert.ok(seen.has('kit.css .ui-step'), 'the kit step declares the container');
+  for (const key of CONTAINER_ALLOW) assert.ok(seen.has(key), `stale CONTAINER_ALLOW entry: ${key}`);
 });
 
 test('palette rule 5: kit.css puts no shadow or glow on anything, only inset rings', () => {
@@ -200,7 +250,7 @@ test('T6 only lib/ui/*.mjs emits ui- classes (index.html is the one static excep
 // (a stale entry fails), and the last phase asserts LEGACY is empty and deletes the CSS.
 const RETIRED = [
   'back-btn', 'btn', 'bubble', 'build', 'build-btn', 'build-editing', 'build-group-title', 'build-layout',
-  'build-log', 'build-main', 'build-opt', 'build-pick', 'build-status', 'choice', 'choices', 'configure-inactive',
+  'build-log', 'build-logs', 'build-main', 'build-opt', 'build-pick', 'build-status', 'choice', 'choices', 'configure-inactive',
   'configure-input', 'configure-label', 'configure-more', 'configure-note', 'env-editor', 'env-label', 'env-note',
   'feedback', 'ghost', 'good', 'help-btn', 'help-chip', 'help-chips', 'help-chips-title', 'help-cost', 'help-count',
   'help-counts', 'help-h', 'help-hint-head', 'help-hint-row', 'help-hint-text', 'help-pips', 'help-rule',
@@ -211,7 +261,6 @@ const RETIRED = [
 ];
 
 const LEGACY = {
-  'index.html': ['back-btn', 'btn'],
   'levels/baggage.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'levels/checkout-is-slow.mjs': ['btn', 'lesson-intro', 'lesson-stage'],
   'levels/context-propagation.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
@@ -224,12 +273,7 @@ const LEGACY = {
   'levels/the-pager.mjs': ['btn', 'choice', 'choices', 'feedback', 'info', 'lesson-intro', 'lesson-stage', 'q', 'show'],
   'levels/the-signals.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'levels/why-opentelemetry.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
-  'lib/lesson-kit.mjs': ['bubble', 'speech'],
-  'lib/play.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
-  'lib/widgets/build-it-view.mjs': ['build', 'build-btn', 'build-editing', 'build-group-title', 'build-layout', 'build-log', 'build-main', 'build-opt', 'build-pick', 'build-status', 'feedback', 'help-hint-head', 'help-pips', 'primary', 'show'],
-  'lib/widgets/choice.mjs': ['choice', 'choices', 'feedback', 'show'],
   'lib/widgets/configure-it-view.mjs': ['btn', 'configure-inactive', 'configure-input', 'configure-label', 'configure-more', 'configure-note', 'feedback', 'ghost', 'info', 'show', 'small'],
-  'lib/widgets/help-ladder.mjs': ['help-btn', 'help-chip', 'help-chips', 'help-chips-title', 'help-cost', 'help-count', 'help-counts', 'help-h', 'help-hint-row', 'help-hint-text', 'help-rule', 'help-score', 'help-side', 'help-star', 'help-stars', 'help-swirl', 'help-tier', 'help-win', 'help-win-closing', 'help-win-stars', 'help-win-text', 'help-win-title'],
   'lib/widgets/incident-view.mjs': ['feedback', 'show'],
   'lib/widgets/query-it-view.mjs': ['btn', 'feedback', 'ghost', 'info', 'query-data', 'query-input', 'query-label', 'query-note', 'show', 'small'],
   'lib/widgets/sort-it-view.mjs': ['feedback', 'show', 'sort-bucket-btn', 'sort-hint', 'sort-item'],
@@ -283,6 +327,91 @@ test('T13 meter cells left and the alert red reach 3:1 (non-text) on surface and
   // D1: the alert is red, apart from the purple error.
   for (const theme of ['light', 'dark']) {
     assert.notDeepEqual(resolveColor('var(--color-alert)', theme), resolveColor('var(--color-error)', theme), theme);
+  }
+});
+
+// A row is matched by its compound selector (class wf-row plus the attribute test), in any
+// quote or value form and under any ancestor, so `.wf .wf-row[data-other='true']` counts.
+const FADED_ROWS = {
+  overflow: (c) => c.classes.includes('wf-row') && c.attrs.some((a) => a.name === 'data-mark' && a.value === 'overflow'),
+  other: (c) => c.classes.includes('wf-row') && c.attrs.some((a) => a.name === 'data-other'),
+};
+const subjects = (list) => list.flatMap((r) => splitTop(r.selector).map((s) => ({ cs: compounds(s), body: r.body })));
+/** The lowest opacity a rule puts on the matched row itself (its last compound), so on every word in it. */
+const rowAlpha = (list, isRow) => Math.min(1, ...subjects(list)
+  .filter(({ cs }) => isRow(cs.at(-1)))
+  .flatMap(({ body }) => decls(body)).filter(([p]) => p === 'opacity').map(([, v]) => Number(v)));
+// The row parts that carry no text (styles/widgets.css, lib/widgets/build-it-view.mjs rowHtml
+// and trackHtml): bars, connector lines, swatches, the grip, the elbow, grid lines and the
+// verdict icon. Anything else inside a row may hold its words (.wf-txt, .wf-name, .wf-svc,
+// .wf-track with its .wf-bar-label), so a fade on it fades text.
+const NON_TEXT = ['wf-bar', 'wf-conn', 'wf-sw', 'wf-grip', 'wf-elbow', 'wf-grid', 'wf-mark'];
+/**
+ * The opacity possibly-text elements inside the matched row (row as a non-last compound) put on
+ * its words. Opacity stacks, so a .wf-txt fade inside a .wf-name fade draws at their product:
+ * this multiplies every such rule. Siblings that do not nest (.wf-txt and .wf-name side by side)
+ * are over-counted, so the result can be lower than any real word, never higher: a nested fade
+ * is never missed.
+ */
+const innerAlpha = (list, isRow) => subjects(list)
+  .filter(({ cs }) => cs.slice(0, -1).some(isRow) && !cs.at(-1).classes.some((c) => NON_TEXT.includes(c)))
+  .flatMap(({ body }) => decls(body)).filter(([p]) => p === 'opacity')
+  .reduce((a, [, v]) => a * Number(v), 1);
+/** What the row's text is drawn at: the row's own fade times the stacked fades on its text-bearing children. */
+const textAlpha = (list, isRow) => rowAlpha(list, isRow) * innerAlpha(list, isRow);
+/** Opacities put on a .wf-bar inside the matched row. */
+const barOpacities = (list, isRow) => subjects(list)
+  .filter(({ cs }) => cs.at(-1).classes.includes('wf-bar') && cs.slice(0, -1).some(isRow))
+  .flatMap(({ body }) => decls(body)).filter(([p]) => p === 'opacity').map(([, v]) => Number(v));
+
+test('T13 harness: a row fade is found in any quote, value or ancestor form; a fade on text inside the row counts; a bar fade does not', () => {
+  for (const css of ['.wf-row[data-other="true"] { opacity: .35 }', ".wf-row[data-other='true'] { opacity: .35 }",
+    '.wf .wf-row[data-other] { opacity: .35 }', '.wf-row[data-other]:hover { opacity: .35 }', '.wf-row[ data-other = true ] { opacity: .35 }']) {
+    assert.equal(rowAlpha(rules(css), FADED_ROWS.other), 0.35, css);
+  }
+  for (const css of ['.wf-row[data-mark="overflow"] { opacity: .4 }', ".wf-row[data-mark='overflow'] { opacity: .4 }",
+    '.wf-row[data-mark=overflow] { opacity: .4 }', '.wf > .wf-row[data-mark="overflow"] { opacity: .4 }', 'a, .wf-row[data-mark="overflow"] { opacity: .4 }']) {
+    assert.equal(rowAlpha(rules(css), FADED_ROWS.overflow), 0.4, css);
+  }
+  for (const css of ['.wf-row[data-other] .wf-bar { opacity: .35 }', '.wf-row[data-mark="invalid"] { opacity: .3 }', '.wf-root[data-other] { opacity: .3 }']) {
+    assert.equal(rowAlpha(rules(css), FADED_ROWS.other), 1, css);
+    assert.equal(rowAlpha(rules(css), FADED_ROWS.overflow), 1, css);
+  }
+  // A fade on the text inside the row is a text fade, alone or on a shared rule with the marks.
+  for (const css of ['.wf-row[data-other] .wf-bar, .wf-row[data-other] .wf-txt { opacity: .35 }',
+    '.wf-row[data-other] .wf-name { opacity: .35 }', '.wf .wf-row[data-other] > .wf-track { opacity: .35 }']) {
+    assert.equal(textAlpha(rules(css), FADED_ROWS.other), 0.35, css);
+  }
+  assert.equal(textAlpha(rules('.wf-row[data-mark="overflow"] { opacity: .5 } .wf-row[data-mark="overflow"] .wf-txt { opacity: .5 }'), FADED_ROWS.overflow), 0.25);
+  // Nested fades stack: .9 on the text inside .9 on the name is drawn at .81, not the lower .9.
+  assert.equal(textAlpha(rules('.wf-row[data-other] .wf-txt { opacity: .9 } .wf-row[data-other] .wf-name { opacity: .9 }'), FADED_ROWS.other), 0.81);
+  for (const css of ['.wf-row[data-other] .wf-bar, .wf-row[data-other] .wf-conn, .wf-row[data-other] .wf-sw, .wf-row[data-other] .wf-grip { opacity: .35 }',
+    '.wf-row[data-other] .wf-elbow, .wf-row[data-other] .wf-mark { opacity: .35 }', '.wf-txt { opacity: .35 }', '.wf-row[data-mark="invalid"] .wf-txt { opacity: .3 }']) {
+    assert.equal(textAlpha(rules(css), FADED_ROWS.other), 1, css);
+  }
+  assert.deepEqual(barOpacities(rules(".wf .wf-row[data-other='1'] .wf-bar { opacity: .35 }"), FADED_ROWS.other), [0.35]);
+  assert.deepEqual(barOpacities(rules('.wf-row[data-other] { opacity: .35 }'), FADED_ROWS.other), []);
+});
+
+// Deferred from the PR #164 review: a faded waterfall row (the overflow mark, another trace)
+// faded the whole row, so its "its parent" text fell to about 2.2:1. The fade goes on the
+// marks and bars; the row's text keeps 4.5:1 in both themes.
+test('T13 faded waterfall rows fade the bars, not the text: row text keeps 4.5:1 on the board, both themes', () => {
+  const list = sheetRules('widgets.css');
+  for (const [row, isRow] of Object.entries(FADED_ROWS)) {
+    const alpha = textAlpha(list, isRow);
+    for (const theme of ['light', 'dark']) {
+      for (const bg of ['--color-surface', '--color-bg']) {
+        const under = resolveColor(`var(${bg})`, theme);
+        for (const fg of ['--color-text', '--color-text-muted', '--color-parent']) {
+          const seen = resolveColor(`var(${fg})`, theme).map((c, i) => c * alpha + under[i] * (1 - alpha));
+          const r = ratio(seen, under);
+          assert.ok(r >= 4.5, `${theme}: ${fg} in the ${row} row on ${bg} is ${r.toFixed(2)} (text opacity ${alpha}), needs 4.5`);
+        }
+      }
+    }
+    const bar = barOpacities(list, isRow);
+    assert.ok(bar.length && Math.min(...bar) < 1, `the ${row} row still fades its bars, the non-text cue`);
   }
 });
 

@@ -175,7 +175,8 @@ View `lib/widgets/build-it-view.mjs` (redesigned in #146 from the owner-approved
   is free. Check: a new failing Check costs one, an identical recheck is free (`Same as last
   time: N problems.`). Each hint tier costs one `ctx.hint()`. Retrying is free; Reset puts the
   board back and keeps what was paid.
-- **Right column** (`lib/widgets/help-ladder.mjs`, shared so Sort it can adopt it, #156): about
+- **Right column** (markup: `sideColumn` and `helpChips` in `lib/ui/side.mjs`; behaviour:
+  `lib/widgets/help-ladder.mjs`, shared so Sort it can adopt it, #156): about
   300px and sticky beside the board from about 960px of widget width (a container query), else
   stacked under it: the success card (hidden until success; heading focused, no focus ring;
   stars line; the spec's `closing`), the score card (wrong drops or failed Checks, hints, five
@@ -219,11 +220,11 @@ letting an author's text vanish.
 Logs mode view (#113 phase B), same `renderBuild` / `mountBuild`, span mode unchanged:
 - **Board.** The read-only waterfall (one row per span, widened by the record times through
   `waterfall(spans, {times})`; a row's accessible name ends `, N records` once records are
-  attached), then the log stream `<ol class="build-logs">`: one `button.build-log`
-  per record with `data-log` first and `aria-pressed`, spec order, text `time ms · SEVERITY ·
+  attached), then the log stream `<ol class="wf-logs">`: one `li` per record holding a
+  `[data-log]` kit option (first, with `aria-pressed`), spec order, text `time ms · SEVERITY ·
   service · trace_id=… · span_id=… · body · k=v, …`; a blank id reads `(none)`.
-- **Select a record.** A dashed `<line class="wf-cursor">` at its time in every row's track (`timeAxis(...).pct`)
-  and the panel "Span context for "body" (service, time ms)": `data-attach` buttons, "No span
+- **Select a record.** A dashed `<line class="wf-cursor">` at its time in every row's track
+  (`timeAxis(...).pct`) and the panel "Span context for "body" (service, time ms)": `data-attach` buttons, "No span
   context" (`data-attach="none"`) first, then every span in row order. Attaching is free and
   says `"body" now carries span_id=… and trace_id=… from <span>.` (or `now has no span context`).
   The ids come from `applyLogs`, never from the view.

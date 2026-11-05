@@ -160,6 +160,57 @@ test('code is plain text: an <img onerror> in it renders escaped', () => {
   assert.equal(text('pre code'), injected);
 });
 
+// ---- T12 (#158): the step frame comes from the kit; the step type decides its width -------
+
+test('T12 every step type says whether its step is wide; Build it is the wide one (for now the only)', () => {
+  for (const [key, type] of Object.entries(STEP_TYPES)) assert.equal(typeof type.wide, 'boolean', `${key}.wide`);
+  assert.deepEqual(Object.keys(STEP_TYPES).filter((k) => STEP_TYPES[k].wide), ['build']);
+});
+
+test('T12 each step renders one kit step, wide by its type: a build step holds the board and its side column', () => {
+  const seen = [];
+  playAll(FX, (i, { key }) => {
+    const wide = STEP_TYPES[key].wide;
+    seen.push(key);
+    assert.equal(qa('.ui-step').length, 1, `step ${i + 1} (${key}) is one kit step`);
+    assert.equal(qa('.ui-step--wide').length, wide ? 1 : 0, `step ${i + 1} (${key}) width`);
+    assert.equal(qa('.ui-actions--wide').length, wide ? 1 : 0, `step ${i + 1} (${key}) actions width`);
+    assert.equal(qa('.ui-step .ui-lesson').length, 1, `step ${i + 1} (${key}) opens with the lesson card`);
+    assert.equal(qa('.ui-step .ui-question').length, FX.play.steps[i].question == null ? 0 : 1, `step ${i + 1} (${key}) question`);
+    if (key === 'build') {
+      assert.equal(qa('.ui-step--wide .ui-split').length, 1, 'the board and side column split inside the wide step');
+      assert.equal(qa('.ui-split-side [id$="-win"]').length, 1, 'the side column holds the success card');
+    }
+  });
+  assert.deepEqual(seen.includes('build') && seen.includes('choice'), true);
+});
+
+test('a step\'s show is its lead-in prose: after the lesson card, before the question, and only on that step', () => {
+  const lv = playFixture();
+  lv.play.steps[0].show = 'Lead-in <em>before</em> the pick.';
+  const level = build(lv).levels[ID];
+  const run = start(level);
+  const leads = qa('.ui-step .ui-prose').filter((el) => !el.closest('.ui-lesson'));
+  assert.equal(leads.length, 1, 'one lead-in on the step with show');
+  assert.equal(leads[0].innerHTML, 'Lead-in <em>before</em> the pick.');
+  const order = qa('.ui-step .ui-lesson, .ui-step .ui-prose, .ui-step .ui-question')
+    .filter((el) => el.matches('.ui-lesson, .ui-question') || !el.closest('.ui-lesson'))
+    .map((el) => (el.matches('.ui-lesson') ? 'lesson' : el.matches('.ui-question') ? 'question' : 'show'));
+  assert.deepEqual(order, ['lesson', 'show', 'question']);
+  for (const sel of STEP_DRIVERS.choice.solve(level.play.steps[0].choice)) click(sel);
+  click(advanceId(level, 0));
+  assert.equal(qa('.ui-step .ui-prose').filter((el) => !el.closest('.ui-lesson')).length, 0, 'step 2 has no show, so no lead-in');
+  assert.equal(run.calls.length, 0);
+});
+
+test('the step frame: Next and Finish are the kit primary buttons, the question carries its id', () => {
+  start(FX);
+  assert.equal(q('#fx-next').getAttribute('type'), 'button');
+  assert.equal(q('#fx-next').classList.contains('ui-btn--primary'), true);
+  assert.equal(q('#fx-pick-q').textContent, 'Pick one.');
+  assert.equal(q('#fx-pick-choices').getAttribute('aria-labelledby'), 'fx-pick-q');
+});
+
 test('lib/play.mjs never charges a penalty itself (PI1)', () => {
   const src = readFileSync(new URL('../lib/play.mjs', import.meta.url), 'utf8');
   assert.equal(/mistake\(|hint\(/.test(src), false);

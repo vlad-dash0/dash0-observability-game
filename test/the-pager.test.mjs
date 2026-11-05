@@ -104,6 +104,8 @@ function start() {
 
 const text = (sel) => q(sel)?.textContent.replace(/\s+/g, ' ').trim() ?? null;
 const budget = () => text('#pager-budget');
+// The level's lesson wrapper (hand-written markup until #165); ctx.speech is the kit card inside it.
+const intro = () => text('.lesson-intro');
 const escalateDisabled = () => q('#pager-escalate').disabled;
 /** The look keys whose reason is on screen, in screen order. */
 const said = () => qa('[data-said]').map((el) => el.dataset.said);
@@ -119,7 +121,7 @@ test('the-pager: the first screen shows the alert, a full budget and a disabled 
     LOOKS.map(([k, label]) => `${k}|${label}|false`));
   assert.deepEqual(said(), []);
   assert.equal(text('#pager-escalate'), 'Escalate');
-  assert.equal(text('.speech'), INTRO, 'the intro states the goal and explains Escalate');
+  assert.equal(intro(), INTRO, 'the intro states the goal and explains Escalate');
   assert.equal(q('#pager-escalate').hasAttribute('data-finish'), false, 'Escalate moves to part 2, it does not finish');
   assert.equal(qa('[data-finish]').length, 0, 'no Finish on the first screen');
   assert.equal(escalateDisabled(), true, 'Escalate waits for the first look');
@@ -172,7 +174,7 @@ test('the-pager: Escalate moves to part 2; only Finish after all four asks ends 
     click('#pager-escalate');
     assert.equal(partTwo(), true, `${looks} looks: Escalate shows part 2`);
     assert.equal(finished.length, 0, 'Escalate does not finish');
-    assert.equal(text('.speech'), LIT_INTRO);
+    assert.equal(intro(), LIT_INTRO);
     assert.equal(text('#pager-alert'), ALERT, 'the same alert');
     assert.deepEqual(qa('[data-ask]').map((b) => `${b.dataset.ask}|${b.textContent.trim()}|${b.disabled}`),
       ASKS.map(([k, label]) => `${k}|${label}|false`));
