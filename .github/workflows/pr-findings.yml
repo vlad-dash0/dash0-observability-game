@@ -1,0 +1,81 @@
+name: PR findings
+
+# The findings half of the merge gate: runs tools/pr-findings.mjs (the script a local run
+# uses) and posts its verdict as the `PR findings` commit status on the PR head
+# (tools/pr-findings-status.mjs). A comment-triggered run is not attached to the PR's
+# checks, so the verdict is a status, not this job's result. The repo is public and anyone
+# can comment, so every trigger here runs main's copy of this file (issue_comment,
+# workflow_run; workflow_dispatch needs write access), each checkout is main, and no run
+# script interpolates event data. PR and review events arrive through
+# pr-findings-relay.yml. test/pr-findings-status.test.mjs checks all of this.
+on:
+  issue_comment:
+    types: [created, edited, deleted]
+  workflow_run:
+    workflows: [PR findings relay]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number to re-evaluate (e.g. after hiding a comment)
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  resolve:
+    name: resolve PRs
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      prs: ${{ steps.prs.outputs.prs }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - id: prs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/pr-findings-status.mjs prs
+
+  report:
+    name: report
+    needs: resolve
+    if: needs.resolve.outputs.prs != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pr: ${{ fromJSON(needs.resolve.outputs.prs) }}
+    # One evaluation at a time per PR, in trigger order: a newer run waits, so an older
+    # evaluation never posts last. Each run reads the PR afresh.
+    concurrency:
+      group: pr-findings-${{ matrix.pr }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      # No npm cache in a job that can write; no install scripts (linkedom needs none).
+      - run: npm ci --ignore-scripts
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ matrix.pr }}
+        run: node tools/pr-findings-status.mjs report "$PR"

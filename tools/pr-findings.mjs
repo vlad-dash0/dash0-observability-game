@@ -557,7 +557,8 @@ export function evaluate({ comments, threads }) {
 
 // --- gh layer -------------------------------------------------------------------------
 
-function defaultGh(args) {
+/** Run `gh` with `args` (no shell); resolves stdout. tools/pr-findings-status.mjs uses it too. */
+export function defaultGh(args) {
   return new Promise((done, fail) => {
     execFile('gh', args, { maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) =>
       err ? fail(new Error(stderr.trim() || err.message)) : done(stdout));

@@ -4,7 +4,8 @@
 
 ## How it was tested
 
-<!-- Tests added or changed, run with NODE_OPTIONS=--max-old-space-size=2048; mutations run. -->
+<!-- Tests added or changed, run with NODE_OPTIONS=--max-old-space-size=2048; mutations run.
+     No full-suite test count: CI shows it, and a pasted count goes stale on the next push. -->
 
 ## Not verifiable here
 
@@ -13,7 +14,10 @@
 <!--
 REVIEW COMMENTS: post findings and dispositions as PR comments in these formats.
 `node tools/pr-findings.mjs <PR>` reads them (all pages) and exits 0 PASS, 1 open
-findings, 2 inconclusive. Merge needs `All checks` green and the detector at 0.
+findings, 2 inconclusive. Merge needs `All checks` green and the `PR findings` status
+green: CI runs this same script on every push, comment, review and resolved thread and
+posts its verdict on the head commit (pending while the PR is a draft). Hiding a comment
+fires no event: re-run it then (Actions, PR findings, Run workflow, the PR number).
 
 1. Findings, one comment per review round. The heading names the reviewed commit:
 

@@ -476,4 +476,8 @@ dependencies. CI: on push + pull_request, `permissions: contents: read`, ubuntu-
 `engines` floor) and `node-version-file: .nvmrc`,
 `cache: npm`, `npm ci`, `npm test`. `.nvmrc` = current Active LTS major. An `All checks`
 job (`if: always()`, `needs:` every other job, fails unless each succeeded) is the merge
-gate, with `node tools/pr-findings.mjs <PR>` exiting 0 (#35).
+gate, with the `PR findings` commit status green (#35): `.github/workflows/pr-findings.yml`
+runs `tools/pr-findings.mjs` (the script a local `node tools/pr-findings.mjs <PR>` runs) on
+comment events and, through `pr-findings-relay.yml`, PR and review events, and posts its
+verdict on the PR head; it runs main's code only, and `All checks` cannot include it
+because it re-runs on comments.
