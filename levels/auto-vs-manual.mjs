@@ -2,7 +2,7 @@
 // from what only their own code adds, finds why each of cart's fetch calls shows two CLIENT
 // spans (an injected agent plus a tracing.js NodeSDK), and picks the fix.
 // Spec: docs/M1-DESIGN.md §6 Act 2.
-// Spec: https://opentelemetry.io/docs/zero-code/js/ , https://opentelemetry.io/docs/platforms/kubernetes/operator/automatic/
+// Spec: https://opentelemetry.io/docs/zero-code/js/ , https://opentelemetry.io/docs/platforms/kubernetes/operator/automatic/ , https://opentelemetry.io/docs/specs/otel/trace/api/#spankind
 
 // Step 1. Label wording must not give the bucket away (test/sort-tells.test.mjs).
 const SORT = {
