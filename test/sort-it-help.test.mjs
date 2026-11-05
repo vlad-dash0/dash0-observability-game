@@ -1,11 +1,11 @@
 // The Sort it help ladder, pure (#156 P3b; docs/M1-DESIGN.md §4.1): lib/widgets/sort-it-help.mjs.
 // Which helps a sort step declares (sortHelps, validateSortHelps), the item a hint is for
-// (hintTarget) and the three hint tiers (hintFor), all derived from the answer through
-// bucketOf: there is no second grader. RED spec tests 12-15.
+// (hintTarget), which tiers an item has (hintLadder) and the three hint tiers (hintFor), all
+// derived from the answer through bucketOf: there is no second grader.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newSortState, place } from '../lib/widgets/sort-it.mjs';
-import { hintFor, hintTarget, SORT_RULE, sortHelps, validateSortHelps } from '../lib/widgets/sort-it-help.mjs';
+import { hintFor, hintLadder, hintTarget, NARROWS_AT, SORT_RULE, sortHelps, validateSortHelps } from '../lib/widgets/sort-it-help.mjs';
 
 // The view test's fixture: i1 -> metric, i2 -> log, i3 -> trace, i4 -> metric.
 function signals(extra = {}) {
@@ -49,16 +49,16 @@ function after(spec, moves) {
 }
 const ids = (list) => list.map((x) => (typeof x === 'string' ? x : x.id));
 
-// ---- 12 sortHelps / validateSortHelps ------------------------------------------------
+// ---- sortHelps / validateSortHelps ------------------------------------------------
 
-test('12 sortHelps: hints on only when the step says so; a step with no helps key has hints off', () => {
+test('sortHelps: hints on only when the step says so; a step with no helps key has hints off', () => {
   assert.equal(sortHelps(signals({ helps: { hints: true } })).hints, true);
   assert.equal(sortHelps(signals({ helps: { hints: false } })).hints, false);
   assert.equal(sortHelps(signals()).hints, false, 'the default ladder: no helps key means no hints');
   assert.equal(sortHelps(signals({ helps: {} })).hints, false, 'an empty helps object turns nothing on');
 });
 
-test('12 validateSortHelps: a valid ladder has no problems; a bad key, a non-boolean, a bad hint and a hint with hints off are each named', () => {
+test('validateSortHelps: a valid ladder has no problems; a bad key, a non-boolean, a bad hint and a hint with hints off are each named', () => {
   assert.deepEqual(validateSortHelps(signals()), []);
   assert.deepEqual(validateSortHelps(signals({ helps: { hints: true } })), []);
   assert.deepEqual(validateSortHelps(signals({ helps: { hints: false } })), []);
@@ -77,9 +77,9 @@ test('12 validateSortHelps: a valid ladder has no problems; a bad key, a non-boo
     'no helps key is hints off, so a hint is never shown either');
 });
 
-// ---- 13 hintTarget -------------------------------------------------------------------
+// ---- hintTarget -------------------------------------------------------------------
 
-test('13 hintTarget: the selected item while it remains, else the first remaining item in DISPLAY order, else null', () => {
+test('hintTarget: the selected item while it remains, else the first remaining item in DISPLAY order, else null', () => {
   const spec = signals({ helps: { hints: true } });
   const order = ['i3', 'i1', 'i4', 'i2']; // not spec order: a target read from spec.items gives i1
   const fresh = newSortState(spec);
@@ -98,9 +98,9 @@ test('13 hintTarget: the selected item while it remains, else the first remainin
   assert.equal(hintTarget(spec, all, { selected: 'i2', order }), null);
 });
 
-// ---- 14 hintFor tier 2 ---------------------------------------------------------------
+// ---- hintFor tier 2 ---------------------------------------------------------------
 
-test('14 hintFor tier 2: the right bucket and one untried wrong decoy, in SPEC order; the decoy comes from the shuffle; a tried bucket is never a candidate', () => {
+test('hintFor tier 2: the right bucket and one untried wrong decoy, in SPEC order; the decoy comes from the shuffle; a tried bucket is never a candidate', () => {
   const spec = four();
   const st = after(spec, [['x', 'a']]); // a tried and wrong; untried wrong buckets: b, d
   const one = hintFor(spec, st, 'x', 2, { shuffle: identity });
@@ -112,36 +112,82 @@ test('14 hintFor tier 2: the right bucket and one untried wrong decoy, in SPEC o
     assert.equal(ids(h.cands).includes('a'), false, 'the tried bucket a is never offered');
     assert.equal(ids(h.cands).includes('c'), true, 'the right bucket is always a candidate');
   }
-  assert.equal(one.html, 'It is one of these two, outlined on the board: <b>Bucket B</b> or <b>Bucket C</b>.');
-  assert.equal(two.html, 'It is one of these two, outlined on the board: <b>Bucket C</b> or <b>Bucket D</b>.');
+  assert.equal(one.html, '<p>It is one of these two, outlined on the board: <b>Bucket B</b> or <b>Bucket C</b>.</p>');
+  assert.equal(two.html, '<p>It is one of these two, outlined on the board: <b>Bucket C</b> or <b>Bucket D</b>.</p>');
 });
 
-test('14 hintFor tier 2: with only the right bucket untried it is the one candidate and the text says so', () => {
+// ---- hintLadder ----------------------------------------------------------------------
+
+// Two buckets: an item has at most two untried, so tier 2 could never narrow it.
+function pair() {
+  return {
+    id: 'pair',
+    buckets: [{ id: 'p', label: 'P' }, { id: 'q', label: 'Q' }],
+    items: [{ id: 'z', label: 'Item Z', bucket: 'q', why: 'Q it is.' }],
+  };
+}
+
+test('NARROWS_AT is 3: the right bucket, a decoy and one more', () => {
+  assert.equal(NARROWS_AT, 3);
+});
+
+test('hintLadder on a 2-bucket item: tiers [1, 3], nothing used, the rule next; the rule then the placement', () => {
+  const spec = pair();
+  const st = newSortState(spec);
+  assert.deepEqual(hintLadder(spec, st, 'z'), { tiers: [1, 3], done: 0, next: 1 });
+  assert.deepEqual(hintLadder(spec, st, 'z', { ruleShown: true }), { tiers: [1, 3], done: 1, next: 3 },
+    'after the rule, the next is the placement: "Hint 2 of 2"');
+  assert.deepEqual(hintLadder(spec, st, 'z', { ruleShown: true, taken: [3] }), { tiers: [1, 3], done: 2, next: null });
+});
+
+test('hintLadder on a 4-bucket item: tiers [1, 2, 3], walked in order', () => {
   const spec = four();
-  const st = after(spec, [['x', 'a'], ['x', 'b'], ['x', 'd']]);
-  for (const shuffle of [identity, reverse]) {
-    const h = hintFor(spec, st, 'x', 2, { shuffle });
-    assert.deepEqual(ids(h.cands), ['c']);
-    assert.equal(h.html, 'Only <b>Bucket C</b> is left untried for it.');
-  }
+  const st = newSortState(spec);
+  assert.deepEqual(hintLadder(spec, st, 'x'), { tiers: [1, 2, 3], done: 0, next: 1 });
+  assert.deepEqual(hintLadder(spec, st, 'x', { ruleShown: true }), { tiers: [1, 2, 3], done: 1, next: 2 });
+  assert.deepEqual(hintLadder(spec, st, 'x', { ruleShown: true, taken: [2] }), { tiers: [1, 2, 3], done: 2, next: 3 });
+  assert.deepEqual(hintLadder(spec, st, 'x', { ruleShown: true, taken: [2, 3] }), { tiers: [1, 2, 3], done: 3, next: null });
 });
 
-// ---- 15 tiers 1 and 3 ---------------------------------------------------------------
+test('hintLadder: exactly NARROWS_AT untried keeps tier 2; one fewer drops it, unless tier 2 was already taken', () => {
+  const spec = four();
+  const three = after(spec, [['x', 'a']]); // untried b, c, d: exactly 3
+  assert.deepEqual(hintLadder(spec, three, 'x', { ruleShown: true }).tiers, [1, 2, 3]);
+  const two = after(spec, [['x', 'a'], ['x', 'b']]); // untried c, d: 2
+  assert.deepEqual(hintLadder(spec, two, 'x', { ruleShown: true }), { tiers: [1, 3], done: 1, next: 3 },
+    'tier 2 would offer the only two left: dropped, the placement is next');
+  assert.deepEqual(hintLadder(spec, two, 'x', { ruleShown: true, taken: [2] }), { tiers: [1, 2, 3], done: 2, next: 3 },
+    'a tier 2 already given stays counted');
+  // Another item's tries do not drop this item's tier 2: untried is per item.
+  assert.deepEqual(hintLadder(spec, two, 'y').tiers, [1, 2, 3]);
+});
 
-test('15 hintFor tier 1: the step\'s own hint when it has one, else the generic rule; no candidates, nothing placed', () => {
+test('hintLadder: the rule counts once shown for any item (ruleShown) or when this item took it; taken tiers of another kind do not', () => {
+  const spec = four();
+  const st = newSortState(spec);
+  assert.equal(hintLadder(spec, st, 'x', { ruleShown: false }).done, 0);
+  assert.equal(hintLadder(spec, st, 'x', { ruleShown: true }).done, 1);
+  assert.deepEqual(hintLadder(spec, st, 'x', { taken: [1] }), { tiers: [1, 2, 3], done: 1, next: 2 });
+  // Without the rule, a taken tier 2 is counted but the rule is still next.
+  assert.deepEqual(hintLadder(spec, st, 'x', { taken: [2] }), { tiers: [1, 2, 3], done: 1, next: 1 });
+});
+
+// ---- tiers 1 and 3 ---------------------------------------------------------------
+
+test('hintFor tier 1: the step\'s own hint when it has one, else the generic rule; no candidates, nothing placed', () => {
   const spec = four();
   const st = newSortState(spec);
   const generic = hintFor(spec, st, 'x', 1, { shuffle: identity });
   assert.equal(typeof SORT_RULE, 'string');
   assert.ok(SORT_RULE.trim().length > 20, 'a real sentence');
-  assert.equal(generic.html, SORT_RULE);
+  assert.equal(generic.html, `<p>${SORT_RULE}</p>`);
   assert.deepEqual(ids(generic.cands ?? []), []);
   assert.equal(generic.apply ?? null, null);
   const own = hintFor({ ...spec, helps: { hints: true }, hint: 'Count the <b>shapes</b>.' }, st, 'x', 1, { shuffle: identity });
-  assert.equal(own.html, 'Count the <b>shapes</b>.', 'the authored hint replaces the generic rule');
+  assert.equal(own.html, '<p>Count the <b>shapes</b>.</p>', 'the authored hint replaces the generic rule, wrapped as a paragraph');
 });
 
-test('15 hintFor tier 3: applies the RIGHT bucket (from the answer), whichever buckets were tried', () => {
+test('hintFor tier 3: applies the RIGHT bucket (from the answer), whichever buckets were tried', () => {
   const spec = four();
   // a tried: untried is [b, c, d], so an apply of untried[0] would give b.
   assert.deepEqual(hintFor(spec, after(spec, [['x', 'a']]), 'x', 3, { shuffle: identity }).apply, { bucket: 'c' });
@@ -151,4 +197,5 @@ test('15 hintFor tier 3: applies the RIGHT bucket (from the answer), whichever b
   const st = after(spec, [['x', 'a']]);
   const { apply } = hintFor(spec, st, 'x', 3, { shuffle: identity });
   assert.equal(place(spec, st, 'x', apply.bucket).outcome, 'right');
+  assert.equal(hintFor(spec, st, 'x', 3, { shuffle: identity }).html, '<p>Placed for you. Item X goes in <b>Bucket C</b>. C it is.</p>');
 });

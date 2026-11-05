@@ -1,4 +1,4 @@
-// The Sort it help ladder per level (#156 P3b, test 20; recorded on #156): every Sort it step
+// The Sort it help ladder per level (#156): every Sort it step
 // declares its helps explicitly, and the ten Sort levels follow the default ladder. Hints are on
 // in the first lessons (0.1, 0.2, 0.3, 1.1, 2.3) and off later (2.5, 2.7, 3.1, 4.1, 5.6). A step
 // with no helps key would have hints off (sortHelps), but the ladder is a decision, so it is
@@ -42,12 +42,12 @@ async function sortLevels() {
   return out;
 }
 
-test('20 the Sort levels are exactly the ten on the ladder', async () => {
+test('the Sort levels are exactly the ten on the ladder', async () => {
   const found = (await sortLevels()).map((l) => l.no).sort();
   assert.deepEqual(found, Object.keys(LADDER).sort());
 });
 
-test('20 each Sort it step declares its helps, and they match the ladder', async () => {
+test('each Sort it step declares its helps, and they match the ladder', async () => {
   const got = {};
   for (const { no, file, specs } of await sortLevels()) {
     for (const spec of specs) {
@@ -61,7 +61,7 @@ test('20 each Sort it step declares its helps, and they match the ladder', async
   assert.deepEqual(got, want);
 });
 
-test('20 the board renders the ladder: a Hint button exactly where hints are on', async () => {
+test('the board renders the ladder: a Hint button exactly where hints are on', async () => {
   for (const { no, file, specs } of await sortLevels()) {
     for (const spec of specs) {
       const dom = makeDom();

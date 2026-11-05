@@ -486,7 +486,7 @@ test('#146 a build step may declare its helps and a closing line; bad helps are 
   assert.deepEqual(problems((p) => { p.steps[2].build.closing = ''; }), ['step 3 (build "fx-tree"): closing: not non-empty text']);
 });
 
-test('19 #156 a sort step may declare its helps and a hint; a typo is named with a did-you-mean; bad helps are refused with the widget\'s message', () => {
+test('#156 a sort step may declare its helps and a hint; a typo is named with a did-you-mean; bad helps are refused with the widget\'s message', () => {
   assert.deepEqual(problems((p) => { p.steps[1].sort.helps = { hints: true }; p.steps[1].sort.hint = 'Ask what shape the data has.'; }), []);
   assert.deepEqual(problems((p) => { p.steps[1].sort.helps = { hints: false }; }), []);
   assert.deepEqual(problems((p) => { p.steps[1].sort.helpz = { hints: true }; }),

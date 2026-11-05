@@ -577,13 +577,16 @@ test('lib/widgets uses no timers (I2)', () => {
   }
 });
 
-// ---- P3b 16-18 the help ladder on the board (#156) ------------------------------------------
+// ---- the help ladder on the board (#156) ------------------------------------------
 
 const withHints = (extra = {}) => ({ ...fixture(), helps: { hints: true }, ...extra });
 const hintedBuckets = () => qa('[data-bucket][data-hinted]').map((b) => b.dataset.bucket);
 const chips = () => text('#signals-helps');
+const hintText = () => q('#signals-hint-text').innerHTML;
+const hintLabel = () => text('#signals-hint');
+const tierLine = () => text('#signals-hint-tier');
 
-test('16 three hint tiers on i2: three hints and no mistake, two outlined candidates at tier 2, then i2 placed in Log and the outlines gone', () => {
+test('three hint tiers on i2: three hints and no mistake, two outlined candidates at tier 2, then i2 placed in Log and the outlines gone', () => {
   const { counts, mount } = setup(withHints());
   mount();
   click('[data-item="i2"]');
@@ -603,12 +606,16 @@ test('16 three hint tiers on i2: three hints and no mistake, two outlined candid
   assert.equal(q('#signals-hints').textContent, '3');
   assert.equal(q('#signals-wrong').textContent, '0');
   assert.equal(placed('log'), 'Stack trace text');
+  assert.equal(feedback(), 'Placed for you.', 'a hint placement is not earned: no "Right."');
+  assert.equal(tone(), 'neutral');
+  assert.equal(hintText().includes('Placed for you. Stack trace text goes in <b>Log</b>. A timestamped record.'), true,
+    'the hint panel says where and why');
   assert.deepEqual(items(), ['i1', 'i3', 'i4']);
   assert.deepEqual(hintedBuckets(), [], 'the outlines clear once the item is placed');
   assert.equal(sorted(), 'Sorted 1 of 4');
 });
 
-test('16 the outlines clear when the player places the item after tier 2', () => {
+test('the outlines clear when the player places the item after tier 2', () => {
   const { counts, mount } = setup(withHints());
   mount();
   click('[data-item="i2"]');
@@ -621,7 +628,7 @@ test('16 the outlines clear when the player places the item after tier 2', () =>
   assert.deepEqual(counts, { mistakes: 0, hints: 2, done: 0 });
 });
 
-test('17 tier 3 on the last remaining item completes the board once; the win line counts the hints', () => {
+test('tier 3 on the last remaining item completes the board once; the win line counts the hints', () => {
   const { counts, swirls, mount } = setup(withHints());
   mount();
   sortTo('i1', 'metric');
@@ -643,7 +650,7 @@ test('17 tier 3 on the last remaining item completes the board once; the win lin
   assert.deepEqual(counts, { mistakes: 0, hints: 3, done: 1 }, 'nothing after done');
 });
 
-test('18 the Hint button: tier and cost before use; with nothing selected it picks the first item shown; disabled with nothing to hint after done', () => {
+test('the Hint button: tier and cost before use; with nothing selected it picks the first item shown; disabled with nothing to hint after done', () => {
   const r = reversing();
   const { counts, mount } = setup(withHints(), { shuffle: r.shuffle });
   mount();
@@ -668,7 +675,7 @@ test('18 the Hint button: tier and cost before use; with nothing selected it pic
   assert.deepEqual(counts, { mistakes: 0, hints: 1, done: 1 }, 'a click that gets through anyway costs nothing');
 });
 
-test('18 hints off (and no helps key): no Hint button, the tier line says so, the chips say hints off', () => {
+test('hints off (and no helps key): no Hint button, the tier line says so, the chips say hints off', () => {
   for (const spec of [{ ...fixture(), helps: { hints: false } }, fixture()]) {
     const { counts, mount } = setup(spec);
     mount();
@@ -680,7 +687,102 @@ test('18 hints off (and no helps key): no Hint button, the tier line says so, th
   }
 });
 
-test('16 the tier-2 decoy is drawn through ctx.shuffle: a reversing draw picks Trace, not Metric', () => {
+// Two buckets: no item ever has three untried, so its ladder is the rule and the placement.
+function pairFixture() {
+  return {
+    id: 'signals',
+    helps: { hints: true },
+    buckets: [
+      { id: 'metric', label: 'Metric' },
+      { id: 'log', label: 'Log' },
+    ],
+    items: [
+      { id: 'i1', label: 'Request rate', bucket: 'metric', why: 'A number over time.' },
+      { id: 'i2', label: 'Stack trace text', bucket: 'log', why: 'A timestamped record.' },
+    ],
+  };
+}
+
+test('the rule is charged once per board: after the rule on i2, Hint on i1 gives its tier 2, not the rule again', () => {
+  const { counts, mount } = setup(withHints());
+  mount();
+  click('[data-item="i2"]');
+  assert.equal(hintLabel(), 'Hint 1 of 3');
+  click('#signals-hint'); // the rule, for the board
+  assert.equal(hintText().includes('Ask what the item actually is'), true, 'tier 1 is the rule');
+  assert.deepEqual(counts, { mistakes: 0, hints: 1, done: 0 });
+  click('[data-item="i1"]');
+  assert.equal(hintLabel(), 'Hint 2 of 3', 'i1 starts with the rule already used');
+  assert.equal(tierLine(), 'For Request rate: 1 of 3 used');
+  click('#signals-hint');
+  assert.deepEqual(counts, { mistakes: 0, hints: 2, done: 0 }, 'one click, one hint');
+  assert.equal(q('#signals-hints').textContent, '2');
+  assert.equal(hintText().includes('Ask what'), false, 'not the rule again');
+  assert.equal(hintText().includes('It is one of these two'), true, 'tier 2 for i1');
+  assert.deepEqual(hintedBuckets(), ['metric', 'log'], 'i1 outlined: Metric (right) and the identity-drawn decoy Log');
+  assert.equal(hintLabel(), 'Hint 3 of 3');
+});
+
+test('a 2-bucket board: "Hint 1 of 2", then after the rule "Hint 2 of 2" places the item, for every item', () => {
+  const { counts, mount } = setup(pairFixture());
+  mount();
+  click('[data-item="i1"]');
+  assert.equal(hintLabel(), 'Hint 1 of 2', 'tier 2 cannot narrow two buckets: it is not offered');
+  assert.equal(tierLine(), 'For Request rate: 0 of 2 used');
+  click('#signals-hint');
+  assert.equal(hintLabel(), 'Hint 2 of 2');
+  assert.equal(tierLine(), 'For Request rate: 1 of 2 used');
+  assert.deepEqual(hintedBuckets(), []);
+  click('#signals-hint');
+  assert.equal(placed('metric'), 'Request rate', 'the second hint places it');
+  assert.deepEqual(counts, { mistakes: 0, hints: 2, done: 0 });
+  assert.equal(feedback(), 'Placed for you.');
+  assert.equal(tone(), 'neutral');
+  // i2 is the next target: the rule was already shown on this board.
+  assert.equal(hintLabel(), 'Hint 2 of 2');
+  assert.equal(tierLine(), 'For Stack trace text: 1 of 2 used');
+  click('#signals-hint');
+  assert.equal(placed('log'), 'Stack trace text');
+  assert.deepEqual(counts, { mistakes: 0, hints: 3, done: 1 });
+});
+
+test('a wrong try that leaves two untried drops tier 2 for that item: the next hint after the rule places it', () => {
+  const { counts, mount } = setup(withHints());
+  mount();
+  sortTo('i2', 'metric'); // wrong: i2 has log and trace untried
+  assert.equal(counts.mistakes, 1);
+  assert.equal(hintLabel(), 'Hint 1 of 2');
+  click('#signals-hint');
+  assert.equal(hintLabel(), 'Hint 2 of 2');
+  click('#signals-hint');
+  assert.equal(placed('log'), 'Stack trace text');
+  assert.deepEqual(counts, { mistakes: 1, hints: 2, done: 0 });
+});
+
+test('the outlines are per item: gone while another item is selected, back on reselecting; tier counts are per item', () => {
+  const { counts, mount } = setup(withHints());
+  mount();
+  click('[data-item="i2"]');
+  click('#signals-hint');
+  click('#signals-hint'); // tier 2 on i2: metric and log
+  assert.deepEqual(hintedBuckets(), ['metric', 'log']);
+  assert.equal(tierLine(), 'For Stack trace text: 2 of 3 used');
+  click('[data-item="i1"]');
+  assert.deepEqual(hintedBuckets(), [], 'i2\'s outlines are not i1\'s');
+  assert.equal(hintLabel(), 'Hint 2 of 3', 'i1 has only the board-wide rule used');
+  assert.equal(tierLine(), 'For Request rate: 1 of 3 used');
+  click('[data-item="i2"]');
+  assert.deepEqual(hintedBuckets(), ['metric', 'log'], 'reselecting i2 redraws its outlines');
+  assert.equal(hintLabel(), 'Hint 3 of 3');
+  assert.equal(tierLine(), 'For Stack trace text: 2 of 3 used');
+  assert.deepEqual(counts, { mistakes: 0, hints: 2, done: 0 }, 'selecting costs nothing');
+  click('[data-bucket="metric"]'); // the decoy: wrong, two untried left, but the tier 2 given stays counted
+  assert.deepEqual(counts, { mistakes: 1, hints: 2, done: 0 });
+  assert.equal(hintLabel(), 'Hint 3 of 3');
+  assert.equal(tierLine(), 'For Stack trace text: 2 of 3 used');
+});
+
+test('the tier-2 decoy is drawn through ctx.shuffle: a reversing draw picks Trace, not Metric', () => {
   // The first call shuffles the pool (kept in authored order here); later calls draw the decoy reversed.
   let calls = 0;
   const shuffle = (a) => (calls++ === 0 ? [...a] : [...a].reverse());

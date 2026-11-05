@@ -1,5 +1,5 @@
 // lib/widgets/help-ladder.mjs: the shared help ladder's behaviour around the right column
-// (score card, hint tools, success card), for Build it now and Sort it later (#146, #156).
+// (score card, hint tools, success card), for Build it and Sort it (#146, #156).
 // The markup is the kit's (lib/ui/side.mjs helpChips, sideColumn, stars; #158). Asserts
 // strings, numbers and booleans only.
 import { test } from 'node:test';
