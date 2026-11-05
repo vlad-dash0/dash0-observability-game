@@ -50,7 +50,8 @@
          level = country); its canvas is sized by CSS classes, never a style attribute (CSP
          style-src 'self'). Without WebGL the list below takes its place. -->
     <section class="map-panel" aria-labelledby="map-title">
-      <h2 id="map-title" class="section-label">World map</h2>
+      <h2 id="map-title" class="section-label" tabindex="-1">World map</h2>
+      <p class="visually-hidden" role="status" x-text="litNote"></p>
       <div class="globe" x-show="!globeFallback">
         <div class="globe-stage" role="img" :aria-label="mapLabel()"></div>
         <p class="globe-hint" aria-hidden="true">Drag to rotate</p>

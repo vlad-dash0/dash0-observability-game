@@ -1,6 +1,6 @@
 // The CI merge gate (#35): an `All checks` job that needs every other job and fails unless
-// all of them succeeded. Branch protection is unavailable on this plan, so this single
-// status is what a merge waits on; a job left out of its `needs` would never gate a merge.
+// all of them succeeded. Branch protection is unavailable on this plan, so a merge waits on
+// this status (and on `PR findings`, below); a job left out of its `needs` would never gate a merge.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -109,9 +109,12 @@ test('all-checks runs always and fails unless every needed job succeeded', () =>
   assert.match(gate, /"\$r" = success/, 'each result must equal success (not merely "not failure")');
 });
 
-// Only ci.yml's jobs are gated. A new workflow file would add a check `All checks` does not
-// wait on, so adding one means extending this list and gating its jobs deliberately.
-const WORKFLOWS = ['ci.yml'];
+// Only ci.yml's jobs are gated by `All checks`. A new workflow file would add a check it does
+// not wait on, so adding one means extending this list and gating its jobs deliberately.
+// pr-findings.yml posts the `PR findings` status, the merge gate's other half (it re-runs on
+// comments, which `All checks` cannot wait on); pr-findings-relay.yml only triggers it
+// (test/pr-findings-status.test.mjs checks both).
+const WORKFLOWS = ['ci.yml', 'pr-findings-relay.yml', 'pr-findings.yml'];
 
 test('every workflow file is on the allow-list', () => {
   const files = readdirSync(join(ROOT, '.github/workflows')).sort();

@@ -713,7 +713,9 @@ test('L3: a disposition must start with a verdict or name a commit or #N; every 
 // A fake `gh`: pages are returned whole only under --paginate --slurp, as gh does;
 // without --slurp gh concatenates pages (not valid JSON); without --paginate, page one.
 // Comments, reviews and threads are three GraphQL connections, told apart by the query.
-function fakeGh({ comments: c = [[]], reviews = [[]], threads = [[]], fail } = {}) {
+// The PR itself (its author) is one plain query, told apart by `author` at the PR level;
+// by default a trusted owner, `dev`.
+function fakeGh({ comments: c = [[]], reviews = [[]], threads = [[]], fail, prAuthor = { author: { login: 'dev' }, authorAssociation: 'OWNER' } } = {}) {
   const calls = [];
   const gh = async (args) => {
     calls.push(args);
@@ -721,6 +723,9 @@ function fakeGh({ comments: c = [[]], reviews = [[]], threads = [[]], fail } = {
     if (fail && fail.test(joined)) throw new Error('gh: HTTP 502');
     if (/repo view/.test(joined)) return 'acme/game\n';
     if (!args.includes('graphql')) throw new Error(`unexpected gh call: ${joined}`);
+    if (/pullRequest\(number: \$number\) \{ author/.test(joined)) {
+      return JSON.stringify({ data: { repository: { pullRequest: prAuthor } } });
+    }
     const key = /reviewThreads\(/.test(joined) ? 'reviewThreads' : /reviews\(/.test(joined) ? 'reviews' : 'comments';
     const src = { reviewThreads: threads, reviews, comments: c }[key];
     const pages = src.map((nodes, i) => ({
@@ -735,16 +740,17 @@ function fakeGh({ comments: c = [[]], reviews = [[]], threads = [[]], fail } = {
   return { gh, calls };
 }
 
-const issueComment = (i, name, extra = {}) => ({ createdAt: at(i), lastEditedAt: null, isMinimized: false, url: `c${i}`, bodyHTML: fx(name), ...extra });
+// A collaborator's comment unless `extra` says otherwise (see the trust tests).
+const issueComment = (i, name, extra = {}) => ({ createdAt: at(i), lastEditedAt: null, isMinimized: false, url: `c${i}`, bodyHTML: fx(name), authorAssociation: 'OWNER', ...extra });
 const sink = () => { const lines = []; return { lines, log: (s) => lines.push(s) }; };
 
 test('fetchPr reads every page of comments, reviews and threads, with edit and hidden flags', async () => {
   const { gh } = fakeGh({
     comments: [[issueComment(0, 'review', { lastEditedAt: at(9), author: { login: 'ann' } })], [issueComment(2, 'dispositions-partial', { isMinimized: true })]],
-    reviews: [[{ submittedAt: at(1), createdAt: at(1), lastEditedAt: null, isMinimized: false, url: 'r1', bodyHTML: '' }],
-      [{ submittedAt: null, createdAt: at(3), lastEditedAt: at(4), isMinimized: false, url: 'r2', bodyHTML: fx('combined') }]],
-    threads: [[{ isResolved: true, path: 'a', line: 1, comments: { nodes: [{ body: 'x', url: 't0' }] } }],
-      [{ isResolved: false, path: 'b', line: 2, comments: { nodes: [{ body: 'y', url: 't1' }] } }]],
+    reviews: [[{ submittedAt: at(1), createdAt: at(1), lastEditedAt: null, isMinimized: false, url: 'r1', bodyHTML: '', authorAssociation: 'MEMBER' }],
+      [{ submittedAt: null, createdAt: at(3), lastEditedAt: at(4), isMinimized: false, url: 'r2', bodyHTML: fx('combined'), authorAssociation: 'MEMBER' }]],
+    threads: [[{ isResolved: true, resolvedBy: { login: 'dev' }, path: 'a', line: 1, comments: { nodes: [{ body: 'x', url: 't0', authorAssociation: 'OWNER' }] } }],
+      [{ isResolved: false, path: 'b', line: 2, comments: { nodes: [{ body: 'y', url: 't1', authorAssociation: 'OWNER' }] } }]],
   });
   const pr = await fetchPr({ repo: 'acme/game', pr: 7, gh });
   assert.deepEqual(pr.comments.map((c) => [c.url, c.at, c.edited, c.minimized, c.author]), [
@@ -845,4 +851,124 @@ test('M1: an audit heading is exactly "Pre-merge audit at <sha>"; any other text
     assert.equal(r.exit, 2, name);
     assert.match(errs(r), /unrecognised review heading/, name);
   }
+});
+
+// --- trust: only collaborators' comments count (the repo is public) ------------------------
+
+const by = (login, authorAssociation) => ({ author: { login }, authorAssociation });
+const thread = (i, resolved, assoc) => ({ isResolved: resolved, path: `f${i}`, line: i,
+  comments: { nodes: [{ body: `t${i} body`, url: `t${i}`, author: { login: `u${i}` }, authorAssociation: assoc }] } });
+
+test('trust: dispositions from someone outside the repo do not clear a finding', async () => {
+  const { gh } = fakeGh({ comments: [[issueComment(0, 'review'), issueComment(1, 'dispositions-all', by('mallory', 'NONE'))]] });
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 1);
+  assert.match(out.lines.join('\n'), /IGNORED untrusted comment by mallory \(NONE\): c1/);
+});
+
+test('trust: a CLEAN review from a contributor is no review at all', async () => {
+  const { gh } = fakeGh({ comments: [[issueComment(0, 'clean', by('drive-by', 'CONTRIBUTOR'))]] });
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 2);
+  assert.match(out.lines.join('\n'), /no review/i);
+});
+
+test('trust: an outsider cannot block a merge: their NOT CLEAN or malformed comments are ignored, not inconclusive', async () => {
+  for (const name of ['review', 'old-style']) {
+    const { gh } = fakeGh({ comments: [[issueComment(0, 'clean'), issueComment(1, name, by('troll', 'FIRST_TIME_CONTRIBUTOR'))]] });
+    const out = sink();
+    assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 0, name);
+    assert.match(out.lines.join('\n'), /IGNORED untrusted comment by troll \(FIRST_TIME_CONTRIBUTOR\): c1/, name);
+  }
+});
+
+test('trust: owner, member and collaborator comments all count', async () => {
+  for (const assoc of ['OWNER', 'MEMBER', 'COLLABORATOR']) {
+    const { gh } = fakeGh({ comments: [[issueComment(0, 'review', by('rev', assoc)), issueComment(1, 'dispositions-all', by('dev', assoc))]] });
+    const out = sink();
+    assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 0, assoc);
+    assert.doesNotMatch(out.lines.join('\n'), /IGNORED/, assoc);
+  }
+});
+
+test('trust: a review body from an outsider is ignored like a comment', async () => {
+  const review = { submittedAt: at(1), createdAt: at(1), lastEditedAt: null, isMinimized: false, url: 'r1', bodyHTML: fx('clean'), ...by('drive-by', 'NONE') };
+  const { gh } = fakeGh({ reviews: [[review]] });
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 2);
+  assert.match(out.lines.join('\n'), /IGNORED untrusted comment by drive-by \(NONE\): r1/);
+});
+
+test('trust: an outsider\'s unresolved thread is ignored and listed; a collaborator\'s stays open', async () => {
+  const { gh } = fakeGh({ comments: [[issueComment(0, 'clean')]], threads: [[thread(1, false, 'NONE'), thread(2, false, 'COLLABORATOR')]] });
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 1);
+  const text = out.lines.join('\n');
+  assert.match(text, /IGNORED untrusted thread by u1 \(NONE\): t1/);
+  assert.match(text, /OPEN thread f2:2/);
+  assert.doesNotMatch(text, /OPEN thread f1:1/);
+});
+
+test('trust: a comment with no author association is inconclusive, neither trusted nor ignored', async () => {
+  for (const authorAssociation of [undefined, null, '']) {
+    const { gh } = fakeGh({ comments: [[issueComment(0, 'clean', { authorAssociation })]] });
+    const out = sink();
+    assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 2, String(authorAssociation));
+    assert.match(out.lines.join('\n'), /INCONCLUSIVE: .*no author association/, String(authorAssociation));
+  }
+});
+
+test('trust: fetchPr asks for the author association of comments, reviews and threads', async () => {
+  const { gh, calls } = fakeGh({ comments: [[issueComment(0, 'clean')]] });
+  await fetchPr({ repo: 'acme/game', pr: 7, gh });
+  const queries = calls.map((a) => a.find((x) => x.startsWith('query=')));
+  const connections = queries.filter((q) => /\(first: 100/.test(q));
+  assert.equal(connections.length, 3, 'comments, reviews and threads');
+  for (const q of connections) assert.match(q, /\bauthorAssociation\b/);
+});
+
+// --- trust: who resolved a thread (GitHub lets the PR's author resolve any thread) -----------
+
+const resolvedThread = (i, resolver, assoc = 'COLLABORATOR') => ({ ...thread(i, true, assoc), resolvedBy: resolver && { login: resolver } });
+
+test('trust: a fork PR author who resolves a collaborator\'s thread does not close it', async () => {
+  const { gh } = fakeGh({ comments: [[issueComment(0, 'clean')]], threads: [[resolvedThread(1, 'forker')]],
+    prAuthor: { author: { login: 'forker' }, authorAssociation: 'CONTRIBUTOR' } });
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 1);
+  assert.match(out.lines.join('\n'), /OPEN thread f1:1: .*resolved by forker, the PR's untrusted author/);
+});
+
+test('trust: a thread resolved by someone else, or by a trusted PR author, is resolved', async () => {
+  for (const [resolver, prAuthor] of [
+    ['maintainer', { author: { login: 'forker' }, authorAssociation: 'NONE' }],
+    ['dev', { author: { login: 'dev' }, authorAssociation: 'COLLABORATOR' }],
+  ]) {
+    const { gh } = fakeGh({ comments: [[issueComment(0, 'clean')]], threads: [[resolvedThread(1, resolver)]], prAuthor });
+    const out = sink();
+    assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 0, resolver);
+  }
+});
+
+test('trust: a resolved thread with no resolver, or a PR with no author association, is inconclusive', async () => {
+  const a = fakeGh({ comments: [[issueComment(0, 'clean')]], threads: [[resolvedThread(1, null)]] });
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh: a.gh, log: out.log }), 2);
+  assert.match(out.lines.join('\n'), /INCONCLUSIVE: .*t1: resolved, but no resolvedBy/);
+  const b = fakeGh({ comments: [[issueComment(0, 'clean')]], prAuthor: { author: { login: 'x' } } });
+  const out2 = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh: b.gh, log: out2.log }), 2);
+  assert.match(out2.lines.join('\n'), /INCONCLUSIVE: .*the PR: no author association/);
+  const c = fakeGh({ comments: [[issueComment(0, 'clean')]], prAuthor: { author: null, authorAssociation: 'OWNER' } });
+  const out3 = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh: c.gh, log: out3.log }), 2);
+  assert.match(out3.lines.join('\n'), /INCONCLUSIVE: .*the PR: no author login/);
+});
+
+test('trust: fetchPr asks who resolved each thread and who opened the PR', async () => {
+  const { gh, calls } = fakeGh({ comments: [[issueComment(0, 'clean')]] });
+  await fetchPr({ repo: 'acme/game', pr: 7, gh });
+  const queries = calls.map((a) => a.find((x) => x.startsWith('query=')));
+  assert.ok(queries.some((q) => /reviewThreads\(.*resolvedBy \{ login \}/s.test(q)));
+  assert.ok(queries.some((q) => /pullRequest\(number: \$number\) \{ author \{ login \} authorAssociation \}/.test(q)));
 });

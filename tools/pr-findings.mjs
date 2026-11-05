@@ -9,7 +9,11 @@
 // only the recognised content is allowed, outside one any text naming a review form is an
 // error, and a disposition counts only in a positive form. The PR body is not read.
 // Prints each finding that has no disposition and who posted each dispositions comment;
-// minimized (hidden) comments are skipped and listed.
+// minimized (hidden) comments are skipped and listed. Only comments and threads by the
+// repo's owner, its organisation's members and its collaborators are read; anyone else's
+// are ignored and listed. A thread the PR's author resolved stays open unless that author
+// is trusted too (GitHub lets a PR's author resolve any thread on it). See the trust note
+// in .github/pull_request_template.md for what else an outsider can and cannot do.
 // Usage: node tools/pr-findings.mjs <pr-number> [--repo owner/name]
 // Exit: 0 PASS, 1 open findings, 2 inconclusive (API error, no review, unparseable).
 // Needs `npm ci` (linkedom, a devDependency); the gh call is injected so the parser and
@@ -492,8 +496,8 @@ const lastWritten = (c) => (c.edited == null ? time(c.at) : Math.max(time(c.at),
  * Decide from comments ({ at, edited?, minimized?, author?, url, html }) and review threads
  * ({ isResolved, where, url, body }). Returns { exit, open, errors, skipped, dispositions,
  * reviews, findings }; `dispositions` lists each dispositions comment's sha, author and
- * url so who cleared which findings is visible (any commenter may: see the trust note in
- * .github/pull_request_template.md). Any error, or no review at all, is inconclusive: the open list may then be
+ * url so who cleared which findings is visible (fetchPr passes only trusted authors' comments:
+ * see the trust note in .github/pull_request_template.md). Any error, or no review at all, is inconclusive: the open list may then be
  * incomplete, so it never reads as PASS. Minimized comments are skipped (the override for
  * a comment the parser must not read) and returned in `skipped` so the bypass is visible.
  */
@@ -547,7 +551,7 @@ export function evaluate({ comments, threads }) {
     for (const f of r.findings) if (!f.disposition) open.push({ ...f, sha: r.sha, url: r.url });
   }
   for (const t of threads) {
-    if (!t.isResolved) open.push({ id: 'thread', severity: '', finding: t.body, where: t.where, url: t.url });
+    if (!t.isResolved) open.push({ id: 'thread', severity: '', finding: t.body, where: t.where, url: t.url, note: t.note });
   }
   if (!reviews.length) errors.push('no review found: no "## Review of <sha>" comment on this PR');
   const findings = reviews.reduce((n, r) => n + r.findings.length, 0) + threads.length;
@@ -557,7 +561,8 @@ export function evaluate({ comments, threads }) {
 
 // --- gh layer -------------------------------------------------------------------------
 
-function defaultGh(args) {
+/** Run `gh` with `args` (no shell); resolves stdout. tools/pr-findings-status.mjs uses it too. */
+export function defaultGh(args) {
   return new Promise((done, fail) => {
     execFile('gh', args, { maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) =>
       err ? fail(new Error(stderr.trim() || err.message)) : done(stdout));
@@ -565,10 +570,25 @@ function defaultGh(args) {
 }
 
 const NODES = {
-  comments: 'createdAt lastEditedAt isMinimized url bodyHTML author { login }',
-  reviews: 'submittedAt createdAt lastEditedAt isMinimized url bodyHTML author { login }',
-  reviewThreads: 'isResolved path line comments(first: 1) { nodes { body url } }',
+  comments: 'createdAt lastEditedAt isMinimized url bodyHTML author { login } authorAssociation',
+  reviews: 'submittedAt createdAt lastEditedAt isMinimized url bodyHTML author { login } authorAssociation',
+  reviewThreads: 'isResolved resolvedBy { login } path line comments(first: 1) { nodes { body url author { login } authorAssociation } }',
 };
+
+// The repo is public: only comments (and threads, by their first comment) from its owner,
+// its organisation's members and its collaborators count for the verdict (GitHub's author
+// association; MEMBER does not itself imply write access). Anyone else's are ignored, and listed, so they
+// can neither clear a finding nor block a merge: an ignored review never makes the result
+// inconclusive. A node with no association is a response the detector cannot read: error.
+export const TRUSTED = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+function trusted(node, url) {
+  const assoc = node?.authorAssociation;
+  if (typeof assoc !== 'string' || !assoc) throw new Error(`${url}: no author association`);
+  return TRUSTED.has(assoc);
+}
+// Who opened the PR: GitHub lets them resolve any thread on it, write access or not.
+const PR_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) { pullRequest(number: $number) { author { login } authorAssociation } } }`;
 const query = (key) => `query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
   repository(owner: $owner, name: $name) { pullRequest(number: $number) {
     ${key}(first: 100, after: $endCursor) { pageInfo { hasNextPage endCursor } nodes { ${NODES[key]} } }
@@ -597,25 +617,58 @@ async function connection(gh, repo, pr, key) {
 }
 
 /**
- * Every issue comment, non-empty review body and review thread on the PR. A missing
- * bodyHTML is passed on as is (not as ''), so the parser reports it.
+ * Every issue comment, non-empty review body and review thread on the PR from a trusted
+ * author (TRUSTED); the rest are returned in `ignored` ({ kind, url, author, association }).
+ * A missing bodyHTML is passed on as is (not as ''), so the parser reports it.
  */
 export async function fetchPr({ repo, pr, gh = defaultGh }) {
   const [issueComments, reviews, threads] = await Promise.all(
     ['comments', 'reviews', 'reviewThreads'].map((key) => connection(gh, repo, pr, key)));
+  const [owner, name] = repo.split('/');
+  let prNode;
+  try {
+    const res = JSON.parse(await gh(['api', 'graphql', '-f', `owner=${owner}`, '-f', `name=${name}`, '-F', `number=${pr}`, '-f', `query=${PR_QUERY}`]));
+    if (res?.errors) throw new Error(JSON.stringify(res.errors));
+    prNode = res?.data?.repository?.pullRequest;
+  } catch (err) {
+    throw new Error(`gh api graphql pullRequest: ${err.message}`);
+  }
+  const prAuthor = prNode?.author?.login;
+  const prAuthorTrusted = trusted(prNode, 'the PR');
+  if (!prAuthor) throw new Error('the PR: no author login');
+  // A resolution counts only by someone other than the PR's author (who then needs write
+  // access to resolve) or by a trusted author. A resolved thread with no resolver: error.
+  const resolution = (t, url) => {
+    if (t.isResolved !== true) return { isResolved: false };
+    const by = t.resolvedBy?.login;
+    if (!by) throw new Error(`${url}: resolved, but no resolvedBy`);
+    if (by === prAuthor && !prAuthorTrusted) return { isResolved: false, note: `resolved by ${by}, the PR's untrusted author` };
+    return { isResolved: true };
+  };
+  const ignored = [];
+  const keep = (kind, node, url, author) => {
+    if (trusted(node, url)) return true;
+    ignored.push({ kind, url, author: author ?? '(unknown)', association: node.authorAssociation });
+    return false;
+  };
   const comment = (at, c) => ({ at, edited: c.lastEditedAt ?? null, minimized: c.isMinimized === true, author: c.author?.login ?? '(unknown)', url: c.url, html: c.bodyHTML });
+  const bodies = [
+    ...issueComments.map((c) => [c, c.createdAt]),
+    ...reviews.filter((r) => typeof r.bodyHTML !== 'string' || r.bodyHTML.trim())
+      .map((r) => [r, r.submittedAt ?? r.createdAt]),
+  ];
   return {
-    comments: [
-      ...issueComments.map((c) => comment(c.createdAt, c)),
-      ...reviews.filter((r) => typeof r.bodyHTML !== 'string' || r.bodyHTML.trim())
-        .map((r) => comment(r.submittedAt ?? r.createdAt, r)),
-    ],
-    threads: threads.map((t) => ({
-      isResolved: t.isResolved === true,
+    comments: bodies.filter(([c]) => keep('comment', c, c.url, c.author?.login)).map(([c, at]) => comment(at, c)),
+    threads: threads.filter((t) => {
+      const first = t.comments?.nodes?.[0];
+      return keep('thread', first, first?.url ?? `${t.path}:${t.line ?? '?'}`, first?.author?.login);
+    }).map((t) => ({
+      ...resolution(t, t.comments?.nodes?.[0]?.url ?? `${t.path}:${t.line ?? '?'}`),
       where: `${t.path}:${t.line ?? '?'}`,
       url: t.comments?.nodes?.[0]?.url ?? '',
       body: t.comments?.nodes?.[0]?.body ?? '',
     })),
+    ignored,
   };
 }
 
@@ -627,21 +680,25 @@ const oneLine = (s, n = 120) => {
 /** Fetch, decide and print. Returns the exit code; never throws. */
 export async function run({ repo, pr, gh = defaultGh, log = console.log }) {
   let result;
+  let ignored;
   try {
     if (!/^\d+$/.test(String(pr))) throw new Error(`not a PR number: ${pr}`);
     const slug = repo ?? (await gh(['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'])).trim();
     if (!/^[\w.-]+\/[\w.-]+$/.test(slug)) throw new Error(`not an owner/name repo: ${slug}`);
     log(`PR ${slug}#${pr}`);
-    result = evaluate(await fetchPr({ repo: slug, pr, gh }));
+    const fetched = await fetchPr({ repo: slug, pr, gh });
+    ignored = fetched.ignored;
+    result = evaluate(fetched);
   } catch (err) {
     log(`INCONCLUSIVE: ${err.message}`);
     return EXIT.INCONCLUSIVE;
   }
+  for (const i of ignored) log(`IGNORED untrusted ${i.kind} by ${i.author} (${i.association}): ${i.url}`);
   for (const s of result.skipped) log(`SKIPPED minimized comment by ${s.author}: ${s.url}`);
   for (const d of result.dispositions) log(`DISPOSITIONS for ${d.sha} by ${d.author}: ${d.url}`);
   for (const f of result.open) {
     const at = f.sha ? `${f.sha} #${f.id}` : `thread ${f.where}`;
-    const stale = f.stale ? ` (dispositioned before the review was edited at ${f.stale})` : '';
+    const stale = f.stale ? ` (dispositioned before the review was edited at ${f.stale})` : f.note ? ` (${f.note})` : '';
     log(`OPEN ${at}${f.severity ? ` [${f.severity}]` : ''}: ${oneLine(f.finding)}${stale} ${f.url}`);
   }
   for (const e of result.errors) log(`ERROR ${e}`);

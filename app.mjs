@@ -9,11 +9,12 @@
 // markup must not use Alpine attributes (x-*, @*, :*). test/levels-play.test.mjs checks.
 import { DECK } from './cards/deck.mjs';
 import { DOTS } from './hub/globe-data.mjs';
-import { ACT_REGIONS, actOfCountry, LEVEL_COUNTRY } from './hub/globe-map.mjs';
+import { ACT_REGIONS, actOfCountry, COUNTRY_NAMES, LEVEL_COUNTRY } from './hub/globe-map.mjs';
 import { NODE_IDS } from './hub/map-data.mjs';
 import { ACTS } from './levels/index.mjs';
 import { shuffle as kitShuffle } from './lib/lesson-kit.mjs';
 import { globeState } from './lib/globe.mjs';
+import { freshlyLit, igniteView, litText } from './lib/globe-ignite.mjs';
 import { dotStates, globeLabel, globeLines, globeTarget } from './lib/globe-view.mjs';
 import { createLevelContext } from './lib/level-context.mjs';
 import { cardTotals, mergeProgress, recordCompletion, registryIds, starTotals } from './lib/progress.mjs';
@@ -73,7 +74,7 @@ const CONFETTI = 40;
  * The Alpine component data for the hub. deps: { registry (§2.4), storage (getter for a
  * Storage), document, window?, deck?, globe? ((host, view) → Promise of a globe handle or
  * null; lib/globe-render.mjs mountGlobe in the browser), globeMap? ({ACT_REGIONS,
- * LEVEL_COUNTRY, actOf}), dots?, now?, rand?, reduceMotion? (() → boolean), reportError?,
+ * LEVEL_COUNTRY, COUNTRY_NAMES, actOf}), dots?, now?, rand?, reduceMotion? (() → boolean), reportError?,
  * setTimeout?, clearTimeout?, debug? (boolean, ?mode=debug: every level opens, nothing is saved) }. Without `globe` the hub shows the globe's text fallback.
  */
 export function createGame(deps) {
@@ -84,7 +85,7 @@ export function createGame(deps) {
     window: win = null,
     deck = DECK,
     globe: mountGlobe = null,
-    globeMap = { ACT_REGIONS, LEVEL_COUNTRY, actOf: actOfCountry },
+    globeMap = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES, actOf: actOfCountry },
     dots = DOTS,
     now = Date.now,
     rand = Math.random,
@@ -111,6 +112,10 @@ export function createGame(deps) {
   // hub was hidden) is disposed instead of kept.
   let globe = null;
   let mounts = 0;
+  // What the last completion freshly lit, until Back to the map plays it; and an ignite asked
+  // for before the globe finished loading.
+  let pendingLit = null;
+  let queuedIgnite = null;
 
   return {
     debug: debug === true,
@@ -135,6 +140,7 @@ export function createGame(deps) {
     rewardStars: null,
     rewardCards: [],
     globeFallback: false,
+    litNote: '', // "Germany is now lit: The signals.": the polite announcement and the fallback's first line
 
     init() {
       win?.addEventListener('storage', (e) => this.onStorage(e));
@@ -215,7 +221,8 @@ export function createGame(deps) {
     },
     // The text fallback (no WebGL): one line per act with its region and progress.
     globeLines() {
-      return globeLines(registry, this.mapState());
+      const lines = globeLines(registry, this.mapState());
+      return this.litNote ? [this.litNote, ...lines] : lines;
     },
     // What the renderer draws: a DOT state per dot and the rotation facing the current act.
     globeView() {
@@ -244,7 +251,11 @@ export function createGame(deps) {
         .then(
           (handle) => {
             if (token !== mounts) handle?.dispose();
-            else if (handle) globe = handle;
+            else if (handle) {
+              globe = handle;
+              if (queuedIgnite) handle.ignite(queuedIgnite.view, queuedIgnite.states);
+              queuedIgnite = null;
+            }
             else failed();
           },
           (e) => (token === mounts ? failed(e) : report(e)),
@@ -253,6 +264,7 @@ export function createGame(deps) {
     // Stop the loop and free the WebGL context (a level covers the hub, or the page goes).
     hideGlobe() {
       mounts++;
+      queuedIgnite = null;
       globe?.dispose();
       globe = null;
     },
@@ -284,6 +296,8 @@ export function createGame(deps) {
       }
       this.endSession();
       this.hideGlobe();
+      pendingLit = null;
+      this.litNote = '';
       this.nudgeId = null;
       const level = registry.levels[id];
       const controller = new AbortController();
@@ -341,12 +355,17 @@ export function createGame(deps) {
       const level = registry.levels[levelId];
       const rec = recordCompletion(this.progress, levelId, result, registry);
       this.rewardDebug = this.debug;
+      const before = this.progress;
       if (!this.debug) {
         const saved = saveProgress(storage, rec.progress, registry);
         this.progress = saved.progress;
         // A save that went through clears corrupt (the backup now exists) and unavailable.
         this.notice = saved.saved ? null : saved.reason;
       }
+      // A debug run saves nothing, so nothing is freshly lit and no ignite plays.
+      const fresh = this.debug ? null : freshlyLit(before, this.progress, registry, globeMap);
+      const text = fresh ? litText(fresh, level, globeMap) : null;
+      pendingLit = text ? { fresh, text } : null;
       this.endSession();
       this.overlayOpen = false;
       this.showGlobe();
@@ -361,7 +380,28 @@ export function createGame(deps) {
 
     closeReward() {
       this.rewardOpen = false;
-      this.returnFocus();
+      if (pendingLit) this.revealLit();
+      else this.returnFocus();
+    },
+    // Back to the map after a first completion: scroll to the globe (smooth unless reduced
+    // motion), focus the map heading, announce the country and turn the globe to it with the
+    // ignite effect (the renderer skips the effect under reduced motion).
+    revealLit() {
+      const { fresh, text } = pendingLit;
+      pendingLit = null;
+      const reduced = !!reduceMotion();
+      this.litNote = text;
+      const go = () => {
+        doc.querySelector('.map-panel')?.scrollIntoView?.({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+        doc.getElementById('map-title')?.focus?.({ preventScroll: true });
+      };
+      if (typeof this.$nextTick === 'function') this.$nextTick(go);
+      else go();
+      const view = igniteView(fresh, dots, globeMap.actOf);
+      if (view === null) return;
+      const states = dotStates(this.mapState(), dots, globeMap.actOf);
+      if (globe) globe.ignite(view, states);
+      else if (mounts > 0 && !this.globeFallback) queuedIgnite = { view, states };
     },
     rewardNote() {
       return this.rewardDebug ? 'Debug run: not saved.' : '';
