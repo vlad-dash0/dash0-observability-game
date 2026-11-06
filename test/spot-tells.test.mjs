@@ -1,9 +1,10 @@
 // Blind strategies must not win any Spot it board (#190). Each rule below ignores what the lines
 // mean: it scores every line by something it can count or read off the text (length, digits,
-// words, commas, quotes, `=` signs, underscores, distinct label keys, the length of a labelled field such as
+// words, commas, quotes, `=` signs, underscores, whether the key of a `key=value` line starts with a namespace (its first dotted segment, or either of two), distinct label keys, the length of a labelled field such as
 // `expr:`, or a numeric field such as `count=`), picks the lines with the most or the fewest, first or after skipping one or two, and plays
 // that through the real checkSpot. If it solves a board first time or after one wrong Check,
-// the player earns stars without reading. (Position rules: test/spot-ladder.test.mjs.) Specs
+// the player earns stars without reading. The equal-value pairing rule below reads no meaning either: it groups
+// the lines of a `key=value` board by value and takes one line of each group. (Position rules: test/spot-ladder.test.mjs.) Specs
 // come from the live registry, so a new Spot board is covered without editing this file.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -89,6 +90,13 @@ function rankings(spec, score) {
   return out;
 }
 
+/** Pick `ids` through the real toggleLine and press Check through the real checkSpot. */
+function play(spec, ids) {
+  let state = newSpotState(spec);
+  for (const id of ids) state = toggleLine(spec, state, id).state;
+  return checkSpot(spec, state);
+}
+
 /**
  * Play a ranking blind, knowing only the answer count k, through the real toggleLine and
  * checkSpot. Check 1: the top k. If that is wrong, the player has learned which picks are
@@ -98,11 +106,7 @@ function rankings(spec, score) {
  */
 function mistakes(spec, ranking) {
   const k = spec.faults.length;
-  const run = (ids) => {
-    let state = newSpotState(spec);
-    for (const id of ids) state = toggleLine(spec, state, id).state;
-    return checkSpot(spec, state);
-  };
+  const run = (ids) => play(spec, ids);
   const first = ranking.slice(0, k);
   const r1 = run(first);
   if (r1.state.solved) return 0;
@@ -233,8 +237,56 @@ function scoresFor(spec) {
     scores[`highest ${name}=`] = (l) => (read(l) === undefined ? MISSING : read(l));
     scores[`lowest ${name}=`] = (l) => (read(l) === undefined ? MISSING : -read(l));
   }
+  for (const set of prefixSets(spec)) {
+    scores[`keys starting ${set.join(' or ')}.`] = (l) => (set.includes(namespaceOf(l.text)) ? 1 : 0);
+  }
+  for (const { set, sub } of minusRules(spec)) {
+    scores[minusName(set, sub)] = (l) => (set.includes(namespaceOf(l.text)) && subNamespaceOf(l.text) !== sub ? 1 : 0);
+  }
   return scores;
 }
+
+/** The first dotted segment of a `key=value` line's key (`http` for `http.route=/checkout`), or null for any other shape. */
+function namespaceOf(text) {
+  const m = /^(\w+)(?:\.[\w.-]*)?=/.exec(text);
+  return m ? m[1] : null;
+}
+
+/**
+ * Every key-prefix set worth trying on a board: each first dotted segment that occurs, and each union of two. A set
+ * that holds every line or none is no rule, and a board with fewer than two segments has nothing to split.
+ */
+function prefixSets(spec) {
+  const segs = [...new Set(spec.lines.map((l) => namespaceOf(l.text)).filter((n) => n !== null))].sort();
+  const sets = [...segs.map((x) => [x]), ...choose(segs, 2)];
+  return segs.length < 2 ? [] : sets.filter((set) => spec.lines.some((l) => set.includes(namespaceOf(l.text))) && spec.lines.some((l) => !set.includes(namespaceOf(l.text))));
+}
+
+/** The first two dotted segments of a key with three or more (`http.request` for `http.request.method=POST`), or null. */
+function subNamespaceOf(text) {
+  const m = /^(\w+\.[\w-]+)\.[\w.-]*=/.exec(text);
+  return m ? m[1] : null;
+}
+
+/**
+ * Rules "first-segment set S minus sub-namespace P": S is each first segment that occurs or a union of two (as in
+ * prefixSets, but a board with one segment counts), P each first-two-segment prefix of a key of three or more segments
+ * whose first segment is in S. A rule that picks every line or none is no rule. Bounded by the sets times the prefixes.
+ */
+function minusRules(spec) {
+  const segs = [...new Set(spec.lines.map((l) => namespaceOf(l.text)).filter((n) => n !== null))].sort();
+  const subs = [...new Set(spec.lines.map((l) => subNamespaceOf(l.text)).filter((n) => n !== null))].sort();
+  const out = [];
+  for (const set of [...segs.map((x) => [x]), ...choose(segs, 2)]) {
+    for (const sub of subs.filter((p) => set.includes(p.split('.')[0]))) {
+      const picked = spec.lines.filter((l) => set.includes(namespaceOf(l.text)) && subNamespaceOf(l.text) !== sub).length;
+      if (picked > 0 && picked < spec.lines.length) out.push({ set, sub });
+    }
+  }
+  return out;
+}
+
+const minusName = (set, sub) => `keys starting ${set.join(' or ')}. not under ${sub}.`;
 
 const ruleName = (score, j) => (j === 0 ? score : `${score}, skipping ${j}`);
 
@@ -263,13 +315,78 @@ async function tells() {
         if (share > TELL_SHARE) (solving[`${no} ${spec.id}`] ??= {})[ruleName(name, j)] = `${Math.round(share * all.length)} of ${all.length} tie-breaks`;
       }
     }
+    const pairing = pairingShare(spec);
+    if (pairing > TELL_SHARE) (solving[`${no} ${spec.id}`] ??= {})[PAIRING] = pairing.toFixed(2);
   }
   return solving;
 }
 
+/** The value of a `key=value` line (everything after the first `=`), or null for a line of any other shape. */
+function valueOf(text) {
+  const m = /^[\w.]+=(.*)$/.exec(text);
+  return m ? m[1] : null;
+}
+
+/** Every way to choose `n` of `list`. */
+function choose(list, n) {
+  if (n === 0) return [[]];
+  return list.flatMap((x, i) => choose(list.slice(i + 1), n - 1).map((c) => [x, ...c]));
+}
+
+/** The product of the lists: one member from each, every way. */
+function product(lists) {
+  return lists.reduce((acc, list) => acc.flatMap((head) => list.map((x) => [...head, x])), [[]]);
+}
+
+/**
+ * The share of equal-value pickings that solve the board within one wrong Check. Lines with the same
+ * value form a group (a line without a `key=value` shape is a group of one). The player takes one line of
+ * each of k groups, with no idea which is the answer: the groups of two or more lines first (any k of
+ * them when there are more than k), then single lines to make up k, any of them. If the Check flags picks,
+ * each flagged line is swapped for another line of its group (it has the same value, so it is the pick's
+ * partner) and the player Checks again. A board where every equal-value pair is one answer plus one
+ * non-answer, as many pairs as answers, is solved by this whichever way the picks fall, since the swap
+ * finds the partner.
+ */
+function pairingShare(spec) {
+  const k = spec.faults.length;
+  const groups = [...Map.groupBy(spec.lines, (l) => valueOf(l.text) ?? l.id).values()].map((g) => g.map((l) => l.id));
+  let wins = 0;
+  let total = 0;
+  const shared = groups.filter((g) => g.length > 1);
+  const single = groups.filter((g) => g.length === 1);
+  const picked = shared.length >= k ? choose(shared, k) : choose(single, k - shared.length).map((c) => [...shared, ...c]);
+  for (const chosen of picked) {
+    for (const picks of product(chosen)) {
+      total += 1;
+      const r1 = play(spec, picks);
+      if (r1.state.solved) {
+        wins += 1;
+        continue;
+      }
+      const swapped = picks.map((id, n) => {
+        const group = chosen[n];
+        return r1.extra.includes(id) ? group[(group.indexOf(id) + 1) % group.length] : id;
+      });
+      if (play(spec, swapped).state.solved) wins += 1;
+    }
+  }
+  return wins / total;
+}
+
+const PAIRING = 'one line of each equal-value group';
+
+// Rules that solve a board because they encode its concept, not a surface tell: "<no> <spot id>" -> exact rule -> why.
+// Narrow on purpose: only this rule on this board, and the test fails if it stops passing.
+const CONCEPT_RULES = {
+  '8.2 scv-spot': {
+    'keys starting http or net. not under http.request.': 'the rule encodes the concept: stable HTTP names nest under http.request./http.response. (#206, #207)',
+  },
+};
+
 test('the rules see every Spot board, read its fields, each board is solved by its own answer, and the retry model counts mistakes', async () => {
   const specs = await allSpotSpecs();
-  assert.equal(specs.length, 7, 'all seven Spot boards');
+  assert.equal(specs.length, 8, 'all eight Spot boards');
   for (const { no, spec } of specs) {
     const key = `${no} ${spec.id}`;
     const ids = spec.lines.map((l) => l.id);
@@ -321,7 +438,16 @@ test('the rules see every Spot board, read its fields, each board is solved by i
 });
 
 test('no Spot board is solved, even with one wrong Check, by taking the lines with the most or fewest of anything countable, first or after skipping one or two, ties tried every way (#190)', async () => {
-  assert.deepEqual(await tells(), {}, 'boards a blind rule solves without reading them');
+  const found = await tells();
+  const rest = found;
+  const others = {};
+  for (const [board, rules] of Object.entries(rest)) {
+    const concept = Object.keys(CONCEPT_RULES[board] ?? {});
+    const surface = Object.keys(rules).filter((r) => !concept.includes(r));
+    if (surface.length) others[board] = Object.fromEntries(surface.map((r) => [r, rules[r]]));
+  }
+  assert.deepEqual(others, {}, 'boards a blind rule solves without reading them');
+  for (const [board, rules] of Object.entries(CONCEPT_RULES)) assert.deepEqual(Object.keys(found[board] ?? {}), Object.keys(rules), `${board}: the concept rules are exactly the ones that still pass; drop any that no longer do`);
 });
 
 test('the underscore measure: it solves the 6.2 board as first reviewed (sampler 7, memory 3, the answers 2, the rest 1), the counts that put the answers third and fourth (#193)', () => {
@@ -347,4 +473,73 @@ test('the underscore measure: it solves the 6.2 board as first reviewed (sampler
   assert.equal(scoresFor(before)['most underscores'](before.lines[3]), 2);
   assert.equal(share(before, 'most underscores', 2) > TELL_SHARE, true, 'skipping the sampler and the memory line, the next two are the answers');
   assert.equal(share(before, 'fewest underscores', 2) > TELL_SHARE, true, 'fewest, skipping two, lands on them too');
+});
+
+test('the equal-value pairing rule: it solves a board whose equal-value pairs are each one old name and one stable name, and no live board (#177)', async () => {
+  const board = (lines, faults) => ({ id: 'literal', lines: lines.map(([id, text]) => ({ id, text })), faults });
+  // 8.2 as first written: POST, 500 and 8443 each shared by one old name (an answer) and its stable name.
+  const paired = board(
+    [['m', 'http.method=POST'], ['cp', 'client.port=51234'], ['rm', 'http.request.method=POST'], ['sp', 'server.port=8443'], ['sc', 'http.status_code=500'], ['rt', 'http.route=/checkout'], ['rs', 'http.response.status_code=500'], ['nh', 'net.host.port=8443']],
+    ['m', 'sc', 'nh'],
+  );
+  assert.equal(pairingShare(paired), 1, 'one line of each pair, swapped for its partner when flagged, always solves it');
+  // The same pairs plus one equal-value pair with no answer in it (url.path and http.route) and an answer with no partner.
+  const mixed = board(
+    [['t', 'http.target=/checkout?step=pay'], ['sp', 'server.port=8443'], ['ca', 'client.address=gw.kettle.example'], ['up', 'url.path=/checkout'], ['nh', 'net.host.port=8443'], ['rt', 'http.route=/checkout'], ['cp', 'client.port=51234'], ['sc', 'http.status_code=500']],
+    ['t', 'nh', 'sc'],
+  );
+  assert.equal(pairingShare(mixed) <= TELL_SHARE, true, `${pairingShare(mixed)}`);
+  // Values read after the first `=`; other shapes group alone.
+  assert.equal(valueOf('http.target=/checkout?step=pay'), '/checkout?step=pay');
+  assert.equal(valueOf('url.query=step=pay'), 'step=pay');
+  assert.equal(valueOf('m{a="b"} count=12'), null);
+  assert.deepEqual(choose([1, 2, 3], 2), [[1, 2], [1, 3], [2, 3]]);
+  assert.deepEqual(product([[1, 2], [3]]), [[1, 3], [2, 3]]);
+  // The live boards: none is a tell; assert the bar.
+  for (const { no, spec } of await allSpotSpecs()) assert.equal(pairingShare(spec) <= TELL_SHARE, true, `${no} ${spec.id}: ${pairingShare(spec)}`);
+});
+
+test('the key-prefix rule: lines whose key starts with a namespace, or either of two, solve a board whose old names share namespaces; no live board (#177)', async () => {
+  const board = (lines, faults) => ({ id: 'literal', lines: lines.map(([id, text]) => ({ id, text })), faults });
+  const shareOf = (spec, name) => {
+    const score = scoresFor(spec)[name];
+    assert.equal(typeof score, 'function', `${name} is a rule on this board`);
+    const all = rankings(spec, score);
+    return all.filter((r) => mistakes(spec, r) <= 1).length / all.length;
+  };
+  // 8.2 as first reviewed: the old names are the http. and net. lines, plus http.route.
+  const before = board(
+    [['t', 'http.target=/checkout?step=pay'], ['sp', 'server.port=8443'], ['ca', 'client.address=gw.kettle.example'], ['up', 'url.path=/checkout'], ['nh', 'net.host.port=8444'], ['rt', 'http.route=/checkout'], ['cp', 'client.port=51234'], ['sc', 'http.status_code=500']],
+    ['t', 'nh', 'sc'],
+  );
+  assert.deepEqual(prefixSets(before).map((s) => s.join('+')).filter((n) => n.includes('http')), ['http', 'client+http', 'http+net', 'http+server', 'http+url']);
+  assert.equal(shareOf(before, 'keys starting http or net.') > TELL_SHARE, true, 'http. or net. solves it');
+  // The same board with two more stable names under http. (a method, a header) beside http.route: the rule loses.
+  const after = board(
+    [['t', 'http.target=/checkout?step=pay'], ['sp', 'server.port=8443'], ['rm', 'http.request.method=POST'], ['ca', 'client.address=gw.kettle.example'], ['nh', 'net.host.port=8443'], ['rt', 'http.route=/checkout'], ['rh', 'http.request.header.content-type=["application/json"]'], ['sc', 'http.status_code=500']],
+    ['t', 'nh', 'sc'],
+  );
+  assert.equal(shareOf(after, 'keys starting http or net.') <= TELL_SHARE, true);
+  // Hyphens in a key stay in the key; other shapes have no namespace.
+  assert.equal(namespaceOf('http.request.header.content-type=["a"]'), 'http');
+  assert.equal(namespaceOf('plain=1'), 'plain');
+  assert.equal(namespaceOf('expr: up'), null);
+  assert.deepEqual(prefixSets(board([['a', 'k.x=1'], ['b', 'k.y=2']], ['a'])), [], 'one namespace: nothing to split');
+  // Depth 2: "http or net. not under http.request." solves `after` (which plain "http or net." loses) and not a board whose answer is under http.request.
+  const minus = 'keys starting http or net. not under http.request.';
+  assert.deepEqual(minusRules(after).map((r) => minusName(r.set, r.sub)).filter((n) => n.includes('http or net')), [minus, 'keys starting http or net. not under net.host.']);
+  assert.equal(shareOf(after, minus) > TELL_SHARE, true, 'the minus rule solves it');
+  const nested = board(
+    [['t', 'http.target=/checkout?step=pay'], ['sp', 'server.port=8443'], ['rm', 'http.request.method=POST'], ['ca', 'client.address=gw.kettle.example'], ['nh', 'net.host.port=8443'], ['rt', 'http.route=/checkout'], ['rh', 'http.request.header.content-type=["application/json"]'], ['sc', 'http.status_code=500']],
+    ['rm', 'rh', 'sc'],
+  );
+  assert.equal(shareOf(nested, minus) <= TELL_SHARE, true, 'the answer is under http.request.: the rule misses it');
+  assert.equal(subNamespaceOf('http.request.method=POST'), 'http.request');
+  assert.equal(subNamespaceOf('http.route=/x'), null, 'two segments: no sub-namespace');
+  assert.deepEqual(minusRules(board([['a', 'k.x=1'], ['b', 'k.x.y=2']], ['a'])).map((r) => minusName(r.set, r.sub)), ['keys starting k. not under k.x.'], 'one namespace is enough');
+  assert.deepEqual(minusRules(board([['a', 'k.x.y=1'], ['b', 'k.x.z=2']], ['a'])), [], 'a rule that picks no line is none');
+  // No live board is one (tells() runs every set on every board).
+  for (const { no, spec } of await allSpotSpecs()) for (const set of prefixSets(spec)) assert.equal(shareOf(spec, `keys starting ${set.join(' or ')}.`) <= TELL_SHARE, true, `${no}: ${set}`);
+  // Depth-2 rules on live boards: counted here, judged (with CONCEPT_RULES) in the test above.
+  for (const { no, spec } of await allSpotSpecs()) assert.equal(minusRules(spec).length <= 20, true, `${no} ${spec.id}: ${minusRules(spec).length} depth-2 rules, keep the combinatorics bounded`);
 });

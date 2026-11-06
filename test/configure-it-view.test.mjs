@@ -163,10 +163,21 @@ test('the same failing text again, whitespace aside, is free and keeps the pipel
   mount();
   check(GIVEN);
   check(`${GIVEN}\n\n`);
-  assert.equal(feedback(), 'Same as last time: that config still does not pass.');
+  assert.equal(feedback(), 'You already checked this config. Nothing new was counted.');
   assert.equal(counts.mistakes, 1);
   assert.equal(stateOf('traces'), 'Stalled');
   check(`${GIVEN}zz: 1\n`);
+  assert.equal(counts.mistakes, 2);
+});
+
+test('a failing config checked again after a different failing one is a repeat: the new copy, nothing new counted', () => {
+  const { counts, mount } = setup();
+  mount();
+  check(GIVEN);
+  check(`${GIVEN}zz: 1\n`);
+  assert.equal(counts.mistakes, 2);
+  check(GIVEN);
+  assert.equal(feedback(), 'You already checked this config. Nothing new was counted.');
   assert.equal(counts.mistakes, 2);
 });
 
@@ -193,7 +204,7 @@ test('a repeat after an unreadable text redraws the pipeline view for the repeat
   check('a: b: c');
   assert.equal(panel(), 'Nothing to show until the YAML can be read.');
   check(GIVEN);
-  assert.equal(feedback(), 'Same as last time: that config still does not pass.');
+  assert.equal(feedback(), 'You already checked this config. Nothing new was counted.');
   assert.equal(stateOf('traces'), 'Stalled');
   assert.equal(counts.mistakes, 1);
 });
@@ -338,7 +349,7 @@ test('the uses message joins several pipelines in plain words, and a repeat is f
   check(bare);
   assert.equal(feedback(), 'The traces and metrics pipelines run, but they do not do what the task asks yet.');
   check(bare);
-  assert.equal(feedback(), 'Same as last time: that config still does not pass.');
+  assert.equal(feedback(), 'You already checked this config. Nothing new was counted.');
   assert.equal(counts.mistakes, 1);
 });
 
