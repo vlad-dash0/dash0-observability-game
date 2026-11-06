@@ -161,10 +161,40 @@ test('the same wrong query again, whitespace aside, is free; a different wrong o
   const { counts, mount } = setup();
   mount();
   askAll('sum by (route) (rate(http_server_requests_total[5m]))', '  sum   by (route)\n(rate(http_server_requests_total[5m]))\n');
-  assert.equal(feedback(), 'Same as last time: that query still does not match.');
+  assert.equal(feedback(), 'You already ran this query. Nothing new was counted.');
   assert.equal(counts.mistakes, 1);
   ask('sum(increase(http_server_requests_total[5m]))');
   assert.equal(counts.mistakes, 2);
+});
+
+test('a repeat of an earlier (not the last) query shows that query\'s rows and says it was already tried', () => {
+  const { counts, mount } = setup();
+  mount();
+  const A = 'sum(rate(http_server_requests_total[5m]))';
+  const B = 'sum by (route) (rate(http_server_requests_total[5m]))';
+  askAll(A, B);
+  const rowsB = rows();
+  assert.notDeepEqual(rowsB, [['{}', '28']]);
+  ask(A);
+  assert.deepEqual(rows(), [['{}', '28']]);
+  assert.equal(feedback(), 'You already ran this query. Nothing new was counted.');
+  assert.equal(counts.mistakes, 2);
+  ask(B);
+  assert.deepEqual(rows(), rowsB);
+  assert.equal(counts.mistakes, 2);
+});
+
+test('a repeat after a syntax error cleared the panel shows that query\'s rows again', () => {
+  const { counts, mount } = setup();
+  mount();
+  const A = 'sum(rate(http_server_requests_total[5m]))';
+  ask(A);
+  ask('sum by (service) (');
+  assert.equal(rows().length, 0);
+  ask(A);
+  assert.deepEqual(rows(), [['{}', '28']]);
+  assert.equal(feedback(), 'You already ran this query. Nothing new was counted.');
+  assert.equal(counts.mistakes, 1);
 });
 
 test('syntax, unsupported and runtime errors are free, however often, and say what went wrong', () => {
