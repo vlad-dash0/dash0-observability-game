@@ -71,6 +71,12 @@ function connectProblem(e, { field: which, reason }) {
   return `${FIELD_NAME[which] ?? 'Input'}: ${e(why)}`;
 }
 
+// An address for display: escaped first, then <wbr> after "//" and each ".", and before ":", so a long
+// address breaks at its punctuation and ":4317" stays together. textContent ignores <wbr>: copy stays plain.
+export function breakableAddress(address, escape) {
+  return escape(address).replace(/\/\/|\./g, '$&<wbr>').replace(/:(?=\d)/g, '<wbr>:');
+}
+
 /** The tone, words and whether to offer a retry for an outcome of the test span. */
 function describeOutcome(outcome, mode) {
   const where = mode === MODE.practice ? 'The simulated Dash0' : 'Dash0';
@@ -176,8 +182,8 @@ export default {
           prose(
             '<h4>Settings, Endpoints</h4>' +
               '<table><caption>Endpoints of this organization</caption><thead><tr><th scope="col">Name</th><th scope="col">Address</th></tr></thead><tbody>' +
-              `<tr><td>OTLP over gRPC</td><td><code id="ctd-ep-grpc">https://${e(host)}:4317</code></td></tr>` +
-              `<tr><td>OTLP over HTTP</td><td><code id="ctd-ep-http">https://${e(host)}</code></td></tr>` +
+              `<tr><td>OTLP over gRPC</td><td><code id="ctd-ep-grpc">${breakableAddress(`https://${host}:4317`, e)}</code></td></tr>` +
+              `<tr><td>OTLP over HTTP</td><td><code id="ctd-ep-http">${breakableAddress(`https://${host}`, e)}</code></td></tr>` +
               '</tbody></table>',
           ),
           '<h4>Settings, Auth Tokens: create a token</h4>' +

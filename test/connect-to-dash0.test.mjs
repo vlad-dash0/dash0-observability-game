@@ -9,7 +9,7 @@ import { makeDom, q, qa } from './helpers/dom.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
 import { createTelemetry } from '../lib/telemetry.mjs';
 import { recordFocus } from './helpers/focus.mjs';
-import level from '../levels/connect-to-dash0.mjs';
+import level, { breakableAddress } from '../levels/connect-to-dash0.mjs';
 
 const HOST = 'ingress.eu-west-1.aws.dash0.com';
 const ENDPOINT = `https://${HOST}`;
@@ -418,6 +418,20 @@ test('the screens give neither answer: the reason is stated, the endpoint and pe
   assert.match(q('#ctd-endpoint-note').textContent, /copied exactly as Dash0 shows it/);
   assert.doesNotMatch(q('#ctd-feedback').textContent + [...qa('label')].map((l) => l.textContent).join(' '), /OTLP over HTTP/);
   for (const sel of ['#ctd-ep-grpc', '#ctd-ep-http']) assert.match(q(sel).textContent, /^https:\/\/ingress\.practice\.dash0\.invalid(:4317)?$/);
+});
+
+test('endpoint addresses break at punctuation, and what is copied is the plain address', () => {
+  open(practiceTelemetry().tele);
+  press('#ctd-practice');
+  const host = 'ingress.practice.dash0.invalid';
+  assert.equal(q('#ctd-ep-http').textContent, `https://${host}`);
+  assert.equal(q('#ctd-ep-grpc').textContent, `https://${host}:4317`);
+  assert.equal(q('#ctd-ep-http').innerHTML, 'https://<wbr>ingress.<wbr>practice.<wbr>dash0.<wbr>invalid');
+  assert.match(q('#ctd-ep-grpc').innerHTML, /invalid<wbr>:4317$/, 'the port stays together after its break');
+  const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  assert.equal(breakableAddress('a<b.c', esc), 'a&lt;b.<wbr>c', 'escaped first, so markup in an address never becomes a tag');
+  fill('#ctd-endpoint', q('#ctd-ep-grpc').textContent);
+  assert.equal(q('#ctd-endpoint').value, `https://${host}:4317`);
 });
 
 test('both fields opt out of autofill and of password managers', () => {

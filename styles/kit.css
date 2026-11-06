@@ -292,7 +292,7 @@
   font-family: var(--font-mono); font-size: 11.5px; vertical-align: top;
 }
 /* Addresses and ids wrap instead of forcing the table wider than a phone (as .ui-lesson code does). */
-.ui-table code, .ui-prose table code { overflow-wrap: anywhere; }
+.ui-table code, .ui-prose table code { overflow-wrap: break-word; }
 .ui-table [data-num] { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ---------- Stats and dots (stats.mjs) ---------- */
