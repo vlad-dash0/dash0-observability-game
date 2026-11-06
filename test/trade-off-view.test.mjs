@@ -183,6 +183,20 @@ test('a plan that is over the cap and drops a need says both, and every lost nee
   assert.equal(feedback(), 'Not quite. Over the cap by 8 GB/day, and it drops what you need: every error trace. A raw user id has a new value for every user.');
 });
 
+test('a failing plan checked again after a different failing one is a repeat: the new copy, nothing new counted', () => {
+  const { counts, mount } = setup();
+  mount();
+  plan('tail', 'user');
+  check();
+  pick('attrs', 'none');
+  check();
+  assert.equal(counts.mistakes, 2);
+  pick('attrs', 'user');
+  check();
+  assert.equal(feedback(), 'You already checked this plan. Nothing new was counted.');
+  assert.equal(counts.mistakes, 2);
+});
+
 test('the same failing plan again is free and says so; a changed plan costs again', () => {
   const { counts, mount } = setup();
   mount();
@@ -191,7 +205,7 @@ test('the same failing plan again is free and says so; a changed plan costs agai
   check();
   check();
   assert.equal(counts.mistakes, 1);
-  assert.equal(feedback(), 'Same as last time: that plan still fails.');
+  assert.equal(feedback(), 'You already checked this plan. Nothing new was counted.');
   pick('attrs', 'none');
   check();
   assert.equal(counts.mistakes, 2);
