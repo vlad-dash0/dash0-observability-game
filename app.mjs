@@ -74,6 +74,7 @@ function isTyping(el) {
 
 const NUDGE_MS = 2600;
 const CONFETTI = 40;
+const FOCUS_FRAMES = 10; // focusSoon waits at most this many frames for its target to be shown
 
 /**
  * The Alpine component data for the hub. deps: { registry (§2.4), storage (getter for a
@@ -99,6 +100,10 @@ export function createGame(deps) {
     reportError = (e) => console.error(e),
     setTimeout: later = globalThis.setTimeout,
     clearTimeout: cancel = globalThis.clearTimeout,
+    // Next animation frame (focusSoon's retry); falls back to a timer where there is none.
+    raf = (fn) => (win && typeof win.requestAnimationFrame === 'function' ? win.requestAnimationFrame(fn) : later(fn, 16)),
+    // Is the element laid out (not display:none)? An environment with no layout API counts as rendered.
+    rendered = (el) => typeof el.getClientRects !== 'function' || el.getClientRects().length > 0,
     debug = false,
     telemetry = null,
   } = deps;
@@ -568,9 +573,20 @@ export function createGame(deps) {
       const id = this.currentLevelId;
       if (id) this.focusSoon(`[data-level-id="${id}"]`);
     },
-    // Focus after Alpine has rendered (its $nextTick when running under Alpine).
+    // Focus after Alpine has rendered (its $nextTick when running under Alpine), and only once the
+    // target is shown: an x-show effect may not have flushed yet, and focus() on a display:none
+    // element does nothing. Retries on the next frame, up to FOCUS_FRAMES, then gives up silently.
     focusSoon(selector) {
-      const go = () => doc.querySelector(selector)?.focus?.();
+      let frames = 0;
+      const go = () => {
+        const el = doc.querySelector(selector);
+        if (!el) return;
+        if (rendered(el)) {
+          el.focus?.();
+        } else if (frames++ < FOCUS_FRAMES) {
+          raf(go);
+        }
+      };
       if (typeof this.$nextTick === 'function') this.$nextTick(go);
       else go();
     },
