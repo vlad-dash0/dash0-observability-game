@@ -23,6 +23,7 @@ import { validateSortHelps } from '../lib/widgets/sort-it-help.mjs';
 
 const ID91 = 'filter-or-sampler';
 const ID92 = 'the-34-percent-error-rate';
+const ID93 = 'connect-to-dash0';
 const ID = ID92; // the 9.2 tests below
 const LIVE = liveRegistry();
 const MAX_STARS = expectedStarMax(LIVE);
@@ -53,14 +54,14 @@ const sort91 = S91_STEP?.sort;
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-9 "Live Demo" is the last act, after act-7, holding 9.1 then 9.2 and no boss', () => {
+test('act-9 "Live Demo" is the last act, after act-7, holding 9.1, 9.2 then 9.3 and no boss', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-9');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 9, name: 'Live Demo', sub: 'Does that answer hold?', levelIds: [ID91, ID92], bossId: null },
+    { no: 9, name: 'Live Demo', sub: 'Does that answer hold?', levelIds: [ID91, ID92, ID93], bossId: null },
   );
   assert.deepEqual(LIVE.acts.map((a) => a.id).slice(-2), ['act-7', 'act-9']);
-  assert.deepEqual(LIVE.order.slice(LIVE.order.indexOf('good-alerts')), ['good-alerts', ID91, ID92], 'act-9 plays after 7.1, last, 9.1 then 9.2');
+  assert.deepEqual(LIVE.order.slice(LIVE.order.indexOf('good-alerts')), ['good-alerts', ID91, ID92, ID93], 'act-9 plays after 7.1, last, 9.1, 9.2 then 9.3');
 });
 
 test('act-9 unlocks like the acts before it: open when acts 0-7 are complete, or once entered', () => {
@@ -97,12 +98,14 @@ test('act-9 unlocks like the acts before it: open when acts 0-7 are complete, or
   assert.deepEqual(lockReason(ID, emptyProgress(), LIVE), { kind: 'act', actId: 'act-0' });
 });
 
-test('act-9 is complete only when both its levels are done (no boss)', () => {
+test('act-9 is complete only when all three of its levels are done (no boss)', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-9');
   assert.equal(isActComplete(act, emptyProgress()), false);
   assert.equal(isActComplete(act, progressOf([ID92])), false, '9.2 alone');
   assert.equal(isActComplete(act, progressOf([ID91])), false, '9.1 alone');
-  assert.equal(isActComplete(act, progressOf([ID91, ID92])), true);
+  assert.equal(isActComplete(act, progressOf([ID93])), false, '9.3 alone');
+  assert.equal(isActComplete(act, progressOf([ID91, ID92])), false, '9.1 and 9.2 without 9.3');
+  assert.equal(isActComplete(act, progressOf([ID91, ID92, ID93])), true);
 });
 
 test('adding act-9 re-locks nothing in acts 0-7: every level has the state it has in a registry built without it', () => {
@@ -121,7 +124,7 @@ test('adding act-9 re-locks nothing in acts 0-7: every level has the state it ha
     [ID91, ID92],
     ['head-sampling'],
   ];
-  assert.deepEqual(without.order, LIVE.order.slice(0, -2));
+  assert.deepEqual(without.order, LIVE.order.slice(0, -3));
   for (const ids of fixtures) {
     const p = progressOf(ids);
     for (const id of without.order) assert.equal(levelState(id, p, LIVE), levelState(id, p, without), `${id} with ${ids.length} done`);
@@ -517,24 +520,27 @@ test('9.1 sources: the Spec and Dash0 URLs, only allowed hosts, the LIVE-DEMO so
 
 // ---- the globe -----------------------------------------------------------------------------
 
-test('globe: 9.2 lights Australia, 9.1 lights New Zealand; Oceania completes with both, in either order', () => {
+test('globe: 9.2 lights Australia, 9.1 New Zealand, 9.3 Papua New Guinea; Oceania completes with the last of the three, in any order', () => {
   assert.equal(LEVEL_COUNTRY[ID92], 'AUS');
   assert.equal(LEVEL_COUNTRY[ID91], 'NZL');
+  assert.equal(LEVEL_COUNTRY[ID93], 'PNG');
   assert.equal(COUNTRY_NAMES.AUS, 'Australia');
   assert.equal(COUNTRY_NAMES.NZL, 'New Zealand');
+  assert.equal(COUNTRY_NAMES.PNG, 'Papua New Guinea');
   assert.equal(ACT_REGIONS['act-9'].region, 'Oceania');
   const map = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES };
+  const level93 = LIVE.levels[ID93];
   const first = freshlyLit(emptyProgress(), progressOf([ID92]), LIVE, map);
-  assert.deepEqual(first, { countryIds: ['AUS'], regionIds: [] }, '9.1 is still open, so the region is not');
+  assert.deepEqual(first, { countryIds: ['AUS'], regionIds: [] }, '9.1 and 9.3 are still open, so the region is not');
   assert.equal(litText(first, level, map), 'Australia is now lit: The 34% error rate.');
   const second = freshlyLit(progressOf([ID92]), progressOf([ID92, ID91]), LIVE, map);
-  assert.deepEqual(second, { countryIds: ['NZL'], regionIds: ['act-9'] });
-  assert.equal(litText(second, level91, map), 'New Zealand is now lit: Filter, sampler, or both? Oceania is complete.', 'no "?." after the name');
-  // The other order: 9.1 first lights New Zealand alone, then 9.2 lights Australia and completes the region.
-  const nzFirst = freshlyLit(emptyProgress(), progressOf([ID91]), LIVE, map);
-  assert.deepEqual(nzFirst, { countryIds: ['NZL'], regionIds: [] }, '9.2 is still open, so the region is not');
-  assert.equal(litText(nzFirst, level91, map), 'New Zealand is now lit: Filter, sampler, or both?', 'no "?." and no region line');
-  const auSecond = freshlyLit(progressOf([ID91]), progressOf([ID91, ID92]), LIVE, map);
-  assert.deepEqual(auSecond, { countryIds: ['AUS'], regionIds: ['act-9'] });
-  assert.equal(litText(auSecond, level, map), 'Australia is now lit: The 34% error rate. Oceania is complete.');
+  assert.deepEqual(second, { countryIds: ['NZL'], regionIds: [] }, '9.3 is still open');
+  assert.equal(litText(second, level91, map), 'New Zealand is now lit: Filter, sampler, or both?', 'no "?." and no region line');
+  const third = freshlyLit(progressOf([ID92, ID91]), progressOf([ID92, ID91, ID93]), LIVE, map);
+  assert.deepEqual(third, { countryIds: ['PNG'], regionIds: ['act-9'] });
+  assert.equal(litText(third, level93, map), 'Papua New Guinea is now lit: Connect the game to Dash0. Oceania is complete.');
+  // Another order: 9.3 and 9.1 first, 9.2 last completes the region.
+  const last = freshlyLit(progressOf([ID93, ID91]), progressOf([ID93, ID91, ID92]), LIVE, map);
+  assert.deepEqual(last, { countryIds: ['AUS'], regionIds: ['act-9'] });
+  assert.equal(litText(last, level, map), 'Australia is now lit: The 34% error rate. Oceania is complete.');
 });

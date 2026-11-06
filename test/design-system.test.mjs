@@ -449,6 +449,8 @@ test('prose tables scroll in the kit wrap, regions and the prose column can shri
   assert.equal(props('.ui-prose table')['inline-size'], '100%');
   assert.equal(props('.ui-prose')['grid-template-columns'], 'minmax(0, 1fr)', 'a grid item would otherwise grow to the table width');
   assert.equal(props('.ui-prose')['min-width'], '0');
+  assert.equal(props('.ui-table code')['overflow-wrap'], 'break-word', 'a token breaks only when it would overflow; anywhere would shrink the column min-content and split short tokens');
+  assert.equal(props('.ui-prose table code')['overflow-wrap'], 'break-word');
   assert.equal(props('.ui-prose pre')['overflow-x'], 'auto');
   assert.equal(props('.ui-prose pre')['max-inline-size'], '100%');
   for (const sel of ['.ui-panel-sec > [data-region]', '.ui-panel-sec', '.ui-meter']) {

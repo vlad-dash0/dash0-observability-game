@@ -12,7 +12,7 @@ import * as ui from '../lib/ui/index.mjs';
 
 const {
   actions, button, checkbox, chip, clearFeedback, codeBlock, dots, eyebrow, feedback, field, finishButton, fold,
-  helpChips, lesson, meter, nextButton, note, option, options, panel, prose, question, radio, setFeedback,
+  helpChips, lesson, meter, nextButton, note, option, options, panel, prose, question, radio, radioGroup, setFeedback,
   sideColumn, split, stars, stats, step, stepHead, table,
   BUTTON_VARIANTS, DOTS_TONES, FEEDBACK_TONES, OPTION_KINDS, OPTION_STATES, OPTIONS_LAYOUTS, PANEL_VARIANTS, TONES,
 } = ui;
@@ -155,9 +155,44 @@ test('field, radio, checkbox', () => {
     '<label class="ui-check"><input type="checkbox" class="ui-check-input" id="c1" disabled><span class="ui-check-label">C</span></label>');
 });
 
+test('radioGroup: a fieldset named by its legend; legend escaped, rows trusted', () => {
+  assert.equal(radioGroup({ legend: 'Which <one>?', itemsHtml: radio({ name: 'k', value: 'v', labelHtml: 'V' }) }),
+    '<fieldset class="ui-group"><legend class="ui-group-legend">Which &lt;one&gt;?</legend>' +
+    '<label class="ui-check"><input type="radio" class="ui-check-input" name="k" value="v"><span class="ui-check-label">V</span></label></fieldset>');
+});
+
+test('button describedBy: names the explanation of a disabled button; absent by default', () => {
+  assert.equal(button({ id: 'go', label: 'Go', disabled: true, describedBy: 'why' }),
+    '<button type="button" class="ui-btn ui-btn--ghost" id="go" aria-describedby="why" disabled>Go</button>');
+  assert.equal(button({ id: 'go', label: 'Go' }).includes('aria-describedby'), false);
+});
+
+test('table and prose: a captioned table scrolls in a labelled region; an uncaptioned one is not labelled', () => {
+  assert.ok(table({ caption: 'Endpoints "x" & <b>', head: ['a'], rows: [['1']] })
+    .startsWith('<div class="ui-table-wrap" role="region" aria-label="Endpoints &quot;x&quot; &amp; &lt;b&gt;"><table'));
+  assert.equal(table({ head: ['a'], rows: [] }).includes('role='), false);
+  assert.equal(prose('<table><caption>Ends <code>x</code></caption><tr><td>1</td></tr></table>'),
+    '<div class="ui-prose"><div class="ui-table-wrap" role="region" aria-label="Ends x"><table><caption>Ends <code>x</code></caption><tr><td>1</td></tr></table></div></div>');
+  assert.equal(prose('<table><caption>Say "hi"</caption></table>').includes('aria-label="Say &quot;hi&quot;"'), true);
+});
+
+test('field kind secret: a labelled password input that never carries a value', () => {
+  const html = field({ id: 'tok', label: 'Token', kind: 'secret', noteHtml: 'Kept in memory' });
+  assert.equal(html,
+    '<div class="ui-field"><label class="ui-field-label" for="tok">Token</label>' +
+    '<input type="password" class="ui-input" id="tok" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" aria-describedby="tok-note">' +
+    '<p class="ui-note" id="tok-note">Kept in memory</p></div>');
+  assert.ok(!/\svalue=/.test(html), 'no value attribute');
+  const plain = field({ id: 'ep', label: 'Endpoint', autocompleteOff: true });
+  assert.ok(plain.includes('type="text"') && plain.includes(' autocomplete="off"'), 'a text field can opt out of autofill');
+  assert.ok(!field({ id: 'ep', label: 'Endpoint' }).includes('autocomplete'), 'and does not by default');
+  assert.throws(() => field({ id: 'tok', label: 'Token', kind: 'secret', value: 'auth_x' }), /field: .*secret/);
+  assert.throws(() => field({ id: 'tok', label: 'Token', kind: 'secret', readonly: true }), /field: .*secret/);
+});
+
 test('table: escaped cells, scoped headings, numeric columns', () => {
   assert.equal(table({ caption: 'Errors', head: ['service', 'count'], rows: [['a<b', 3]], numeric: [1] }),
-    '<div class="ui-table-wrap"><table class="ui-table"><caption>Errors</caption><thead><tr><th scope="col">service</th>' +
+    '<div class="ui-table-wrap" role="region" aria-label="Errors"><table class="ui-table"><caption>Errors</caption><thead><tr><th scope="col">service</th>' +
     '<th scope="col" data-num>count</th></tr></thead><tbody><tr><td>a&lt;b</td><td data-num>3</td></tr></tbody></table></div>');
   assert.equal(table({ head: ['a'], rows: [] }),
     '<div class="ui-table-wrap"><table class="ui-table"><thead><tr><th scope="col">a</th></tr></thead><tbody></tbody></table></div>');
@@ -227,6 +262,7 @@ const CASES = [
   ['radio', (t) => radio({ name: 'r', value: t, labelHtml: 'l' }), (h) => radio({ name: 'r', value: 'v', labelHtml: h })],
   ['checkbox', (t) => checkbox({ value: t, labelHtml: 'l' }), (h) => checkbox({ labelHtml: h })],
   ['table', (t) => table({ caption: t, head: [t], rows: [[t]] }), null],
+  ['radioGroup', (t) => radioGroup({ legend: t, itemsHtml: '' }), (h) => radioGroup({ legend: 'l', itemsHtml: h })],
   ['stats', (t) => stats([{ label: t, value: t }]), null],
   ['dots', (t) => dots({ total: 2, on: 1, label: t }), null],
   ['helpChips', (t) => helpChips('h', [{ key: 'k', label: t, on: true }]), null],
@@ -246,7 +282,7 @@ const VARIANTS = () => [
   ...DOTS_TONES.map((tone) => dots({ total: 2, on: 1, decorative: true, tone })),
   step({ wide: true, bodyHtml: '' }), actions({ wide: true, buttonsHtml: '' }), feedback({ id: 'f', bar: true }),
   field({ id: 'f', label: 'l', kind: 'code', noteHtml: 'n' }), field({ id: 'f', label: 'l' }),
-  radio({ name: 'r', value: 'v', labelHtml: 'l' }), checkbox({ labelHtml: 'l' }),
+  radio({ name: 'r', value: 'v', labelHtml: 'l' }), checkbox({ labelHtml: 'l' }), radioGroup({ legend: 'l', itemsHtml: '' }),
   fold({ value: 'v', titleHtml: 't', metaHtml: 'm', bodyHtml: 'b', open: true, fresh: true }),
 ];
 
@@ -390,6 +426,8 @@ const INVALID = [
   ['field', () => field({ id: 'f', label: 'L', rows: 0, kind: 'code' })],
   ['field', () => field({ label: 'L' })],
   ['radio', () => radio({ value: 'v', labelHtml: 'l' })],
+  ['radioGroup', () => radioGroup({ itemsHtml: '' })],
+  ['button', () => button({ label: 'x', describedBy: 'not an id' })],
   ['checkbox', () => checkbox({ labelHtml: 'l', checked: 'yes' })],
   ['table', () => table({ head: [], rows: [] })],
   ['table', () => table({ head: ['a', 'b'], rows: [['1']] })],
