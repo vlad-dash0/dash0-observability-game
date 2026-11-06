@@ -44,3 +44,26 @@ test('a non-element is never focusable', () => {
     assert.equal(canFocus(v), false, String(v));
   }
 });
+
+test('escapeFromHint: with no focusable target the Escape is not prevented and nothing is focused; a function target is read at the key', async () => {
+  const { escapeFromHint } = await import('../lib/widgets/focus.mjs');
+  const dom = makeDom();
+  dom.body.innerHTML = '<div id="t" tabindex="-1"></div><button id="b" disabled>b</button><button id="later">l</button>';
+  const text = dom.document.getElementById('t');
+  const calls = [];
+  dom.window.HTMLElement.prototype.focus = function focus() {
+    calls.push(this.id);
+  };
+  const press = () => {
+    const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+    text.onkeydown(e);
+    return e.defaultPrevented;
+  };
+  let pick = null;
+  escapeFromHint(text, dom.document.getElementById('b'), () => pick);
+  assert.equal(press(), false, 'nothing can take focus: left to the app');
+  assert.deepEqual(calls, []);
+  pick = dom.document.getElementById('later');
+  assert.equal(press(), true);
+  assert.deepEqual(calls, ['later']);
+});

@@ -625,3 +625,14 @@ test('Escape on a shown hint is handled, focuses the hint button and leaves the 
   assert.equal(e.defaultPrevented, true);
   assert.equal(focus.last(), `#${ID}-hint`);
 });
+
+test('Escape on the hint after the last tier (button spent) falls back to a cause to pick, and is handled (#178)', () => {
+  const { focus } = setup(rightLast());
+  for (let i = 0; i < 3; i += 1) click(q(`[id="${ID}-hint"]`));
+  assert.equal(q(`[id="${ID}-hint"]`).disabled, true);
+  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q(`[id="${ID}-hint-text"]`).onkeydown(e);
+  assert.equal(e.defaultPrevented, true);
+  assert.equal(focus.last().startsWith('hypothesis:'), true, focus.last());
+  assert.deepEqual(focus.unfocusable(), []);
+});
