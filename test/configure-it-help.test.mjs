@@ -10,6 +10,8 @@ import {
   CONFIGURE_HELPS, CONFIGURE_RULE, configureHelps, hintFor, validateConfigureHelps,
 } from '../lib/widgets/configure-it-help.mjs';
 
+const LEVEL_FILES = ['agent-vs-gateway', 'collecting-logs', 'detectors-and-kubernetes', 'otlp-endpoints', 'ottl-and-transforms'];
+const configureSpecs = async (file) => (await import(`../levels/${file}.mjs`)).default.play.steps.flatMap((st) => (st.configure ? [st.configure] : []));
 const BASE = pipelines.play.steps[1].configure; // uses memory_limiter in traces and metrics
 const spec = (extra = {}) => ({ ...BASE, helps: { hints: true }, ...extra });
 const REF = BASE.reference;
@@ -62,7 +64,7 @@ test('tier 2 reads the answer counts, not the player: uses batch, player lacks b
 test('tier 2 picks the first unmet pipeline: metrics when only metrics is stalled; invalid uses the first required pipeline not flowing', () => {
   const player = REF.replace(/(metrics:\n {6}receivers: \[otlp\]\n {6}processors: \[memory_limiter, batch\]\n {6}exporters: )\[otlp_grpc\/dash0\]/, '$1[otlp_grpc/dash0x]');
   assert.equal(runConfigure(spec(), state(), player).reason, 'invalid');
-  assert.match(tier2(spec(), player), /the metrics pipeline lists 1 receiver, 2 processors and 1 exporter; yours lists 1 receiver, 2 processors and 1 exporter\.<\/p>$/);
+  assert.match(tier2(spec(), player), /the metrics pipeline lists 1 receiver, 2 processors and 1 exporter; yours lists 1 receiver, 2 processors and 1 exporter\. One name yours lists under exporters is not defined under that exact id\.<\/p>$/);
 });
 
 test('tier 2 with no such pipeline in the player config', () => {
@@ -72,27 +74,92 @@ test('tier 2 with no such pipeline in the player config', () => {
 });
 
 test('tier 2 with text that does not read, or none', () => {
-  const unread = '<p>In the answer, the traces pipeline lists 1 receiver, 2 processors and 1 exporter. Yours cannot be read yet.</p>';
-  assert.equal(tier2(spec(), 'a: [unclosed'), unread);
-  assert.equal(tier2(spec(), ''), unread);
+  const head = '<p>In the answer, the traces pipeline lists 1 receiver, 2 processors and 1 exporter.';
+  assert.equal(tier2(spec(), 'a: [unclosed'), `${head} Yours cannot be read yet.</p>`);
+  assert.equal(tier2(spec(), ''), `${head} Yours is empty.</p>`);
+  assert.equal(tier2(spec(), '  \n'), `${head} Yours is empty.</p>`);
 });
 
 test('tier 2 when the player already passes', () => {
   assert.equal(tier2(spec(), REF), '<p>Yours already passes: press Check.</p>');
 });
 
-test('tier 2 never names a component id from the answer, for any pipeline', () => {
-  const ids = new Set();
-  const ref = checkConfig(REF, SCHEMAS.collector);
-  for (const name of ['traces', 'metrics', 'logs']) {
-    for (const { items } of pipelineStages(ref, SCHEMAS.collector, name)) for (const [, id] of items) ids.add(id);
+const LOGS = '    logs:\n      receivers: [nope]\n      processors: [batch]\n      exporters: [otlp_grpc/dash0]\n';
+const EXT = (text) => text.replace('extensions: [health_check]', 'extensions: [healthcheck]');
+
+test('tier 2 on each real level given: the stage that stalls, by stage key only', async () => {
+  const want = {
+    'agent-vs-gateway': ['traces', 'exporters'],
+    'collecting-logs': ['logs', 'receivers'],
+    'detectors-and-kubernetes': ['traces', 'processors'],
+    'otlp-endpoints': ['metrics', 'exporters'],
+    'ottl-and-transforms': ['logs', 'processors'],
+  };
+  for (const [file, [pipe, stage]] of Object.entries(want)) {
+    const c = (await configureSpecs(file))[0];
+    const html = tier2({ ...c, helps: { hints: true } }, c.given);
+    assert.match(html, new RegExp(`^<p>In the answer, the ${pipe} pipeline lists `), file);
+    assert.ok(html.endsWith(` One name yours lists under ${stage} is not defined under that exact id.</p>`), `${file}: ${html}`);
   }
-  assert.ok(ids.has('memory_limiter') && ids.has('batch'));
-  const texts = [BASE.given, '', 'a: [', without(REF, 'batch'), REF.replace(/ {4}metrics:[\s\S]*$/, ''), REF];
-  for (const text of texts) {
-    for (const s of [spec(), spec({ uses: { traces: ['batch'] }, target: undefined })]) {
-      const html = tier2(s, text);
-      for (const id of ids) assert.equal(html.includes(id), false, `${id} in ${html}`);
+  assert.equal(tier2(spec(), BASE.given),
+    '<p>Your traces pipeline flows; what stops the Collector is under service.extensions.</p>');
+});
+
+test('tier 2 pointer phrasing follows the reason kind', () => {
+  const s = spec({ uses: undefined, target: ['traces'] });
+  const lead = '<p>In the answer, the traces pipeline lists 1 receiver, 2 processors and 1 exporter; ';
+  assert.equal(tier2(s, REF.replace('receivers: [otlp]', 'receivers: []')),
+    `${lead}yours lists 0 receivers, 2 processors and 1 exporter. Yours lists nothing under receivers.</p>`);
+  assert.equal(tier2(s, REF.replace('receivers: [otlp]\n      processors: [memory_limiter, batch]\n      exporters: [otlp_grpc/dash0]', 'receivers: otlp\n      processors: [memory_limiter, batch]\n      exporters: [otlp_grpc/dash0]')),
+    `${lead}yours lists 0 receivers, 2 processors and 1 exporter. What yours has under receivers is not a list.</p>`);
+});
+
+test('tier 2 finds an error outside the required pipelines: by section, then by a non-required pipeline', () => {
+  assert.equal(tier2(spec(), EXT(REF)),
+    '<p>Your traces pipeline flows; what stops the Collector is under service.extensions.</p>');
+  assert.equal(tier2(spec(), REF.replace('  otlp_grpc/dash0:\n    endpoint: ${env:DASH0_ENDPOINT}', '  otlp_grpc/dash0: 5')),
+    '<p>Your traces pipeline flows; what stops the Collector is under exporters.</p>');
+  const s = spec({ target: ['traces'], uses: undefined });
+  assert.equal(runConfigure(s, state(), REF + LOGS).reason, 'invalid');
+  assert.equal(tier2(s, REF + LOGS),
+    '<p>The answer has no logs pipeline; yours lists 1 receiver, 1 processor and 1 exporter. One name yours lists under receivers is not defined under that exact id.</p>');
+});
+
+test('tier 2 on a solved state is the passes line, whatever the text', () => {
+  assert.equal(tier2(spec(), 'junk: 1', { tried: [], solved: true }), '<p>Yours already passes: press Check.</p>');
+});
+
+test('tier 2 on a spec with no target and no uses never says undefined', () => {
+  const s = spec({ target: undefined, uses: undefined });
+  const traces = '<p>In the answer, the traces pipeline lists 1 receiver, 2 processors and 1 exporter';
+  assert.equal(tier2(s, ''), `${traces}. Yours is empty.</p>`);
+  assert.equal(tier2(s, 'a: ['), `${traces}. Yours cannot be read yet.</p>`);
+  const metricsBroken = REF.replace(/(metrics:\n {6}receivers: )\[otlp\]/, '$1[nope]');
+  assert.equal(tier2(s, metricsBroken),
+    '<p>In the answer, the metrics pipeline lists 1 receiver, 2 processors and 1 exporter; yours lists 1 receiver, 2 processors and 1 exporter. One name yours lists under receivers is not defined under that exact id.</p>');
+  assert.equal(tier2(s, EXT(REF)), '<p>Your traces pipeline flows; what stops the Collector is under service.extensions.</p>');
+});
+
+test('tier 2 never names a component id from the answer, for any pipeline or level', async () => {
+  const levels = [BASE, ...(await Promise.all(LEVEL_FILES.map(async (f) => (await configureSpecs(f))[0])))];
+  assert.equal(levels.length, 6);
+  for (const base of levels) {
+    const schema = SCHEMAS[base.schema];
+    const ref = checkConfig(base.reference, schema);
+    const ids = new Set();
+    for (const { name } of ref.verdict.pipelines) {
+      for (const { items } of pipelineStages(ref, schema, name)) for (const [, id] of items) ids.add(id);
+    }
+    assert.ok(ids.size >= 3);
+    const texts = [base.given, '', '  ', 'a: [', base.reference, EXT(base.given), EXT(base.reference), base.reference + LOGS, base.given + LOGS,
+      base.reference.replace(/ {4}\w+:\n {6}receivers:[\s\S]*$/, ''), ...[...ids].map((id) => base.reference.split(id).join(`${id}x`))];
+    for (const text of texts) {
+      for (const s of [{ ...base, helps: { hints: true } }, { ...base, helps: { hints: true }, target: undefined, uses: undefined },
+        { ...base, helps: { hints: true }, target: undefined, uses: Object.fromEntries(ref.verdict.pipelines.map((q) => [q.name, [[...ids][0]]])) }]) {
+        const html = tier2(s, text);
+        assert.equal(html.includes('undefined'), false, html);
+        for (const id of ids) assert.equal(html.includes(id), false, `${id} in ${html}`);
+      }
     }
   }
 });
@@ -111,7 +178,9 @@ test('tier 2 escapes pipeline names', () => {
   const s = spec({ target: ['t<b>'], uses: undefined });
   assert.equal(s.target[0], 't<b>');
   const html = hintFor(s, state(), '', 2, { e: (v) => `[${v}]` }).html;
-  assert.match(html, /the \[t<b>\] pipeline/);
+  assert.equal(html, '<p>The answer has no [t<b>] pipeline. Yours is empty.</p>');
+  assert.match(hintFor(spec(), state(), '', 2, { e: (v) => `[${v}]` }).html, /the \[traces\] pipeline/);
+  assert.match(hintFor(spec(), state(), EXT(REF), 2, { e: (v) => `<${v}>` }).html, /under <service\.extensions>\./);
 });
 
 // ---- tier 3 --------------------------------------------------------------------------------
