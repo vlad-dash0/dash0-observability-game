@@ -108,9 +108,9 @@ test('a specific note per logs-mode code, from the chosen span, never the expect
   attachLog(spec, st, 'l-other', S1);
   const notes = checkBuild(spec, st).issues.map((i) => `${i.code}: ${text(noteFor(spec, st, i, escapeHtml))}`);
   assert.deepEqual(notes, [
-    '"Application started" (checkout, -40 ms): POST /checkout (checkout) ran 0 to 100 ms, and this record was written outside that window. A span is current only while it runs.',
+    '"Application started" (checkout, -40 ms): POST /checkout (checkout, trace 4bf92f35) ran 0 to 100 ms, and this record was written outside that window. A span is current only while it runs.',
     '"Cart validated" (checkout, 30 ms): POST /charge (payments) is a span of payments, and this record was written by checkout. A log call only sees the current span of its own service.',
-    '"Order accepted" (checkout, 60 ms): POST /checkout (checkout) is in another trace than the request that wrote this record. Its attributes say which request it belongs to.',
+    '"Order accepted" (checkout, 60 ms): POST /checkout (checkout, trace 4bf92f35) is in another trace than the request that wrote this record. Its attributes say which request it belongs to.',
     '"Charge submitted" (payments, 70 ms): validate cart (checkout) is a span of checkout, and this record was written by payments. A log call only sees the current span of its own service.',
   ].map((n, i) => `${['log-outside-span', 'log-other-service', 'log-wrong-trace', 'log-other-service'][i]}: ${n}`));
   const st2 = newBuildState(spec);
@@ -120,7 +120,7 @@ test('a specific note per logs-mode code, from the chosen span, never the expect
   attachLog(spec, st2, 'l-charge', S3);
   const by = Object.fromEntries(checkBuild(spec, st2).issues.map((i) => [i.code, text(noteFor(spec, st2, i, escapeHtml))]));
   assert.equal(by['log-no-active-span'], '"Retry worker gave up on charge" (payments, 75 ms): was a span current when the log call ran? Compare its time and attributes with the span\'s.');
-  assert.equal(by['log-wrong-span'], '"Cart validated" (checkout, 30 ms): POST /checkout (checkout) is in the right trace, but another span of it was current when this record was written. Compare the record\'s time and attributes with each span\'s.');
+  assert.equal(by['log-wrong-span'], '"Cart validated" (checkout, 30 ms): POST /checkout (checkout, trace 4bf92f35) is in the right trace, but another span of it was current when this record was written. Compare the record\'s time and attributes with each span\'s.');
   assert.equal(note(spec, newBuildState(spec), 'l-cart'), '"Cart validated" (checkout, 30 ms) has no span context yet, so nothing links it to a trace.');
 });
 
@@ -214,4 +214,16 @@ test('hint tiers for a kind and for a record follow the same three steps', () =>
   attachLog(logs, lst, 'l-worker', S3);
   assert.equal(text(hintFor(logs, lst, 'l-worker', 3, { e: escapeHtml }).html), 'Set for you. No span was current when this record was written, so it carries no span context.');
   assert.deepEqual(hintFor(logs, lst, 'l-worker', 2, { e: escapeHtml }).cands, ['none', S3]);
+});
+
+test('a same-name, same-service twin is named with the view\'s suffix in notes and hints; a unique span is not (#228)', () => {
+  const spec = { ...b1Spec(), helps: ALL };
+  const b = spec.spans[1]; // POST (storefront), trace 4bf92f35
+  Object.assign(spec.spans[4], { name: b.name, service: b.service }); // E becomes B's twin in trace 0af76519
+  const st = newBuildState(spec);
+  setParent(spec, st, E, C);
+  assert.equal(note(spec, st, E), 'POST (storefront, trace 0af76519) carries trace id 0af76519, POST /checkout (api-gateway) carries 4bf92f35. Different trace ids, so it can\'t be the parent.');
+  const placed = new Set([A, B, C, D, E]);
+  assert.equal(text(hintFor(spec, st, C, 3, { placed, e: escapeHtml }).html), 'Placed for you. POST (storefront, trace 4bf92f35) is the CLIENT call into api-gateway, and this is the SERVER span that handled it.');
+  assert.equal(text(hintFor(spec, st, D, 3, { placed, e: escapeHtml }).html), 'Placed for you. POST /checkout (api-gateway) is the innermost span of trace 4bf92f35 that runs around it (15 to 85 ms).');
 });

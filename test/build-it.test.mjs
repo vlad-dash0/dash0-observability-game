@@ -511,14 +511,14 @@ test('A9 checkBuild log codes: one issue per record, rule codes win, messages ne
   assert.deepEqual(lcodes(result), ['log-other-service:l-boot', 'log-wrong-span:l-cart', 'log-wrong-trace:l-other', 'log-no-active-span:l-worker']);
   assert.deepEqual(result.issues.map((i) => i.message), [
     '"Application started" (checkout, -40 ms): POST /charge (payments) is a span of another service.',
-    '"Cart validated" (checkout, 30 ms): POST /checkout (checkout) is in the right trace but is not the span this record was logged in.',
-    '"Order accepted" (checkout, 60 ms): POST /checkout (checkout) is in a different trace from the one this record belongs to.',
+    '"Cart validated" (checkout, 30 ms): POST /checkout (checkout, trace 4bf92f35) is in the right trace but is not the span this record was logged in.',
+    '"Order accepted" (checkout, 60 ms): POST /checkout (checkout, trace 4bf92f35) is in a different trace from the one this record belongs to.',
     '"Retry worker gave up on charge" (payments, 75 ms): it was not written while a span was active, so it carries no span context.',
   ]);
   const outside = newBuildState(LSPEC);
   attachLog(LSPEC, outside, 'l-boot', S1); // -40 is outside 0..100
   assert.deepEqual(lcodes(checkBuild(LSPEC, outside)).slice(0, 1), ['log-outside-span:l-boot']);
-  assert.equal(checkBuild(LSPEC, outside).issues[0].message, '"Application started" (checkout, -40 ms): POST /checkout (checkout) ran 0 to 100 ms and this record is outside that window.');
+  assert.equal(checkBuild(LSPEC, outside).issues[0].message, '"Application started" (checkout, -40 ms): POST /checkout (checkout, trace 4bf92f35) ran 0 to 100 ms and this record is outside that window.');
   const missing = checkBuild(LSPEC, newBuildState(LSPEC));
   assert.deepEqual(lcodes(missing), ['log-not-attached:l-cart', 'log-not-attached:l-other', 'log-not-attached:l-charge']);
   assert.equal(missing.issues[0].message, '"Cart validated" (checkout, 30 ms): it has no span context yet.');
@@ -600,4 +600,25 @@ test('explain is refused outside logs mode, because span mode never shows it', (
   assert.deepEqual(validateBuildSpec({ ...b1Spec(), explain: ' ' }), ['explain: not non-empty text', 'explain: only shown in logs mode']);
   assert.deepEqual(validateBuildSpec(b1Spec()), []);
   assert.deepEqual(validateBuildSpec({ ...logsSpec(), explain: 'Because.' }), []);
+});
+
+test('checkBuild span mode: a twin carries the trace suffix in its message, a unique span does not (#228)', () => {
+  const T1 = '1111aaaa1111aaaa1111aaaa1111aaaa';
+  const T2 = '2222bbbb2222bbbb2222bbbb2222bbbb';
+  const mk = (spanId, traceId, name, startMs, endMs) => ({
+    spanId, traceId, name, service: 'api', kind: 'INTERNAL', startMs, endMs, status: 'UNSET', parentId: null, attributes: {}, events: [], links: [],
+  });
+  const spec = {
+    id: 'twins',
+    spans: [mk('aaaaaaaaaaaaaaa1', T1, 'root', 0, 100), mk('aaaaaaaaaaaaaaa2', T1, 'retry', 10, 90), mk('aaaaaaaaaaaaaaa3', T2, 'retry', 20, 30)],
+    edit: ['parent'],
+    answer: { aaaaaaaaaaaaaaa2: { parentId: 'aaaaaaaaaaaaaaa1' }, aaaaaaaaaaaaaaa3: { parentId: null } },
+  };
+  const st = newBuildState(spec);
+  setParent(spec, st, 'aaaaaaaaaaaaaaa2', 'aaaaaaaaaaaaaaa3'); // the twin, under its twin of another trace
+  setParent(spec, st, 'aaaaaaaaaaaaaaa1', 'aaaaaaaaaaaaaaa3'); // the unique span, across traces too
+  assert.deepEqual(checkBuild(spec, st).issues.map((i) => i.message), [
+    "root (api): its parent is in another trace. A parent always shares its child's trace ID.",
+    "retry (api, trace 1111aaaa): its parent is in another trace. A parent always shares its child's trace ID.",
+  ]);
 });

@@ -1160,3 +1160,19 @@ test('the hint header names a hinted twin like the button and the status do (#69
   click('#b1-hint');
   assert.equal(q('#b1-hint-text .ui-eyebrow').textContent, 'Hint 1 of 3 \u00b7 POST (storefront, trace 4bf92f35)');
 });
+
+test('twins get distinct screen-reader row labels, waiting and arrived; a unique span keeps its label (#228)', () => {
+  const T = '1111aaaa1111aaaa1111aaaa1111aaaa';
+  const spec = { ...twinSpec([
+    twin('aaaaaaaaaaaaa1b2', T), twin('aaaaaaaaaaaaa2b2', T, 'solo', 4), twin('aaaaaaaaaaaaa3c4', T, 'retry', 8), twin('aaaaaaaaaaaaa5d6', T, 'retry', 12),
+  ].map((s) => ({ ...s, parentId: null }))), edit: ['parent'], answer: {}, helps: { queue: true, instant: true } };
+  const { mount } = setup(spec);
+  mount();
+  const labels = qa('[data-waiting]').map((r) => r.getAttribute('aria-label'));
+  assert.deepEqual(labels, [
+    'retry, api, trace 1111aaaa, span id \u2026a3c4, waiting, not arrived yet',
+    'retry, api, trace 1111aaaa, span id \u2026a5d6, waiting, not arrived yet',
+  ]);
+  assert.equal(q('[data-arriving]').getAttribute('aria-label').startsWith('solo, api, INTERNAL, '), true, 'a unique span keeps its label');
+  assert.equal(q('[data-span]:not([data-arriving])').getAttribute('aria-label'), 'retry, api, trace 1111aaaa, span id \u2026a1b2, INTERNAL, UNSET, 0 to 3 ms, trace 1111aaaa, root');
+});
