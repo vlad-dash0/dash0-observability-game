@@ -130,6 +130,7 @@ export const ACTS = [
     no: 7,
     name: 'Alerting and SLOs',
     sub: 'Wake me only when it matters',
+    teaser: 'Good alerts, SLOs and error budgets, burn-rate alerts and synthetic checks.',
     levels: [goodAlerts],
     boss: null,
   },
