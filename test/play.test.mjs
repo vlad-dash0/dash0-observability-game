@@ -313,14 +313,17 @@ test('validatePlay names the widgets with no hint on any step, the way each moun
   const off = structuredClone(noHint);
   off.build.helps = {};
   assert.deepEqual(hintless([off]), ['build']);
-  // Incident always has the Hint button; Query and Configure need an authored hint.
+  // Incident always has the Hint button; Query needs helps.hints, Configure an authored hint.
   assert.deepEqual(hintless([incident, query, configure]), []);
-  const bare = (step, key) => {
+  const bare = (step, key, field) => {
     const c = structuredClone(step);
-    delete c[key].hint;
+    delete c[key][field];
     return c;
   };
-  assert.deepEqual(hintless([bare(query, 'query'), bare(configure, 'configure')]), ['query', 'configure']);
+  assert.deepEqual(hintless([bare(query, 'query', 'helps'), bare(configure, 'configure', 'hint')]), ['query', 'configure']);
+  assert.deepEqual(hintless([bare(query, 'query', 'hint')]), [], 'a query step with helps.hints has hints even with no authored hint (the widget rule)');
+  const hintsOff = (step) => Object.assign(structuredClone(step), { query: { ...step.query, helps: { hints: false } } });
+  assert.deepEqual(hintless([hintsOff(query)]), ['query']);
   assert.deepEqual(hintless([choice, tradeoff]), [], 'choice and tradeoff never have hints, so they are never named');
 });
 
@@ -430,6 +433,12 @@ test('validatePlay names each query step problem, with the step and widget id', 
     const got = problems(edit);
     assert.ok(got.some((e) => e.startsWith(want)), `${want}\n  got: ${JSON.stringify(got)}`);
   }
+});
+
+test('a query step with an authored hint and no helps.hints fails validation', () => {
+  const [msg] = problems((p) => { delete p.steps[6].query.helps; });
+  assert.match(msg, /step 7 \(query "fx-query"\): hint: shown only when helps\.hints is on/);
+  assert.deepEqual(problems((p) => { p.steps[6].query.helps = { hints: true, q: true }; }).length, 1);
 });
 
 test('a query step may carry a given starting query', () => {

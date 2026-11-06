@@ -115,7 +115,8 @@ export default {
           dataset: 'checkout-http',
           at: 3600,
           reference: 'sum by (route) (rate(http_server_requests_total{service="checkout", status="500"}[5m]))',
-          hint: 'Select the <code>500</code> status and the checkout service in braces, take the <code>rate</code>, then <code>sum by (route)</code>.',
+          helps: { hints: true },
+          hint: 'Narrow the counter to the requests you mean, turn it into a per-second figure, then keep one series for each thing the question says "each" of.',
           explain:
             '/pay returns 1 error per second and /quote none. Rate turns the counter into a per-second figure, ' +
             'and sum by keeps one series per route.',
@@ -133,7 +134,8 @@ export default {
           dataset: 'checkout-http',
           at: 2700,
           reference: 'sum(increase(http_server_requests_total{route="/pay"}[10m]))',
-          hint: 'Use <code>increase</code> with a <code>[10m]</code> range, and <code>sum</code> the series of /pay together.',
+          helps: { hints: true },
+          hint: 'The right function already copes with the counter reset, and the question wants one number, however the requests differ.',
           explain:
             'About 2,338 requests: increase adjusts for the reset and extrapolates to the whole window, which is why it ' +
             'is not a whole number. It equals the rate times the 600 seconds of the window.',
