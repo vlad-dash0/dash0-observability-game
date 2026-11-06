@@ -913,10 +913,10 @@ test('V1 selecting a record presses it and offers "No span context" first, then 
   assert.equal(q('[data-build-panel] [data-panel-title="log"]').textContent, 'Span context for "Retry worker gave up on charge" (payments, 75 ms)');
   assert.deepEqual(qa('[data-attach]').map((b) => b.textContent), [
     'No span context',
-    'POST /checkout (checkout) · 0–100 ms',
+    'POST /checkout (checkout, trace 4bf9) · 0–100 ms',
     'validate cart (checkout) · 20–40 ms',
     'POST /charge (payments) · 50–90 ms',
-    'POST /checkout (checkout) · 30–80 ms',
+    'POST /checkout (checkout, trace 0af7) · 30–80 ms',
   ]);
   assert.equal(counts.mistakes, 0, 'selecting is free');
 });
@@ -928,7 +928,7 @@ test('V2 attaching fills in the record ids, ticks the record time on the span ro
   assert.equal(logLines()[2], `60 ms · INFO · checkout · trace_id=${T2} · span_id=${S4} · Order accepted · order.id=8842`);
   assert.deepEqual(ticks(), [`${S4}@71.43%`]);
   assert.equal(label(S4).endsWith(', 1 record'), true);
-  assert.equal(lstatus(), `"Order accepted" now carries span_id=${S4} and trace_id=${T2} from POST /checkout (checkout).`);
+  assert.equal(lstatus(), `"Order accepted" now carries span_id=${S4} and trace_id=${T2} from POST /checkout (checkout, trace 0af7).`);
   attach('l-boot', S1);
   assert.deepEqual(ticks(), [`${S1}@0%`, `${S4}@71.43%`], 'a time outside the bar hangs off it');
   attach('l-boot', 'none');
@@ -1084,4 +1084,45 @@ test('the box still cancels a pick on an Escape nothing else handled, and ignore
   click(`[data-span="${B}"]`);
   q('[data-build="b1"]').onkeydown({ key: 'Escape', defaultPrevented: true, preventDefault() {} });
   assert.equal(q(`[data-span="${B}"]`).getAttribute('aria-pressed'), 'true');
+});
+
+test('same-name, same-service spans get distinct names in the controls and the announcements (#69)', async () => {
+  const { CONTENT } = await import('../levels/events-and-links.mjs');
+  const spec = CONTENT.steps[2].build; // 2.6's batch step: three "orders publish (orders)" spans
+  const [p1, p2, p3, send] = spec.spans;
+  const { dom, mount } = setup(spec);
+  mount();
+  click(`[data-span="${send.spanId}"]`);
+  const names = qa('[data-link]').map((b) => b.textContent.trim());
+  assert.deepEqual(names, [
+    'orders publish (orders, trace 6512)',
+    'orders publish (orders, trace c20a)',
+    'orders publish (orders, trace c51c)',
+  ]);
+  assert.equal(new Set(names).size, 3);
+  click(`[data-link="${p2.spanId}"]`);
+  assert.match(status(), /orders publish/);
+  assert.ok(status().includes('(orders, trace c20a)'), status());
+  // A span with a unique name keeps the plain label.
+  click(`[data-span="${p1.spanId}"]`);
+  assert.match(dom.body.querySelector('[data-build-panel]').textContent, /Editing orders publish \(orders, trace 6512\)/);
+  assert.ok(p3);
+});
+
+test('same-name spans in one trace are told apart by span id (#69)', () => {
+  const spec = {
+    id: 'dup',
+    spans: [
+      { spanId: 'aaaaaaaaaaaaaaa1', traceId: '1111aaaa1111aaaa1111aaaa1111aaaa', name: 'retry', service: 'api', kind: 'INTERNAL', startMs: 0, endMs: 5, status: 'UNSET', attributes: {}, events: [], links: [] },
+      { spanId: 'aaaaaaaaaaaaaaa2', traceId: '1111aaaa1111aaaa1111aaaa1111aaaa', name: 'retry', service: 'api', kind: 'INTERNAL', startMs: 6, endMs: 9, status: 'UNSET', attributes: {}, events: [], links: [] },
+      { spanId: 'aaaaaaaaaaaaaaa3', traceId: '2222bbbb2222bbbb2222bbbb2222bbbb', name: 'solo', service: 'api', kind: 'INTERNAL', startMs: 10, endMs: 12, status: 'UNSET', attributes: {}, events: [], links: [] },
+    ],
+    edit: ['links'],
+    answer: {},
+    helps: {},
+  };
+  const html = renderBuild(spec, newBuildState(spec), { escapeHtml, selected: 'aaaaaaaaaaaaaaa3' });
+  assert.ok(html.includes('retry (api, trace 1111, span aaaaaaaaaaaaaaa1)'));
+  assert.ok(html.includes('retry (api, trace 1111, span aaaaaaaaaaaaaaa2)'));
+  assert.ok(html.includes('Editing solo (api),'));
 });
