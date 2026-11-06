@@ -262,3 +262,14 @@ test('a long result in the view shows 20 rows and the count of the rest', () => 
   assert.ok(q('#qa-result').textContent.includes('and 8 more series'));
   assert.ok(q('#qa-result').textContent.includes('more series'));
 });
+
+test('Escape on the shown hint is handled and moves focus off it; the once-only hint button is disabled, so focus goes to the textarea (#178)', () => {
+  const { focus, mount } = setup({ ...fixture(), hint: 'Try <code>rate</code> first.' });
+  mount();
+  click('#qa-hint');
+  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q('#qa-hint-text').onkeydown(e);
+  assert.equal(e.defaultPrevented, true);
+  assert.equal(focus.last(), '#qa-input');
+  assert.deepEqual(focus.unfocusable(), []);
+});

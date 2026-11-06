@@ -1049,3 +1049,16 @@ test('setParent stays the one transition: the view never writes a parent itself,
   const st = newBuildState(b1Spec());
   assert.equal(setParent(b1Spec(), st, B, A), 'set');
 });
+
+test('Escape on a shown hint is handled, focuses the hint button and leaves the level open (#178)', () => {
+  const { focus, mount } = setup(withHelps(ALL));
+  mount();
+  click('#b1-hint');
+  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q('#b1-hint-text').onkeydown(e);
+  assert.equal(e.defaultPrevented, true);
+  assert.equal(focus.last(), '#b1-hint');
+  const other = { key: 'a', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q('#b1-hint-text').onkeydown(other);
+  assert.equal(other.defaultPrevented, false, 'only Escape is taken');
+});

@@ -351,3 +351,14 @@ test('the reference passes a uses step after a uses slip, and the slip costs not
   assert.equal(counts.mistakes, 1);
   assert.equal(counts.done, 1);
 });
+
+test('Escape on the shown hint is handled and moves focus off it; the once-only hint button is disabled, so focus goes to the textarea (#178)', () => {
+  const { focus, mount } = setup(fixture({ hint: 'Compare the <code>exporters</code> names.' }));
+  mount();
+  click('#cf-hint');
+  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q('#cf-hint-text').onkeydown(e);
+  assert.equal(e.defaultPrevented, true);
+  assert.equal(focus.last(), '#cf-input');
+  assert.deepEqual(focus.unfocusable(), []);
+});

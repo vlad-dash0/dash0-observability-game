@@ -169,11 +169,21 @@ test('button describedBy: names the explanation of a disabled button; absent by 
 
 test('table and prose: a captioned table scrolls in a labelled region; an uncaptioned one is not labelled', () => {
   assert.ok(table({ caption: 'Endpoints "x" & <b>', head: ['a'], rows: [['1']] })
-    .startsWith('<div class="ui-table-wrap" role="region" aria-label="Endpoints &quot;x&quot; &amp; &lt;b&gt;"><table'));
+    .startsWith('<div class="ui-table-wrap" role="region" aria-label="Endpoints &quot;x&quot; &amp; &lt;b&gt;" tabindex="0"><table'));
   assert.equal(table({ head: ['a'], rows: [] }).includes('role='), false);
   assert.equal(prose('<table><caption>Ends <code>x</code></caption><tr><td>1</td></tr></table>'),
-    '<div class="ui-prose"><div class="ui-table-wrap" role="region" aria-label="Ends x"><table><caption>Ends <code>x</code></caption><tr><td>1</td></tr></table></div></div>');
+    '<div class="ui-prose"><div class="ui-table-wrap" role="region" aria-label="Ends x" tabindex="0"><table><caption>Ends <code>x</code></caption><tr><td>1</td></tr></table></div></div>');
   assert.equal(prose('<table><caption>Say "hi"</caption></table>').includes('aria-label="Say &quot;hi&quot;"'), true);
+});
+
+test('a captioned table region takes focus so the keyboard can scroll it; an uncaptioned one does not (#178)', () => {
+  const tab = (html) => /<div class="ui-table-wrap"([^>]*)>/.exec(html)[1];
+  assert.match(tab(table({ caption: 'Errors', head: ['a'], rows: [['1']] })), /\btabindex="0"/);
+  assert.match(tab(prose('<table><caption>Ends</caption><tr><td>1</td></tr></table>')), /\btabindex="0"/);
+  assert.doesNotMatch(tab(table({ head: ['a'], rows: [] })), /tabindex/);
+  const ring = rules(read('styles/kit.css')).find((r) => r.selector.split(',').map((s) => s.trim()).includes('.ui-table-wrap:focus-visible'));
+  assert.ok(ring, 'the kit styles the focused scroll region');
+  assert.deepEqual(decls(ring.body).filter(([k]) => k === 'outline').map(([, v]) => v), ['2px solid var(--color-focus)']);
 });
 
 test('field kind secret: a labelled password input that never carries a value', () => {
@@ -192,7 +202,7 @@ test('field kind secret: a labelled password input that never carries a value', 
 
 test('table: escaped cells, scoped headings, numeric columns', () => {
   assert.equal(table({ caption: 'Errors', head: ['service', 'count'], rows: [['a<b', 3]], numeric: [1] }),
-    '<div class="ui-table-wrap" role="region" aria-label="Errors"><table class="ui-table"><caption>Errors</caption><thead><tr><th scope="col">service</th>' +
+    '<div class="ui-table-wrap" role="region" aria-label="Errors" tabindex="0"><table class="ui-table"><caption>Errors</caption><thead><tr><th scope="col">service</th>' +
     '<th scope="col" data-num>count</th></tr></thead><tbody><tr><td>a&lt;b</td><td data-num>3</td></tr></tbody></table></div>');
   assert.equal(table({ head: ['a'], rows: [] }),
     '<div class="ui-table-wrap"><table class="ui-table"><thead><tr><th scope="col">a</th></tr></thead><tbody></tbody></table></div>');

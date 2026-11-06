@@ -616,3 +616,12 @@ test('V14 the view and the help never read a kind as "clue" (clueIds is the one 
     assert.equal(/['"`]clue['"`]/.test(src(f)), false, `${f} names the clue kind`);
   }
 });
+
+test('Escape on a shown hint is handled, focuses the hint button and leaves the level open (#178)', () => {
+  const { focus } = setup();
+  click(`[id="${ID}-hint"]`);
+  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q(`[id="${ID}-hint-text"]`).onkeydown(e);
+  assert.equal(e.defaultPrevented, true);
+  assert.equal(focus.last(), `#${ID}-hint`);
+});

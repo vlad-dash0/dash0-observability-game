@@ -332,3 +332,17 @@ test('parent-coloured text (the "its parent" tag, the queue heading) reaches 4.5
     }
   }
 });
+
+test('reward stars (#178): the glyph colour comes from a token and reaches 3:1 on the card, both themes', () => {
+  const rule = rules(read('styles/hub.css')).find((r) => r.selector.split(',').map((s) => s.trim()).includes('.reward-card .reward-stars'));
+  assert.ok(rule, '.reward-card .reward-stars rule');
+  const colour = decls(rule.body).filter(([k]) => k === 'color').at(-1)?.[1];
+  const token = /^var\((--color-[\w-]+)\)$/.exec(colour ?? '')?.[1];
+  assert.ok(token, `the stars take a --color-* token, not ${colour}`);
+  for (const theme of ['light', 'dark']) {
+    for (const bg of ['--color-surface', '--color-bg']) {
+      const r = contrast(token, bg, theme);
+      assert.ok(r >= 3, `${theme}: reward stars (${token}) on ${bg} are ${r.toFixed(2)}, need 3`);
+    }
+  }
+});
