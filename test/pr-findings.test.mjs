@@ -715,10 +715,10 @@ test('L3: a disposition must start with a verdict or name a commit or #N; every 
 // Comments, reviews and threads are three GraphQL connections, told apart by the query.
 // The PR itself (its author) is one plain query, told apart by `author` at the PR level;
 // by default a trusted owner, `dev`.
-// The PR's commits are a fourth connection (`commits`, { oid, merge, parents? } here: without
-// `parents` a commit follows the previous one, a merge adding a second parent outside the PR). By default the
-// head is the latest sha any review names, padded to 40 characters, so a test that is not
-// about the head rule has a review of the head.
+// The PR's commits are a fourth connection (`commits`, { oid, merge, parents? } here:
+// without `parents` a commit follows the previous one, a merge adding a second parent
+// outside the PR). By default the head is the latest sha any review names, padded to 40
+// characters, so a test that is not about the head rule has a review of the head.
 const pad = (sha) => sha.padEnd(40, '0');
 const MAIN = 'e'.repeat(40);
 function fakeGh({ comments: c = [[]], reviews = [[]], threads = [[]], commits, head, commitTotal, fail, prAuthor = { author: { login: 'dev' }, authorAssociation: 'OWNER' } } = {}) {
@@ -1033,7 +1033,7 @@ test('head: a commit list that does not contain headRefOid is inconclusive', asy
 
 // The commit list is date ordered, not ancestry ordered: reachability decides (#65).
 test('head: an old-dated non-merge commit merged in, listed before the reviewed one, is unreviewed code', async () => {
-  // x is dated before a, reaches the head only as m's second parent.
+  // d is dated before a, reaches the head only as b's second parent.
   const commits = [commit(H.d, false, [MAIN]), commit(H.a, false, [MAIN]), commit(H.b, false, [H.a, H.d])];
   const r = await headRun(H.a, commits);
   assert.equal(r.exit, 1);
@@ -1055,9 +1055,10 @@ test('head: a PR past the 250 commits GitHub lists cannot be checked, exit 2 wit
 
 test('head: a parent list cut short is unreadable, exit 2', async () => {
   const { gh } = fakeGh({ comments: [[reviewAt(H.a)]], commits: [commit(H.a)] });
-  const cut = async (args) => JSON.stringify(JSON.parse(await gh(args)), (k, v) => (k === 'totalCount' && v === 1 ? 3 : v));
+  const cut = async (args) => JSON.stringify(JSON.parse(await gh(args)), (k, v) => (k === 'parents' ? { ...v, totalCount: v.totalCount + 1 } : v));
   const out = sink();
   assert.equal(await run({ repo: 'acme/game', pr: 7, gh: cut, log: out.log }), 2);
+  assert.match(out.lines.join('\n'), /an unreadable commit in its commit list/);
 });
 
 test('head: two reviews of different commits; the later one decides, whatever the shas look like', async () => {
