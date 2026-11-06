@@ -296,7 +296,8 @@ export default {
         );
     };
 
-    const explorerHead = (what) => `${chip({ text: 'Simulated', tone: 'attention' })} ${what}. Nothing here is your account.`;
+    // The heading text is focusable (tabindex -1) so a screen-reader or keyboard user lands where the task is.
+    const explorerHead = (what, id) => `${chip({ text: 'Simulated', tone: 'attention' })} <span id="${id}" tabindex="-1">${what}</span>. Nothing here is your account.`;
 
     const showList = () => {
       const shown = applied ? matchTraces(traces, applied) : traces;
@@ -313,7 +314,7 @@ export default {
         : `${shown.length} traces.`;
       const box = $('#its-explorer');
       box.innerHTML = panel({
-        headHtml: explorerHead('Trace Explorer'),
+        headHtml: explorerHead('Trace Explorer', 'its-explorer-title'),
         sections: [
           `<p>Your session id: <code id="its-session">${e(tele.sessionId)}</code></p>`,
           filterForm(),
@@ -369,7 +370,7 @@ export default {
       ]);
       const opens = t.spans.map((s, i) => button({ id: `its-open-${i}`, label: `Open ${s.name}`, variant: 'ghost' })).join('');
       $('#its-explorer').innerHTML = panel({
-        headHtml: explorerHead('Trace View'),
+        headHtml: explorerHead('Trace View', 'its-trace-title'),
         sections: [
           `<p>Trace id: <code id="its-trace">${e(t.traceId)}</code></p>`,
           table({
@@ -383,6 +384,7 @@ export default {
           bar(button({ id: 'its-back', label: 'Back to the trace list', variant: 'ghost' })),
         ],
       });
+      $('#its-trace-title').focus();
       t.spans.forEach((s, i) => {
         $(`#its-open-${i}`).onclick = () => {
           const box = $('#its-detail');
@@ -501,7 +503,8 @@ export default {
             : 'You found the game\'s own incident in your own Dash0: you filtered by your session id, opened the trace and read the span in error.',
           cards: [],
         });
-      $('#its-q-operation').focus();
+      // Practice: the task starts in the explorer, not in the first answer field.
+      (practice ? $('#its-explorer-title') : $('#its-q-operation')).focus();
     };
 
     stepStart();

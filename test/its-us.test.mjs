@@ -14,6 +14,7 @@ import { RESOURCE_ATTRIBUTES } from '../lib/otlp/encode.mjs';
 import { answersFrom, buildTraceList, startAgoMs, FAULT_ATTR, FILTER_KEY, FILTER_OP, QUESTION } from '../lib/incident-lab.mjs';
 import { msToUnixNano } from '../lib/otlp/encode.mjs';
 import { PRACTICE_HOSTS } from '../lib/dash0/ingress.mjs';
+import { recordFocus } from './helpers/focus.mjs';
 import level from '../levels/its-us.mjs';
 
 const HOST = 'ingress.eu-west-1.aws.dash0.com';
@@ -144,6 +145,27 @@ function practiceView(over) {
   press('#its-open-trace-0');
   return x;
 }
+
+test('practice: focus starts at the explorer heading, not the first answer field', () => {
+  const { tele } = session({ live: false });
+  open(tele);
+  const focus = recordFocus(globalThis.window);
+  press('#its-practice');
+  assert.equal(focus.last(), '#its-explorer-title');
+  assert.equal(q('#its-explorer-title').getAttribute('tabindex'), '-1');
+  assert.deepEqual(focus.unfocusable(), []);
+});
+
+test('Open trace: focus lands on the trace view heading', () => {
+  const { tele } = session({ live: false });
+  open(tele);
+  const focus = recordFocus(globalThis.window);
+  press('#its-practice');
+  applyFilter(FILTER_KEY.sessionId, FILTER_OP.is, tele.sessionId);
+  press('#its-open-trace-0');
+  assert.equal(focus.last(), '#its-trace-title');
+  assert.equal(q('#its-trace-title').getAttribute('tabindex'), '-1');
+});
 
 // ---- not connected ----
 
