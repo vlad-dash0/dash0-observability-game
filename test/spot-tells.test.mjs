@@ -211,6 +211,9 @@ function scoresFor(spec) {
   for (const set of prefixSets(spec)) {
     scores[`keys starting ${set.join(' or ')}.`] = (l) => (set.includes(namespaceOf(l.text)) ? 1 : 0);
   }
+  for (const { set, sub } of minusRules(spec)) {
+    scores[minusName(set, sub)] = (l) => (set.includes(namespaceOf(l.text)) && subNamespaceOf(l.text) !== sub ? 1 : 0);
+  }
   return scores;
 }
 
@@ -229,6 +232,32 @@ function prefixSets(spec) {
   const sets = [...segs.map((x) => [x]), ...choose(segs, 2)];
   return segs.length < 2 ? [] : sets.filter((set) => spec.lines.some((l) => set.includes(namespaceOf(l.text))) && spec.lines.some((l) => !set.includes(namespaceOf(l.text))));
 }
+
+/** The first two dotted segments of a key with three or more (`http.request` for `http.request.method=POST`), or null. */
+function subNamespaceOf(text) {
+  const m = /^(\w+\.[\w-]+)\.[\w.-]*=/.exec(text);
+  return m ? m[1] : null;
+}
+
+/**
+ * Rules "first-segment set S minus sub-namespace P": S is each first segment that occurs or a union of two (as in
+ * prefixSets, but a board with one segment counts), P each first-two-segment prefix of a key of three or more segments
+ * whose first segment is in S. A rule that picks every line or none is no rule. Bounded by the sets times the prefixes.
+ */
+function minusRules(spec) {
+  const segs = [...new Set(spec.lines.map((l) => namespaceOf(l.text)).filter((n) => n !== null))].sort();
+  const subs = [...new Set(spec.lines.map((l) => subNamespaceOf(l.text)).filter((n) => n !== null))].sort();
+  const out = [];
+  for (const set of [...segs.map((x) => [x]), ...choose(segs, 2)]) {
+    for (const sub of subs.filter((p) => set.includes(p.split('.')[0]))) {
+      const picked = spec.lines.filter((l) => set.includes(namespaceOf(l.text)) && subNamespaceOf(l.text) !== sub).length;
+      if (picked > 0 && picked < spec.lines.length) out.push({ set, sub });
+    }
+  }
+  return out;
+}
+
+const minusName = (set, sub) => `keys starting ${set.join(' or ')}. not under ${sub}.`;
 
 const ruleName = (score, j) => (j === 0 ? score : `${score}, skipping ${j}`);
 
@@ -350,6 +379,14 @@ const KNOWN = {
   ],
 };
 
+// Rules that solve a board because they encode its concept, not a surface tell: "<no> <spot id>" -> exact rule -> why.
+// Narrow on purpose: only this rule on this board, and the test fails if it stops passing.
+const CONCEPT_RULES = {
+  '8.2 scv-spot': {
+    'keys starting http or net. not under http.request.': 'the rule encodes the concept: stable HTTP names nest under http.request./http.response. (#206, #207)',
+  },
+};
+
 test('the rules see every Spot board, read its fields, each board is solved by its own answer, and the retry model counts mistakes', async () => {
   const specs = await allSpotSpecs();
   assert.equal(specs.length, 8, 'all eight Spot boards');
@@ -398,8 +435,15 @@ test('the rules see every Spot board, read its fields, each board is solved by i
 
 test('no Spot board is solved, even with one wrong Check, by taking the lines with the most or fewest of anything countable, first or after skipping one or two, ties tried every way (#190)', async () => {
   const found = await tells();
-  const { [Object.keys(KNOWN)[0]]: known = {}, ...others } = found;
+  const { [Object.keys(KNOWN)[0]]: known = {}, ...rest } = found;
+  const others = {};
+  for (const [board, rules] of Object.entries(rest)) {
+    const concept = Object.keys(CONCEPT_RULES[board] ?? {});
+    const surface = Object.keys(rules).filter((r) => !concept.includes(r));
+    if (surface.length) others[board] = Object.fromEntries(surface.map((r) => [r, rules[r]]));
+  }
   assert.deepEqual(others, {}, 'boards a blind rule solves without reading them');
+  for (const [board, rules] of Object.entries(CONCEPT_RULES)) assert.deepEqual(Object.keys(found[board] ?? {}), Object.keys(rules), `${board}: the concept rules are exactly the ones that still pass; drop any that no longer do`);
   assert.deepEqual(Object.keys(known).sort(), [...KNOWN['6.2 ts-spot']].sort(), '6.2: the KNOWN tells (#193) are exactly the ones that still pass; drop any that no longer do');
 });
 
@@ -453,6 +497,21 @@ test('the key-prefix rule: lines whose key starts with a namespace, or either of
   assert.equal(namespaceOf('plain=1'), 'plain');
   assert.equal(namespaceOf('expr: up'), null);
   assert.deepEqual(prefixSets(board([['a', 'k.x=1'], ['b', 'k.y=2']], ['a'])), [], 'one namespace: nothing to split');
+  // Depth 2: "http or net. not under http.request." solves `after` (which plain "http or net." loses) and not a board whose answer is under http.request.
+  const minus = 'keys starting http or net. not under http.request.';
+  assert.deepEqual(minusRules(after).map((r) => minusName(r.set, r.sub)).filter((n) => n.includes('http or net')), [minus, 'keys starting http or net. not under net.host.']);
+  assert.equal(shareOf(after, minus) > TELL_SHARE, true, 'the minus rule solves it');
+  const nested = board(
+    [['t', 'http.target=/checkout?step=pay'], ['sp', 'server.port=8443'], ['rm', 'http.request.method=POST'], ['ca', 'client.address=gw.kettle.example'], ['nh', 'net.host.port=8443'], ['rt', 'http.route=/checkout'], ['rh', 'http.request.header.content-type=["application/json"]'], ['sc', 'http.status_code=500']],
+    ['rm', 'rh', 'sc'],
+  );
+  assert.equal(shareOf(nested, minus) <= TELL_SHARE, true, 'the answer is under http.request.: the rule misses it');
+  assert.equal(subNamespaceOf('http.request.method=POST'), 'http.request');
+  assert.equal(subNamespaceOf('http.route=/x'), null, 'two segments: no sub-namespace');
+  assert.deepEqual(minusRules(board([['a', 'k.x=1'], ['b', 'k.x.y=2']], ['a'])).map((r) => minusName(r.set, r.sub)), ['keys starting k. not under k.x.'], 'one namespace is enough');
+  assert.deepEqual(minusRules(board([['a', 'k.x.y=1'], ['b', 'k.x.z=2']], ['a'])), [], 'a rule that picks no line is none');
   // No live board is one (tells() runs every set on every board).
   for (const { no, spec } of await allSpotSpecs()) for (const set of prefixSets(spec)) assert.equal(shareOf(spec, `keys starting ${set.join(' or ')}.`) <= TELL_SHARE, true, `${no}: ${set}`);
+  // Depth-2 rules on live boards: counted here, judged (with CONCEPT_RULES) in the test above.
+  for (const { no, spec } of await allSpotSpecs()) assert.equal(minusRules(spec).length <= 20, true, `${no} ${spec.id}: ${minusRules(spec).length} depth-2 rules, keep the combinatorics bounded`);
 });
