@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { makeDom, q, qa } from './helpers/dom.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
 import { createTelemetry } from '../lib/telemetry.mjs';
+import { recordFocus } from './helpers/focus.mjs';
 import level from '../levels/connect-to-dash0.mjs';
 
 const HOST = 'ingress.eu-west-1.aws.dash0.com';
@@ -659,4 +660,61 @@ test('the level file never touches storage, the URL, the console or the cookie j
   for (const banned of [/localStorage/, /sessionStorage/, /document\.cookie/, /\blocation\b/, /\bhistory\b/, /console\./, /indexedDB/, /reportError/, /fetch\(/, /innerHTML\s*=\s*[^;]*token/i]) {
     assert.doesNotMatch(code, banned);
   }
+});
+
+test('the permission radios sit in a group named by the question, in practice and in live', () => {
+  const names = (h) => {
+    const groups = qa('fieldset.ui-group');
+    assert.equal(groups.length, 1, h);
+    assert.equal(qa('input[name="ctd-scope"]').length, 3);
+    for (const r of qa('input[name="ctd-scope"]')) assert.ok(r.closest('fieldset') === groups[0], 'every radio is inside the group');
+    return groups[0].querySelector('legend').textContent;
+  };
+  const a = open(practiceTelemetry().tele);
+  press('#ctd-practice');
+  assert.equal(names('practice'), 'Permissions');
+  const b = open(liveTelemetry([ok()]).tele);
+  press('#ctd-live');
+  assert.equal(names('live'), 'Which permission did you give this token?');
+  assert.ok(a && b);
+});
+
+test('the endpoint table is a labelled scroll region', () => {
+  open(practiceTelemetry().tele);
+  press('#ctd-practice');
+  const region = q('.ui-table-wrap');
+  assert.equal(region.getAttribute('role'), 'region');
+  assert.equal(region.getAttribute('aria-label'), 'Endpoints of this organization');
+});
+
+test('a disabled live button points at the paragraph that says why', () => {
+  open(practiceTelemetry().tele);
+  const why = q('#ctd-live').getAttribute('aria-describedby');
+  assert.equal(why, 'ctd-live-why');
+  assert.match(q(`#${why}`).textContent, /not open yet/);
+  open(liveTelemetry([ok()]).tele);
+  assert.equal(q('#ctd-live').hasAttribute('aria-describedby'), false, 'enabled: nothing to explain');
+});
+
+test('focus lands on the connected screen heading after an accepted Connect, in both modes', async () => {
+  let focus;
+  const check = async () => {
+    await settle('#ctd-finish');
+    assert.equal(focus.last(), '#ctd-connected-title');
+    assert.deepEqual(focus.unfocusable(), [], 'the target can take focus');
+    assert.equal(q('#ctd-connected-title').getAttribute('tabindex'), '-1');
+  };
+  const p = open(practiceTelemetry().tele);
+  focus = recordFocus(p.dom.window);
+  press('#ctd-practice');
+  press('#ctd-scope-ingest');
+  press('#ctd-mint');
+  fill('#ctd-endpoint', q('#ctd-ep-http').textContent);
+  fill('#ctd-token', q('#ctd-minted').textContent);
+  press('#ctd-connect');
+  await check();
+  const l = open(liveTelemetry([ok()]).tele);
+  focus = recordFocus(l.dom.window);
+  await connectLive(l);
+  await check();
 });
