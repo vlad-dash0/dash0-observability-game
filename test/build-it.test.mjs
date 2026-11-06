@@ -601,3 +601,24 @@ test('explain is refused outside logs mode, because span mode never shows it', (
   assert.deepEqual(validateBuildSpec(b1Spec()), []);
   assert.deepEqual(validateBuildSpec({ ...logsSpec(), explain: 'Because.' }), []);
 });
+
+test('checkBuild span mode: a twin carries the trace suffix in its message, a unique span does not (#228)', () => {
+  const T1 = '1111aaaa1111aaaa1111aaaa1111aaaa';
+  const T2 = '2222bbbb2222bbbb2222bbbb2222bbbb';
+  const mk = (spanId, traceId, name, startMs, endMs) => ({
+    spanId, traceId, name, service: 'api', kind: 'INTERNAL', startMs, endMs, status: 'UNSET', parentId: null, attributes: {}, events: [], links: [],
+  });
+  const spec = {
+    id: 'twins',
+    spans: [mk('aaaaaaaaaaaaaaa1', T1, 'root', 0, 100), mk('aaaaaaaaaaaaaaa2', T1, 'retry', 10, 90), mk('aaaaaaaaaaaaaaa3', T2, 'retry', 20, 30)],
+    edit: ['parent'],
+    answer: { aaaaaaaaaaaaaaa2: { parentId: 'aaaaaaaaaaaaaaa1' }, aaaaaaaaaaaaaaa3: { parentId: null } },
+  };
+  const st = newBuildState(spec);
+  setParent(spec, st, 'aaaaaaaaaaaaaaa2', 'aaaaaaaaaaaaaaa3'); // the twin, under its twin of another trace
+  setParent(spec, st, 'aaaaaaaaaaaaaaa1', 'aaaaaaaaaaaaaaa3'); // the unique span, across traces too
+  assert.deepEqual(checkBuild(spec, st).issues.map((i) => i.message), [
+    "root (api): its parent is in another trace. A parent always shares its child's trace ID.",
+    "retry (api, trace 1111aaaa): its parent is in another trace. A parent always shares its child's trace ID.",
+  ]);
+});
