@@ -106,7 +106,7 @@ test('a widget in the level\'s hintless list says no hints; the others keep thei
 
 test('the hint lines state the cost as one penalty and the Hint button as pricing on that board\'s score card', () => {
   assert.equal(HOW_TO.sort.hints, "Each hint counts as one penalty. Where the board has hints, the Hint button shows what the next one costs on that board's score card.");
-  assert.equal(HOW_TO.query.hints, 'Show a hint costs one penalty. Some steps have no hint.');
+  assert.equal(HOW_TO.query.hints, 'Showing a hint costs one penalty. Some steps have no hint.');
   assert.equal(HOW_TO.configure.hints, HOW_TO.query.hints);
 });
 
