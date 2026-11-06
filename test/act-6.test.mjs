@@ -486,15 +486,15 @@ test('spot: every decoy says why it is fine, no reason names the traces pipeline
   assert.deepEqual(Object.keys(spec.whyNot).sort(), decoys);
   for (const [id, why] of Object.entries(spec.whyNot)) {
     const t = plain(why);
-    assert.equal(/tail_sampling|traces|feed/.test(t.replace(/\bthe pipelines that feed the connector\b/, '')), false, `${id}: names no fault, the traces pipeline, or the sampler on it`);
+    assert.equal(/tail_sampling|traces|feed/.test(t.replace(/\bthe pipelines that feed the connector\b/, '').replace(/\bevery traces pipeline can read\b/, '').replace(/\bwaits for whole traces\b/, '')), false, `${id}: names no fault, the traces pipeline, or the sampler on it`);
     for (const fault of spec.lines.filter((l) => spec.faults.includes(l.id))) assert.equal(t.includes(fault.text), false, `${id}: not the full text of ${fault.id}`);
   }
   assert.equal(/receiv/.test(plain(spec.whyNot['metrics-receivers'])), true);
   assert.equal(/the connector/.test(plain(spec.whyNot['metrics-receivers'])) && !/four/.test(plain(spec.whyNot['metrics-receivers'])), true, 'one connector again');
   assert.equal(/archive of its own/.test(plain(spec.whyNot['archive-processors'])) && /archive of its own/.test(plain(spec.whyNot['archive-exporters'])), true);
   assert.equal(/counted/.test(plain(spec.whyNot['metrics-exporters'])), true);
-  // probabilistic_sampler is stateless for traces (its README), so the archive reason says it holds nothing in memory.
-  assert.equal(plain(spec.whyNot['archive-processors']).includes('each decided on its own, so it holds nothing in memory'), true);
+  // probabilistic_sampler is stateless for traces (its README), so the archive reason says it keeps no state between spans.
+  assert.equal(plain(spec.whyNot['archive-processors']).includes('each decided on its own, with no state kept between spans, unlike the sampler that waits for whole traces'), true);
   assert.equal(/no processor here drops one/.test(plain(spec.whyNot['count-processors'])), true, 'count sees every span');
   assert.equal(/pipeline lines?\b|that list it/.test(plain(spec.whyNot['metrics-receivers'])), false, 'no reason points at the one line that lists the component');
 });

@@ -23,7 +23,7 @@
 // Spot it does not parse the config or check any wiring: it grades which of ten config lines the player selects against a seeded
 // set. The seeded fault is two lines of one pipeline, the processors of the traces pipeline (tail_sampling among them) and its exporters
 // (span_metrics among them): each is right alone, and together they count only the spans the sampler kept. A second pipeline,
-// traces/archive, lists tail_sampling too but exports no connector, so it is no fault. Configure it
+// traces/archive, lists probabilistic_sampler but exports no connector, so it is no fault. Configure it
 // cannot grade this, because its `uses` can only require a component, never forbid one. There is no Configure it step.
 // The numbers are one invented table: 400 traces a second, a gateway replica that holds each for the decision wait at 0.05 MiB a trace.
 // Error and slow traces are taken as distinct sets, so the kept figures add up.
@@ -165,14 +165,14 @@ const SPOT = {
     'metrics-exporters': 'This sends the metrics on, to the backend and to a debug exporter that prints them. By then the spans are counted, so it cannot change what the connector counts.',
     'count-processors': 'This pipeline only batches its spans: no processor here drops one, so the count connector at its end counts every span.',
     'count-exporters': 'This pipeline ends in a connector too, the count connector, which counts spans. Nothing before it in this pipeline drops a span, so its count is the real one.',
-    'archive-processors': 'probabilistic_sampler keeps a random share of the spans it sees, each decided on its own, so it holds nothing in memory. Its cut stays in this pipeline, which ends in an archive of its own and lists no connector.',
+    'archive-processors': 'probabilistic_sampler keeps a random share of the spans it sees, each decided on its own, with no state kept between spans, unlike the sampler that waits for whole traces. Its cut stays in this pipeline, which ends in an archive of its own and lists no connector.',
     'archive-exporters': 'This sends the sample to an archive of its own and lists no connector, so nothing in this pipeline reaches the span metrics.',
-    'traces-receivers': 'A receiver can be listed in more than one pipeline, and every pipeline here reads the same otlp receiver, so this one gets every span. Getting every span is not what makes a count wrong.',
+    'traces-receivers': 'A receiver can be listed in more than one pipeline, so every traces pipeline can read the same otlp receiver and get every span. Getting every span is not what makes a count wrong.',
   },
   explain:
     'A connector is an exporter at the end of one pipeline and a receiver at the start of another, so it counts what comes out of the processors of the pipeline that exports to it. ' +
     'Two lines of <code>traces/dash0</code> do it together, and neither is wrong alone: its processors list <code>tail_sampling</code>, which is how a pipeline samples what it sends to a backend, and its exporters list <code>span_metrics</code>, which a connector needs. ' +
-    `Because <code>tail_sampling</code> runs first, <code>span_metrics</code> gets only the spans of the traces it kept: ${n(KEPT)} of ${n(TRACES)} traces a second. ` +
+    `Because <code>tail_sampling</code> runs first, <code>span_metrics</code> gets only the spans of the traces it kept: ${n(KEPT)} of ${n(TRACES)} traces a second with the policies you picked in the last step. ` +
     `The request rate it computes is ${n(KEPT)} of every ${n(TRACES)}, not all of them, and the error ratio is ${n(ERRORS)} of ${n(KEPT)}, ${ERROR_SHARE}%, not the real ${pct(ERROR_RATE)}, because the sampler kept every error and few of the rest. ` +
     `The other two traces pipelines each have one half: <code>traces/count</code> ends in a connector but samples nothing, so <code>count</code> sees the spans of all ${n(TRACES)} traces a second, and <code>traces/archive</code> samples but ends in no connector. ` +
     'The two lines are the fault because of how they meet in one pipeline, so the fix keeps them apart rather than making either one wrong: <code>tail_sampling</code> stays in the processors of <code>traces/dash0</code>, and <code>span_metrics</code> moves to a pipeline whose processors list no sampler. ' +
@@ -210,7 +210,7 @@ export default {
         intro:
           'The same gateway computes request and error rates from spans with one <code>span_metrics</code> connector, and a metrics pipeline sends them to the dashboards. Since the <code>tail_sampling</code> processor went in, the dashboards are wrong: the request rate fell to a tenth and the error ratio jumped. ' +
           'It also counts spans with a <code>count</code> connector. Here are the gateway\'s pipelines, one field of one pipeline per line, each pipeline named for where it sends; the definitions of the components are not shown.',
-        question: 'Spot the two lines that together make the connector count the wrong spans.',
+        question: 'Spot the two lines that together make the span_metrics connector count the wrong spans.',
         qid: 'ts-q-spot',
         spot: SPOT,
       },
