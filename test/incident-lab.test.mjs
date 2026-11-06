@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import {
   answersFrom, buildIncident, CANDIDATES, FAULT_ALPHABET, FAULT_ATTR, GRADE, gradeAnswer, QUESTION,
 } from '../lib/incident-lab.mjs';
-import { encodeTraces } from '../lib/otlp/encode.mjs';
+import { encodeTraces, SPAN_KIND, STATUS_CODE } from '../lib/otlp/encode.mjs';
 import { createTelemetry, PRACTICE_TOKEN } from '../lib/telemetry.mjs';
 import { PRACTICE_HOSTS } from '../lib/dash0/ingress.mjs';
 
@@ -30,7 +30,7 @@ test('the incident is a function of seed and injected clock only', () => {
   assert.deepEqual(later.spans.map((s) => s.spanId), build(42).spans.map((s) => s.spanId));
 });
 
-test('one trace: root progress.sync with four children; exactly one of the last three is ERROR', () => {
+test('one trace: root progress.sync with four children; exactly one of the last three is in Error', () => {
   const inc = build(7);
   const [root, ...kids] = inc.spans;
   assert.equal(root.name, 'progress.sync');
@@ -47,12 +47,39 @@ test('one trace: root progress.sync with four children; exactly one of the last 
   assert.ok(bad.events.some((e) => e.name === 'exception' && e.attributes['exception.type']));
 });
 
-test('every span encodes as OTLP; times nest inside the root', () => {
+test('times nest inside the root and the spans encode', () => {
   const inc = build(11);
   encodeTraces(inc.spans, { sessionId: 'a'.repeat(16) });
   const [root, ...kids] = inc.spans;
   for (const k of kids) {
     assert.ok(k.startMs >= root.startMs && k.endMs <= root.endMs && k.endMs >= k.startMs);
+  }
+});
+
+test('encoded OTLP: kinds, parents, one Error status, session.id on every span', () => {
+  const inc = build(11);
+  const sid = 'a'.repeat(16);
+  const spans = encodeTraces(inc.spans, { sessionId: sid }).resourceSpans[0].scopeSpans[0].spans;
+  const [root, ...kids] = spans;
+  assert.equal(root.kind, SPAN_KIND.server);
+  assert.equal(root.parentSpanId, undefined);
+  for (const k of kids) {
+    assert.equal(k.kind, SPAN_KIND.internal);
+    assert.equal(k.parentSpanId, root.spanId);
+  }
+  assert.equal(spans.filter((s) => s.status?.code === STATUS_CODE.error).length, 1);
+  for (const s of spans) assert.equal(s.attributes.find((x) => x.key === 'session.id').value.stringValue, sid);
+  const bad = kids.find((s) => s.status?.code === STATUS_CODE.error);
+  assert.equal(bad.events.length, answersFrom(inc.spans).retryCount + 1);
+});
+
+test('every event lies inside its span, retries before the exception (seeds 0..199)', () => {
+  for (let seed = 0; seed < 200; seed += 1) {
+    const bad = failed(build(seed))[0];
+    for (const e of bad.events) assert.ok(e.timeMs >= bad.startMs && e.timeMs <= bad.endMs, `seed ${seed} ${e.name}`);
+    const exc = bad.events.at(-1);
+    assert.equal(exc.name, 'exception');
+    for (const e of bad.events.slice(0, -1)) assert.ok(e.timeMs < exc.timeMs, `seed ${seed}`);
   }
 });
 
@@ -118,6 +145,54 @@ test('answersFrom refuses spans that cannot give an answer', () => {
   assert.equal(answersFrom(noCode), null);
 });
 
+test('answersFrom refuses a retry count outside 2..4', () => {
+  const inc = build(42);
+  for (const n of [0, 1, 5]) {
+    const spans = JSON.parse(JSON.stringify(inc.spans));
+    const bad = spans.find((s) => s.status);
+    bad.events = Array.from({ length: n }, (_, i) => ({ name: 'retry', timeMs: bad.startMs, attributes: { 'retry.attempt': i + 1 } }));
+    assert.equal(answersFrom(spans), null, `n=${n}`);
+  }
+});
+
+test('answersFrom: one rule for "in error", across all spans and one trace', () => {
+  const inc = build(42);
+  const fresh = () => JSON.parse(JSON.stringify(inc.spans));
+  const bad = (spans) => spans.find((s) => s.status);
+  const key = answersFrom(inc.spans);
+  // the encoder's spellings of Error still name the same operation
+  for (const code of [2, 'ERROR', 'Error']) {
+    const spans = fresh();
+    bad(spans).status = { code };
+    assert.equal(answersFrom(spans)?.operation, key.operation, String(code));
+  }
+  // a second span in error anywhere (root, serialize, other candidate) is ambiguous
+  for (const i of [0, 1]) {
+    for (const code of ['error', 2, 'ERROR']) {
+      const spans = fresh();
+      spans[i].status = { code };
+      assert.equal(answersFrom(spans), null, `span ${i} ${code}`);
+    }
+  }
+  // a foreign trace id on any span
+  for (let i = 0; i < inc.spans.length; i += 1) {
+    const spans = fresh();
+    spans[i].traceId = 'f'.repeat(32);
+    assert.equal(answersFrom(spans), null, `foreign trace on span ${i}`);
+  }
+  // a status the encoder would refuse is not a readable key
+  const odd = fresh();
+  odd[1].status = { code: 'bogus' };
+  assert.equal(answersFrom(odd), null);
+  // the only error is not a candidate
+  const moved = fresh();
+  const failing = bad(moved);
+  const serialize = moved.find((s) => s.name === 'progress.serialize');
+  Object.assign(serialize, { attributes: failing.attributes, events: failing.events, status: failing.status });
+  delete failing.status;
+  assert.equal(answersFrom(moved), null);
+});
+
 test('gradeAnswer: the code is trimmed and case-insensitive; short or wrong fails', () => {
   const inc = build(42);
   const a = answersFrom(inc.spans);
@@ -159,19 +234,45 @@ test('buildIncident refuses a bad seed or clock', () => {
   assert.throws(() => buildIncident(1, { now: () => 'x' }), TypeError);
 });
 
-test('telemetry.incident() is lazy, cached, seeded from randomBytes, and sends through sendBatch', async () => {
+test('telemetry.incident() is lazy, seeded by the big-endian uint32 of randomBytes(4), cached, and sends nothing', () => {
+  const asked = [];
+  const randomBytes = (n) => {
+    asked.push(n);
+    return n === 4 ? Uint8Array.from([0xde, 0xad, 0xbe, 0xef]) : new Uint8Array(n).fill(7);
+  };
+  let reads = 0;
+  const tel = createTelemetry({ randomBytes, now: () => { reads += 1; return NOW; }, setTimeout, clearTimeout });
+  const before = asked.length;
+  assert.equal(reads, 0);
+  const inc = tel.incident();
+  assert.deepEqual(asked.slice(before), [4]);
+  assert.equal(reads, 1);
+  assert.equal(inc.seed, 0xdeadbeef);
+  assert.deepEqual(inc, buildIncident(0xdeadbeef, { now: () => NOW }));
+  assert.equal(tel.incident(), inc);
+  tel.disconnect();
+  assert.equal(tel.incident(), inc);
+  assert.deepEqual(asked.slice(before), [4]);
+  assert.equal(reads, 1);
+  assert.ok(!JSON.stringify(inc).includes(PRACTICE_TOKEN));
+});
+
+test('telemetry.incident() seed reads the bytes, not the buffer: subarray and plain array', () => {
+  const seedOf = (randomBytes) => createTelemetry({ randomBytes, now: clock, setTimeout, clearTimeout }).incident().seed;
+  const sub = (n) => (n === 4 ? new Uint8Array([1, 2, 0xde, 0xad, 0xbe, 0xef, 9]).subarray(2, 6) : new Uint8Array(n));
+  assert.equal(seedOf(sub), 0xdeadbeef);
+  assert.equal(seedOf((n) => (n === 4 ? [0xde, 0xad, 0xbe, 0xef] : new Array(n).fill(0))), 0xdeadbeef);
+});
+
+test('telemetry.incident() spans go out through sendBatch', async () => {
   let k = 3;
   const randomBytes = (n) => Uint8Array.from({ length: n }, () => (k++ * 41) & 0xff);
   const tel = createTelemetry({ randomBytes, now: clock, setTimeout, clearTimeout });
   const first = tel.incident();
-  assert.ok(first && first.spans.length === 5);
-  assert.equal(tel.incident(), first);
+  assert.equal(first.spans.length, 5);
   assert.equal(first.spans[0].startMs, NOW);
   assert.ok(tel.connect({ mode: 'practice', token: PRACTICE_TOKEN, endpoint: `https://${PRACTICE_HOSTS[0]}` }).ok);
   assert.equal((await tel.sendTest()).kind, 'accepted');
-  const out = await tel.sendBatch(first.spans);
-  assert.equal(out.kind, 'accepted');
-  const status = JSON.stringify(tel.status());
-  assert.ok(!status.includes(PRACTICE_TOKEN));
-  assert.ok(!JSON.stringify(first).includes(PRACTICE_TOKEN));
+  assert.equal((await tel.sendBatch(first.spans)).kind, 'accepted');
+  assert.ok(!JSON.stringify(tel.status()).includes(PRACTICE_TOKEN));
 });
