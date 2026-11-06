@@ -115,5 +115,5 @@ test('the star line names the level, not the board, and the play lines name what
   assert.equal(choice.stars, "Penalties count against the level's stars: a wrong pick.");
   assert.ok(HOW_TO.choice.play.includes('Not quite'));
   assert.ok(HOW_TO.sort.play.includes('Not quite'));
-  assert.ok(HOW_TO.query.play.startsWith('Write a PromQL query and press Run. A query that runs shows its result.'));
+  assert.ok(HOW_TO.query.play.startsWith('Write a PromQL query and press Run. A new query that runs shows its result; running one you already tried again changes nothing and is free.'));
 });
