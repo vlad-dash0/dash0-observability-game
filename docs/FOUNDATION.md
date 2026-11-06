@@ -179,6 +179,8 @@ disposes it while a level covers the hub and on `pagehide`, and shows the text f
 three.js, the colours or WebGL are unavailable. Level `lights` stay level data, validated
 against `hub/map-data.mjs` `NODE_IDS`, and are no longer drawn.
 
+Act 9 (Oceania) uses its three countries: `filter-or-sampler` NZL, `the-34-percent-error-rate` AUS, `connect-to-dash0` PNG (docs/DASH0-LAB.md). `test/globe-data.test.mjs` `HOME` has a box for each.
+
 Coming soon (#177 P7): `hub/coming-soon.mjs` `COMING_SOON` lists announced acts (`{id, no, name,
 sub, teaser}`, frozen); it is empty now, since Acts 7 and 8 left it for `ACTS` with levels 7.1 and 8.2. It is never passed to `buildRegistry`, so unlock, progress, stars, cards
 and ignite cannot see those acts. `createGame` (`comingSoon` dep) merges them into `acts` by
@@ -244,6 +246,7 @@ builds run side by side, only the current build's registry is protected at the c
 | `isCompleted`, `isActComplete`, `isActUnlocked`, `levelState`, `lockReason` | `lib/unlock.mjs` |
 | `loadProgress(storageGetter, registry)` → `{status, progress}` (`TypeError` before any read without a registry), `saveProgress(storageGetter, progress, registry)` → `{saved, reason?, progress}` (`progress` is always the registry view; `TypeError` before any storage access without a registry) | `lib/storage.mjs` |
 | `resolveTheme`, `readTheme(getter)`, `writeTheme(getter, t)` | `lib/theme.mjs` |
+| `HELP_KEY` (`oncall.help`), `readHiddenHelp(getter)` → `{status, hidden: Set}`, `hideHelp(getter, keys)` → `{saved, reason?}` | `lib/help-prefs.mjs` |
 | `globeState(registry, progress, map?, soon?)` | `lib/globe.mjs` |
 | `dotStates`, `currentActId`, `regionCentre`, `facingRotation`, `globeTarget`, `globeLines`, `globeLabel`, `parseColor`, `readColors`, `createLoop` | `lib/globe-view.mjs` |
 | `parseEnv`, `effectiveResource`, `checkConfig` | `lib/widgets/env-config.mjs` |
@@ -262,6 +265,14 @@ Absence (`storageGetter = () => window.localStorage`, called inside try/catch):
 | `corrupt` | bad JSON, not an object, `v` missing / not an integer, migration gap, `levels` not an object | empty | each save first copies the raw string to `oncall.progress.corrupt` if absent, else to `oncall.progress.corrupt.latest` if it differs; a failed copy aborts with `unavailable`; then writes |
 | `future` | `v > CURRENT_VERSION` | sanitized best effort | refused `{saved:false, reason:'future'}` |
 | `unavailable` | getter / `getItem` / `setItem` throws | memory only | `{saved:false, reason:'unavailable'}` |
+
+The "Don't show again" choice for the How to play card (#199) is a preference, not progress, so it has its own key
+`oncall.help`, `{"v":1,"hidden":["build","sort"]}` (widget keys, sorted, unique, at most 100), and never
+touches `oncall.progress`. `readHiddenHelp` gives `fresh`, `ok`, `corrupt`, `future` or `unavailable` with a
+set of the well-formed keys (empty unless `ok` or `future`); a corrupt or unreadable value shows the card.
+`hideHelp` reads, unions and writes in one task (unknown well-formed keys are kept), overwrites a corrupt
+value with no backup, refuses `future` (store untouched) and a full store (`full`: the union would pass 100 keys; nothing written), and answers `unavailable` when storage throws; the
+game raises no notice for any of these. Debug (`?mode=debug`) never writes it.
 
 `game.notice` is set for corrupt, future and unavailable; null for fresh and ok. On save,
 stored data is sanitized without id filtering, so unknown levels survive in storage; the

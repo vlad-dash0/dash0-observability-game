@@ -383,8 +383,8 @@ test('everything main.mjs imports, transitively, is deployed (not in .verceligno
 // runs synchronously for minutes, once took tens of GB, and --test-timeout cannot stop
 // it. This line-based check catches the common forms only: an equality assertion whose
 // first argument is a getElementById / querySelector(All) / closest call, a q( / qa(
-// helper call, or ctxs.<id> / ctx. A node held in a variable, a second argument, or a
-// call split over lines gets through. Compare booleans or strings instead, e.g.
+// helper call, or ctxs.<id> / ctx. A node held in a variable is caught by the per-file check below; a call split
+// over lines gets through. Compare booleans or strings instead, e.g.
 // `assert.equal(el === null, true)`.
 const DOM_OPERAND = new RegExp(
   String.raw`assert\.(?:equal|notEqual|strictEqual|notStrictEqual|deepEqual|deepStrictEqual|notDeepEqual|notDeepStrictEqual)\(\s*` +
@@ -405,11 +405,39 @@ test('the DOM-operand guard spots node and ctx operands, not their string proper
   assert.ok(!DOM_OPERAND.test("assert.equal(dom.document.getElementById('ov-body').innerHTML, '')"));
 });
 
+// Per file: identifiers assigned straight from a DOM lookup (const card = q('#x')), then an
+// equality assertion with one as the first or second argument. Same-line, simple forms only.
+const ASSERT_FN = String.raw`assert\.(?:equal|notEqual|strictEqual|notStrictEqual|deepEqual|deepStrictEqual)\(`;
+const DOM_ASSIGN = /\b(?:const|let|var)\s+(\w+)\s*=\s*(?:[\w.]+\.)?(?:getElementById|querySelectorAll|querySelector|closest|qa?)\([^()]*\)(?!\s*[.?[])/g;
+const domIdents = (text) => [...text.matchAll(DOM_ASSIGN)].map((m) => m[1]);
+const domVarAsserts = (text) => {
+  const ids = domIdents(text);
+  if (ids.length === 0) return () => false;
+  const alt = ids.join('|');
+  const re = new RegExp(`${ASSERT_FN}\\s*(?:(?:${alt})\\s*,|[^()]*,\\s*(?:${alt})\\s*[,)])`);
+  return (line) => re.test(line);
+};
+
+test('the DOM-operand guard also spots a node held in a variable', () => {
+  const src = "const card = shell.querySelector('#x');\nassert.equal(card, null);";
+  const hit = domVarAsserts(src);
+  assert.equal(hit('assert.equal(card, null)'), true);
+  assert.equal(hit('assert.deepEqual(1, card)'), true);
+  assert.equal(hit("assert.equal(card, null, 'm')"), true);
+  assert.equal(hit('assert.equal(card === null, true)'), false);
+  assert.equal(hit('assert.equal(card.id, "x")'), false);
+  assert.equal(hit('assert.equal(cardinal, 1)'), false);
+  assert.equal(domVarAsserts('const n = 5;')('assert.equal(n, 5)'), false);
+});
+
 test('no test passes a DOM node or a level ctx to an equality assertion', () => {
   const files = walk('test', ['.mjs']).filter((rel) => rel !== 'test/static.test.mjs');
   for (const rel of files) {
-    read(rel).split('\n').forEach((line, i) => {
+    const text = read(rel);
+    const held = domVarAsserts(text);
+    text.split('\n').forEach((line, i) => {
       assert.ok(!DOM_OPERAND.test(line), `${rel}:${i + 1} compares a DOM node; compare a boolean: ${line.trim()}`);
+      assert.ok(!held(line), `${rel}:${i + 1} compares a DOM node held in a variable; use === null, true: ${line.trim()}`);
     });
   }
 });

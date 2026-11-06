@@ -24,6 +24,7 @@ import baggage from './baggage.mjs';
 import cardinality from './cardinality.mjs';
 import checkoutIsSlow from './checkout-is-slow.mjs';
 import collectingLogs from './collecting-logs.mjs';
+import connectToDash0 from './connect-to-dash0.mjs';
 import contextPropagation from './context-propagation.mjs';
 import correlation from './correlation.mjs';
 import detectorsAndKubernetes from './detectors-and-kubernetes.mjs';
@@ -154,7 +155,7 @@ export const ACTS = [
     sub: 'Does that answer hold?',
     badges: ['customer-calls'],
     teaser: 'Judge a confident answer about filters, tail sampling and an error rate before it goes to a customer.',
-    levels: [filterOrSampler, the34PercentErrorRate],
+    levels: [filterOrSampler, the34PercentErrorRate, connectToDash0],
     boss: null,
   },
 ];
