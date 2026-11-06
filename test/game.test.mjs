@@ -1391,6 +1391,7 @@ test('index.html: the How to play control and card', () => {
   const card = shell.querySelector('#ov-howto');
   assert.ok(card.closest('.overlay'), 'the card is overlay markup');
   assert.equal(card.closest('[x-ignore]') === null, true, 'Alpine renders it');
+  assert.equal(shell.querySelector('.level-host #ov-howto, [x-ignore] #ov-howto') === null, true);
   assert.equal(card.closest('.level-host') === null, true, 'a step never wipes it');
   assert.equal(card.getAttribute('aria-labelledby'), 'ov-howto-title');
   assert.equal(card.closest('[x-show="howToOpen"]') !== null, true, 'shown by howToOpen');
