@@ -167,7 +167,9 @@ test('answersFrom: one rule for "in error", across all spans and one trace', () 
     assert.equal(answersFrom(spans)?.operation, key.operation, String(code));
   }
   // a second span in error anywhere (root, serialize, other candidate) is ambiguous
-  for (const i of [0, 1]) {
+  const other = inc.spans.findIndex((s) => CANDIDATES.includes(s.name) && !s.status);
+  assert.ok(other > 1, 'a non-failing candidate exists');
+  for (const i of [0, 1, other]) {
     for (const code of ['error', 2, 'ERROR']) {
       const spans = fresh();
       spans[i].status = { code };
