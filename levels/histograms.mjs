@@ -84,7 +84,7 @@ export default {
             'sum(rate(http_server_request_duration_seconds_sum{route="/pay"}[5m])) / ' +
             'sum(rate(http_server_request_duration_seconds_count{route="/pay"}[5m]))',
           helps: { hints: true },
-          hint: 'A mean is a total over a count, and the histogram keeps both as running counters.',
+          hint: 'A mean is a total over a count, and the histogram keeps both as counters that only grow.',
           explain:
             'About 0.83 seconds: a rate of the sum divided by a rate of the count is the mean of the last 5 minutes. ' +
             'It looks tolerable, and an average cannot show you how slow the slowest requests are.',
@@ -105,7 +105,7 @@ export default {
           reference:
             'histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{route="/pay"}[5m])))',
           helps: { hints: true },
-          hint: 'A percentile is estimated from buckets; buckets from several series can be added before you estimate, never after.',
+          hint: 'A percentile is estimated from buckets; a percentile cannot be added or averaged, so add up the bucket rates for each boundary first.',
           explain:
             'The p99 is 2.5 seconds, three times the average. Percentiles show the tail the average hides.',
         },
@@ -131,7 +131,7 @@ export default {
           reference:
             'histogram_quantile(0.95, sum by (service, le) (rate(http_server_request_duration_seconds_bucket[5m])))',
           helps: { hints: true },
-          hint: 'Start from the previous query: change the percentile, and decide what one line on the panel stands for.',
+          hint: 'Reuse the recipe from the previous query, not its filter: change the percentile, and keep one line per thing the panel compares.',
           explain:
             'One series per service: checkout is at 1.5 seconds and cart at 0.24. ' +
             'Dash0 speaks PromQL, so <code>histogram_quantile</code> over the rate of the <code>_bucket</code> series is the query you would write against Prometheus.',

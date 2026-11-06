@@ -171,7 +171,7 @@ export default {
             'sum by (service_name) (rate(traces_span_metrics_calls_total{span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR"}[5m])) / ' +
             'sum by (service_name) (rate(traces_span_metrics_calls_total{span_kind="SPAN_KIND_SERVER"}[5m]))',
           helps: { hints: true },
-          hint: 'A ratio is the failing requests over all requests, per service; no series says a call went OK.',
+          hint: 'A ratio is the failing requests over all requests, per service; no series has an OK status, so the denominator is not one status.',
           explain:
             'Checkout fails 1 request in 12, about 8.3%, and cart 1 in 240, about 0.4%. Divide by all the calls: ' +
             'no series says OK, so a ratio against the OK calls would match nothing.',
@@ -191,7 +191,7 @@ export default {
           reference:
             'histogram_quantile(0.95, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER"}[5m])))',
           helps: { hints: true },
-          hint: 'The percentile recipe from 3.3, on the span histogram, for the requests a service serves.',
+          hint: 'The percentile recipe from 3.3, on the duration histogram, for the requests a service serves.',
           explain:
             'Checkout is at 1,500 milliseconds and cart at 238: the p95 of 3.3 again, now in milliseconds and built from spans.',
         },
