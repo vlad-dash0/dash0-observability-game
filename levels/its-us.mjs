@@ -20,7 +20,7 @@
 //
 // The token never comes into this file: connecting is level 9.3's job (and the game is connected
 // or it is not). The boss reads ctx.telemetry.status(), sends with sendBatch and shows what came back.
-import { isErrorStatus, SESSION_ATTR } from '../lib/otlp/encode.mjs';
+import { isErrorStatus, RESOURCE_ATTRIBUTES, SESSION_ATTR } from '../lib/otlp/encode.mjs';
 import { OUTCOME, TIMEOUT_MS } from '../lib/otlp/send.mjs';
 import {
   answersFrom, buildTraceList, FILTER_KEY, FILTER_OP, gradeAnswer, GRADE, matchTraces, normaliseAnswer, QUESTION,
@@ -33,7 +33,7 @@ import {
 // Incidents already accepted by a Dash0 in this page's session (one per telemetry session), and the
 // host that took them. Keyed by the incident object the session caches, so a second open of the boss
 // does not send again to the same Dash0, and a different Dash0 is offered the send.
-const SENT = new WeakMap();
+const SENT = new WeakMap(); // incident -> Set of the hosts that took it
 // Incidents a send was ever started for. An attempt may have got through (the level can close before the
 // answer), so a later send screen must not say "not sent yet".
 const ATTEMPTED = new WeakSet();
@@ -135,7 +135,7 @@ export default {
     const stepStart = () => {
       const { state, mode, host } = tele.status();
       if (state === STATE.connected && mode === MODE.live) {
-        if (SENT.get(incident) === host) stepFind(MODE.live);
+        if (SENT.get(incident)?.has(host)) stepFind(MODE.live);
         else stepSend();
         return;
       }
@@ -174,10 +174,10 @@ export default {
     // ---- connected live: send the incident once ----
     const stepSend = () => {
       const { host } = tele.status();
-      const elsewhere = SENT.get(incident);
+      const elsewhere = [...(SENT.get(incident) ?? [])];
       let lead;
-      if (elsewhere !== undefined) {
-        lead = `The game sent this incident to ${e(elsewhere)} earlier. This is a different Dash0, so it has not got it yet. Send it here, then find it there.`;
+      if (elsewhere.length > 0) {
+        lead = `The game sent this incident to ${elsewhere.map(e).join(' and ')} earlier. This is a different Dash0, so it has not got it yet. Send it here, then find it there.`;
       } else if (ATTEMPTED.has(incident)) {
         lead = 'The game keeps a trace of its own save path, and one step of it failed. An earlier attempt to send it may have got through; ' +
           'the game cannot tell. Send it to your Dash0, then find it there.';
@@ -185,7 +185,7 @@ export default {
         lead = 'The game keeps a trace of its own save path, and one step of it failed. It has not been sent yet. ' +
           'Send it to your Dash0, then find it there.';
       }
-      const duplicate = elsewhere === undefined && ATTEMPTED.has(incident);
+      const duplicate = elsewhere.length === 0 && ATTEMPTED.has(incident);
       ctx.renderStep(
         screen(
           ctx.speech(lead),
@@ -262,7 +262,7 @@ export default {
       if (ctx.signal.aborted) return; // the level was closed while the request was out
       const now = tele.status();
       if (outcome.kind === OUTCOME.accepted && now.state === STATE.connected && now.host === target) {
-        SENT.set(incident, target);
+        SENT.set(incident, new Set([...(SENT.get(incident) ?? []), target]));
         stepFind(MODE.live);
         return;
       }
@@ -398,7 +398,7 @@ export default {
 
     // The Span Sidebar of the simulation: the span's attributes and events. The one place a fault code is.
     const detail = (s, t) => {
-      const attrs = Object.entries({ ...(s.attributes ?? {}), [SESSION_ATTR]: t.sessionId }).map(([k, v]) => [k, String(v)]);
+      const attrs = Object.entries({ ...(s.attributes ?? {}), ...RESOURCE_ATTRIBUTES, [SESSION_ATTR]: t.sessionId }).map(([k, v]) => [k, String(v)]);
       const events = Array.isArray(s.events) ? s.events : [];
       const status = failed(s) ? `Error: ${s.status.message ?? ''}` : 'Unset';
       return panel({
@@ -497,7 +497,7 @@ export default {
           text: practice
             ? (filtered
               ? 'You filtered a simulated Dash0 Trace Explorer by your session id, opened your trace and read the span in error. Your own Dash0 works the same way.'
-              : 'You found your trace in a simulated Dash0 Trace Explorer without the filter, by opening traces and checking the session id on their spans. Filtering by session.id is quicker, and it is how you find your own telemetry in your own Dash0.')
+              : 'You found your trace in a simulated Dash0 Trace Explorer without the filter. Filtering by session.id is quicker, and it is how you find your own telemetry in your own Dash0.')
             : 'You found the game\'s own incident in your own Dash0: you filtered by your session id, opened the trace and read the span in error.',
           cards: [],
         });
