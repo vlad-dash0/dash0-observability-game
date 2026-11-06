@@ -1,6 +1,6 @@
 // Blind strategies must not win any Spot it board (#190). Each rule below ignores what the lines
 // mean: it scores every line by something it can count or read off the text (length, digits,
-// words, commas, quotes, `=` signs, distinct label keys, the length of a labelled field such as
+// words, commas, quotes, `=` signs, whether the key of a `key=value` line starts with a namespace (its first dotted segment, or either of two), distinct label keys, the length of a labelled field such as
 // `expr:`, or a numeric field such as `count=`), picks the lines with the most or the fewest, first or after skipping one or two, and plays
 // that through the real checkSpot. If it solves a board first time or after one wrong Check,
 // the player earns stars without reading. The equal-value pairing rule below reads no meaning either: it groups
@@ -208,7 +208,26 @@ function scoresFor(spec) {
     scores[`highest ${name}=`] = (l) => (read(l) === undefined ? MISSING : read(l));
     scores[`lowest ${name}=`] = (l) => (read(l) === undefined ? MISSING : -read(l));
   }
+  for (const set of prefixSets(spec)) {
+    scores[`keys starting ${set.join(' or ')}.`] = (l) => (set.includes(namespaceOf(l.text)) ? 1 : 0);
+  }
   return scores;
+}
+
+/** The first dotted segment of a `key=value` line's key (`http` for `http.route=/checkout`), or null for any other shape. */
+function namespaceOf(text) {
+  const m = /^(\w+)(?:\.[\w.-]*)?=/.exec(text);
+  return m ? m[1] : null;
+}
+
+/**
+ * Every key-prefix set worth trying on a board: each first dotted segment that occurs, and each union of two. A set
+ * that holds every line or none is no rule, and a board with fewer than two segments has nothing to split.
+ */
+function prefixSets(spec) {
+  const segs = [...new Set(spec.lines.map((l) => namespaceOf(l.text)).filter((n) => n !== null))].sort();
+  const sets = [...segs.map((x) => [x]), ...choose(segs, 2)];
+  return segs.length < 2 ? [] : sets.filter((set) => spec.lines.some((l) => set.includes(namespaceOf(l.text))) && spec.lines.some((l) => !set.includes(namespaceOf(l.text))));
 }
 
 const ruleName = (score, j) => (j === 0 ? score : `${score}, skipping ${j}`);
@@ -406,4 +425,34 @@ test('the equal-value pairing rule: it solves a board whose equal-value pairs ar
   assert.deepEqual(product([[1, 2], [3]]), [[1, 3], [2, 3]]);
   // The live boards: none is a tell, bar the known one (checked in the test above); print nothing, assert the bar.
   for (const { no, spec } of await allSpotSpecs()) assert.equal(pairingShare(spec) <= TELL_SHARE, true, `${no} ${spec.id}: ${pairingShare(spec)}`);
+});
+
+test('the key-prefix rule: lines whose key starts with a namespace, or either of two, solve a board whose old names share namespaces; no live board (#177)', async () => {
+  const board = (lines, faults) => ({ id: 'literal', lines: lines.map(([id, text]) => ({ id, text })), faults });
+  const shareOf = (spec, name) => {
+    const score = scoresFor(spec)[name];
+    assert.equal(typeof score, 'function', `${name} is a rule on this board`);
+    const all = rankings(spec, score);
+    return all.filter((r) => mistakes(spec, r) <= 1).length / all.length;
+  };
+  // 8.2 as first reviewed: the old names are the http. and net. lines, plus http.route.
+  const before = board(
+    [['t', 'http.target=/checkout?step=pay'], ['sp', 'server.port=8443'], ['ca', 'client.address=gw.kettle.example'], ['up', 'url.path=/checkout'], ['nh', 'net.host.port=8444'], ['rt', 'http.route=/checkout'], ['cp', 'client.port=51234'], ['sc', 'http.status_code=500']],
+    ['t', 'nh', 'sc'],
+  );
+  assert.deepEqual(prefixSets(before).map((s) => s.join('+')).filter((n) => n.includes('http')), ['http', 'client+http', 'http+net', 'http+server', 'http+url']);
+  assert.equal(shareOf(before, 'keys starting http or net.') > TELL_SHARE, true, 'http. or net. solves it');
+  // The same board with two more stable names under http. (a method, a header) beside http.route: the rule loses.
+  const after = board(
+    [['t', 'http.target=/checkout?step=pay'], ['sp', 'server.port=8443'], ['rm', 'http.request.method=POST'], ['ca', 'client.address=gw.kettle.example'], ['nh', 'net.host.port=8443'], ['rt', 'http.route=/checkout'], ['rh', 'http.request.header.content-type=["application/json"]'], ['sc', 'http.status_code=500']],
+    ['t', 'nh', 'sc'],
+  );
+  assert.equal(shareOf(after, 'keys starting http or net.') <= TELL_SHARE, true);
+  // Hyphens in a key stay in the key; other shapes have no namespace.
+  assert.equal(namespaceOf('http.request.header.content-type=["a"]'), 'http');
+  assert.equal(namespaceOf('plain=1'), 'plain');
+  assert.equal(namespaceOf('expr: up'), null);
+  assert.deepEqual(prefixSets(board([['a', 'k.x=1'], ['b', 'k.y=2']], ['a'])), [], 'one namespace: nothing to split');
+  // No live board is one (tells() runs every set on every board).
+  for (const { no, spec } of await allSpotSpecs()) for (const set of prefixSets(spec)) assert.equal(shareOf(spec, `keys starting ${set.join(' or ')}.`) <= TELL_SHARE, true, `${no}: ${set}`);
 });

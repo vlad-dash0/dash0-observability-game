@@ -107,17 +107,18 @@ test('step 1: a valid span board of eight attributes, hints off, faults at F...F
   assert.deepEqual(validateSpotHelps(spec), []);
   assert.deepEqual(spec.helps, { hints: false });
   assert.equal(Object.hasOwn(spec, 'hint'), false, 'no authored hint (hints off)');
-  assert.deepEqual(spec.lines.map((l) => l.id), ['http-target', 'server-port', 'client-address', 'url-path', 'net-host-port', 'route', 'client-port', 'http-status-code']);
+  assert.deepEqual(spec.lines.map((l) => l.id), ['http-target', 'server-port', 'request-method', 'client-address', 'net-host-port', 'route', 'request-header', 'http-status-code']);
   assert.deepEqual(spec.faults, ['http-target', 'net-host-port', 'http-status-code']);
   assert.equal(layout(spec), 'F...F..F');
+  assert.equal(spec.lines.length, 8);
   for (const l of spec.lines) assert.match(l.text, /^[^=\s]+=/, `${l.id} reads as key=value`);
   assert.equal(spotRun(spec.faults).solved, true, 'the three faults solve it');
   assert.equal(spotRun(['http-target', 'net-host-port']).solved, false, 'two of three do not');
   assert.equal(spotRun([...spec.faults, 'route']).solved, false, 'http.route, which did not change, picked too does not');
   assert.equal(plain(SPOT_STEP.question), 'Spot the attributes that stop arriving once the opt-in is set to http.');
   assert.match(plain(SPOT_STEP.intro), /OTEL_SEMCONV_STABILITY_OPT_IN=http\/dup/);
-  assert.match(plain(SPOT_STEP.intro), /http\.method became http\.request\.method/, 'the intro example is not on the board');
-  assert.equal(spec.lines.some((l) => l.text.startsWith('http.method=') || l.text.startsWith('http.request.method=')), false, 'the intro example is not a line');
+  assert.match(plain(SPOT_STEP.intro), /http\.user_agent became user_agent\.original/, 'the intro example is not on the board');
+  assert.equal(spec.lines.some((l) => l.text.startsWith('http.user_agent=') || l.text.startsWith('user_agent.original=')), false, 'the intro example is not a line');
 });
 
 test('step 1 oracle: an independent reading of the migration page flags exactly the faults', () => {
@@ -126,9 +127,10 @@ test('step 1 oracle: an independent reading of the migration page flags exactly 
     'net.host.port': ['server.port'],
     'http.target': ['url.path', 'url.query'], // split into two attributes
   };
-  // Not renamed: http.route is "No change"; client.address replaced http.client_ip and client.port is an opt-in attribute of
-  // server spans (the port of the client captured in client.address). None is one of the old names the opt-in drops.
-  const KEPT = ['http.route', 'client.address', 'client.port', 'url.path', 'server.port'];
+  // Not renamed: http.route is "No change"; http.request.method is the stable name of http.method; client.address is a server
+  // span attribute (a domain name if available); http.request.header.<key> is the Opt-In stable attribute, the key lowercase with
+  // dashes. None is one of the old names the opt-in drops. Three of the five start with http., like the old names do.
+  const KEPT = ['http.route', 'client.address', 'server.port', 'http.request.method', 'http.request.header.content-type'];
   const pairs = spec.lines.map((l) => {
     const [key, ...rest] = l.text.split('=');
     return { id: l.id, key, value: rest.join('=') };
@@ -142,21 +144,24 @@ test('step 1 oracle: an independent reading of the migration page flags exactly 
   // http/dup sends both names with the same value: a twin on the board carries the old name's value.
   const get = (key) => pairs.find((q) => q.key === key);
   assert.equal(get('server.port').value, get('net.host.port').value, 'net.host.port and server.port carry the same value');
-  assert.equal(get('http.target').value.split('?')[0], get('url.path').value, 'http.target is url.path then url.query');
-  // Equal values do not give the answer away: /checkout is shared by two names that both stay.
-  const groups = Map.groupBy(pairs, (p) => p.value);
-  const shared = [...groups.values()].filter((g) => g.length > 1);
-  assert.equal(shared.some((g) => g.every((p) => !spec.faults.includes(p.id))), true, 'an equal-value pair with no old name');
-  assert.equal(shared.some((g) => g.some((p) => spec.faults.includes(p.id))), true, 'and one with an old name');
+  assert.equal(get('http.target').value.split('?')[0], get('http.route').value, 'http.target carries the path that http.route templates');
+  // The namespace does not give the answer away: stable names start with http. too (a rule "old = http. or net." fails).
+  const stableHttp = pairs.filter((p) => !spec.faults.includes(p.id) && p.key.startsWith('http.'));
+  assert.deepEqual(stableHttp.map((p) => p.id), ['request-method', 'route', 'request-header'], 'three stable names start with http.');
+  assert.deepEqual(pairs.filter((p) => spec.faults.includes(p.id) && !/^(http|net)\./.test(p.key)), [], 'the old names are in http. and net.');
+  // Equal values do not give the answer away: the one equal-value pair is an old name and its stable name, and nothing else repeats.
+  const shared = [...Map.groupBy(pairs, (p) => p.value).values()].filter((g) => g.length > 1);
+  assert.deepEqual(shared.map((g) => g.map((p) => p.id)), [['server-port', 'net-host-port']]);
 });
 
-test('step 1 whyNot on exactly the five attributes that stay; explain names the three old names, http/dup and http.route', () => {
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['client-address', 'client-port', 'route', 'server-port', 'url-path']);
+test('step 1 whyNot on exactly the five attributes that stay (stable names that start with http. included); explain names the three old names, http/dup and http.route', () => {
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['client-address', 'request-header', 'request-method', 'route', 'server-port']);
   for (const [id, t] of Object.entries(spec.whyNot)) assert.match(plain(t), /\S[\s\S]*\.$/, `${id} ends a sentence`);
   const e = plain(spec.explain);
   for (const s of ['http.target', 'url.path', 'url.query', 'http.status_code', 'net.host.port', 'http/dup', 'OTEL_SEMCONV_STABILITY_OPT_IN', 'http.route']) assert.equal(e.includes(s), true, s);
   assert.match(plain(spec.whyNot.route), /Unchanged/);
-  assert.equal(plain(spec.whyNot['client-port']), 'Not an old name: the port of the client that sent the request.');
+  assert.equal(plain(spec.whyNot['request-method']), 'The stable name for the request method. Stable names can start with http. too.');
+  assert.equal(plain(spec.whyNot['request-header']), 'A stable name: a request header, recorded as a list of values under http.request.header. plus the header name.');
   assert.match(plain(spec.whyNot['server-port']), /usually from the Host header/);
 });
 
