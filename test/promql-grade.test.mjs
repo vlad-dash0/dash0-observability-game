@@ -2,7 +2,7 @@
 // Spec: docs/M1-DESIGN.md §4.6.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gradeQuery, TOLERANCE, sameNumber } from '../lib/promql/grade.mjs';
+import { gradeQuery, referenceResult, TOLERANCE, sameNumber } from '../lib/promql/grade.mjs';
 import { at, ds } from './helpers/promql.mjs';
 
 const N = (name, extra = {}) => ({ __name__: name, ...extra });
@@ -105,4 +105,14 @@ test('numbers compare with a relative and absolute tolerance', () => {
 
 test('a dataset can be named', () => {
   assert.equal(gradeQuery('checkout-http', 3600, 'sum(rate(http_server_requests_total[5m]))', 'sum(rate(http_server_requests_total[5m]))').ok, true);
+});
+
+test('referenceResult is the answer gradeQuery compares against, and throws the same message on no data', () => {
+  const want = referenceResult(D, 300, REF);
+  assert.equal(want.kind, 'vector');
+  assert.deepEqual(want.series.map((s) => s.labels), [{ route: '/a' }, { route: '/b' }]);
+  assert.deepEqual(grade(REF).result, want);
+  const msg = (f) => assert.throws(f, /^Error: reference query "nope" gives no data: /);
+  msg(() => referenceResult(D, 300, 'nope'));
+  msg(() => grade(REF, 'nope'));
 });
