@@ -235,6 +235,13 @@ test('which widgets have no hints on each live level is pinned, and the how-to-p
   }
 });
 
+test('act badges: Acts 7 and 8 are Dash0, Act 9 is From customer calls, the rest have none', () => {
+  const want = { 'act-7': ['dash0'], 'act-8': ['dash0'], 'act-9': ['customer-calls'] };
+  for (const act of liveRegistry().acts) {
+    assert.deepEqual([...act.badges], want[act.id] ?? [], act.id);
+  }
+});
+
 test('every act, live and coming soon, has a one-line plain-text teaser', () => {
   for (const act of [...ACTS, ...COMING_SOON]) {
     assert.equal(typeof act.teaser, 'string', `${act.id} teaser is a string`);

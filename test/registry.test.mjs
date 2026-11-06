@@ -75,13 +75,32 @@ test('act teaser is carried through; absent is \'\'; non-string is an error', ()
   rejects(bad, 'act "a0": teaser must be a string');
 });
 
+test('act badges are carried through; absent is []; unknown, duplicate or non-array are errors', () => {
+  const acts = baseline();
+  acts[0].badges = ['dash0', 'customer-calls'];
+  assert.deepEqual(validateRegistry(acts, REFS), { ok: true, errors: [] });
+  const reg = buildRegistry(acts, { deck: DECK, nodeIds: ['n1'] });
+  assert.deepEqual(reg.acts[0].badges, ['dash0', 'customer-calls']);
+  assert.deepEqual(reg.acts[1].badges, []);
+  for (const [badges, fragment] of [
+    [['nope'], 'act "a0": unknown badge "nope"'],
+    [['dash0', 'dash0'], 'act "a0": duplicate badge "dash0"'],
+    [['toString'], 'act "a0": unknown badge "toString"'],
+    ['dash0', 'act "a0": badges must be an array'],
+  ]) {
+    const bad = baseline();
+    bad[0].badges = badges;
+    rejects(bad, fragment);
+  }
+});
+
 test('the baseline is valid and builds into ordered, defaulted, typed levels', () => {
   assert.deepEqual(validateRegistry(baseline(), REFS), { ok: true, errors: [] });
   const reg = buildRegistry(baseline(), { deck: DECK, nodeIds: ['n1'] });
   assert.deepEqual(reg.order, ['x', 'y', 'bx', 'z']);
   assert.deepEqual(reg.acts, [
-    { id: 'a0', no: 0, name: '', sub: '', teaser: '', levelIds: ['x', 'y'], bossId: 'bx' },
-    { id: 'a1', no: 1, name: '', sub: '', teaser: '', levelIds: ['z'], bossId: null },
+    { id: 'a0', no: 0, name: '', sub: '', teaser: '', badges: [], levelIds: ['x', 'y'], bossId: 'bx' },
+    { id: 'a1', no: 1, name: '', sub: '', teaser: '', badges: [], levelIds: ['z'], bossId: null },
   ]);
   assert.equal(reg.levels.bx.kind, 'boss');
   assert.equal(reg.levels.bx.actId, 'a0');
