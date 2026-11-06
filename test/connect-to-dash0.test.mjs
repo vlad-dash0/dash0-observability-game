@@ -303,12 +303,18 @@ test('live: the declared permission is required before anything is sent, and is 
   press('#ctd-connect');
   assert.equal(h.mistakes(), 1);
   assert.match(q('#ctd-scope-feedback').textContent, /cannot send telemetry/);
+  assert.match(q('#ctd-feedback').textContent, /Create an Ingesting token\. Nothing was sent/);
+  assert.equal(sent.length, 0, 'a Reading declaration stops before sending');
+  press('#ctd-scope-ingest');
+  fill('#ctd-token', SECRET);
+  press('#ctd-connect');
   await settle('#ctd-finish');
   assert.equal(sent.length, 1);
+  assert.equal(h.mistakes(), 1);
 });
 
 test('live: declaring the same wrong permission again is not charged again; Ingesting is free', async () => {
-  const { tele } = liveTelemetry([reply(401), reply(401), ok()]);
+  const { tele, sent } = liveTelemetry([ok()]);
   const h = open(tele);
   press('#ctd-live');
   press('#ctd-scope-read');
@@ -316,15 +322,55 @@ test('live: declaring the same wrong permission again is not charged again; Inge
   for (const t of [SECRET, `${SECRET}2`]) {
     fill('#ctd-token', t);
     press('#ctd-connect');
-    await settle('#ctd-feedback[data-outcome]');
-    q('#ctd-feedback').removeAttribute('data-outcome');
   }
-  assert.equal(h.mistakes(), 2, 'one for Reading, one for the 401 (the second 401 is the same cause)');
+  assert.equal(h.mistakes(), 1, 'Reading costs one, however often it is declared, and one press is one charge');
+  assert.equal(sent.length, 0);
   press('#ctd-scope-ingest');
   fill('#ctd-token', `${SECRET}3`);
   press('#ctd-connect');
   await settle('#ctd-finish');
+  assert.equal(h.mistakes(), 1);
+});
+
+test('live: a 401 and then a 403 are two causes and cost two mistakes', async () => {
+  const { tele } = liveTelemetry([reply(401), reply(403)]);
+  const h = open(tele);
+  await connectLive(h);
+  await settle('#ctd-feedback[data-outcome]');
+  q('#ctd-feedback').removeAttribute('data-outcome');
+  fill('#ctd-token', `${SECRET}2`);
+  press('#ctd-connect');
+  await settle('#ctd-feedback[data-outcome]');
   assert.equal(h.mistakes(), 2);
+});
+
+test('a fixed endpoint clears the old reason: the token is asked for again, free', () => {
+  for (const [pickMode, again] of [['#ctd-practice', /Create a token again/], ['#ctd-live', /Paste the token again/]]) {
+    const { tele } = liveTelemetry([ok()]);
+    const h = open(pickMode === '#ctd-live' ? tele : practiceTelemetry().tele);
+    press(pickMode);
+    if (pickMode === '#ctd-live') press('#ctd-scope-ingest');
+    const fix = pickMode === '#ctd-live' ? ENDPOINT : q('#ctd-ep-http').textContent;
+    const grpc = pickMode === '#ctd-live' ? `${ENDPOINT}:4317` : q('#ctd-ep-grpc').textContent;
+    fill('#ctd-endpoint', grpc);
+    fill('#ctd-token', SHAPED);
+    press('#ctd-connect');
+    assert.match(q('#ctd-feedback').textContent, /4317/);
+    assert.equal(h.mistakes(), 1);
+    fill('#ctd-endpoint', fix);
+    press('#ctd-connect'); // the token field was emptied by the first press
+    assert.doesNotMatch(q('#ctd-feedback').textContent, /4317/);
+    assert.match(q('#ctd-feedback').textContent, again);
+    assert.match(q('#ctd-feedback').textContent, /Nothing was sent/);
+    assert.equal(h.mistakes(), 1, 'asking for the token again is free');
+  }
+});
+
+test('the card subtitle and the intro name no answer', () => {
+  const h = open(practiceTelemetry().tele);
+  for (const text of [level.sub, h.text()]) {
+    assert.doesNotMatch(text, /only send|Ingesting/i);
+  }
 });
 
 // ---- one charge rule for form errors ----
