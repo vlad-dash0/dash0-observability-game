@@ -3,7 +3,8 @@
 // words, commas, quotes, `=` signs, distinct label keys, the length of a labelled field such as
 // `expr:`, or a numeric field such as `count=`), picks the lines with the most or the fewest, first or after skipping one or two, and plays
 // that through the real checkSpot. If it solves a board first time or after one wrong Check,
-// the player earns stars without reading. (Position rules: test/spot-ladder.test.mjs.) Specs
+// the player earns stars without reading. The equal-value pairing rule below reads no meaning either: it groups
+// the lines of a `key=value` board by value and takes one line of each group. (Position rules: test/spot-ladder.test.mjs.) Specs
 // come from the live registry, so a new Spot board is covered without editing this file.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -61,6 +62,13 @@ function rankings(spec, score) {
   return out;
 }
 
+/** Pick `ids` through the real toggleLine and press Check through the real checkSpot. */
+function play(spec, ids) {
+  let state = newSpotState(spec);
+  for (const id of ids) state = toggleLine(spec, state, id).state;
+  return checkSpot(spec, state);
+}
+
 /**
  * Play a ranking blind, knowing only the answer count k, through the real toggleLine and
  * checkSpot. Check 1: the top k. If that is wrong, the player has learned which picks are
@@ -70,11 +78,7 @@ function rankings(spec, score) {
  */
 function mistakes(spec, ranking) {
   const k = spec.faults.length;
-  const run = (ids) => {
-    let state = newSpotState(spec);
-    for (const id of ids) state = toggleLine(spec, state, id).state;
-    return checkSpot(spec, state);
-  };
+  const run = (ids) => play(spec, ids);
   const first = ranking.slice(0, k);
   const r1 = run(first);
   if (r1.state.solved) return 0;
@@ -234,9 +238,66 @@ async function tells() {
         if (share > TELL_SHARE) (solving[`${no} ${spec.id}`] ??= {})[ruleName(name, j)] = `${Math.round(share * all.length)} of ${all.length} tie-breaks`;
       }
     }
+    const pairing = pairingShare(spec);
+    if (pairing > TELL_SHARE) (solving[`${no} ${spec.id}`] ??= {})[PAIRING] = pairing.toFixed(2);
   }
   return solving;
 }
+
+/** The value of a `key=value` line (everything after the first `=`), or null for a line of any other shape. */
+function valueOf(text) {
+  const m = /^[\w.]+=(.*)$/.exec(text);
+  return m ? m[1] : null;
+}
+
+/** Every way to choose `n` of `list`. */
+function choose(list, n) {
+  if (n === 0) return [[]];
+  return list.flatMap((x, i) => choose(list.slice(i + 1), n - 1).map((c) => [x, ...c]));
+}
+
+/** The product of the lists: one member from each, every way. */
+function product(lists) {
+  return lists.reduce((acc, list) => acc.flatMap((head) => list.map((x) => [...head, x])), [[]]);
+}
+
+/**
+ * The share of equal-value pickings that solve the board within one wrong Check. Lines with the same
+ * value form a group (a line without a `key=value` shape is a group of one). The player takes one line of
+ * each of k groups, with no idea which is the answer: the groups of two or more lines first (any k of
+ * them when there are more than k), then single lines to make up k, any of them. If the Check flags picks,
+ * each flagged line is swapped for another line of its group (it has the same value, so it is the pick's
+ * partner) and the player Checks again. A board where every equal-value pair is one answer plus one
+ * non-answer, as many pairs as answers, is solved by this whichever way the picks fall, since the swap
+ * finds the partner.
+ */
+function pairingShare(spec) {
+  const k = spec.faults.length;
+  const groups = [...Map.groupBy(spec.lines, (l) => valueOf(l.text) ?? l.id).values()].map((g) => g.map((l) => l.id));
+  let wins = 0;
+  let total = 0;
+  const shared = groups.filter((g) => g.length > 1);
+  const single = groups.filter((g) => g.length === 1);
+  const picked = shared.length >= k ? choose(shared, k) : choose(single, k - shared.length).map((c) => [...shared, ...c]);
+  for (const chosen of picked) {
+    for (const picks of product(chosen)) {
+      total += 1;
+      const r1 = play(spec, picks);
+      if (r1.state.solved) {
+        wins += 1;
+        continue;
+      }
+      const swapped = picks.map((id, n) => {
+        const group = chosen[n];
+        return r1.extra.includes(id) ? group[(group.indexOf(id) + 1) % group.length] : id;
+      });
+      if (play(spec, swapped).state.solved) wins += 1;
+    }
+  }
+  return wins / total;
+}
+
+const PAIRING = 'one line of each equal-value group';
 
 // Known and deferred: 6.2 has five lines and one answer, so some skip rule always lands (#193).
 // Pinned to exactly the rules that pass today: fixing #193 fails this test until the entry goes.
@@ -321,4 +382,28 @@ test('no Spot board is solved, even with one wrong Check, by taking the lines wi
   const { [Object.keys(KNOWN)[0]]: known = {}, ...others } = found;
   assert.deepEqual(others, {}, 'boards a blind rule solves without reading them');
   assert.deepEqual(Object.keys(known).sort(), [...KNOWN['6.2 ts-spot']].sort(), '6.2: the KNOWN tells (#193) are exactly the ones that still pass; drop any that no longer do');
+});
+
+test('the equal-value pairing rule: it solves a board whose equal-value pairs are each one old name and one stable name, and no live board (#177)', async () => {
+  const board = (lines, faults) => ({ id: 'literal', lines: lines.map(([id, text]) => ({ id, text })), faults });
+  // 8.2 as first written: POST, 500 and 8443 each shared by one old name (an answer) and its stable name.
+  const paired = board(
+    [['m', 'http.method=POST'], ['cp', 'client.port=51234'], ['rm', 'http.request.method=POST'], ['sp', 'server.port=8443'], ['sc', 'http.status_code=500'], ['rt', 'http.route=/checkout'], ['rs', 'http.response.status_code=500'], ['nh', 'net.host.port=8443']],
+    ['m', 'sc', 'nh'],
+  );
+  assert.equal(pairingShare(paired), 1, 'one line of each pair, swapped for its partner when flagged, always solves it');
+  // The same pairs plus one equal-value pair with no answer in it (url.path and http.route) and an answer with no partner.
+  const mixed = board(
+    [['t', 'http.target=/checkout?step=pay'], ['sp', 'server.port=8443'], ['ca', 'client.address=gw.kettle.example'], ['up', 'url.path=/checkout'], ['nh', 'net.host.port=8443'], ['rt', 'http.route=/checkout'], ['cp', 'client.port=51234'], ['sc', 'http.status_code=500']],
+    ['t', 'nh', 'sc'],
+  );
+  assert.equal(pairingShare(mixed) <= TELL_SHARE, true, `${pairingShare(mixed)}`);
+  // Values read after the first `=`; other shapes group alone.
+  assert.equal(valueOf('http.target=/checkout?step=pay'), '/checkout?step=pay');
+  assert.equal(valueOf('url.query=step=pay'), 'step=pay');
+  assert.equal(valueOf('m{a="b"} count=12'), null);
+  assert.deepEqual(choose([1, 2, 3], 2), [[1, 2], [1, 3], [2, 3]]);
+  assert.deepEqual(product([[1, 2], [3]]), [[1, 3], [2, 3]]);
+  // The live boards: none is a tell, bar the known one (checked in the test above); print nothing, assert the bar.
+  for (const { no, spec } of await allSpotSpecs()) assert.equal(pairingShare(spec) <= TELL_SHARE, true, `${no} ${spec.id}: ${pairingShare(spec)}`);
 });

@@ -107,24 +107,28 @@ test('step 1: a valid span board of eight attributes, hints off, faults at F...F
   assert.deepEqual(validateSpotHelps(spec), []);
   assert.deepEqual(spec.helps, { hints: false });
   assert.equal(Object.hasOwn(spec, 'hint'), false, 'no authored hint (hints off)');
-  assert.deepEqual(spec.lines.map((l) => l.id), ['http-method', 'client-port', 'request-method', 'server-port', 'http-status-code', 'route', 'response-status-code', 'net-host-port']);
-  assert.deepEqual(spec.faults, ['http-method', 'http-status-code', 'net-host-port']);
+  assert.deepEqual(spec.lines.map((l) => l.id), ['http-target', 'server-port', 'client-address', 'url-path', 'net-host-port', 'route', 'client-port', 'http-status-code']);
+  assert.deepEqual(spec.faults, ['http-target', 'net-host-port', 'http-status-code']);
   assert.equal(layout(spec), 'F...F..F');
   for (const l of spec.lines) assert.match(l.text, /^[^=\s]+=/, `${l.id} reads as key=value`);
   assert.equal(spotRun(spec.faults).solved, true, 'the three faults solve it');
-  assert.equal(spotRun(['http-method', 'net-host-port']).solved, false, 'two of three do not');
+  assert.equal(spotRun(['http-target', 'net-host-port']).solved, false, 'two of three do not');
   assert.equal(spotRun([...spec.faults, 'route']).solved, false, 'http.route, which did not change, picked too does not');
   assert.equal(plain(SPOT_STEP.question), 'Spot the attributes that stop arriving once the opt-in is set to http.');
   assert.match(plain(SPOT_STEP.intro), /OTEL_SEMCONV_STABILITY_OPT_IN=http\/dup/);
+  assert.match(plain(SPOT_STEP.intro), /http\.method became http\.request\.method/, 'the intro example is not on the board');
+  assert.equal(spec.lines.some((l) => l.text.startsWith('http.method=') || l.text.startsWith('http.request.method=')), false, 'the intro example is not a line');
 });
 
 test('step 1 oracle: an independent reading of the migration page flags exactly the faults', () => {
   const STABLE = {
-    'http.method': 'http.request.method',
-    'http.status_code': 'http.response.status_code',
-    'net.host.port': 'server.port',
+    'http.status_code': ['http.response.status_code'],
+    'net.host.port': ['server.port'],
+    'http.target': ['url.path', 'url.query'], // split into two attributes
   };
-  const UNCHANGED = ['http.route', 'client.port']; // client.port was never one of the three renamed names
+  // Not renamed: http.route is "No change"; client.address replaced http.client_ip and client.port is an opt-in attribute of
+  // server spans (the port of the client captured in client.address). None is one of the old names the opt-in drops.
+  const KEPT = ['http.route', 'client.address', 'client.port', 'url.path', 'server.port'];
   const pairs = spec.lines.map((l) => {
     const [key, ...rest] = l.text.split('=');
     return { id: l.id, key, value: rest.join('=') };
@@ -133,29 +137,33 @@ test('step 1 oracle: an independent reading of the migration page flags exactly 
   assert.equal(keys.size, pairs.length, 'one line per key');
   // Old names stop arriving with the opt-in at http: exactly the faults.
   assert.deepEqual(pairs.filter((p) => Object.hasOwn(STABLE, p.key)).map((p) => p.id), spec.faults);
-  // Everything else is a stable name or unchanged, so it keeps arriving.
-  for (const p of pairs.filter((q) => !Object.hasOwn(STABLE, q.key))) {
-    assert.equal(Object.values(STABLE).includes(p.key) || UNCHANGED.includes(p.key), true, `${p.id}: ${p.key} is a stable or unchanged name`);
-  }
-  // http/dup sends both names with the same value: every old name's twin is on the board.
-  for (const p of pairs.filter((q) => Object.hasOwn(STABLE, q.key))) {
-    const twin = pairs.find((q) => q.key === STABLE[p.key]);
-    assert.ok(twin, `${p.key} has its stable twin ${STABLE[p.key]} on the board`);
-    assert.equal(twin.value, p.value, `${p.key} and ${twin.key} carry the same value`);
-  }
+  // Everything else keeps arriving.
+  for (const p of pairs.filter((q) => !Object.hasOwn(STABLE, q.key))) assert.equal(KEPT.includes(p.key), true, `${p.id}: ${p.key} is a stable or unchanged name`);
+  // http/dup sends both names with the same value: a twin on the board carries the old name's value.
+  const get = (key) => pairs.find((q) => q.key === key);
+  assert.equal(get('server.port').value, get('net.host.port').value, 'net.host.port and server.port carry the same value');
+  assert.equal(get('http.target').value.split('?')[0], get('url.path').value, 'http.target is url.path then url.query');
+  // Equal values do not give the answer away: /checkout is shared by two names that both stay.
+  const groups = Map.groupBy(pairs, (p) => p.value);
+  const shared = [...groups.values()].filter((g) => g.length > 1);
+  assert.equal(shared.some((g) => g.every((p) => !spec.faults.includes(p.id))), true, 'an equal-value pair with no old name');
+  assert.equal(shared.some((g) => g.some((p) => spec.faults.includes(p.id))), true, 'and one with an old name');
 });
 
 test('step 1 whyNot on exactly the five attributes that stay; explain names the three old names, http/dup and http.route', () => {
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['client-port', 'request-method', 'response-status-code', 'route', 'server-port']);
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['client-address', 'client-port', 'route', 'server-port', 'url-path']);
   for (const [id, t] of Object.entries(spec.whyNot)) assert.match(plain(t), /\S[\s\S]*\.$/, `${id} ends a sentence`);
   const e = plain(spec.explain);
-  for (const s of ['http.method', 'http.status_code', 'net.host.port', 'http/dup', 'OTEL_SEMCONV_STABILITY_OPT_IN', 'http.route']) assert.equal(e.includes(s), true, s);
+  for (const s of ['http.target', 'url.path', 'url.query', 'http.status_code', 'net.host.port', 'http/dup', 'OTEL_SEMCONV_STABILITY_OPT_IN', 'http.route']) assert.equal(e.includes(s), true, s);
   assert.match(plain(spec.whyNot.route), /Unchanged/);
+  assert.equal(plain(spec.whyNot['client-port']), 'Not an old name: the port of the client that sent the request.');
+  assert.match(plain(spec.whyNot['server-port']), /usually from the Host header/);
 });
 
 // ---- step 2: what first -------------------------------------------------------------------
 
-test('step 2: one right answer, move the queries first; labels give nothing away', () => {
+test('step 2: one right answer, move the queries first; labels give nothing away; the figure is scoped to the eight lines shown', () => {
+  assert.match(plain(SWITCH_STEP.intro), /Of the eight attributes you just read, 3 are old names/);
   assert.equal(SWITCH_STEP.qid, 'scv-q-switch');
   assert.equal(SWITCH_STEP.choice.id, 'scv-switch');
   assert.equal(plain(SWITCH_STEP.question), 'What has to happen first?');
