@@ -76,7 +76,7 @@ links level text to these anchors. "(Act N)" is where it's taught.
 - **PromQL**: the Prometheus query language. (Act 3)
 - **RED**: Rate, Errors, Duration, for request-driven services.
 - **USE**: Utilisation, Saturation, Errors, for resources.
-- **Span metrics**: RED metrics derived from spans (the `spanmetrics` connector).
+- **Span metrics**: RED metrics derived from spans (the `span_metrics` connector; `spanmetrics` is its deprecated alias).
 
 ## Logs
 
@@ -94,7 +94,7 @@ links level text to these anchors. "(Act N)" is where it's taught.
 - **Pipeline**: receivers, then processors, then exporters, per signal, declared under
   `service.pipelines`.
 - **Connector**: a component that is an exporter in one pipeline and a receiver in
-  another (for example `spanmetrics`).
+  another (for example `span_metrics`, whose deprecated alias is `spanmetrics`).
 - **Extension**: non-pipeline capability (health check, auth, storage).
 - **Agent / gateway**: a Collector per node vs a central Collector tier.
 - **OTTL**: the OpenTelemetry Transformation Language, used in transform/filter
