@@ -961,3 +961,15 @@ test('Escape on a shown hint is handled, focuses the hint button and leaves the 
   assert.equal(e.defaultPrevented, true);
   assert.equal(focus.last(), '#signals-hint');
 });
+
+test('Escape on the hint with no tier left (button spent) falls back to the untried bucket, and is handled (#178)', () => {
+  const { focus, mount } = setup(withHints());
+  mount();
+  sortTo('i2', 'metric');
+  sortTo('i2', 'trace');
+  assert.equal(q('#signals-hint').disabled, true);
+  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q('#signals-hint-text').onkeydown(e);
+  assert.equal(e.defaultPrevented, true);
+  assert.equal(focus.last(), 'bucket:log');
+});

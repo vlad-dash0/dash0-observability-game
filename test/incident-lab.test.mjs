@@ -4,7 +4,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  answersFrom, buildIncident, CANDIDATES, FAULT_ALPHABET, FAULT_ATTR, GRADE, gradeAnswer, QUESTION,
+  answersFrom, buildIncident, buildTraceList, CANDIDATES, FAULT_ALPHABET, FAULT_ATTR, FILTER_KEY, FILTER_OP, GRADE, gradeAnswer,
+  matchTraces, normaliseAnswer, QUESTION, START_MAX_AGO_MS, START_MIN_AGO_MS, startAgoMs, TRACE_LIST_SIZE,
 } from '../lib/incident-lab.mjs';
 import { encodeTraces, SPAN_KIND, STATUS_CODE } from '../lib/otlp/encode.mjs';
 import { createTelemetry, PRACTICE_SCOPE } from '../lib/telemetry.mjs';
@@ -205,6 +206,7 @@ test('gradeAnswer: the code is trimmed and case-insensitive; short or wrong fail
   assert.equal(g(QUESTION.faultCode, 'AAAAAA'), GRADE.fail);
   assert.equal(g(QUESTION.operation, a.operation), GRADE.pass);
   assert.equal(g(QUESTION.operation, 'progress.sync'), GRADE.fail);
+  assert.equal(g(QUESTION.operation, `  ${a.operation.toUpperCase()} `), GRADE.pass, 'operation: trimmed, case-insensitive');
   assert.equal(g(QUESTION.retryCount, a.retryCount), GRADE.pass);
   assert.equal(g(QUESTION.retryCount, String(a.retryCount)), GRADE.pass);
   assert.equal(g(QUESTION.retryCount, a.retryCount === 2 ? 3 : 2), GRADE.fail);
@@ -250,7 +252,7 @@ test('telemetry.incident() is lazy, seeded by the big-endian uint32 of randomByt
   assert.deepEqual(asked.slice(before), [4]);
   assert.equal(reads, 1);
   assert.equal(inc.seed, 0xdeadbeef);
-  assert.deepEqual(inc, buildIncident(0xdeadbeef, { now: () => NOW }));
+  assert.deepEqual(inc, buildIncident(0xdeadbeef, { now: () => NOW - startAgoMs(0xdeadbeef) }), 'built in the past, by the seed-derived offset');
   assert.equal(tel.incident(), inc);
   tel.disconnect();
   assert.equal(tel.incident(), inc);
@@ -272,9 +274,140 @@ test('telemetry.incident() spans go out through sendBatch', async () => {
   const tel = createTelemetry({ randomBytes, now: clock, setTimeout, clearTimeout });
   const first = tel.incident();
   assert.equal(first.spans.length, 5);
-  assert.equal(first.spans[0].startMs, NOW);
+  assert.equal(first.spans[0].startMs, NOW - startAgoMs(first.seed));
   assert.ok(tel.connect({ mode: 'practice', token: tel.practiceCredential(PRACTICE_SCOPE.ingest), endpoint: `https://${PRACTICE_HOSTS[0]}` }).ok);
   assert.equal((await tel.sendTest()).kind, 'accepted');
   assert.equal((await tel.sendBatch(first.spans)).kind, 'accepted');
   assert.ok(!JSON.stringify(tel.status()).includes(tel.practiceCredential(PRACTICE_SCOPE.ingest)));
+});
+
+test('normaliseAnswer: one spelling per answer, so "02" and "2" are the same retry count', () => {
+  assert.equal(normaliseAnswer(QUESTION.retryCount, '02'), normaliseAnswer(QUESTION.retryCount, ' 2 '));
+  assert.notEqual(normaliseAnswer(QUESTION.retryCount, '3'), normaliseAnswer(QUESTION.retryCount, '2'));
+  assert.equal(normaliseAnswer(QUESTION.faultCode, ' AbC '), 'abc');
+  assert.equal(normaliseAnswer(QUESTION.operation, ' Storage.Write'), 'storage.write');
+  assert.equal(normaliseAnswer(QUESTION.retryCount, 'two'), 'two');
+  assert.equal(normaliseAnswer(QUESTION.faultCode, undefined), '');
+});
+
+// ---- the practice trace list ----
+
+const SID = '0123456789abcdef';
+const list = (seed, sessionId = SID) => buildTraceList(build(seed), { sessionId });
+const kidsOf = (e) => e.spans.slice(1);
+const dur = (s) => s.endMs - s.startMs;
+
+test('buildTraceList: deterministic, and the own entry holds the very spans that are graded', () => {
+  assert.deepEqual(list(42), list(42));
+  const inc = build(42);
+  const own = buildTraceList(inc, { sessionId: SID }).filter((e) => e.own);
+  assert.equal(own.length, 1);
+  assert.equal(own[0].spans, inc.spans, 'the same array, not a copy');
+  assert.equal(own[0].sessionId, SID);
+});
+
+test('buildTraceList: exactly one own trace and distinct sessions, traces, fault codes and seeds', () => {
+  for (const seed of [0, 1, 42, 99999, 2 ** 32 - 1, 0x80000000]) {
+    const l = list(seed);
+    assert.equal(l.length, TRACE_LIST_SIZE);
+    assert.equal(l.filter((e) => e.own).length, 1);
+    assert.equal(new Set(l.map((e) => e.sessionId)).size, l.length, 'one session each');
+    assert.equal(new Set(l.map((e) => e.traceId)).size, l.length, 'one trace id each');
+    const keys = l.map((e) => answersFrom(e.spans));
+    assert.ok(keys.every((k) => k !== null), 'every trace has a readable key');
+    assert.equal(new Set(keys.map((k) => k.faultCode.toLowerCase())).size, l.length, 'one fault code each');
+    for (const e of l) assert.ok(e.spans.every((s) => s.traceId === e.traceId));
+  }
+});
+
+test('buildTraceList: a decoy has its own error span, events inside their spans, and the own trace is untouched', () => {
+  const inc = build(42);
+  const before = JSON.stringify(inc.spans);
+  const l = buildTraceList(inc, { sessionId: SID });
+  assert.equal(JSON.stringify(inc.spans), before, 'the own spans are not changed');
+  for (const e of l.filter((x) => !x.own)) {
+    const k = answersFrom(e.spans);
+    const failing = e.spans.find((s) => s.name === k.operation);
+    assert.equal(failing.events.filter((ev) => ev.name === 'retry').length, k.retryCount);
+    for (const s of kidsOf(e)) assert.ok(s.startMs >= e.spans[0].startMs && s.endMs <= e.spans[0].endMs, 'inside the root');
+    for (const ev of failing.events) assert.ok(ev.timeMs >= failing.startMs && ev.timeMs <= failing.endMs, 'events stay in their span');
+  }
+});
+
+// Every trace starts in the past, in one window; a start time is no clue.
+const sweepLists = (n) => Array.from({ length: n }, (_, i) => {
+  const seed = (Math.imul(i + 1, 2654435761) >>> 0);
+  const inc = buildIncident(seed, { now: () => NOW - startAgoMs(seed) }); // as telemetry.incident() builds it
+  const nowMs = NOW;
+  return { nowMs, entries: buildTraceList(inc, { sessionId: SID }) };
+});
+
+test('buildTraceList: every trace starts in the past, inside [now - 8 min, now - 30 s], the player\'s included', () => {
+  for (const { nowMs, entries } of sweepLists(300)) {
+    for (const e of entries) {
+      const ago = nowMs - e.spans[0].startMs;
+      assert.ok(ago >= START_MIN_AGO_MS && ago <= START_MAX_AGO_MS, `started ${ago} ms ago`);
+      assert.ok(e.spans.every((s) => s.endMs < nowMs), 'nothing in the future');
+    }
+  }
+});
+
+test('buildTraceList: no blind rule finds the player\'s trace more than 25% of the time (chance is 1/6)', () => {
+  const N = 1000;
+  const lists = sweepLists(N);
+  const total = (e) => e.spans[0].endMs - e.spans[0].startMs;
+  const failingIsLongest = (e) => {
+    const kids = kidsOf(e);
+    const worst = kids.reduce((a, b) => (dur(b) > dur(a) ? b : a));
+    return worst.status?.code === 'error';
+  };
+  const rules = {
+    shortest: (l) => l.entries.reduce((a, b) => (total(b) < total(a) ? b : a)),
+    longest: (l) => l.entries.reduce((a, b) => (total(b) > total(a) ? b : a)),
+    latest: (l) => l.entries.reduce((a, b) => (b.spans[0].startMs > a.spans[0].startMs ? b : a)),
+    earliest: (l) => l.entries.reduce((a, b) => (b.spans[0].startMs < a.spans[0].startMs ? b : a)),
+    closestToNow: (l) => l.entries.reduce((a, b) => (l.nowMs - b.spans[0].startMs < l.nowMs - a.spans[0].startMs ? b : a)),
+    failingIsLongest: (l) => l.entries.find(failingIsLongest) ?? l.entries[0],
+    firstInList: (l) => l.entries[0],
+    lastInList: (l) => l.entries[l.entries.length - 1],
+  };
+  for (const [name, pick] of Object.entries(rules)) {
+    const hits = lists.filter((l) => pick(l).own).length / N;
+    assert.ok(hits <= 0.25, `${name} finds the player's trace ${(hits * 100).toFixed(1)}% of the time`);
+  }
+});
+
+test('buildTraceList: the own trace sits in different places and starts at different ranks across seeds', () => {
+  const positions = new Set();
+  const ranks = new Set();
+  for (let seed = 1; seed <= 60; seed++) {
+    const l = list(seed * 7919);
+    positions.add(l.findIndex((e) => e.own));
+    ranks.add([...l].sort((a, b) => a.spans[0].startMs - b.spans[0].startMs).findIndex((e) => e.own));
+  }
+  assert.ok(positions.size >= 5, `positions: ${[...positions]}`);
+  assert.ok(ranks.size >= 5, `start-time ranks: ${[...ranks]}`);
+});
+
+test('buildTraceList: refuses an unreadable incident, no session id and a silly count', () => {
+  assert.throws(() => buildTraceList({ seed: 1, spans: [] }, { sessionId: SID }), TypeError);
+  assert.throws(() => buildTraceList(build(1), { sessionId: '' }), TypeError);
+  assert.throws(() => buildTraceList(build(1), {}), TypeError);
+  assert.throws(() => buildTraceList(build(1), { sessionId: SID, count: 1 }), TypeError);
+});
+
+test('matchTraces: session.id is X keeps exactly the own trace; is not drops it; a wrong value matches nothing', () => {
+  const l = list(42);
+  const f = (key, op, value) => matchTraces(l, { key, op, value });
+  const mine = f(FILTER_KEY.sessionId, FILTER_OP.is, SID);
+  assert.equal(mine.length, 1);
+  assert.equal(mine[0].own, true);
+  assert.equal(f(FILTER_KEY.sessionId, FILTER_OP.isNot, ` ${SID} `).length, l.length - 1, 'the value is trimmed');
+  assert.deepEqual(f(FILTER_KEY.sessionId, FILTER_OP.is, SID.toUpperCase()), [], 'matched exactly');
+  assert.deepEqual(f(FILTER_KEY.sessionId, FILTER_OP.is, 'nope'), []);
+  assert.equal(f(FILTER_KEY.serviceName, FILTER_OP.is, 'oncall-game').length, l.length, 'every trace is the same service');
+  assert.equal(f(FILTER_KEY.spanName, FILTER_OP.is, 'progress.sync').length, l.length);
+  assert.throws(() => f('nope', FILTER_OP.is, 'x'), TypeError);
+  assert.throws(() => f(FILTER_KEY.sessionId, 'like', 'x'), TypeError);
+  assert.throws(() => f(FILTER_KEY.sessionId, FILTER_OP.is, '  '), TypeError);
 });

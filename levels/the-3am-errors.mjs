@@ -47,8 +47,8 @@ const SCENARIO = {
         '<tr><td><code>Cannot read stock reservation: missing field &lt;field&gt;</code></td><td>12,380</td></tr>' +
         '<tr><td><code>Order &lt;order_id&gt; rejected: invalid coupon &lt;code&gt;</code></td><td>21</td></tr>' +
         '</tbody></table>' +
-        '<p>The first pattern is 99.8% of the errors. Its extracted attribute <code>field</code> is <code>reserved_qty</code> on every record. ' +
-        `One record, opened: its <code>trace_id</code> is <code>${TRACE_ID}</code>.</p>`,
+        '<p>The first pattern is 99.8% of the errors, and its extracted attribute <code>field</code> is <code>reserved_qty</code> on every record. ' +
+        `One record, opened, has <code>trace_id</code> <code>${TRACE_ID}</code>.</p>`,
     },
     {
       id: 'trace-of-error',
@@ -63,7 +63,7 @@ const SCENARIO = {
         '<li>inventory <code>POST /reserve</code> SERVER, status 200, 31 ms, <code>service.version</code> 3.1.0</li>' +
         '<li>orders <code>parse reservation</code> INTERNAL, ERROR, exception: missing field <code>reserved_qty</code></li>' +
         '</ul>' +
-        '<p>The call to inventory succeeded. The failure comes after it, in the orders code that reads the reply. ' +
+        '<p>The call to inventory succeeded and the failure comes after it, in the orders code that reads the reply. ' +
         'No database span appears: the request fails before it writes the order.</p>',
     },
     {
@@ -117,30 +117,32 @@ const SCENARIO = {
   hypotheses: [
     {
       id: 'inventory-reply',
-      label: 'Inventory 3.1.0 renamed a field in its reply, and orders cannot read it',
+      label: 'Inventory renamed a field in its reply and orders cannot read it',
       right: true,
       why: 'Every ERROR record says orders is missing field reserved_qty, the trace shows the call to inventory succeeded and the failure is in orders\' parse reservation step, and inventory 3.1.0, deployed at 03:01, one minute before the burst, renamed that field. The log led to the trace, and the trace led to the deploy.',
     },
     {
       id: 'orders-release',
-      label: 'A bad orders release',
+      label: 'A bad orders release introduced a bug in the code that reads replies',
       right: false,
       why: 'Orders was last deployed on Thursday. Its code failed on a reply that arrived with status 200: what changed is the reply it reads, not orders.',
     },
     {
       id: 'database',
-      label: 'The database is failing',
+      label: 'The database is failing and orders cannot save the order',
       right: false,
       why: 'Postgres is healthy (21% CPU, steady connections), and the request fails before it writes the order, so no database span runs.',
     },
     {
       id: 'traffic-spike',
-      label: 'A traffic spike overloaded orders',
+      label: 'A traffic spike overloaded orders and made it fail',
       right: false,
       why: 'Traffic is the same as last Tuesday and the pods are at 17% CPU. The errors are one parse failure, not timeouts or load.',
     },
   ],
   answerAfterViews: 2,
+  hint:
+    '<p>Do not guess from the symptom. Follow one failing request from where it was recorded to where it went wrong, then ask what changed in what it received.</p>',
 };
 
 // Step 2: what linked the views. `why` follows "Right." or "Not quite.".
@@ -178,9 +180,7 @@ export default {
     prefix: 'tae',
     steps: [
       {
-        intro:
-          'It is 3 a.m. and orders is throwing errors. Every look costs minutes of error budget. Start from the logs, ' +
-          'follow a record to its trace, and the trace to what changed. Open what you need, then name the cause.',
+        intro: 'It is 3 a.m. and orders is throwing errors. Start from the logs, follow a record to its trace, and the trace to what changed.',
         incident: SCENARIO,
       },
       {

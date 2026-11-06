@@ -137,6 +137,8 @@ test('without a telemetry session the level says so and offers no Finish', () =>
   const h = open(null);
   assert.match(h.text(), /no telemetry session/);
   assert.equal(qa('[data-finish]').length, 0);
+  assert.equal(qa('button').length, 0, 'no button at all, not a disabled Close');
+  assert.match(q('.ui-note').textContent, /^Use Back to return to the map\.$/);
 });
 
 test('the secret field is a labelled password input with no value attribute', () => {

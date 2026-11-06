@@ -93,6 +93,7 @@
 /* A region a widget redraws in place (the incident board's tiles, evidence log, causes). The column
    is minmax(0, 1fr): an implicit auto column grows to min-content and the panel clips it at 320px. */
 .ui-panel-sec > [data-region] { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); min-width: 0; align-content: start; }
+.ui-panel code { overflow-wrap: anywhere; } /* the panel clips (overflow: hidden) and is no table cell: a long id must break, not clip */
 .ui-panel-head h3 { font-size: var(--text-base); font-weight: var(--weight-semibold); }
 .ui-panel--inset { background: var(--color-bg); border-radius: var(--radius-sm); }
 .ui-panel--alert { border-color: color-mix(in srgb, var(--color-alert) 55%, var(--color-border)); }

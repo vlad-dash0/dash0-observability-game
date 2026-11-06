@@ -61,6 +61,7 @@ const EXPECTED_ORDER = [
   'filter-or-sampler',
   'the-34-percent-error-rate',
   'connect-to-dash0',
+  'its-us',
 ];
 
 test('the live registry builds against the real deck and map nodes', () => {
@@ -150,7 +151,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
       name: 'Live Demo',
       sub: 'Does that answer hold?',
       levelIds: ['filter-or-sampler', 'the-34-percent-error-rate', 'connect-to-dash0'],
-      bossId: null,
+      bossId: 'its-us',
     },
   ]);
 });
@@ -179,11 +180,13 @@ const HAND_WRITTEN_WIDGETS = {
   'events-and-links': ['choice', 'build'],
   'checkout-is-slow': ['incident'],
   'connect-to-dash0': [],
+  'its-us': [],
 };
 // Declares a mechanic its board is not (custom, unscored, unwinnable), so no help is offered.
 const NOT_A_WIDGET = {
   'the-pager': 'No help card: its intro explains the board (it is not scored).',
   'connect-to-dash0': 'No help card: its form is its own kit markup, not a shared widget.',
+  'its-us': 'No help card: its trace view and questions are its own kit markup, not a shared widget.',
 };
 
 test('hand-written levels declare their widgets', () => {

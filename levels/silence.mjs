@@ -175,30 +175,32 @@ const SCENARIO = {
   hypotheses: [
     {
       id: 'exporter-renamed',
-      label: 'The rollout renamed the exporter to otlp_grpc/dash0-eu, but service.pipelines still lists otlp_grpc/dash0, so the Collector in eu-west refuses to start',
+      label: 'The exporter was renamed but pipelines list the old id so the eu-west Collector sends no data',
       right: true,
-      why: 'All three signals stopped in eu-west at 14:02 and nowhere else, the Collector pods there restart and are never ready, and their log says the configuration is invalid: a pipeline references exporter "otlp_grpc/dash0", which is not configured. The diff, merged at 14:01 and applied to eu-west at 14:02, renamed that exporter and left the three pipelines listing the old id. An id a pipeline lists must be defined, so the Collector exits at validation.',
+      why: 'All three signals stopped in eu-west at 14:02 and nowhere else, the Collector pods there restart and are never ready, and their log says the configuration is invalid: a pipeline references exporter "otlp_grpc/dash0", which is not configured. The diff, merged at 14:01 and applied to eu-west at 14:02, renamed that exporter to otlp_grpc/dash0-eu and left the three pipelines listing the old id. An id a pipeline lists must be defined, so the Collector exits at validation.',
     },
     {
       id: 'memory-limiter',
-      label: 'The memory_limiter in eu-west is refusing data',
+      label: 'The memory_limiter processor in eu-west is refusing spans after a traffic peak',
       right: false,
       why: 'A memory_limiter refuses data while the Collector is running, and the sender is expected to retry. These pods never get that far: they exit at startup, before any pipeline runs, and the diff does not touch memory_limiter. The one refusal burst, in us-east, was at 12:40.',
     },
     {
       id: 'wrong-port',
-      label: 'The exporter sends to the wrong OTLP port',
+      label: 'The otlp_grpc/dash0 exporter in eu-west sends data to the wrong OTLP port and nothing ever arrives',
       right: false,
       why: 'The endpoint line is not in the diff. A wrong port would still be a valid configuration: the Collector would start and show send errors while running, and its pods would not restart. These pods exit with a configuration error.',
     },
     {
       id: 'apps-stopped',
-      label: 'The eu-west applications stopped exporting',
+      label: 'The applications in eu-west stopped sending their traces and metrics and logs',
       right: false,
       why: 'The application pods are Running with no restarts and have not been deployed since Tuesday. Traces, metrics and logs from every service in the cluster stopped in the same minute, which points at the one thing they all send through.',
     },
   ],
   answerAfterViews: 3,
+  hint:
+    '<p>Silence is a symptom with many causes. Work out first whether the data stopped or only thinned, then follow it back along its path toward the source, and ask what touched that path last.</p>',
 };
 
 // Step 2: the rule that was broken. `why` follows "Right." or "Not quite.".
@@ -237,9 +239,7 @@ export default {
     prefix: 'sil',
     steps: [
       {
-        intro:
-          'The eu-west cluster has gone quiet: no traces, metrics or logs since 14:02. Every look costs minutes of error budget. ' +
-          'Start from what is arriving, follow it to the Collector, and find what changed. Open what you need, then name the cause.',
+        intro: 'The eu-west cluster has gone quiet: no traces, metrics or logs since 14:02. Find out why it went quiet.',
         incident: SCENARIO,
       },
       {

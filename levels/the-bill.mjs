@@ -66,8 +66,7 @@ const SCENARIO = {
         `<tr><td>every other metric together</td><td>${n(FLEET_BEFORE - SERIES_BEFORE)}</td><td>${n(FLEET_BEFORE - SERIES_BEFORE)}</td></tr>` +
         `<tr><td>all metrics</td><td>${n(FLEET_BEFORE)}</td><td>${n(FLEET_AFTER)}</td></tr>` +
         '</tbody></table>' +
-        '<p>One tile fills the map. Its series count did not climb: it stepped, at 09:42, from 228 to 118,904, which is 91% of all series. ' +
-        'Every other metric is where it was.</p>',
+        '<p>One tile fills the map: its series count stepped at 09:42 from 228 to 118,904, 91% of all series, while every other metric stayed where it was.</p>',
     },
     {
       id: 'label-breakdown',
@@ -75,7 +74,8 @@ const SCENARIO = {
       costMin: 4,
       kind: 'clue',
       html:
-        '<p>The sidebar of <code>checkout_attempts_total</code>, series grouped by label, at 10:12:</p>' +
+        '<p>The sidebar of <code>checkout_attempts_total</code>, series grouped by label, at 10:12, for example ' +
+        '<code>checkout_attempts_total{payment_method="card",store_country="DE",user_id="u-8f31c2"}</code>:</p>' +
         '<table><caption>Distinct values for each label</caption>' +
         '<thead><tr><th scope="col">Label</th><th scope="col">Distinct values</th></tr></thead>' +
         '<tbody>' +
@@ -84,9 +84,8 @@ const SCENARIO = {
         `<tr><td><code>user_id</code></td><td>${n(USERS)}</td></tr>` +
         '</tbody></table>' +
         `<p>At 09:40 the labels were <code>payment_method</code> and <code>store_country</code> only: 6 &times; 38 = ${SERIES_BEFORE} series. ` +
-        `Now <code>user_id</code> is on every series and almost every user has exactly one series, ${n(SERIES_AFTER)} in all. ` +
-        'A sample: <code>checkout_attempts_total{payment_method="card",store_country="DE",user_id="u-8f31c2"}</code>.</p>' +
-        '<p>No point carries <code>otel.metric.overflow</code>: this SDK version has no cardinality limit set.</p>',
+        `Now <code>user_id</code> is on every series and almost every user has exactly one series, ${n(SERIES_AFTER)} in all, and no point carries ` +
+        '<code>otel.metric.overflow</code>: this SDK version has no cardinality limit set.</p>',
     },
     {
       id: 'deploys',
@@ -146,30 +145,32 @@ const SCENARIO = {
   hypotheses: [
     {
       id: 'user-id-label',
-      label: 'Checkout 5.12.0 added a user_id label to a counter, so every user is a new series',
+      label: 'Checkout added a user_id label to a counter so each user gets a series',
       right: true,
       why: `The volume view shows one metric, checkout_attempts_total, stepping from ${SERIES_BEFORE} to ${n(SERIES_AFTER)} series at 09:42 while every other metric stayed put. Its label breakdown shows a new label, user_id, with ${n(USERS)} values, and checkout 5.12.0, deployed at 09:41, added user.id to the counter's attributes. Series are the unique combinations of attribute values, so one new unbounded label made the series count follow the user count.`,
     },
     {
       id: 'traffic-growth',
-      label: 'Real traffic grew, and the data grew with it',
+      label: 'Real checkout traffic grew and the number of series grew with it',
       right: false,
       why: 'Checkout traffic is the same as last Thursday at this hour, and every other metric kept its series count. Only one metric changed, and it stepped at the deploy instead of following the traffic.',
     },
     {
       id: 'new-service-metrics',
-      label: 'The new loyalty service reports too many metrics',
+      label: 'The new loyalty service started reporting on Tuesday and now sends far too many metrics',
       right: false,
       why: 'Loyalty has 46 series, under 0.1% of the total, and it was already reporting at 09:40. It cannot account for 118,676 new series.',
     },
     {
       id: 'export-interval-change',
-      label: 'Someone shortened the metric export interval',
+      label: 'Someone shortened OTEL_METRIC_EXPORT_INTERVAL on checkout',
       right: false,
       why: 'The export interval is unchanged at 60 s. A shorter one would raise the points a minute for every metric, not for one, and the series counts would be the same.',
     },
   ],
   answerAfterViews: 2,
+  hint:
+    '<p>Series are combinations of attribute values: find the one metric whose count jumped and ask which attribute multiplies it.</p>',
 };
 
 // Step 2: the fix. `why` follows "Right." or "Not quite.".
@@ -213,9 +214,7 @@ export default {
     prefix: 'tbl',
     steps: [
       {
-        intro:
-          'Metric volume has jumped, and dashboards are timing out. Every look costs minutes of query error budget. ' +
-          'Find which metric grew, what changed in it, and what changed in the code. Open what you need, then name the cause.',
+        intro: 'Metric volume has jumped and dashboards are timing out. Find which metric grew, what changed in it and what changed in the code.',
         incident: SCENARIO,
       },
       {

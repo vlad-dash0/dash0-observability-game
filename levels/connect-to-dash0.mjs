@@ -133,8 +133,8 @@ export default {
 
     if (!tele) {
       ctx.renderStep(
-        screen(ctx.speech('The game has no telemetry session in this build, so there is nothing to connect.')),
-        bar(button({ id: 'ctd-none', label: 'Close this level', variant: 'ghost', disabled: true })),
+        screen(ctx.speech('The game has no telemetry session in this build, so there is nothing to connect.'), note('Use Back to return to the map.')),
+        bar(''),
       );
       return;
     }

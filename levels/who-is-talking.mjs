@@ -53,9 +53,8 @@ const SCENARIO = {
         '<tr><td><code>k8s.deployment.name</code></td><td><code>notifications</code></td></tr>' +
         '<tr><td><code>k8s.pod.name</code></td><td><code>notifications-7c5d8f6b9-q4m2x</code></td></tr>' +
         '</tbody></table>' +
-        '<p>The name has the shape of the fallback: <code>unknown_service:</code> plus <code>process.executable.name</code>. ' +
-        'The <code>k8s.*</code> attributes were added by the Collector\'s <code>k8sattributes</code> processor, so they still say which pod this is and that ' +
-        'the deployment is <code>notifications</code>. The version and namespace came from the environment, so something did set resource attributes.</p>',
+        '<p>The name is the fallback, <code>unknown_service:</code> plus <code>process.executable.name</code>, yet the <code>k8s.*</code> attributes, ' +
+        'added by the Collector\'s <code>k8sattributes</code> processor, still name the deployment <code>notifications</code>.</p>',
     },
     {
       id: 'deploy-history',
@@ -79,8 +78,8 @@ const SCENARIO = {
         '<pre>NODE_ENV=production\n' +
         'OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318\n' +
         'OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=production,service.namespace=comms,service.version=5.2.0</pre>' +
-        '<p><code>OTEL_SERVICE_NAME</code> is not set, and <code>service.name</code> is not in <code>OTEL_RESOURCE_ATTRIBUTES</code> either. ' +
-        'The process the SDK sees is <code>node</code>.</p>',
+        '<p><code>OTEL_SERVICE_NAME</code> is not set and <code>service.name</code> is not in <code>OTEL_RESOURCE_ATTRIBUTES</code>, ' +
+        'so the only name the SDK can build comes from the process, <code>node</code>.</p>',
     },
     {
       id: 'collector-restart',
@@ -128,30 +127,32 @@ const SCENARIO = {
   hypotheses: [
     {
       id: 'name-dropped',
-      label: 'The 5.2.0 deploy removed OTEL_SERVICE_NAME, so the SDK fell back to unknown_service:node',
+      label: 'The latest deploy dropped OTEL_SERVICE_NAME so the SDK used its fallback name',
       right: true,
       why: 'The resource has no service.name, only the fallback unknown_service:node, built from process.executable.name node. The deploy at 14:09 removed OTEL_SERVICE_NAME, the running pod does not have it, and the first spans under the new name arrived at 14:11. The k8s attributes from the Collector were never the problem: they are what led you to the owner, the notifications deployment.',
     },
     {
       id: 'new-service',
-      label: 'A new service nobody told us about is running in the cluster',
+      label: 'A new service nobody told us about has started running in the cluster under its own name',
       right: false,
       why: 'The pod belongs to the notifications deployment, which has been deployed for a long time (5.1.3 last Tuesday). It is an old service that lost its name, not a new one.',
     },
     {
       id: 'detector-broken',
-      label: 'The Kubernetes resource attributes are broken',
+      label: 'The Kubernetes resource attributes such as k8s.pod.name are broken',
       right: false,
       why: 'They are all there: k8s.deployment.name, k8s.namespace.name and k8s.pod.name identify the pod. What is missing is service.name, and the deploy diff shows the variable that sets it was removed.',
     },
     {
       id: 'collector-renamed',
-      label: 'The Collector restart renamed the service',
+      label: 'The Collector restart renamed the service on its way to the backend',
       right: false,
       why: 'The restart was at 14:03 with an unchanged config, before the 14:09 deploy, and no other service changed name. A Collector would have to have been configured to rewrite service.name; nothing says it was.',
     },
   ],
   answerAfterViews: 2,
+  hint:
+    '<p>Start with what the telemetry says about itself, then ask what changed shortly before the alert began. Confirm it where the service actually runs.</p>',
 };
 
 // Step 2: what fixes it. `why` follows "Right." or "Not quite.".
@@ -189,9 +190,7 @@ export default {
     prefix: 'wit',
     steps: [
       {
-        intro:
-          'An alert names a service nobody has heard of. Every look costs minutes of error budget. Read what the telemetry says about ' +
-          'itself, find who owns it, and work out why it has that name. Open what you need, then name the cause.',
+        intro: 'An alert names a service nobody has heard of. Find out who owns it and why it has that name.',
         incident: SCENARIO,
       },
       {
