@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseHTML } from 'linkedom';
 import { makeDom } from './helpers/dom.mjs';
+import { recordFocus } from './helpers/focus.mjs';
 import { fakeStorage } from './helpers/fake-storage.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
 import { STORAGE_KEY } from '../lib/storage.mjs';
@@ -19,6 +20,8 @@ import { GAME_SUMMARY } from '../hub/about.mjs';
 import { litText } from '../lib/globe-ignite.mjs';
 import { MAX_STARS } from '../lib/scoring.mjs';
 import { createTelemetry } from '../lib/telemetry.mjs';
+import { newSpotState } from '../lib/widgets/spot-it.mjs';
+import { mountSpot, renderSpot } from '../lib/widgets/spot-it-view.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
@@ -1082,6 +1085,33 @@ test('index.html: each element the game focuses on opening a level and the rewar
   assert.equal(game.rewardOpen, true);
   assert.deepEqual(focused, ['#ov-back', '#reward-close'], 'the back button on open, the reward close on finish');
   for (const sel of focused) assert.equal(shell.querySelectorAll(sel).length, 1, `${sel} matches one element in index.html`);
+});
+
+test('opening a level with no help card puts focus on Back, even when its widget focuses its first line on mount', () => {
+  const spec = {
+    id: 'sp',
+    target: 'metric',
+    lines: [
+      { id: 's1', text: 'http_requests_total{route="/cart"}' },
+      { id: 's2', text: 'http_requests_total{user_id="8841"}' },
+    ],
+    faults: ['s2'],
+    whyNot: {},
+    explain: 'user_id explodes cardinality.',
+  };
+  const spotLevel = L('sp', '0.9', {
+    run(ctx) {
+      ctx.renderStep(renderSpot(spec, newSpotState(spec), { escapeHtml: ctx.escapeHtml }), '<button data-finish disabled>Finish</button>');
+      mountSpot(ctx, spec, { onComplete: () => {}, swirl: () => {} });
+    },
+  });
+  const registry = buildRegistry([{ id: 'a0', no: 0, name: 'Act', levels: [spotLevel], boss: null }], { deck: [], nodeIds: [] });
+  const { game, dom } = setup({ registry });
+  const focus = recordFocus(dom.window);
+  assert.equal(game.openLevel('sp'), true);
+  assert.deepEqual(focus.names(), ['line:s1', '#ov-back'], 'the widget focuses its first line on mount, then the app moves focus to Back');
+  assert.equal(focus.last(), '#ov-back', 'Back holds focus, not the first Spot line');
+  assert.equal(dom.document.querySelectorAll('[data-line]').length, 2, 'the Spot board did mount');
 });
 
 test('index.html: the level overlay elements live inside an x-ignore wrapper', () => {

@@ -106,6 +106,10 @@ pass it); the level overlay is as wide as the widest step. Every step is the `le
 960px)` and stacks below. The 960 is a literal: custom properties do not work in container
 conditions. Questions are centred in narrow steps and left-aligned in wide ones (D4).
 
+## Focus
+
+A level opens with focus on Back (`#ov-back`, set by `openLevel` in `app.mjs` after `level.run`); a widget's mount focus (first line, input, radio) only takes effect on later steps, and after a Check or Next focus moves to the feedback or the next step.
+
 ## Authoring content
 
 - Lesson text, questions and prose are classless HTML inside the helpers.
