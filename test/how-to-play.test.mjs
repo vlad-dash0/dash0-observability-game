@@ -3,7 +3,7 @@
 // PENALTY (identity-tested), so the card cannot drift from the code that charges them.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HOW_TO, NOT_SCORED, PAR, REPLAY, howToView } from '../lib/how-to-play.mjs';
+import { HOW_TO, NOT_SCORED, NO_HINTS, PAR, REPLAY, howToView } from '../lib/how-to-play.mjs';
 import { LADDER, PENALTY as BUILD_PENALTY } from '../lib/widgets/help-ladder.mjs';
 import { PENALTY as CHOICE_PENALTY } from '../lib/widgets/choice.mjs';
 import { PENALTY as SORT_PENALTY } from '../lib/widgets/sort-it-view.mjs';
@@ -89,10 +89,31 @@ test('howToView refuses a widget it has no copy for', () => {
   assert.throws(() => howToView(level({ widgets: ['quiz'] })), /quiz/);
 });
 
-test('a widget that never charges has no cost sentence invented for it', () => {
-  // choice costs "a wrong pick" and frees nothing: the free sentence is simply absent.
+test('a widget with nothing free has no free sentence', () => {
+  // choice costs "a wrong pick" and frees nothing: the free sentence is absent.
   const [choice] = howToView(level({ widgets: ['choice'] })).topics;
   assert.ok(choice.stars.includes('a wrong pick'));
   assert.equal(choice.stars.includes('undefined'), false);
   assert.equal(choice.stars.endsWith(' '), false);
+});
+
+test('a widget in the level\'s hintless list says no hints; the others keep their own hint line', () => {
+  const v = howToView(level({ widgets: ['sort', 'build', 'choice'], hintless: ['sort'] }));
+  assert.deepEqual(v.topics.map((t) => t.hints), [NO_HINTS, HOW_TO.build.hints, HOW_TO.choice.hints]);
+  assert.notEqual(HOW_TO.sort.hints, NO_HINTS);
+  assert.equal(howToView(level({ widgets: ['sort'] })).topics[0].hints, HOW_TO.sort.hints, 'no hintless list: the entry\'s line');
+});
+
+test('the hint lines state the cost as one penalty and the Hint button as pricing on that board\'s score card', () => {
+  assert.equal(HOW_TO.sort.hints, "Each hint counts as one penalty. Where the board has hints, the Hint button shows what the next one costs on that board's score card.");
+  assert.equal(HOW_TO.query.hints, 'Show a hint costs one penalty. Some steps have no hint.');
+  assert.equal(HOW_TO.configure.hints, HOW_TO.query.hints);
+});
+
+test('the star line names the level, not the board, and the play lines name what the screen says', () => {
+  const [choice] = howToView(level({ widgets: ['choice'] })).topics;
+  assert.equal(choice.stars, "Penalties count against the level's stars: a wrong pick.");
+  assert.ok(HOW_TO.choice.play.includes('Not quite'));
+  assert.ok(HOW_TO.sort.play.includes('Not quite'));
+  assert.ok(HOW_TO.query.play.startsWith('Write a PromQL query and press Run. A query that runs shows its result.'));
 });

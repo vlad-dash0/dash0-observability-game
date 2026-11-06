@@ -281,6 +281,57 @@ test('a play level derives its widgets; a declared list must equal them', () => 
   ]);
 });
 
+test('a declared widgets list with the right members in another order is rejected', () => {
+  const swapped = [FIXTURE_WIDGETS[1], FIXTURE_WIDGETS[0], ...FIXTURE_WIDGETS.slice(2)];
+  assert.deepEqual([...swapped].sort(), [...FIXTURE_WIDGETS].sort());
+  assert.deepEqual(errorsOf({ ...playFixture(), widgets: swapped }), [
+    `${AT}: declares widgets ${JSON.stringify(swapped)} but its steps give ${JSON.stringify(FIXTURE_WIDGETS)}; fix or remove widgets`,
+  ]);
+});
+
+test('validatePlay names the widgets with no hint on any step, the way each mount decides it', () => {
+  const lv = playFixture();
+  const [choice, sort, build, incident, spot, tradeoff, query, configure] = lv.play.steps;
+  const hintless = (steps) => validatePlay({ ...lv.play, steps }).hintless;
+  assert.deepEqual(validatePlay(lv.play).hintless, ['sort', 'spot']);
+  assert.deepEqual(validatePlay(null).hintless, []);
+  // Sort and Spot: hints only with helps.hints on.
+  const withHints = (step, key, id) => {
+    const c = structuredClone(step);
+    c[key].id = id;
+    c[key].helps = { hints: true };
+    return c;
+  };
+  assert.deepEqual(hintless([withHints(sort, 'sort', 'a')]), []);
+  assert.deepEqual(hintless([sort, withHints(sort, 'sort', 'b')]), [], 'one step with hints is enough');
+  assert.deepEqual(hintless([withHints(spot, 'spot', 'a')]), []);
+  // Build: an authored hint with no helps has hints; helps given and hints off does not.
+  assert.deepEqual(hintless([build]), []);
+  const noHint = structuredClone(build);
+  delete noHint.build.hint;
+  assert.deepEqual(hintless([noHint]), ['build']);
+  const off = structuredClone(noHint);
+  off.build.helps = {};
+  assert.deepEqual(hintless([off]), ['build']);
+  // Incident always has the Hint button; Query and Configure need an authored hint.
+  assert.deepEqual(hintless([incident, query, configure]), []);
+  const bare = (step, key) => {
+    const c = structuredClone(step);
+    delete c[key].hint;
+    return c;
+  };
+  assert.deepEqual(hintless([bare(query, 'query'), bare(configure, 'configure')]), ['query', 'configure']);
+  assert.deepEqual(hintless([choice, tradeoff]), [], 'choice and tradeoff never have hints, so they are never named');
+});
+
+test('a play level derives its hintless list; a declared one must equal it', () => {
+  assert.deepEqual([...FX.hintless], ['sort', 'spot']);
+  assert.deepEqual([...build({ ...playFixture(), hintless: ['sort', 'spot'] }).levels[ID].hintless], ['sort', 'spot']);
+  assert.deepEqual(errorsOf({ ...playFixture(), hintless: ['sort'] }), [
+    `${AT}: declares hintless ["sort"] but its steps give ["sort","spot"]; fix or remove hintless`,
+  ]);
+});
+
 test('registry errors for run and play together, no kit, differing mechanics, a function', () => {
   assert.deepEqual(errorsOf({ ...playFixture(), run() {} }), [`${AT}: declares both run and play; use one`]);
   assert.deepEqual(errorsOf(playFixture(), { play: undefined }), [`${AT}: play needs the step kit (buildRegistry option "play")`]);

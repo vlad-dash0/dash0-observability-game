@@ -42,7 +42,7 @@ test('the side-column RULEs are unchanged and composed from PENALTY and LADDER',
   );
   assert.equal(
     INCIDENT_RULE,
-    `Stars count this board only: a misleading view, running out of budget, a wrong pick, a hint. ${LADDER_TEXT} Retrying is free.`,
+    `Stars count this board only: a misleading view, running out of error budget, a wrong pick, a hint. ${LADDER_TEXT} Retrying is free.`,
   );
   for (const [rule, penalty] of [[RULE, PENALTY], [SORT_RULE, SORT_PENALTY], [SPOT_RULE, SPOT_PENALTY], [INCIDENT_RULE, INCIDENT_PENALTY]]) {
     assert.equal(rule, ruleText(penalty));
@@ -174,4 +174,18 @@ test('S1 score takes more counts (the incident board\'s misleading views and bud
   side.hintUi({ label: 'Hint 1 of 3', disabled: false, tierHtml: '0 of 3 used' });
   assert.equal(q('#x-hint-cost').textContent, 'costs 1 star');
   assert.equal(side.score({ wrong: 0, wrongLabel: 'wrong picks', hints: 0, done: false }), 5, 'without more: no extra penalty');
+});
+
+test('ladderText: a rung three or more counts wide reads "from to to"; two read "from or to"', () => {
+  assert.equal(ladderText((p) => (p <= 1 ? 5 - p : p <= 5 ? 3 : 1)), '0 penalties give 5 stars, 1 gives 4, 2 to 5 give 3, more give 1.');
+  assert.equal(ladderText((p) => (p <= 2 ? 5 : p <= 4 ? 3 : 1)), '0 to 2 penalties give 5 stars, 3 or 4 give 3, more give 1.');
+});
+
+test('ladderText: a rule that never changes says any number of penalties; a late change is not cut off', () => {
+  assert.equal(ladderText(() => 3), 'any number of penalties give 3 stars.');
+  assert.equal(ladderText((p) => (p < 60 ? 5 : 1)), '0 to 59 penalties give 5 stars, more give 1.');
+});
+
+test('ladderText: a rule that never settles is refused, not printed', () => {
+  assert.throws(() => ladderText((p) => p % 2), /still changing/);
 });

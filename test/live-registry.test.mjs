@@ -10,6 +10,7 @@ import { liveRegistry } from '../app.mjs';
 import { COMING_SOON } from '../hub/coming-soon.mjs';
 import { runPlay, validatePlay } from '../lib/play.mjs';
 import { WIDGETS } from '../lib/registry.mjs';
+import { NO_HINTS, howToView } from '../lib/how-to-play.mjs';
 
 const nodeIds = NODE_IDS;
 
@@ -169,7 +170,7 @@ const HAND_WRITTEN_WIDGETS = {
   'checkout-is-slow': ['incident'],
 };
 // Declares a mechanic its board is not (custom, unscored, unwinnable), so no help is offered.
-const NOT_A_WIDGET = { 'the-pager': 'a custom board, not the incident widget; its intro explains it' };
+const NOT_A_WIDGET = { 'the-pager': 'No help card: its intro explains the board (it is not scored).' };
 
 test('hand-written levels declare their widgets', () => {
   const reg = liveRegistry();
@@ -191,6 +192,36 @@ test('every play level has widgets, all known; non-choice ones equal its mechani
     assert.ok(lv.widgets.length > 0, id);
     assert.ok(lv.widgets.every((w) => WIDGETS.includes(w)), id);
     assert.deepEqual([...lv.widgets].filter((w) => w !== 'choice').sort(), [...lv.mechanics].sort(), id);
+  }
+});
+
+// The widgets with no Hint button on any step of the level (every other live level
+// has none listed). Play levels derive it from their steps; the two hand-written ones declare it.
+const HINTLESS = {
+  baggage: ['sort'],
+  'events-and-links': ['build'],
+  'auto-vs-manual': ['sort'],
+  instruments: ['sort'],
+  'structured-logs': ['sort'],
+  distributions: ['sort'],
+  'filter-or-sampler': ['sort'],
+  'order-matters': ['spot'],
+  'tail-sampling': ['spot'],
+  'ottl-and-transforms': ['spot'],
+  'good-alerts': ['spot'],
+};
+
+test('which widgets have no hints on each live level is pinned, and the how-to-play help says so', () => {
+  const reg = liveRegistry();
+  assert.deepEqual(Object.keys(HINTLESS).filter((id) => !reg.order.includes(id)), []);
+  for (const id of reg.order) {
+    const lv = reg.levels[id];
+    const want = HINTLESS[id] ?? [];
+    assert.deepEqual([...lv.hintless], want, id);
+    for (const t of howToView(lv).topics) {
+      const none = want.includes(t.key) || t.key === 'choice' || t.key === 'tradeoff';
+      assert.equal(t.hints === NO_HINTS, none, `${id} ${t.key}`);
+    }
   }
 });
 
