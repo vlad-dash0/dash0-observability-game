@@ -14,6 +14,9 @@ import { fakeStorage } from './helpers/fake-storage.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
 import { STORAGE_KEY } from '../lib/storage.mjs';
 import { THEME_KEY } from '../lib/theme.mjs';
+import { sideColumn } from '../lib/ui/index.mjs';
+import { mountSide } from '../lib/widgets/help-ladder.mjs';
+import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { HELP_KEY, hideHelp } from '../lib/help-prefs.mjs';
 import { createGame, liveRegistry } from '../app.mjs';
 import { endSentence } from '../lib/text.mjs';
@@ -303,6 +306,22 @@ test('an Escape a widget already handled leaves the level open; an unhandled one
   assert.equal(unhandled.defaultPrevented, false);
   game.onEscape(unhandled);
   assert.equal(game.overlayOpen, false, 'an unhandled Escape still closes the level');
+});
+
+test('Escape on a shown hint keeps the level open: the hint handles it, the app then leaves it alone (#178)', () => {
+  const { game, dom } = setup();
+  game.openLevel('x');
+  ctxs.x.renderStep(sideColumn({ id: 'h1', titleHtml: 'T', counts: [{ key: 'wrong', label: '' }], hints: true, ruleHtml: 'r' }));
+  const body = dom.document.getElementById('ov-body');
+  const side = mountSide({ ovBody: body, escapeHtml, reduceMotion: true }, body, 'h1');
+  side.showHint('<p>Look at the root.</p>');
+  const ev = new dom.window.Event('keydown', { bubbles: true, cancelable: true });
+  ev.key = 'Escape';
+  dom.document.getElementById('h1-hint-text').dispatchEvent(ev);
+  assert.equal(ev.defaultPrevented, true);
+  game.onEscape(ev);
+  assert.equal(game.overlayOpen, true, 'the level stays open');
+  assert.equal(ctxs.x.signal.aborted, false);
 });
 
 test('focus returns to the level card after closing the level and after the reward of a replay', () => {

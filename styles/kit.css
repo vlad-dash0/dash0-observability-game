@@ -280,6 +280,8 @@
 
 /* ---------- Table (table.mjs; the same look inside prose) ---------- */
 .ui-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: 8px; }
+/* A captioned wrap is a focusable region so the keyboard can scroll it (#178). */
+.ui-table-wrap:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .ui-table, .ui-prose table { border-collapse: collapse; inline-size: 100%; font-size: var(--text-sm); }
 /* prose() wraps each table in .ui-table-wrap, which scrolls sideways inside the card; the table
    itself stays display: table at full width. The wrap's border replaces the table's own. */

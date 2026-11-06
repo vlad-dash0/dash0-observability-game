@@ -224,3 +224,15 @@ test('focus never drops to the page: each step, pick, hint and pass moves it on'
   assert.equal(lastFocus(), '#nys-finish', 'the right answer moves to Finish');
   assert.deepEqual(focusLog.filter((f) => !f.focusable).map((f) => f.name), [], 'focused only enabled elements');
 });
+
+test('Escape on the shown hint is handled and moves focus to the editor (the hint is once-only) (#178)', () => {
+  start();
+  toEditor();
+  click('#nys-hint');
+  focusLog = [];
+  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q('#nys-hint-text').onkeydown(e);
+  assert.equal(e.defaultPrevented, true);
+  assert.equal(q('#nys-hint-text').getAttribute('tabindex'), '-1');
+  assert.deepEqual(focusLog, [{ name: '#nys-env', focusable: true }]);
+});

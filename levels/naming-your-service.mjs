@@ -4,6 +4,7 @@
 // OTEL_SERVICE_NAME and service.name in OTEL_RESOURCE_ATTRIBUTES disagree.
 // Spec: docs/FOUNDATION.md §5 and §6 F6. Player text reaches HTML only via escapeHtml.
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
+import { escapeFromHint } from '../lib/widgets/focus.mjs';
 import { checkConfig, effectiveResource, parseEnv, renderIssues } from '../lib/widgets/env-config.mjs';
 
 const TARGET = { serviceName: 'checkout', environment: 'production' };
@@ -139,7 +140,7 @@ export default {
             variable; the spec says SDKs should, and some languages keep the valid pairs instead.</p>
           <button class="btn" id="nys-check">Check</button>
           <button class="btn ghost small" id="nys-hint">Show a hint</button>
-          <div class="feedback info" id="nys-hint-text"></div>
+          <div class="feedback info" id="nys-hint-text" tabindex="-1"></div>
           ${feedbackBox}
         </div>`,
         '<button class="btn" id="nys-next" disabled>Next</button>',
@@ -156,6 +157,7 @@ export default {
         input.focus();
         const box = body.querySelector('#nys-hint-text');
         box.classList.add('show');
+        escapeFromHint(box, hint, input);
         box.innerHTML =
           'Add a line <code>OTEL_SERVICE_NAME=checkout</code>, then append ' +
           '<code>,service.version=1.4.2</code> to the <code>OTEL_RESOURCE_ATTRIBUTES</code> value. ' +

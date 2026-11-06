@@ -950,3 +950,26 @@ test('after a tier 3 placement of a non-last item the panel keeps "Placed for yo
   assert.equal(hintText().includes('Ask what the item actually is'), true, 'i3 has no own hint: the rule');
   assert.equal(hintText().includes('Hint 1 of 3'), true);
 });
+
+test('Escape on a shown hint is handled, focuses the hint button and leaves the level open (#178)', () => {
+  const { focus, mount } = setup(withHints());
+  mount();
+  click('[data-item="i2"]');
+  click('#signals-hint');
+  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q('#signals-hint-text').onkeydown(e);
+  assert.equal(e.defaultPrevented, true);
+  assert.equal(focus.last(), '#signals-hint');
+});
+
+test('Escape on the hint with no tier left (button spent) falls back to the untried bucket, and is handled (#178)', () => {
+  const { focus, mount } = setup(withHints());
+  mount();
+  sortTo('i2', 'metric');
+  sortTo('i2', 'trace');
+  assert.equal(q('#signals-hint').disabled, true);
+  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q('#signals-hint-text').onkeydown(e);
+  assert.equal(e.defaultPrevented, true);
+  assert.equal(focus.last(), 'bucket:log');
+});

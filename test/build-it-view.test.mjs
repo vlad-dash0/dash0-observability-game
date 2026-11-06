@@ -1049,3 +1049,39 @@ test('setParent stays the one transition: the view never writes a parent itself,
   const st = newBuildState(b1Spec());
   assert.equal(setParent(b1Spec(), st, B, A), 'set');
 });
+
+test('Escape on a shown hint is handled, focuses the hint button and leaves the level open (#178)', () => {
+  const { focus, mount } = setup(withHelps(ALL));
+  mount();
+  click('#b1-hint');
+  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q('#b1-hint-text').onkeydown(e);
+  assert.equal(e.defaultPrevented, true);
+  assert.equal(focus.last(), '#b1-hint');
+  const other = { key: 'a', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q('#b1-hint-text').onkeydown(other);
+  assert.equal(other.defaultPrevented, false, 'only Escape is taken');
+});
+
+test('one Escape on the hint is handled once: a pending pick survives it and focus lands on the hint button (#178)', () => {
+  const { dom, focus, mount } = setup(withHelps({ ...ALL, queue: false }));
+  mount();
+  click(`[data-span="${B}"]`);
+  assert.equal(q(`[data-span="${B}"]`).getAttribute('aria-pressed'), 'true');
+  click('#b1-hint');
+  const ev = new dom.window.Event('keydown', { bubbles: true, cancelable: true });
+  ev.key = 'Escape';
+  q('#b1-hint-text').dispatchEvent(ev);
+  assert.equal(ev.defaultPrevented, true);
+  assert.equal(q(`[data-span="${B}"]`).getAttribute('aria-pressed'), 'true', 'the pick is still pending');
+  assert.notEqual(status(), 'Cancelled.');
+  assert.equal(focus.last(), '#b1-hint');
+});
+
+test('the box still cancels a pick on an Escape nothing else handled, and ignores one already handled', () => {
+  const { mount } = setup(withHelps({ ...ALL, queue: false }));
+  mount();
+  click(`[data-span="${B}"]`);
+  q('[data-build="b1"]').onkeydown({ key: 'Escape', defaultPrevented: true, preventDefault() {} });
+  assert.equal(q(`[data-span="${B}"]`).getAttribute('aria-pressed'), 'true');
+});

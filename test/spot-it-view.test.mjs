@@ -527,3 +527,14 @@ test('after the player\'s own win the hint panel is emptied; after a tier-3 solv
   assert.equal(hintText().startsWith('Hint 3 of 3'), true, hintText());
   assert.match(hintText(), /Picked for you: every line that matches the question, and nothing else\./);
 });
+
+test('Escape on a shown hint is handled, focuses the hint button and leaves the level open (#178)', () => {
+  const { focus, mount } = setup(withHints());
+  mount();
+  pickAll('s1');
+  click('#bomb-hint');
+  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q('#bomb-hint-text').onkeydown(e);
+  assert.equal(e.defaultPrevented, true);
+  assert.equal(focus.last(), '#bomb-hint');
+});
