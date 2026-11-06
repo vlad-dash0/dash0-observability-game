@@ -78,3 +78,27 @@ test('the scanners have teeth: Spec line URLs, hosts and the exemption list', ()
     assert.deepEqual(specUrls(read(`levels/${f}`)), [], `${f} has a Spec URL now: drop it from NO_SPEC_URL_YET`);
   }
 });
+
+// A penalty is not always a star (at 3+ penalties it may cost none), so player copy says
+// "counts as one penalty", never "costs a star". Comment lines are not player copy.
+const COST_A_STAR = /\bcosts? (?:a|one|1) star\b/i;
+const codeLines = (src) => src.split('\n').filter((l) => !/^\s*(\/\/|\/\*|\*)/.test(l));
+const COPY_FILES = [
+  ...readdirSync(join(ROOT, 'lib/widgets')).filter((f) => f.endsWith('.mjs')).map((f) => `lib/widgets/${f}`),
+  ...LEVEL_FILES.map((f) => `levels/${f}`),
+];
+
+test('no player-facing string in lib/widgets or levels says a penalty "costs a star"', () => {
+  assert.ok(COPY_FILES.length > 20, 'the scan found the files');
+  for (const rel of COPY_FILES) {
+    const hit = codeLines(read(rel)).find((l) => COST_A_STAR.test(l));
+    assert.equal(hit, undefined, `${rel}: say "counts as one penalty": ${hit?.trim()}`);
+  }
+});
+
+test('the costs-a-star scanner has teeth: copy lines match, comment lines do not', () => {
+  assert.ok(codeLines("x: 'A wrong pick costs a star.',").some((l) => COST_A_STAR.test(l)));
+  assert.ok(codeLines("'Each cost one star'").some((l) => COST_A_STAR.test(l)));
+  assert.ok(!codeLines('// a wrong pick costs a star').some((l) => COST_A_STAR.test(l)));
+  assert.ok(!codeLines("'costs no star now'").some((l) => COST_A_STAR.test(l)));
+});
