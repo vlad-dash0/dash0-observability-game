@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   answersFrom, buildIncident, buildTraceList, CANDIDATES, FAULT_ALPHABET, FAULT_ATTR, FILTER_KEY, FILTER_OP, GRADE, gradeAnswer,
-  matchTraces, normaliseAnswer, QUESTION, TRACE_LIST_SIZE,
+  matchTraces, normaliseAnswer, QUESTION, START_MAX_AGO_MS, START_MIN_AGO_MS, startAgoMs, TRACE_LIST_SIZE,
 } from '../lib/incident-lab.mjs';
 import { encodeTraces, SPAN_KIND, STATUS_CODE } from '../lib/otlp/encode.mjs';
 import { createTelemetry, PRACTICE_SCOPE } from '../lib/telemetry.mjs';
@@ -252,7 +252,7 @@ test('telemetry.incident() is lazy, seeded by the big-endian uint32 of randomByt
   assert.deepEqual(asked.slice(before), [4]);
   assert.equal(reads, 1);
   assert.equal(inc.seed, 0xdeadbeef);
-  assert.deepEqual(inc, buildIncident(0xdeadbeef, { now: () => NOW }));
+  assert.deepEqual(inc, buildIncident(0xdeadbeef, { now: () => NOW - startAgoMs(0xdeadbeef) }), 'built in the past, by the seed-derived offset');
   assert.equal(tel.incident(), inc);
   tel.disconnect();
   assert.equal(tel.incident(), inc);
@@ -274,7 +274,7 @@ test('telemetry.incident() spans go out through sendBatch', async () => {
   const tel = createTelemetry({ randomBytes, now: clock, setTimeout, clearTimeout });
   const first = tel.incident();
   assert.equal(first.spans.length, 5);
-  assert.equal(first.spans[0].startMs, NOW);
+  assert.equal(first.spans[0].startMs, NOW - startAgoMs(first.seed));
   assert.ok(tel.connect({ mode: 'practice', token: tel.practiceCredential(PRACTICE_SCOPE.ingest), endpoint: `https://${PRACTICE_HOSTS[0]}` }).ok);
   assert.equal((await tel.sendTest()).kind, 'accepted');
   assert.equal((await tel.sendBatch(first.spans)).kind, 'accepted');
@@ -320,7 +320,7 @@ test('buildTraceList: exactly one own trace and distinct sessions, traces, fault
   }
 });
 
-test('buildTraceList: a decoy has its own error span, its slowest span is not the failing one, and the own trace is untouched', () => {
+test('buildTraceList: a decoy has its own error span, events inside their spans, and the own trace is untouched', () => {
   const inc = build(42);
   const before = JSON.stringify(inc.spans);
   const l = buildTraceList(inc, { sessionId: SID });
@@ -328,11 +328,52 @@ test('buildTraceList: a decoy has its own error span, its slowest span is not th
   for (const e of l.filter((x) => !x.own)) {
     const k = answersFrom(e.spans);
     const failing = e.spans.find((s) => s.name === k.operation);
-    assert.ok(kidsOf(e).every((s) => s === failing || dur(s) > 0));
-    assert.ok(kidsOf(e).some((s) => s !== failing && dur(s) > dur(failing)), 'a slower span than the failing one');
     assert.equal(failing.events.filter((ev) => ev.name === 'retry').length, k.retryCount);
     for (const s of kidsOf(e)) assert.ok(s.startMs >= e.spans[0].startMs && s.endMs <= e.spans[0].endMs, 'inside the root');
     for (const ev of failing.events) assert.ok(ev.timeMs >= failing.startMs && ev.timeMs <= failing.endMs, 'events stay in their span');
+  }
+});
+
+// Every trace starts in the past, in one window; a start time is no clue.
+const sweepLists = (n) => Array.from({ length: n }, (_, i) => {
+  const seed = (Math.imul(i + 1, 2654435761) >>> 0);
+  const inc = buildIncident(seed, { now: () => NOW - startAgoMs(seed) }); // as telemetry.incident() builds it
+  const nowMs = NOW;
+  return { nowMs, entries: buildTraceList(inc, { sessionId: SID }) };
+});
+
+test('buildTraceList: every trace starts in the past, inside [now - 8 min, now - 30 s], the player\'s included', () => {
+  for (const { nowMs, entries } of sweepLists(300)) {
+    for (const e of entries) {
+      const ago = nowMs - e.spans[0].startMs;
+      assert.ok(ago >= START_MIN_AGO_MS && ago <= START_MAX_AGO_MS, `started ${ago} ms ago`);
+      assert.ok(e.spans.every((s) => s.endMs < nowMs), 'nothing in the future');
+    }
+  }
+});
+
+test('buildTraceList: no blind rule finds the player\'s trace more than 25% of the time (chance is 1/6)', () => {
+  const N = 1000;
+  const lists = sweepLists(N);
+  const total = (e) => e.spans[0].endMs - e.spans[0].startMs;
+  const failingIsLongest = (e) => {
+    const kids = kidsOf(e);
+    const worst = kids.reduce((a, b) => (dur(b) > dur(a) ? b : a));
+    return worst.status?.code === 'error';
+  };
+  const rules = {
+    shortest: (l) => l.entries.reduce((a, b) => (total(b) < total(a) ? b : a)),
+    longest: (l) => l.entries.reduce((a, b) => (total(b) > total(a) ? b : a)),
+    latest: (l) => l.entries.reduce((a, b) => (b.spans[0].startMs > a.spans[0].startMs ? b : a)),
+    earliest: (l) => l.entries.reduce((a, b) => (b.spans[0].startMs < a.spans[0].startMs ? b : a)),
+    closestToNow: (l) => l.entries.reduce((a, b) => (l.nowMs - b.spans[0].startMs < l.nowMs - a.spans[0].startMs ? b : a)),
+    failingIsLongest: (l) => l.entries.find(failingIsLongest) ?? l.entries[0],
+    firstInList: (l) => l.entries[0],
+    lastInList: (l) => l.entries[l.entries.length - 1],
+  };
+  for (const [name, pick] of Object.entries(rules)) {
+    const hits = lists.filter((l) => pick(l).own).length / N;
+    assert.ok(hits <= 0.25, `${name} finds the player's trace ${(hits * 100).toFixed(1)}% of the time`);
   }
 });
 

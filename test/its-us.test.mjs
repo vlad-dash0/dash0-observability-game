@@ -10,7 +10,8 @@ import { readFileSync } from 'node:fs';
 import { makeDom, q, qa } from './helpers/dom.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
 import { createTelemetry, MODE } from '../lib/telemetry.mjs';
-import { answersFrom, buildTraceList, FAULT_ATTR, FILTER_KEY, FILTER_OP, QUESTION } from '../lib/incident-lab.mjs';
+import { RESOURCE_ATTRIBUTES } from '../lib/otlp/encode.mjs';
+import { answersFrom, buildTraceList, startAgoMs, FAULT_ATTR, FILTER_KEY, FILTER_OP, QUESTION } from '../lib/incident-lab.mjs';
 import { msToUnixNano } from '../lib/otlp/encode.mjs';
 import { PRACTICE_HOSTS } from '../lib/dash0/ingress.mjs';
 import level from '../levels/its-us.mjs';
@@ -462,14 +463,13 @@ test('practice: answers read from a decoy trace are wrong, cost a mistake and do
   assert.notEqual(k.faultCode, key.faultCode);
 });
 
-test('practice: in a decoy the slowest span is not the failing one, so "the longest span" is no rule', () => {
+test('practice: every trace, decoy or not, shows five spans with exactly one in Error', () => {
   const { traces } = explorer();
   for (let i = 0; i < traces.length; i++) {
-    if (traces[i].own) continue;
     press(`#its-open-trace-${i}`);
-    const rows = qa('#its-explorer tbody tr').slice(1).map((tr) => ({ dur: Number(tr.children[3].textContent), err: tr.lastElementChild.textContent === 'Error' }));
-    const slowest = rows.reduce((a, b) => (b.dur > a.dur ? b : a));
-    assert.equal(slowest.err, false, `trace ${i + 1}`);
+    const rows = qa('#its-explorer tbody tr');
+    assert.equal(rows.length, 5, `trace ${i + 1}`);
+    assert.equal(rows.filter((tr) => tr.lastElementChild.textContent === 'Error').length, 1, `trace ${i + 1}`);
     press('#its-back');
   }
 });
@@ -574,6 +574,58 @@ test('connecting to a different Dash0 after a send offers the send screen, namin
   const back = open(tele);
   assert.ok(q('#its-check') && !q('#its-send'), 'now sent to the current host');
   assert.ok(back);
+});
+
+test('sending to H1, then H2, then reconnecting to H1 goes straight to the questions; a third host names both earlier ones', async () => {
+  const HOST3 = 'ingress.ap-south-1.aws.dash0.com';
+  const { tele, sent } = session({ hosts: [HOST, HOST2, HOST3], answers: Array.from({ length: 12 }, () => ok()) });
+  const connectTo = async (host) => {
+    assert.equal(tele.connect({ mode: MODE.live, endpoint: `https://${host}`, token: SECRET, dataset: '' }).ok, true);
+    assert.equal((await tele.sendTest()).kind, 'accepted');
+  };
+  await connectLive(tele); // H1
+  open(tele);
+  press('#its-send');
+  await settle('#its-check');
+  await connectTo(HOST2);
+  open(tele);
+  press('#its-send');
+  await settle('#its-check');
+  await connectTo(HOST);
+  open(tele);
+  assert.ok(q('#its-check') && !q('#its-send'), 'H1 again: it already has the incident');
+  assert.equal(incidentSends(sent).length, 2, 'nothing sent a third time');
+  await connectTo(HOST3);
+  const h = open(tele);
+  assert.ok(q('#its-send'), 'H3 is offered the send');
+  assert.ok(h.text().includes(HOST) && h.text().includes(HOST2), 'and both earlier hosts are named');
+});
+
+test('practice: Finish says "without the filter" when session.id is filtered by "is not" with the player\'s own id', () => {
+  const { h, tele, traces, key } = explorer();
+  applyFilter(FILTER_KEY.sessionId, FILTER_OP.isNot, tele.sessionId); // right key, right value, wrong operator
+  assert.equal(rowCount(), traces.length - 1, 'is not hides the player\'s trace');
+  press('#its-filter-clear');
+  press(`#its-open-trace-${traces.findIndex((t) => t.own)}`);
+  answer(key);
+  press('#its-finish');
+  assert.match(h.finished[0].result.text, /without the filter/);
+});
+
+test('practice: the span detail shows the resource attributes, service.name among them, the same for every trace', () => {
+  const { traces } = explorer();
+  const seen = [];
+  for (const i of [0, 1]) {
+    press(`#its-open-trace-${i}`);
+    openSpan(0);
+    const rows = Object.fromEntries(qa('#its-detail tbody tr').map((tr) => [tr.children[0].textContent, tr.children[1].textContent]));
+    assert.ok(rows['service.name'], 'service.name is shown');
+    assert.equal(rows['service.name'], RESOURCE_ATTRIBUTES['service.name']);
+    assert.equal(rows['session.id'], traces[i].sessionId);
+    seen.push(rows['service.name']);
+    press('#its-back');
+  }
+  assert.equal(seen[0], seen[1]);
 });
 
 // ---- live: send once ----
@@ -764,7 +816,9 @@ test('the incident is built when the boss first needs it, not when the page star
   press('#its-send');
   await settle('#its-check');
   const root = JSON.parse(incidentSends(sent)[0].init.body).resourceSpans[0].scopeSpans[0].spans.find((s) => s.name === 'progress.sync');
-  assert.equal(root.startTimeUnixNano, msToUnixNano(T0 + 5 * 60 * 1000), 'the root starts when the boss opened');
+  const ago = startAgoMs(tele.incident().seed);
+  assert.ok(ago >= 30 * 1000 && ago <= 8 * 60 * 1000);
+  assert.equal(root.startTimeUnixNano, msToUnixNano(T0 + 5 * 60 * 1000 - ago), 'the root starts a little before the moment the boss opened');
 });
 
 test('a retry sends the same timestamps: the times are not rebased', async () => {
