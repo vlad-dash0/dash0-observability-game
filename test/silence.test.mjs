@@ -127,7 +127,8 @@ test('one exporter id runs through the log, the diff and the answer: the pipelin
   assert.equal(log.includes('naming one of the three pipelines (traces, metrics or logs)'), true, 'the log does not claim a fixed pipeline');
   assert.equal(log.includes('same two lines'), false, 'no claim that every restart prints identical lines');
   const right = plain(S.hypotheses.find((h) => h.id === RIGHT).label + S.hypotheses.find((h) => h.id === RIGHT).why);
-  for (const w of ['otlp_grpc/dash0-eu', 'otlp_grpc/dash0', 'pipelines', 'exits at validation']) assert.equal(right.includes(w), true, w);
+  for (const w of ['otlp_grpc/dash0-eu', 'pipelines', 'exits at validation']) assert.equal(right.includes(w), true, w);
+  assert.equal(/otlp_grpc\/dash0(?![\w-])/.test(right), true, 'the old id is named exactly, not only as a prefix of the new one');
 });
 
 test('the rollout is a minute before the silence, only eu-west has it, and the other clusters keep sending', () => {
@@ -453,9 +454,10 @@ test('silence: the closing step grades the wiring rule: a listed id must be defi
   const right = pick.find((c) => c.right);
   assert.equal(right.key, 'listed-must-be-defined');
   const t = plain(right.label + right.why);
-  for (const w of ['service.pipelines', 'otlp_grpc/dash0', 'otlp_grpc/dash0-eu', 'not configured', 'validation']) {
+  for (const w of ['service.pipelines', 'otlp_grpc/dash0-eu', 'not configured', 'validation']) {
     assert.equal(t.includes(w), true, w);
   }
+  assert.equal(/otlp_grpc\/dash0(?![\w-])/.test(t), true, 'the old id is named exactly, not only as a prefix of the new one');
   assert.deepEqual(pick.filter((c) => !c.right).map((c) => c.key).sort(), ['defined-not-listed', 'same-exporter']);
   assert.equal(/defined but not listed|does nothing/.test(plain(pick.find((c) => c.key === 'defined-not-listed').why)), true);
   assert.equal(/type\[\/name\]|different/.test(plain(pick.find((c) => c.key === 'same-exporter').why)), true);

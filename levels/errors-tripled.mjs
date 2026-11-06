@@ -151,7 +151,7 @@ const SCENARIO = {
   hypotheses: [
     {
       id: 'metrics-after-sampling',
-      label: 'The <code>span_metrics</code> connector counts after sampling so it misses most healthy requests',
+      label: 'The <code>span_metrics</code> connector counts after sampling and skews the checkout ratio',
       right: true,
       why:
         `The change at 02:04 put <code>tail_sampling</code> in the pipeline that feeds <code>span_metrics</code>. Its policies keep all ${ERRORS} errors a second and ${KEEP_PCT}% of the other ${n(HEALTHY)}, ` +
@@ -160,7 +160,7 @@ const SCENARIO = {
     },
     {
       id: 'payments-regression',
-      label: 'The payments deploy at 02:20 added errors to checkout requests',
+      label: 'The payments deploy added errors to checkout requests overnight',
       right: false,
       why: `The error count is ${ERRORS} a second before and after, and the deploy was at 02:20, fifteen minutes after the ratio moved.`,
     },
@@ -172,14 +172,14 @@ const SCENARIO = {
     },
     {
       id: 'provider-failing',
-      label: 'The payment provider is failing more requests and checkout retries raise the error ratio',
+      label: 'The payment provider is failing more requests, as its 03:30 to 03:40 incident shows',
       right: false,
       why: `Its incident ended at 03:40 and the ratio did not come down. The error count is ${ERRORS} a second before and after.`,
     },
   ],
   answerAfterViews: 3,
   hint:
-    '<p>A ratio has two parts. Check which of them moved, and compare each against a number measured somewhere else.</p>',
+    '<p>A ratio has two parts. Check which of them moved, and compare the one that moved against a number measured somewhere else.</p>',
 };
 
 // Step 2: why the ratio moved when the count did not. `why` follows "Right." or "Not quite.".

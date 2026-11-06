@@ -175,13 +175,13 @@ const SCENARIO = {
   hypotheses: [
     {
       id: 'exporter-renamed',
-      label: 'The exporter was renamed but the pipelines still list the old id so the Collector cannot start',
+      label: 'The exporter was renamed but the pipelines list the old id so the eu-west cluster cannot start',
       right: true,
       why: 'All three signals stopped in eu-west at 14:02 and nowhere else, the Collector pods there restart and are never ready, and their log says the configuration is invalid: a pipeline references exporter "otlp_grpc/dash0", which is not configured. The diff, merged at 14:01 and applied to eu-west at 14:02, renamed that exporter to otlp_grpc/dash0-eu and left the three pipelines listing the old id. An id a pipeline lists must be defined, so the Collector exits at validation.',
     },
     {
       id: 'memory-limiter',
-      label: 'The memory_limiter processor in eu-west is refusing spans and the senders are not retrying',
+      label: 'The memory_limiter processor in eu-west is refusing spans after a traffic peak',
       right: false,
       why: 'A memory_limiter refuses data while the Collector is running, and the sender is expected to retry. These pods never get that far: they exit at startup, before any pipeline runs, and the diff does not touch memory_limiter. The one refusal burst, in us-east, was at 12:40.',
     },
@@ -239,7 +239,7 @@ export default {
     prefix: 'sil',
     steps: [
       {
-        intro: 'The eu-west cluster has gone quiet: no traces, metrics or logs since 14:02. Find out why the data stopped.',
+        intro: 'The eu-west cluster has gone quiet: no traces, metrics or logs since 14:02. Find out why it went quiet.',
         incident: SCENARIO,
       },
       {

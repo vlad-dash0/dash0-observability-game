@@ -142,7 +142,7 @@ const SCENARIO = {
   ],
   answerAfterViews: 2,
   hint:
-    '<p>Do not guess from the symptom. Follow one failing request from where it was recorded to where it went wrong, then ask what changed upstream of it.</p>',
+    '<p>Do not guess from the symptom. Follow one failing request from where it was recorded to where it went wrong, then ask what changed in what it received.</p>',
 };
 
 // Step 2: what linked the views. `why` follows "Right." or "Not quite.".

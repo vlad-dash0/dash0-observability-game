@@ -79,7 +79,7 @@ const SCENARIO = {
         'OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318\n' +
         'OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=production,service.namespace=comms,service.version=5.2.0</pre>' +
         '<p><code>OTEL_SERVICE_NAME</code> is not set and <code>service.name</code> is not in <code>OTEL_RESOURCE_ATTRIBUTES</code>, ' +
-        'so the SDK sees only the process, <code>node</code>.</p>',
+        'so the only name the SDK can build comes from the process, <code>node</code>.</p>',
     },
     {
       id: 'collector-restart',

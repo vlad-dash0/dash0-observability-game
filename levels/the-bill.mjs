@@ -170,7 +170,7 @@ const SCENARIO = {
   ],
   answerAfterViews: 2,
   hint:
-    '<p>Work from the whole to the part: find which one thing grew, then what is different about it, then what changed in the code that sends it.</p>',
+    '<p>Series are combinations of attribute values: find the one metric whose count jumped and ask which attribute multiplies it.</p>',
 };
 
 // Step 2: the fix. `why` follows "Right." or "Not quite.".
