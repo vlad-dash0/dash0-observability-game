@@ -19,6 +19,9 @@ green: CI runs this same script on every push, comment, review and resolved thre
 posts its verdict on the head commit (pending while the PR is a draft). Hiding a comment
 fires no event, and a failed PR findings run may leave the status out of date: re-run it
 then (Actions, PR findings, Run workflow, the PR number).
+The latest review must be of the PR head commit, or of an earlier commit followed only by
+merge commits (merges of main): otherwise the script prints "no review of head <sha>" and
+exits 1. Full and short shas both match by prefix; an unknown or ambiguous sha exits 2.
 
 1. Findings, one comment per review round. The heading names the reviewed commit:
 

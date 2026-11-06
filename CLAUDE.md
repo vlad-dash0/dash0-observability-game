@@ -61,7 +61,7 @@ package files out (keep its lines to the forms `tools/serve.mjs` parses).
 - Merge gate: `All checks` green and the `PR findings` status green. The status is the
   canonical findings check: `.github/workflows/pr-findings.yml` runs `tools/pr-findings.mjs`
   on every push, comment, review and thread change and posts its verdict on the PR head
-  (pending on a draft); `node tools/pr-findings.mjs <PR>` is the same script locally, for
+  (pending on a draft; the latest review must cover the PR head, see the PR template); `node tools/pr-findings.mjs <PR>` is the same script locally, for
   the details (review comment formats: `.github/pull_request_template.md`). A failed PR
   findings run, or a hidden comment, can leave the status out of date: re-run the workflow
   (Actions, PR findings, Run workflow, the PR number) before merging.
