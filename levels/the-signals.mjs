@@ -125,6 +125,7 @@ export default {
   icon: '\u{1F4E1}',
   rewardTitle: 'Signal reader',
   mechanics: ['sort'],
+  widgets: ['sort', 'choice'],
   cards: ['profiles-signal'],
   lights: [],
   scoring: { parMs: null },

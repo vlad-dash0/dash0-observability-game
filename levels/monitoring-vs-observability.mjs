@@ -93,6 +93,7 @@ export default {
   icon: '\u{1F52D}',
   rewardTitle: 'Question asker',
   mechanics: ['sort'],
+  widgets: ['sort', 'choice'],
   cards: [],
   lights: [],
   scoring: { parMs: null },

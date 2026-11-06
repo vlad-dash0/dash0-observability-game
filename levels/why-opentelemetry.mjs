@@ -90,6 +90,7 @@ export default {
   icon: '\u{1F9E9}',
   rewardTitle: 'Part namer',
   mechanics: ['sort'],
+  widgets: ['sort', 'choice'],
   cards: ['api-vs-sdk'],
   lights: [],
   scoring: { parMs: null },
