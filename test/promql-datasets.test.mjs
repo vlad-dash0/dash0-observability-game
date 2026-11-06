@@ -77,7 +77,7 @@ test('after the deploy /pay errors jump to 25% and p99 to 2.5s while other route
   assert.ok(approx(one(q(0.99), 2100), 0.9), 'before: rank 59.4 in (0.5, 1]: 0.5 + 0.5 * 2.4/3');
   assert.ok(approx(one(q(0.9), 2100), 0.25 + 0.25 * (6 / 9)));
   assert.ok(approx(one(q(0.5), end), 0.5), 'after: rank 30 lands on the 0.5 bound');
-  assert.ok(approx(one(q(0.9), end), 2), 'after: 1 + 1.5 * 6/9');
+  assert.ok(approx(one(q(0.9), end), 1.9), 'after: 1 + 1.5 * 6/10');
   assert.ok(approx(one(q(0.99), end), 2.5), 'after: rank in +Inf, highest finite bound');
 });
 
@@ -93,8 +93,8 @@ test('the request rate survives the checkout restart because rate() handles the 
 test('the last 5 minutes show 3 ok req/s on /pay and the average latency matches the buckets', () => {
   assert.ok(approx(one(`sum(rate(http_server_requests_total{${PAY},status="200"}[5m]))`, end), 3));
   const avg = one(`sum(rate(http_server_request_duration_seconds_sum{${PAY}}[5m])) / sum(rate(http_server_request_duration_seconds_count{${PAY}}[5m]))`, end);
-  // per scrape: 0*.03 + 6*.07 + 12*.17 + 12*.4 + 18*.8 + 9*1.8 + 3*4 = 49.86 over 60
-  assert.ok(approx(avg, 49.86 / 60, 1e-6), String(avg));
+  // per scrape: 0*.03 + 6*.07 + 12*.17 + 12*.4 + 18*.8 + 10*1.8 + 2*4 = 47.66 over 60
+  assert.ok(approx(avg, 47.66 / 60, 1e-6), String(avg));
 });
 
 // ---- checkout-spanmetrics: what a spanmetrics connector in the Collector emits for the same traffic ----
@@ -169,11 +169,11 @@ test('checkout-spanmetrics: histogram count, +Inf bucket and calls agree per spa
     assert.deepEqual(inf.samples, calls.samples, `${span} ${status} +Inf`);
   }
   const p95 = sval(`histogram_quantile(0.95, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{${SERVER}}[5m])))`);
-  // checkout: per scrape [60,46,27,17,18,9,3] of 180, rank 171 in (1000, 2500]: 1000 + 1500 * 3/9; cart: [135,70,25,10] of 240, rank 228 in (100, 250]: 100 + 150 * 23/25
-  assert.ok(approx(p95['service_name="checkout"'], 1500, 1e-6));
+  // checkout: per scrape [60,46,27,17,18,10,2] of 180, rank 171 in (1000, 2500]: 1000 + 1500 * 3/10; cart: [135,70,25,10] of 240, rank 228 in (100, 250]: 100 + 150 * 23/25
+  assert.ok(approx(p95['service_name="checkout"'], 1450, 1e-6));
   assert.ok(approx(p95['service_name="cart"'], 238, 1e-6));
   const unfiltered = sval(`histogram_quantile(0.95, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket[5m])))`);
-  assert.equal(Math.abs(unfiltered['service_name="checkout"'] - 1500) > 1, true, 'the client span moves checkout\'s p95');
+  assert.equal(Math.abs(unfiltered['service_name="checkout"'] - 1450) > 1, true, 'the client span moves checkout\'s p95');
 });
 
 const sone = (q, t = end) => {
@@ -182,11 +182,11 @@ const sone = (q, t = end) => {
   return v[0];
 };
 
-test('checkout-spanmetrics: failing requests are the slowest ones: /pay errors after the deploy land 3, 9 and 3 per scrape in (500,1000], (1000,2500] and +Inf', () => {
+test('checkout-spanmetrics: failing requests are the slowest ones: /pay errors after the deploy land 3, 10 and 2 per scrape in (500,1000], (1000,2500] and +Inf', () => {
   const failed = (le) => sone(`sum(rate(traces_span_metrics_duration_milliseconds_bucket{span_name="POST /pay", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR", le="${le}"}[5m]))`, end);
   assert.ok(approx(failed('500'), 0), 'none under 500ms');
   assert.ok(approx(failed('1000'), 3 / 15));
-  assert.ok(approx(failed('2500'), 12 / 15));
+  assert.ok(approx(failed('2500'), 13 / 15));
   assert.ok(approx(failed('+Inf'), 15 / 15));
   const ok = (le) => sone(`sum(rate(traces_span_metrics_duration_milliseconds_bucket{span_name="POST /pay", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_UNSET", le="${le}"}[5m]))`, end);
   assert.ok(approx(ok('+Inf'), 45 / 15), 'the other 45 of 60 per scrape succeeded');

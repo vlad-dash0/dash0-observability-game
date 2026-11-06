@@ -359,7 +359,7 @@ test('histograms: the average is a rate of _sum over a rate of _count, and the i
   const spec = queryOf('histograms', 'hist-avg');
   const [[labels, mean]] = valueOf(spec);
   assert.deepEqual(labels, {});
-  assert.equal(Math.abs(mean - 0.831) < 1e-6, true, `mean ${mean}`);
+  assert.equal(Math.abs(mean - 0.7943333333) < 1e-6, true, `mean ${mean}`);
   const B = 'http_server_request_duration_seconds';
   const alt = `sum(increase(${B}_sum{route="/pay"}[5m])) / sum(increase(${B}_count{route="/pay"}[5m]))`;
   assert.equal(grade(spec, alt).ok, true, 'increase over increase is the same mean');
@@ -384,12 +384,23 @@ test('histograms: the p99 reads exactly the top finite bucket bound, three times
   const bounds = LE_TEXT('http_server_request_duration_seconds_bucket');
   const finite = bounds.filter((b) => b !== '+Inf').map(Number);
   assert.equal(p99, Math.max(...finite), 'a quantile inside +Inf answers the second highest bound');
-  assert.equal(p99 / avg > 2.9 && p99 / avg < 3.1, true, `p99 ${p99} over mean ${avg}`);
+  assert.equal(p99 / avg > 2.9 && p99 / avg < 3.2, true, `p99 ${p99} over mean ${avg}`);
   // the buckets step names these boundaries; they must be the dataset's
   const intro = plain(LIVE.levels.histograms.play.steps[3].intro);
   assert.equal(intro.includes(`${finite.slice(0, -1).join(', ')} and ${finite.at(-1)} seconds, then +Inf`), true, intro);
   assert.equal(plain(LIVE.levels.histograms.play.steps[3].question).includes(String(p99)), true);
-  assert.equal(plain(queryOf('histograms', 'hist-avg').explain).includes('0.83'), true);
+  assert.equal(plain(queryOf('histograms', 'hist-avg').explain).includes('0.79'), true);
+});
+
+test('histograms: every query step rejects its no-rate variant, because the totals since the restart are not the last 5 minutes', () => {
+  for (const id of ['hist-avg', 'hist-p99', 'hist-p95']) {
+    const spec = queryOf('histograms', id);
+    const noRate = spec.reference.replace(/rate\(([^[]*)\[5m\]\)/g, '$1');
+    assert.equal(noRate.includes('rate('), false, `${id}: variant built by stripping rate: ${noRate}`);
+    assert.notEqual(noRate, spec.reference, id);
+    assert.equal(grade(spec, noRate).reason, 'wrong-values', id);
+    assert.equal(grade(spec, spec.reference).ok, true, id);
+  }
 });
 
 test('histograms: the buckets step grades the nuance: a p99 on the top bound is a floor, and the average is not the number to trust', () => {
@@ -429,7 +440,7 @@ test('histograms: the Dash0 tie-in is a per-service p95 with histogram_quantile,
   const spec = queryOf('histograms', 'hist-p95');
   const rows = valueOf(spec);
   assert.deepEqual(rows.map(([l]) => l), [{ service: 'cart' }, { service: 'checkout' }]);
-  assert.equal(Math.abs(rows[1][1] - 1.5) < 1e-6 && Math.abs(rows[0][1] - 0.238) < 1e-6, true, JSON.stringify(rows));
+  assert.equal(Math.abs(rows[1][1] - 1.45) < 1e-6 && Math.abs(rows[0][1] - 0.238) < 1e-6, true, JSON.stringify(rows));
   const B = 'http_server_request_duration_seconds_bucket';
   assert.equal(grade(spec, `histogram_quantile(0.95, sum(rate(${B}[5m])) by (service, le))`).ok, true);
   assert.equal(grade(spec, `histogram_quantile(0.95, sum by (le) (rate(${B}[5m])))`).reason, 'wrong-count', 'no service: one series, not two');
@@ -751,13 +762,13 @@ test('red-and-use: the error ratio is 1 in 12 and 1 in 240; a success is UNSET, 
   assert.equal(grade(spec, `${E}{status_code="STATUS_CODE_ERROR"}[5m])) / ${E}[5m]))`).reason, 'wrong-values', 'CLIENT spans included');
 });
 
-test('red-and-use: the p95 is 1,500 and 238 milliseconds, the p95 of 3.3 from spans, and the span kind and quantile are graded', () => {
+test('red-and-use: the p95 is 1,450 and 238 milliseconds, the p95 of 3.3 from spans, and the span kind and quantile are graded', () => {
   const spec = ruQuery('ru-duration');
   const v = byService(spec);
-  assert.equal(near(v.checkout, 1500) && near(v.cart, 238), true, JSON.stringify(v));
+  assert.equal(near(v.checkout, 1450) && near(v.cart, 238), true, JSON.stringify(v));
   const h3 = valueOf(queryOf('histograms', 'hist-p95'));
   const seconds = Object.fromEntries(h3.map(([l, x]) => [l.service, x]));
-  assert.equal(near(seconds.checkout * 1000, v.checkout), true, '3.3 found 1.5 seconds for checkout');
+  assert.equal(near(seconds.checkout * 1000, v.checkout), true, '3.3 found 1.45 seconds for checkout');
   assert.equal(Math.abs(seconds.cart * 1000 - v.cart) < 1, true, '3.3 found about 0.24 seconds for cart');
   const B = `rate(${DURATION}{${SERVER_KIND}}[5m])`;
   assert.equal(grade(spec, `histogram_quantile(0.95, sum by (service_name, le) (rate(${DURATION}{span_kind=~"SPAN_KIND_SERVER"}[10m])))`).ok, true, 'a steady rate over 10m');

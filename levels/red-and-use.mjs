@@ -193,7 +193,7 @@ export default {
           helps: { hints: true },
           hint: 'The percentile recipe from 3.3, on the duration histogram, for the requests a service serves.',
           explain:
-            'Checkout is at 1,500 milliseconds and cart at 238: the p95 of 3.3 again, now in milliseconds and built from spans.',
+            'Checkout is at 1,450 milliseconds and cart at 238: the p95 of 3.3 again, now in milliseconds and built from spans.',
         },
       },
       {

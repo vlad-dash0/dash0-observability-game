@@ -42,7 +42,7 @@ const BUCKETS = [
   },
   {
     key: 'trust-average',
-    label: 'Nothing: the 0.83 second average is the number to trust',
+    label: 'Nothing: the 0.79 second average is the number to trust',
     why: 'The average is the one that hid the problem. A mean is a sum divided by a count, so a few very slow requests are diluted by every fast one.',
   },
 ];
@@ -86,7 +86,7 @@ export default {
           helps: { hints: true },
           hint: 'A mean is a total over a count, and the histogram keeps both as counters that only grow.',
           explain:
-            'About 0.83 seconds: a rate of the sum divided by a rate of the count is the mean of the last 5 minutes. ' +
+            'About 0.79 seconds: a rate of the sum divided by a rate of the count is the mean of the last 5 minutes. ' +
             'It looks tolerable, and an average cannot show you how slow the slowest requests are.',
         },
       },
@@ -133,7 +133,7 @@ export default {
           helps: { hints: true },
           hint: 'Reuse the recipe from the previous query, not its filter: change the percentile, and keep one line per thing the panel compares.',
           explain:
-            'One series per service: checkout is at 1.5 seconds and cart at 0.24. ' +
+            'One series per service: checkout is at 1.45 seconds and cart at 0.24. ' +
             'Dash0 speaks PromQL, so <code>histogram_quantile</code> over the rate of the <code>_bucket</code> series is the query you would write against Prometheus.',
         },
       },
