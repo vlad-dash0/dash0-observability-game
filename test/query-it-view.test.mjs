@@ -160,7 +160,11 @@ test('a wrong query shows its own result as a table', () => {
 test('the same wrong query again, whitespace aside, is free; a different wrong one costs again', () => {
   const { counts, mount } = setup();
   mount();
-  askAll('sum by (route) (rate(http_server_requests_total[5m]))', '  sum   by (route)\n(rate(http_server_requests_total[5m]))\n');
+  ask('  sum   by (route)\n(rate(http_server_requests_total[5m]))\n');
+  const firstRows = rows();
+  assert.ok(firstRows.length > 0);
+  ask('sum by (route) (rate(http_server_requests_total[5m]))');
+  assert.deepEqual(rows(), firstRows);
   assert.equal(feedback(), 'You already ran this query. Nothing new was counted.');
   assert.equal(counts.mistakes, 1);
   ask('sum(increase(http_server_requests_total[5m]))');
