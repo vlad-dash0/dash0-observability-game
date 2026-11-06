@@ -1451,3 +1451,57 @@ test('every star display shows five: filled then empty, for each value 0 to 5 an
   assert.equal(game.rewardStarsText(), '');
   assert.equal(game.rewardStarsLabel(), 'Not scored');
 });
+
+// ---- focusSoon waits for its target to be shown (#199) ---------------------------
+
+/** A game over a fake document whose one element is hidden for `hiddenFrames` frames; frames run by hand. */
+function focusRig(hiddenFrames) {
+  const rig = { focuses: 0, frames: 0, queue: [], at: 0 };
+  const el = {
+    getClientRects: () => (rig.frames >= hiddenFrames ? [{}] : []),
+    focus: () => { rig.focuses++; },
+  };
+  rig.game = createGame({
+    registry: REG,
+    storage: () => fakeStorage({}),
+    document: { querySelector: () => el },
+    raf: (fn) => rig.queue.push(fn),
+  });
+  rig.frame = () => {
+    rig.frames++;
+    const run = rig.queue.splice(0);
+    for (const fn of run) fn();
+  };
+  return rig;
+}
+
+test('focusSoon: a target hidden for 2 frames is focused once, after it is shown', () => {
+  const rig = focusRig(2);
+  rig.game.focusSoon('#x');
+  assert.equal(rig.focuses, 0, 'hidden: nothing focused yet');
+  rig.frame();
+  assert.equal(rig.focuses, 0, 'still hidden after one frame');
+  rig.frame();
+  assert.equal(rig.focuses, 1, 'focused once rendered');
+  rig.frame();
+  rig.frame();
+  assert.equal(rig.focuses, 1, 'and only once');
+});
+
+test('focusSoon: a target that never renders is given up on silently after the bound', () => {
+  const rig = focusRig(Infinity);
+  assert.doesNotThrow(() => {
+    rig.game.focusSoon('#x');
+    for (let i = 0; i < 30; i++) rig.frame();
+  });
+  assert.equal(rig.focuses, 0);
+  assert.equal(rig.queue.length, 0, 'no frame left scheduled');
+  assert.equal(rig.frames, 30);
+});
+
+test('focusSoon: a target that is already shown is focused at once, with no frame wait', () => {
+  const rig = focusRig(0);
+  rig.game.focusSoon('#x');
+  assert.equal(rig.focuses, 1);
+  assert.equal(rig.queue.length, 0);
+});
