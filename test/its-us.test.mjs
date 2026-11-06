@@ -10,13 +10,14 @@ import { readFileSync } from 'node:fs';
 import { makeDom, q, qa } from './helpers/dom.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
 import { createTelemetry, MODE } from '../lib/telemetry.mjs';
-import { answersFrom, FAULT_ATTR, QUESTION } from '../lib/incident-lab.mjs';
+import { answersFrom, buildTraceList, FAULT_ATTR, FILTER_KEY, FILTER_OP, QUESTION } from '../lib/incident-lab.mjs';
 import { msToUnixNano } from '../lib/otlp/encode.mjs';
 import { PRACTICE_HOSTS } from '../lib/dash0/ingress.mjs';
 import level from '../levels/its-us.mjs';
 
 const HOST = 'ingress.eu-west-1.aws.dash0.com';
 const ENDPOINT = `https://${HOST}`;
+const HOST2 = 'ingress.us-west-2.aws.dash0.com';
 const SECRET = 'auth_LIVESECRETvalue0123456789';
 const T0 = 1_800_000_000_000;
 
@@ -29,7 +30,7 @@ const ok = () => ({ status: 200, ok: true, text: async () => '{}' });
 const reply = (status, body = '{}') => ({ status, ok: status < 300, text: async () => body });
 
 /** A telemetry session with a fake clock; `answers` are consumed one per request (a function throws/decides). */
-function session({ answers = [ok()], live = true, seed = 9, reportError = () => {}, timers = { setTimeout, clearTimeout } } = {}) {
+function session({ answers = [ok()], live = true, hosts = live ? [HOST] : [], seed = 9, reportError = () => {}, timers = { setTimeout, clearTimeout } } = {}) {
   const sent = [];
   const queue = [...answers];
   const clock = { t: T0 };
@@ -40,7 +41,7 @@ function session({ answers = [ok()], live = true, seed = 9, reportError = () => 
   };
   const tele = createTelemetry({
     fetch,
-    hosts: live ? [HOST] : [],
+    hosts,
     randomBytes: (n) => new Uint8Array(n).fill(seed),
     now: () => clock.t,
     ...timers,
@@ -113,11 +114,34 @@ function answer(key, over = {}) {
 const failingIndex = (inc) => inc.spans.findIndex((s) => s.status?.code === 'error');
 const openSpan = (i) => press(`#its-open-${i}`);
 
-function practiceView() {
-  const { tele, sent } = session({ live: false });
+/** Pick a radio of the filter form by its value (a browser unchecks the others of the group). */
+function pick(name, value) {
+  const radios = qa(`input[name="${name}"]`);
+  assert.ok(radios.some((r) => r.value === value), `no ${name} ${value}`);
+  for (const r of radios) r.checked = r.value === value;
+}
+function applyFilter(key, op, value) {
+  pick('its-fkey', key);
+  pick('its-fop', op);
+  fill('#its-fvalue', value);
+  press('#its-filter-apply');
+}
+const rowCount = () => qa('#its-explorer tbody tr').length;
+
+/** The practice Trace Explorer, unfiltered. */
+function explorer(over = {}) {
+  const { tele, sent } = session({ live: false, ...over });
   const h = open(tele);
   press('#its-practice');
-  return { tele, sent, h, inc: tele.incident(), key: answersFrom(tele.incident().spans) };
+  return { tele, sent, h, inc: tele.incident(), key: answersFrom(tele.incident().spans), traces: buildTraceList(tele.incident(), { sessionId: tele.sessionId }) };
+}
+
+/** Filter by the player's session id and open the one trace that matches: the player's own. */
+function practiceView(over) {
+  const x = explorer(over);
+  applyFilter(FILTER_KEY.sessionId, FILTER_OP.is, x.tele.sessionId);
+  press('#its-open-trace-0');
+  return x;
 }
 
 // ---- not connected ----
@@ -139,6 +163,8 @@ test('without a telemetry session the boss says so and offers no Finish', () => 
   open(null);
   assert.ok(qa('[data-finish]').every((b) => b.disabled));
   assert.equal(qa('button:not([disabled])').length, 0);
+  assert.ok(!q('#its-none'), 'no dead Close button');
+  assert.match(q('.ui-note').textContent, /^Use Back to return to the map\.$/);
 });
 
 test('a session connected after 9.3 with live open goes to the send screen, not to practice', async () => {
@@ -154,7 +180,7 @@ test('a session connected to the practice Dash0 goes straight to the simulated t
   assert.equal(tele.connect({ mode: MODE.practice, endpoint: `https://${PRACTICE_HOSTS[0]}`, token: tele.practiceCredential('ingest'), dataset: '' }).ok, true);
   assert.equal((await tele.sendTest()).kind, 'accepted');
   open(tele);
-  assert.ok(q('#its-detail'), 'the trace view');
+  assert.ok(q('#its-explorer') && q('#its-filter-apply'), 'the simulated Trace Explorer');
   assert.ok(!q('#its-send'));
   assert.equal(sent.length, 0);
 });
@@ -166,8 +192,8 @@ test('practice: the trace view lists every span of the shared incident and label
   const t = h.text();
   assert.ok(t.includes('Simulated'), 'labelled');
   for (const s of inc.spans) assert.ok(t.includes(s.name), s.name);
-  assert.ok(t.includes(inc.traceId), 'the trace id is in the view header, as in Dash0');
-  assert.ok(t.includes(inc.spans.length > 0 ? 'session.id' : ''), 'the filter that finds it');
+  assert.ok(t.includes(inc.traceId), 'the trace id is in the opened trace view, as in Dash0');
+  assert.equal(q('#its-trace').textContent, inc.traceId);
   assert.equal(qa('[data-finish]').filter((b) => !b.disabled).length, 0, 'no Finish before the answers');
 });
 
@@ -249,6 +275,33 @@ test('a well-formed wrong answer is a mistake, once per distinct wrong value', (
   assert.ok(key);
 });
 
+test('the same wrong retry count in another spelling is charged once: "02" is "2"', () => {
+  const { key, h } = practiceView();
+  const wrong = key.retryCount === 3 ? '4' : '3';
+  fill(field(QUESTION.retryCount), wrong);
+  press('#its-check');
+  fill(field(QUESTION.retryCount), `0${wrong}`);
+  press('#its-check');
+  fill(field(QUESTION.retryCount), ` ${wrong} `);
+  press('#its-check');
+  assert.equal(h.mistakes(), 1);
+});
+
+test('the operation is graded without regard to case, so pasting it in any case passes', () => {
+  const { key, h } = practiceView();
+  fill(field(QUESTION.operation), ` ${key.operation.toUpperCase()} `);
+  press('#its-check');
+  assert.equal(h.mistakes(), 0);
+  assert.ok(q(field(QUESTION.operation)).disabled, 'passed and locked');
+});
+
+test('the span table holds the bare span name, so copying it from the table passes', () => {
+  const { inc } = practiceView();
+  const cells = qa('#its-explorer tbody tr').map((tr) => tr.firstElementChild.textContent);
+  assert.deepEqual(cells, inc.spans.map((s) => s.name), 'no tree glyph in the copyable text');
+  assert.ok(!q('#its-explorer').textContent.includes('\u2514'));
+});
+
 test('a malformed or empty answer is a free nudge', () => {
   const { h } = practiceView();
   press('#its-check'); // everything empty
@@ -267,11 +320,21 @@ test('a wrong answer never carries the right one in its feedback', () => {
   assert.ok(!q(`${field(QUESTION.operation)}-feedback`).textContent.includes(key.operation));
 });
 
-test('a passed answer is locked and a later change cannot cost anything', () => {
+test('a passed answer is locked, and a later change to it costs nothing and unlocks nothing', () => {
   const { key, h } = practiceView();
-  answer(key);
-  assert.ok(q(field(QUESTION.faultCode)).disabled || q(field(QUESTION.faultCode)).hasAttribute('readonly'));
-  assert.equal(h.mistakes(), 0);
+  answer(key, { retryCount: key.retryCount === 2 ? 3 : 2 }); // three pass, retry count fails: one mistake
+  assert.equal(h.mistakes(), 1);
+  const code = q(field(QUESTION.faultCode));
+  assert.ok(code.disabled, 'a passed field is locked');
+  code.disabled = false; // as a browser or a dev tools edit could
+  code.value = 'ZZZZZZ';
+  press('#its-check');
+  assert.equal(h.mistakes(), 1, 'a wrong value typed over a passed answer is not charged');
+  assert.ok(q('#its-finish').disabled, 'and the finish is still locked by the unfixed answer');
+  fill(field(QUESTION.retryCount), String(key.retryCount));
+  press('#its-check');
+  assert.ok(!q('#its-finish').disabled, 'the passed code still counts as passed');
+  assert.equal(h.mistakes(), 1);
 });
 
 test('the fault code is checked without regard to case or spaces', () => {
@@ -279,6 +342,238 @@ test('the fault code is checked without regard to case or spaces', () => {
   answer(key, { faultCode: `  ${key.faultCode.toLowerCase()} ` });
   assert.equal(h.mistakes(), 0);
   assert.ok(!q('#its-finish').disabled);
+});
+
+
+// ---- practice: a real search across sessions ----
+
+test('practice: the Trace Explorer lists six traces with their root operation, start, duration and span count', () => {
+  const { h, tele, traces } = explorer();
+  assert.equal(traces.length, 6);
+  assert.equal(rowCount(), 6);
+  const head = qa('#its-explorer thead th').map((c) => c.textContent);
+  for (const col of ['Root operation', 'Start (UTC)', 'Duration (ms)', 'Spans']) assert.ok(head.includes(col), col);
+  const first = qa('#its-explorer tbody tr')[0].children;
+  assert.equal(first[1].textContent, 'progress.sync');
+  assert.equal(Number(first[3].textContent), traces[0].spans[0].endMs - traces[0].spans[0].startMs, 'the list is the shuffled list');
+  assert.equal(first[4].textContent, String(traces[0].spans.length));
+  assert.ok(h.text().includes('Simulated'));
+  assert.ok(h.text().includes('Your session id'));
+  assert.equal(q('#its-session').textContent, tele.sessionId);
+});
+
+test('practice: no trace id and no fault code is on the list, and nothing marks which trace is the player\'s', () => {
+  const { h, traces } = explorer();
+  for (const t of traces) {
+    assert.ok(!h.page().includes(t.traceId), 'no trace id in the list');
+    assert.ok(!h.page().includes(answersFrom(t.spans).faultCode), 'no fault code in the list');
+    assert.ok(!h.page().includes(t.sessionId) || t.own, 'a decoy session id is not shown');
+  }
+  assert.ok(!q('#its-trace'), 'the trace id appears only inside an opened trace');
+  assert.doesNotMatch(h.page(), /data-own|data-mine|aria-current/i);
+});
+
+test('practice: the player\'s trace is not always where a lazy reader looks', () => {
+  const places = new Set();
+  const ranks = new Set();
+  for (let seed = 1; seed <= 24; seed++) {
+    const { traces } = explorer({ seed });
+    places.add(traces.findIndex((t) => t.own));
+    ranks.add([...traces].sort((a, b) => a.spans[0].startMs - b.spans[0].startMs).findIndex((t) => t.own));
+  }
+  assert.ok(places.size >= 4, `list positions ${[...places]}`);
+  assert.ok(ranks.size >= 4, `start-time ranks ${[...ranks]}`);
+});
+
+test('practice: filtering session.id is your session id narrows the list to your trace, and opening it gives right answers', () => {
+  const { h, tele, inc, key } = explorer();
+  applyFilter(FILTER_KEY.sessionId, FILTER_OP.is, tele.sessionId);
+  assert.equal(rowCount(), 1);
+  assert.match(q('#its-results').textContent, /1 trace matches: session\.id is /);
+  press('#its-open-trace-0');
+  assert.equal(q('#its-trace').textContent, inc.traceId);
+  openSpan(failingIndex(inc));
+  answer(key);
+  assert.equal(h.mistakes(), 0);
+  assert.ok(!q('#its-finish').disabled);
+  press('#its-finish');
+  assert.match(h.finished[0].result.text, /filtered a simulated Dash0 Trace Explorer by your session id/);
+  assert.equal(h.finished[0].result.stars, 5);
+});
+
+test('practice: a wrong filter value shows "No traces match", costs nothing, and Clear filter brings the list back', () => {
+  const { h, tele } = explorer();
+  applyFilter(FILTER_KEY.sessionId, FILTER_OP.is, `${tele.sessionId}0`);
+  assert.equal(rowCount(), 0);
+  assert.match(q('#its-results').textContent, /^No traces match/);
+  assert.equal(h.mistakes(), 0);
+  assert.ok(q('#its-fvalue').value.endsWith('0'), 'the typed value is kept');
+  press('#its-filter-clear');
+  assert.equal(rowCount(), 6);
+  assert.equal(h.mistakes(), 0);
+});
+
+test('practice: an empty filter value is a free nudge and the list is unchanged', () => {
+  const { h } = explorer();
+  applyFilter(FILTER_KEY.sessionId, FILTER_OP.is, '   ');
+  assert.equal(rowCount(), 6);
+  assert.match(q('#its-filter-feedback').textContent, /Type a value/);
+  assert.equal(h.mistakes(), 0);
+});
+
+test('practice: the operator matters: session.id is not your id keeps the other five; service.name is oncall-game keeps all six', () => {
+  const { tele } = explorer();
+  applyFilter(FILTER_KEY.sessionId, FILTER_OP.isNot, tele.sessionId);
+  assert.equal(rowCount(), 5);
+  applyFilter(FILTER_KEY.serviceName, FILTER_OP.is, 'oncall-game');
+  assert.equal(rowCount(), 6);
+});
+
+test('practice: opening traces without the filter is allowed, and every trace gives different answers', () => {
+  const { tele, inc, key } = explorer();
+  const seen = [];
+  for (let i = 0; i < 6; i++) {
+    press(`#its-open-trace-${i}`);
+    const rows = qa('#its-explorer tbody tr');
+    const bad = rows.findIndex((tr) => tr.lastElementChild.textContent === 'Error');
+    assert.ok(bad >= 0, 'every trace has a span in error');
+    openSpan(bad);
+    const attr = (name) => qa('#its-detail tr').find((tr) => tr.firstElementChild?.textContent === name)?.children[1].textContent;
+    seen.push({ id: q('#its-trace').textContent, code: attr(FAULT_ATTR), session: attr('session.id'), op: q('#its-detail-title').textContent });
+    press('#its-back');
+  }
+  assert.equal(new Set(seen.map((x) => x.id)).size, 6, 'six trace ids');
+  assert.equal(new Set(seen.map((x) => x.code)).size, 6, 'six fault codes');
+  assert.equal(new Set(seen.map((x) => x.session)).size, 6, 'six sessions');
+  assert.equal(seen.filter((x) => x.id === inc.traceId).length, 1);
+  assert.equal(seen.find((x) => x.id === inc.traceId).code, key.faultCode);
+  assert.equal(seen.find((x) => x.id === inc.traceId).session, tele.sessionId, 'only your trace carries your session id');
+});
+
+test('practice: answers read from a decoy trace are wrong, cost a mistake and do not unlock Finish', () => {
+  const { h, traces, key } = explorer();
+  const decoy = traces.findIndex((t) => !t.own);
+  press(`#its-open-trace-${decoy}`);
+  const k = answersFrom(traces[decoy].spans);
+  assert.equal(q('#its-trace').textContent, traces[decoy].traceId);
+  answer(k);
+  assert.ok(h.mistakes() >= 2, 'a wrong code and a wrong trace id at least');
+  assert.ok(q('#its-finish').disabled);
+  assert.notEqual(k.faultCode, key.faultCode);
+});
+
+test('practice: in a decoy the slowest span is not the failing one, so "the longest span" is no rule', () => {
+  const { traces } = explorer();
+  for (let i = 0; i < traces.length; i++) {
+    if (traces[i].own) continue;
+    press(`#its-open-trace-${i}`);
+    const rows = qa('#its-explorer tbody tr').slice(1).map((tr) => ({ dur: Number(tr.children[3].textContent), err: tr.lastElementChild.textContent === 'Error' }));
+    const slowest = rows.reduce((a, b) => (b.dur > a.dur ? b : a));
+    assert.equal(slowest.err, false, `trace ${i + 1}`);
+    press('#its-back');
+  }
+});
+
+test('practice: the Back button returns to the list and the trace id leaves the page', () => {
+  const { h, inc } = explorer();
+  press('#its-open-trace-0');
+  assert.ok(q('#its-trace'));
+  press('#its-back');
+  assert.ok(!q('#its-trace'));
+  assert.ok(!h.page().includes(inc.traceId));
+  assert.equal(rowCount(), 6);
+});
+
+test('practice: Finish text says what the player did when the filter was not used', () => {
+  const { h, traces, key } = explorer();
+  applyFilter(FILTER_KEY.serviceName, FILTER_OP.is, 'oncall-game'); // a filter, but not by the session id
+  applyFilter(FILTER_KEY.sessionId, FILTER_OP.isNot, 'nope'); // right key, wrong operator and value
+  press(`#its-open-trace-${traces.findIndex((t) => t.own)}`);
+  answer(key);
+  press('#its-finish');
+  assert.match(h.finished[0].result.text, /without the filter/);
+  assert.doesNotMatch(h.finished[0].result.text, /^You filtered/);
+});
+
+test('practice: a typed filter survives opening a trace and going back', () => {
+  const { tele } = explorer();
+  applyFilter(FILTER_KEY.sessionId, FILTER_OP.is, tele.sessionId);
+  press('#its-open-trace-0');
+  press('#its-back');
+  assert.equal(rowCount(), 1);
+  assert.equal(q('#its-fvalue').value, tele.sessionId);
+});
+
+// ---- the send screen ----
+
+test('after a refused token the send button is disabled, not just the retry absent', async () => {
+  for (const status of [401, 403]) {
+    const { tele, sent } = session({ answers: [ok(), reply(status)] });
+    await connectLive(tele);
+    open(tele);
+    press('#its-send');
+    await settle('#its-feedback[data-outcome]');
+    assert.ok(q('#its-send').disabled, `send is disabled after a ${status}`);
+    assert.throws(() => press('#its-send'), /disabled/);
+    assert.equal(incidentSends(sent).length, 1);
+    assert.ok(q('#its-switch') && !q('#its-switch').disabled);
+  }
+});
+
+test('after any other failure the send button is disabled too and the retry is the way on', async () => {
+  const { tele } = session({ answers: [ok(), reply(500)] });
+  await connectLive(tele);
+  open(tele);
+  press('#its-send');
+  await settle('#its-feedback[data-outcome]');
+  assert.ok(q('#its-send').disabled);
+  assert.ok(q('#its-retry') && !q('#its-retry').disabled);
+});
+
+test('a first visit says the incident has not been sent yet; reopening after a send that was cut off does not', async () => {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const { tele, sent } = session({ answers: [ok(), async () => { await gate; return ok(); }] });
+  await connectLive(tele);
+  const first = open(tele);
+  assert.match(first.text(), /has not been sent yet/);
+  assert.ok(!q('#its-duplicate'));
+  press('#its-send');
+  first.abort.abort(); // the level closes with the request out; Dash0 takes it
+  release();
+  await turn();
+  await turn();
+  assert.equal(incidentSends(sent).length, 1);
+  const again = open(tele);
+  assert.ok(q('#its-send'), 'the send screen again');
+  assert.doesNotMatch(again.text(), /not been sent yet/);
+  assert.match(q('#its-duplicate').textContent, /list each span of the trace twice, with the same ids; read one copy/);
+});
+
+test('connecting to a different Dash0 after a send offers the send screen, naming the first host', async () => {
+  const { tele, sent } = session({ hosts: [HOST, HOST2], answers: [ok(), ok(), ok(), ok()] });
+  await connectLive(tele);
+  open(tele);
+  press('#its-send');
+  await settle('#its-check');
+  assert.equal(incidentSends(sent).length, 1);
+  const same = open(tele);
+  assert.ok(q('#its-check') && !q('#its-send'), 'the same Dash0: straight to the questions');
+  assert.ok(same);
+  assert.equal(tele.connect({ mode: MODE.live, endpoint: `https://${HOST2}`, token: SECRET, dataset: '' }).ok, true);
+  assert.equal((await tele.sendTest()).kind, 'accepted');
+  const h = open(tele);
+  assert.ok(q('#its-send'), 'a different host is offered the send');
+  assert.ok(h.text().includes(HOST), 'it says where it went before');
+  assert.ok(h.text().includes(HOST2), 'and where it would go now');
+  press('#its-send');
+  await settle('#its-check');
+  const urls = incidentSends(sent).map((x) => x.url);
+  assert.equal(urls.length, 2);
+  assert.ok(urls[0].includes(HOST) && urls[1].includes(HOST2));
+  const back = open(tele);
+  assert.ok(q('#its-check') && !q('#its-send'), 'now sent to the current host');
+  assert.ok(back);
 });
 
 // ---- live: send once ----
@@ -319,6 +614,8 @@ test('live: Dash0 instructions name the filter and where to read the span, witho
   const t = h.text();
   assert.ok(t.includes('session.id'));
   assert.ok(t.includes('Trace Explorer'));
+  assert.ok(t.includes('Time Picker') && t.includes('Visualize the full trace'), 'the names Dash0 uses');
+  assert.doesNotMatch(t, /Related Logs|time picker/, 'a tab the docs do not name, and the old spelling');
 });
 
 test('live: the result names Dash0, not the simulation', async () => {
@@ -376,7 +673,7 @@ test('unreachable: plain words, no mistake, retry resends the same span ids, and
   assert.equal(q('#its-feedback').getAttribute('data-outcome'), 'unreachable');
   assert.equal(h.mistakes(), 0);
   assert.ok(q('#its-retry') && q('#its-switch'), 'retry and practice are both offered');
-  assert.match(q('#its-feedback').textContent, /may show the trace twice/, 'a retry can duplicate');
+  assert.match(q('#its-feedback').textContent, /list each span of the trace twice, with the same ids; read one copy/, 'a retry can duplicate');
   assert.ok(qa('[data-finish]').every((b) => b.disabled));
   press('#its-retry');
   await settle('#its-check');
@@ -394,6 +691,9 @@ test('unreachable then practice: the simulated view shows the very incident that
   await settle('#its-switch');
   press('#its-switch');
   const inc = tele.incident();
+  applyFilter(FILTER_KEY.sessionId, FILTER_OP.is, tele.sessionId);
+  press('#its-open-trace-0');
+  assert.equal(q('#its-trace').textContent, inc.traceId, 'the trace that was sent');
   openSpan(failingIndex(inc));
   assert.ok(q('#its-detail').textContent.includes(answersFrom(inc.spans).faultCode));
   assert.ok(h.text().includes('Simulated'));

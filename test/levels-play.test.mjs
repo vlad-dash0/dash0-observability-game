@@ -404,8 +404,8 @@ const DRIVERS = {
       expect: { stars: 2, cards: [] },
     },
   },
-  // The lab boss in practice (the session was never connected): open the spans of the simulated trace
-  // view, read the failing one, and type what the page shows. The expected values come from the page, so
+  // The lab boss in practice (the session was never connected): filter the simulated Trace Explorer by the
+  // session id, open the trace, open the spans, read the failing one, and type what the page shows. The expected values come from the page, so
   // the driver breaks if the view stops showing them. Sloppy: a wrong operation and a wrong retry count.
   'its-us': {
     async: true,
@@ -430,8 +430,15 @@ const DRIVERS = {
 /** Read the failing span off the practice trace view and type the four answers (with `over` swapped in). */
 async function findIncident(telemetry, over = {}) {
   click('#its-practice');
+  // The Trace Explorer lists several sessions' traces: filter by the session id the page shows.
+  for (const r of qa('input[name="its-fkey"]')) r.checked = r.value === 'session.id';
+  for (const r of qa('input[name="its-fop"]')) r.checked = r.value === 'is';
+  type('#its-fvalue', q('#its-session').textContent.trim());
+  click('#its-filter-apply');
+  assert.equal(qa('#its-explorer tbody tr').length, 1, 'the filter narrows the list to one trace');
+  click('#its-open-trace-0');
   const spans = telemetry.incident().spans;
-  const rows = qa('.ui-table tbody tr');
+  const rows = qa('#its-explorer tbody tr');
   const bad = rows.findIndex((tr) => tr.lastElementChild.textContent.trim() === 'Error');
   assert.ok(bad >= 0, 'the failing span is marked in the list');
   click(`#its-open-${bad}`);
