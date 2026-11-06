@@ -6,15 +6,17 @@
 // Spec: https://opentelemetry.io/docs/specs/semconv/non-normative/http-migration/ , https://opentelemetry.io/docs/specs/semconv/http/http-spans/
 // Dash0 docs: https://www.dash0.com/docs/dash0/dashboards/reference-drilldown-filter-translation
 //
-// Facts used (each read on the pages above, 2026-11-05): the migration page maps `http.method` to `http.request.method`,
+// Facts used (read on the migration page, 2026-11-05, except where noted): it maps `http.method` to `http.request.method`,
 // `http.status_code` to `http.response.status_code`, `net.host.port` to `server.port` on server spans, and `http.target` to `url.path`
 // plus `url.query`; `http.route` is "No change". `OTEL_SEMCONV_STABILITY_OPT_IN` accepts `http` (emit the stable conventions and stop
-// emitting the old ones the instrumentation emitted before) and `http/dup` (emit both, for a phased rollout); `client.port` is an opt-in
-// attribute of server spans (the port of the client that sent the request). Dash0 page: its drilldown filter translation page says a chart's PromQL filters and series labels are
+// emitting the old ones the instrumentation emitted before) and `http/dup` (emit both, for a phased rollout). The HTTP spans spec gives
+// `url.path` as the URI path component (`/search`) and `url.query` as the URI query component (`q=OpenTelemetry`, no leading `?`);
+// on server spans `client.address` is Recommended and `client.port` Opt-In ("the port of whichever client was captured in
+// `client.address`"). Dash0 page: its drilldown filter translation page says a chart's PromQL filters and series labels are
 // OpenTelemetry attributes (`service.name`, `http.response.status_code`), written with underscores in PromQL (`service_name`). Not
 // claimed: that Dash0 reads both the old and the stable names, or that anything keeps working in Dash0 after the switch.
 //
-// Invented for the game: the company, the checkout service, the eight values on the span (POST, /checkout, 500, 8443, 51234) and the
+// Invented for the game: the company, the checkout service, the values on the span (/checkout, /checkout?step=pay, 500, 8443, gw.kettle.example, 51234) and the
 // scenario of the week-ahead switch. Each attribute is shown as `key=value`.
 
 const SPOT = {
@@ -22,27 +24,27 @@ const SPOT = {
   target: 'span',
   helps: { hints: false },
   lines: [
-    { id: 'http-method', text: 'http.method=POST' },
-    { id: 'client-port', text: 'client.port=51234' },
-    { id: 'request-method', text: 'http.request.method=POST' },
+    { id: 'http-target', text: 'http.target=/checkout?step=pay' },
     { id: 'server-port', text: 'server.port=8443' },
-    { id: 'http-status-code', text: 'http.status_code=500' },
-    { id: 'route', text: 'http.route=/checkout' },
-    { id: 'response-status-code', text: 'http.response.status_code=500' },
+    { id: 'client-address', text: 'client.address=gw.kettle.example' },
+    { id: 'url-path', text: 'url.path=/checkout' },
     { id: 'net-host-port', text: 'net.host.port=8443' },
+    { id: 'route', text: 'http.route=/checkout' },
+    { id: 'client-port', text: 'client.port=51234' },
+    { id: 'http-status-code', text: 'http.status_code=500' },
   ],
-  faults: ['http-method', 'http-status-code', 'net-host-port'],
+  faults: ['http-target', 'net-host-port', 'http-status-code'],
   whyNot: {
-    'client-port': 'Not an old name: the port of the client that sent the request, which the opt-in does not touch.',
-    'request-method': 'The stable name for the request method; it stays when the opt-in is <code>http</code>.',
-    'server-port': 'The stable name for the port the request was addressed to, from the Host header.',
+    'server-port': 'The stable name for the port the request was addressed to, usually from the Host header.',
+    'url-path': 'The stable name for the path of the URL; it stays when the opt-in is <code>http</code>.',
+    'client-address': 'Not an old name: the address of the client that sent the request, a stable name.',
     route: 'Unchanged: <code>http.route</code> keeps its name with either opt-in, so it stays. Not every name that looks old has changed.',
-    'response-status-code': 'The stable name for the response status code.',
+    'client-port': 'Not an old name: the port of the client that sent the request.',
   },
   explain:
-    'Those three are the old names: <code>http.method</code>, <code>http.status_code</code> and <code>net.host.port</code>. ' +
+    'Those three are the old names: <code>http.target</code> (now split into <code>url.path</code> and <code>url.query</code>), <code>net.host.port</code> (now <code>server.port</code>) and <code>http.status_code</code> (now <code>http.response.status_code</code>). ' +
     'With <code>OTEL_SEMCONV_STABILITY_OPT_IN=http/dup</code> the instrumentation sends the old and the stable names side by side; ' +
-    'with <code>http</code> it sends only the stable ones, and the three old names stop arriving. <code>http.route</code> did not change.',
+    'with <code>http</code> it sends only the stable ones, and the old names stop arriving. <code>http.route</code> did not change.',
 };
 
 const SWITCH = [
@@ -56,7 +58,7 @@ const SWITCH = [
     label: 'Move every query, alert and dashboard to the stable names, then switch',
     right: true,
     why:
-      'While <code>http/dup</code> is on, both names arrive, so you can move each query, dashboard and alert rule to <code>http.request.method</code>, <code>http.response.status_code</code> and <code>server.port</code> and see it still returns data. ' +
+      'While <code>http/dup</code> is on, both names arrive, so you can move each query, dashboard and alert rule to <code>http.response.status_code</code>, <code>server.port</code> and <code>url.path</code> plus <code>url.query</code> and see it still returns data. ' +
       'Then set <code>OTEL_SEMCONV_STABILITY_OPT_IN=http</code> and the old names stop. ' +
       'In Dash0, a chart\'s PromQL filters name OpenTelemetry attributes, with the dots written as underscores (<code>service.name</code> is <code>service_name</code>), so check your charts for the old names too.',
   },
@@ -82,7 +84,7 @@ export default {
     steps: [
       {
         intro:
-          'OpenTelemetry\'s HTTP semantic conventions went stable with new names: <code>http.target</code> became <code>url.path</code> plus <code>url.query</code>. ' +
+          'OpenTelemetry\'s HTTP semantic conventions went stable with new names: <code>http.method</code> became <code>http.request.method</code>. ' +
           'Kettle &amp; Co\'s checkout upgraded its instrumentation and set <code>OTEL_SEMCONV_STABILITY_OPT_IN=http/dup</code>, so its HTTP spans carry the old and the stable names side by side. ' +
           'Next week the team sets it to <code>http</code>, which sends the stable names only. Here are eight attributes from one checkout server span. Each line is one attribute, as key=value.',
         question: 'Spot the attributes that stop arriving once the opt-in is set to http.',
@@ -90,7 +92,7 @@ export default {
         spot: SPOT,
       },
       {
-        intro: 'The team is ready to set the opt-in to <code>http</code>. While <code>http/dup</code> is on, this span carries 3 extra attributes, the old names.',
+        intro: 'The team is ready to set the opt-in to <code>http</code>. Of the eight attributes you just read, 3 are old names that <code>http/dup</code> sends alongside the stable ones.',
         question: 'What has to happen first?',
         qid: 'scv-q-switch',
         choice: { id: 'scv-switch', choices: SWITCH },
