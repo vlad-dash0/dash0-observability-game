@@ -295,6 +295,18 @@ test('mountChoice refuses a null choice, naming the question', () => {
   assert.throws(() => mountChoice(ctx, [...CHOICES, null], { id: 'q1', onRight }), { name: 'TypeError', message: /^choice "q1": choice 4 is not an object/ });
 });
 
+test('choiceHtml and mountChoice join several problems; mountChoice also reports the content problems', () => {
+  const { ctx } = setup();
+  const choices = [null, { key: '' }];
+  const message = (fn) => { try { fn(); } catch (e) { return e.message; } return undefined; };
+  const shape = 'choice "q1": choice 0 is not an object; choice keys must be non-empty strings';
+  assert.equal(message(() => choiceHtml(ctx, choices, { id: 'q1' })), shape);
+  // choiceHtml checks the shape only; mountChoice runs the whole validateChoiceSpec.
+  const full = message(() => mountChoice(ctx, choices, { id: 'q1', onRight: () => undefined }));
+  assert.equal(full, `choice "q1": ${validateChoiceSpec(choices).join('; ')}`);
+  assert.ok(full.startsWith(shape));
+});
+
 test('validateChoiceSpec: a valid spec has no problems', () => {
   assert.deepEqual(validateChoiceSpec(CHOICES), []);
 });
