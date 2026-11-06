@@ -338,7 +338,7 @@
 .ui-score-stars { display: flex; gap: 3px; }
 .ui-star svg { display: block; inline-size: 13px; block-size: 13px; }
 .ui-star path { fill: none; stroke: var(--color-parent); stroke-width: 1.1; stroke-linejoin: round; }
-.ui-star[data-star="possible"] path { stroke: color-mix(in srgb, var(--color-parent) 55%, transparent); }
+.ui-star[data-star="possible"] path { stroke: color-mix(in srgb, var(--color-parent) 75%, transparent); }
 .ui-star[data-star="lost"] path { stroke: var(--color-border); stroke-dasharray: 1.6 1.4; }
 .ui-star[data-star="earned"] path { fill: var(--color-parent); }
 .ui-score-rule { font-size: 11.5px; color: var(--color-text-muted); }

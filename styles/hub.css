@@ -35,7 +35,7 @@
   background: var(--color-surface); border: 1px solid var(--color-border);
   padding: 6px 11px; border-radius: 20px; font-weight: 700; font-size: 13px;
 }
-.star-count span:first-child { color: var(--color-accent); }
+.star-count span:first-child { color: var(--color-parent); }
 /* The theme, ?, Back and reward buttons are kit buttons (index.html; D3: the hub changes only its buttons). */
 @media (max-width: 360px) {
   .brand-name span { display: none; }
@@ -166,7 +166,7 @@
   color: var(--color-text-muted);
 }
 .level-card.done .level-status { color: var(--color-success); }
-.level-stars { font-size: 15px; letter-spacing: 1px; color: var(--color-accent); }
+.level-stars { font-size: 15px; letter-spacing: 1px; color: var(--color-parent); }
 
 /* ---------- Level overlay: header, scrolling body, pinned actions ---------- */
 .overlay {

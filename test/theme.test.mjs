@@ -346,3 +346,35 @@ test('reward stars (#178): the glyph colour comes from a token and reaches 3:1 o
     }
   }
 });
+
+test('every star display (#221): each star rule takes a --color-* token and reaches 3:1 on its background, both themes', () => {
+  // Every rule in styles/ whose selector names a star, except the win-card star line: that is
+  // muted text on the success card, held to 4.5 in the trace-waterfall test above.
+  const all = readdirSync(join(ROOT, 'styles')).filter((f) => f.endsWith('.css')).flatMap((f) => rules(read(`styles/${f}`)));
+  const starRules = all.filter((r) => r.selector.split(',').some((s) => /star/.test(s) && !/win-stars/.test(s)));
+  const sels = starRules.map((r) => r.selector);
+  for (const want of ['.star-count span:first-child', '.level-stars', '.reward-card .reward-stars', '.ui-star path', '.help-stars']) {
+    assert.ok(sels.some((s) => s.split(',').map((x) => x.trim()).includes(want)), `${want} is checked`);
+  }
+  let checked = 0;
+  for (const r of starRules) {
+    for (const [prop, value] of decls(r.body).filter(([k]) => ['color', 'fill', 'stroke'].includes(k))) {
+      if (value === 'none' || value === 'currentColor') continue;
+      const tint = /^color-mix\(in srgb, (var\(--color-[\w-]+\)) ([\d.]+)%, transparent\)$/.exec(value);
+      assert.ok(tint || /^var\(--color-[\w-]+\)$/.test(value), `${r.selector} ${prop} is a token, not ${value}`);
+      for (const theme of ['light', 'dark']) {
+        for (const bg of ['--color-surface', '--color-bg']) {
+          const u = resolveColor(`var(${bg})`, theme);
+          const fg = tint ? resolveColor(tint[1], theme).map((c, i) => c * tint[2] / 100 + u[i] * (1 - tint[2] / 100)) : resolveColor(value, theme);
+          const [a, b] = [luminance(fg), luminance(u)];
+          const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+          // The lost star is a dashed border-coloured outline: its state is also carried by the dash, not colour alone.
+          if (/data-star="lost"/.test(r.selector)) continue;
+          assert.ok(ratio >= 3, `${theme}: ${r.selector} ${prop} ${value} on ${bg} is ${ratio.toFixed(2)}, needs 3`);
+          checked++;
+        }
+      }
+    }
+  }
+  assert.ok(checked >= 20, `expected the star rules, checked ${checked}`);
+});
