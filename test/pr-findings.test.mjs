@@ -715,11 +715,13 @@ test('L3: a disposition must start with a verdict or name a commit or #N; every 
 // Comments, reviews and threads are three GraphQL connections, told apart by the query.
 // The PR itself (its author) is one plain query, told apart by `author` at the PR level;
 // by default a trusted owner, `dev`.
-// The PR's commits are a fourth connection (`commits`, { oid, merge } here). By default the
+// The PR's commits are a fourth connection (`commits`, { oid, merge, parents? } here: without
+// `parents` a commit follows the previous one, a merge adding a second parent outside the PR). By default the
 // head is the latest sha any review names, padded to 40 characters, so a test that is not
 // about the head rule has a review of the head.
 const pad = (sha) => sha.padEnd(40, '0');
-function fakeGh({ comments: c = [[]], reviews = [[]], threads = [[]], commits, head, fail, prAuthor = { author: { login: 'dev' }, authorAssociation: 'OWNER' } } = {}) {
+const MAIN = 'e'.repeat(40);
+function fakeGh({ comments: c = [[]], reviews = [[]], threads = [[]], commits, head, commitTotal, fail, prAuthor = { author: { login: 'dev' }, authorAssociation: 'OWNER' } } = {}) {
   const bodies = [...c.flat(), ...reviews.flat()].filter((n) => TRUSTED.has(n.authorAssociation)).map((n) => n.bodyHTML).filter((h) => typeof h === 'string');
   const latest = bodies.flatMap((h) => parseComment(h).reviews).at(-1)?.sha ?? 'abc1234';
   const list = commits ?? [{ oid: pad(latest), merge: false }];
@@ -732,10 +734,13 @@ function fakeGh({ comments: c = [[]], reviews = [[]], threads = [[]], commits, h
     if (/repo view/.test(joined)) return 'acme/game\n';
     if (!args.includes('graphql')) throw new Error(`unexpected gh call: ${joined}`);
     if (/pullRequest\(number: \$number\) \{ author/.test(joined)) {
-      return JSON.stringify({ data: { repository: { pullRequest: { ...prAuthor, headRefOid: headOid } } } });
+      return JSON.stringify({ data: { repository: { pullRequest: { ...prAuthor, headRefOid: headOid, commits: { totalCount: commitTotal ?? list.length } } } } });
     }
     const key = /reviewThreads\(/.test(joined) ? 'reviewThreads' : /reviews\(/.test(joined) ? 'reviews' : /commits\(/.test(joined) ? 'commits' : 'comments';
-    const commitNodes = list.map((x) => ({ commit: { oid: x.oid, parents: { totalCount: x.merge ? 2 : 1 } } }));
+    const commitNodes = list.map((x, i) => {
+      const parents = x.parents ?? [i ? list[i - 1].oid : MAIN, ...(x.merge ? [MAIN] : [])];
+      return { commit: { oid: x.oid, parents: { totalCount: parents.length, nodes: parents.map((oid) => ({ oid })) } } };
+    });
     const src = { reviewThreads: threads, reviews, comments: c, commits: [commitNodes] }[key];
     const pages = src.map((nodes, i) => ({
       data: { repository: { pullRequest: { [key]: {
@@ -985,7 +990,7 @@ test('trust: fetchPr asks who resolved each thread and who opened the PR', async
 // --- the review must cover the head (#65) ---------------------------------------------
 
 const H = { a: 'a'.repeat(40), b: 'b'.repeat(40), c: 'c'.repeat(40), d: 'd'.repeat(40) };
-const commit = (oid, merge = false) => ({ oid, merge });
+const commit = (oid, merge = false, parents) => ({ oid, merge, parents });
 const reviewAt = (sha) => ({ ...issueComment(0, 'clean'), bodyHTML: `<h2>Review of ${sha}: CLEAN</h2><p>No findings.</p>` });
 const headRun = async (sha, commits, head) => {
   const { gh } = fakeGh({ comments: [[reviewAt(sha)]], commits, head });
@@ -1019,16 +1024,59 @@ test('head: an unknown or ambiguous reviewed sha is inconclusive, exit 2', async
   const twin = [commit(`abc1234${'1'.repeat(33)}`), commit(`abc1234${'2'.repeat(33)}`)];
   const ambiguous = await headRun('abc1234', twin);
   assert.equal(ambiguous.exit, 2);
-  assert.match(ambiguous.text, /ambiguous/);
+  assert.match(ambiguous.text, /matches 2 commits of this PR, so it cannot be told apart/);
 });
 
-test('head: a commit list that does not end at headRefOid is inconclusive', async () => {
+test('head: a commit list that does not contain headRefOid is inconclusive', async () => {
   assert.equal((await headRun(H.a, [commit(H.a), commit(H.b)], H.c)).exit, 2);
+});
+
+// The commit list is date ordered, not ancestry ordered: reachability decides (#65).
+test('head: an old-dated non-merge commit merged in, listed before the reviewed one, is unreviewed code', async () => {
+  // x is dated before a, reaches the head only as m's second parent.
+  const commits = [commit(H.d, false, [MAIN]), commit(H.a, false, [MAIN]), commit(H.b, false, [H.a, H.d])];
+  const r = await headRun(H.a, commits);
+  assert.equal(r.exit, 1);
+  assert.match(r.text, /^OPEN: no review of head/m);
+  assert.equal((await headRun(H.b, commits)).exit, 0);
+});
+
+test('head: a merge of main passes wherever the list puts the head; its main-side parent drops out', async () => {
+  const commits = [commit(H.a, false, [MAIN]), commit(H.c, false, [H.a, MAIN]), commit(H.b, false, [H.a])];
+  assert.equal((await headRun(H.a, commits, H.c)).exit, 0, 'head c is not last in the list');
+});
+
+test('head: a PR past the 250 commits GitHub lists cannot be checked, exit 2 with a clear message', async () => {
+  const { gh } = fakeGh({ comments: [[reviewAt(H.b)]], commits: [commit(H.a), commit(H.b)], commitTotal: 251 });
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh, log: out.log }), 2);
+  assert.match(out.lines.join('\n'), /251 commits.*cannot check the head rule/);
+});
+
+test('head: a parent list cut short is unreadable, exit 2', async () => {
+  const { gh } = fakeGh({ comments: [[reviewAt(H.a)]], commits: [commit(H.a)] });
+  const cut = async (args) => JSON.stringify(JSON.parse(await gh(args)), (k, v) => (k === 'totalCount' && v === 1 ? 3 : v));
+  const out = sink();
+  assert.equal(await run({ repo: 'acme/game', pr: 7, gh: cut, log: out.log }), 2);
+});
+
+test('head: two reviews of different commits; the later one decides, whatever the shas look like', async () => {
+  const two = (first, second) => ({ comments: [[{ ...reviewAt(first), createdAt: at(0) }, { ...reviewAt(second), createdAt: at(1), url: 'c1' }]], commits: [commit(H.a), commit(H.b), commit(H.c)] });
+  const go = async (opts) => {
+    const { gh } = fakeGh(opts);
+    return run({ repo: 'acme/game', pr: 7, gh, log: sink().log });
+  };
+  assert.equal(await go(two(H.a, H.c)), 0, 'a then c (the head)');
+  assert.equal(await go(two(H.c, H.a)), 1, 'c then a (stale)');
+});
+
+test('head: the sha in the review heading matches case-insensitively', async () => {
+  assert.equal((await headRun(H.b.toUpperCase(), [commit(H.a), commit(H.b)])).exit, 0);
 });
 
 test('head: the latest review decides, and the commits come from the PR commit connection', async () => {
   const { gh, calls } = fakeGh({ comments: [[reviewAt(H.a)]], commits: [commit(H.a), commit(H.b)] });
   await fetchPr({ repo: 'acme/game', pr: 7, gh });
-  assert.ok(calls.some((a) => /commits\(first: 100/.test(a.join(' ')) && /parents \{ totalCount/.test(a.join(' '))));
+  assert.ok(calls.some((a) => /commits\(first: 100/.test(a.join(' ')) && /parents\(first: 100\) \{ totalCount nodes/.test(a.join(' '))));
   assert.ok(calls.some((a) => /headRefOid/.test(a.join(' '))));
 });

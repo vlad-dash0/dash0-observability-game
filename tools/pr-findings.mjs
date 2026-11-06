@@ -14,8 +14,9 @@
 // are ignored and listed. A thread the PR's author resolved stays open unless that author
 // is trusted too (GitHub lets a PR's author resolve any thread on it). See the trust note
 // in .github/pull_request_template.md for what else an outsider can and cannot do.
-// The latest review must be of the PR head (headRefOid) or of an earlier commit followed
-// only by merge commits (merges of main); otherwise "no review of head <sha>" (#65).
+// The latest review must be of the PR head (headRefOid) or of a commit from which every
+// other commit reachable from the head (by parent links) is a merge commit; otherwise
+// "no review of head <sha>" (#65). A merge's own content is not reviewed.
 // Usage: node tools/pr-findings.mjs <pr-number> [--repo owner/name]
 // Exit: 0 PASS, 1 open findings or no review of the head, 2 inconclusive (API error, no
 // review, unparseable, a reviewed sha that is unknown or ambiguous).
@@ -503,10 +504,12 @@ const lastWritten = (c) => (c.edited == null ? time(c.at) : Math.max(time(c.at),
  * see the trust note in .github/pull_request_template.md). Any error, or no review at all, is inconclusive: the open list may then be
  * incomplete, so it never reads as PASS. Minimized comments are skipped (the override for
  * a comment the parser must not read) and returned in `skipped` so the bypass is visible.
- * With `head` (the PR head's full sha) and `commits` (the PR's commits, oldest first, as
- * { oid, merge }), the latest review must be of the head, or of a commit followed only by
- * merge commits (merges of main); otherwise `headMissing` is set and the exit is OPEN. A
- * reviewed sha matching no commit or several is an error. fetchPr always supplies both.
+ * With `head` (the PR head's full sha) and `commits` (the PR's commits, in any order, as
+ * { oid, parents: [oid] }), the latest review must be of the head, or of a commit such that
+ * every PR commit reachable from the head but not from it has two or more parents;
+ * otherwise `headMissing` is set and the exit is OPEN. Reachability follows parent links
+ * inside the PR's commit set (the base branch's commits drop out), never list position.
+ * A reviewed sha matching no commit or several is an error. fetchPr always supplies both.
  */
 export function evaluate({ comments, threads, head, commits }) {
   const errors = [];
@@ -563,12 +566,27 @@ export function evaluate({ comments, threads, head, commits }) {
   if (!reviews.length) errors.push('no review found: no "## Review of <sha>" comment on this PR');
   let headMissing = null;
   if (head !== undefined && reviews.length) {
-    const sha = String(reviews.at(-1).sha).toLowerCase();
+    const sha = reviews.at(-1).sha;
     const hits = commits.filter((c) => c.oid.startsWith(sha));
     if (!hits.length) errors.push(`the latest review is of ${sha}, which matches no commit of this PR`);
-    else if (hits.length > 1) errors.push(`the latest review's sha ${sha} is ambiguous: it matches ${hits.length} commits of this PR`);
-    else if (commits.slice(commits.indexOf(hits[0]) + 1).some((c) => !c.merge)) {
-      headMissing = `no review of head ${head} (the latest review is of ${sha}, and commits after it are not all merges from main)`;
+    else if (hits.length > 1) errors.push(`the latest review's sha ${sha} matches ${hits.length} commits of this PR, so it cannot be told apart`);
+    else {
+      const byOid = new Map(commits.map((c) => [c.oid, c]));
+      const reach = (from) => {
+        const seen = new Set();
+        for (const todo = [from]; todo.length;) {
+          const oid = todo.pop();
+          if (seen.has(oid) || !byOid.has(oid)) continue;
+          seen.add(oid);
+          todo.push(...byOid.get(oid).parents);
+        }
+        return seen;
+      };
+      const reviewed = reach(hits[0].oid);
+      const unreviewed = [...reach(head)].filter((oid) => !reviewed.has(oid) && byOid.get(oid).parents.length < 2);
+      if (unreviewed.length) {
+        headMissing = `no review of head ${head} (the latest review is of ${sha}, and ${unreviewed.length} commit(s) reachable from the head, not all merge commits, came after it)`;
+      }
     }
   }
   const findings = reviews.reduce((n, r) => n + r.findings.length, 0) + threads.length;
@@ -589,7 +607,7 @@ export function defaultGh(args) {
 const NODES = {
   comments: 'createdAt lastEditedAt isMinimized url bodyHTML author { login } authorAssociation',
   reviews: 'submittedAt createdAt lastEditedAt isMinimized url bodyHTML author { login } authorAssociation',
-  commits: 'commit { oid parents { totalCount } }',
+  commits: 'commit { oid parents(first: 100) { totalCount nodes { oid } } }',
   reviewThreads: 'isResolved resolvedBy { login } path line comments(first: 1) { nodes { body url author { login } authorAssociation } }',
 };
 
@@ -606,7 +624,7 @@ function trusted(node, url) {
 }
 // Who opened the PR: GitHub lets them resolve any thread on it, write access or not.
 const PR_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
-  repository(owner: $owner, name: $name) { pullRequest(number: $number) { author { login } authorAssociation headRefOid } } }`;
+  repository(owner: $owner, name: $name) { pullRequest(number: $number) { author { login } authorAssociation headRefOid commits { totalCount } } } }`;
 const query = (key) => `query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
   repository(owner: $owner, name: $name) { pullRequest(number: $number) {
     ${key}(first: 100, after: $endCursor) { pageInfo { hasNextPage endCursor } nodes { ${NODES[key]} } }
@@ -653,12 +671,18 @@ export async function fetchPr({ repo, pr, gh = defaultGh }) {
   }
   const head = prNode?.headRefOid;
   if (!/^[0-9a-f]{40}$/.test(head ?? '')) throw new Error(`the PR: no usable head sha (${head})`);
+  const commitTotal = prNode?.commits?.totalCount;
+  if (!Number.isInteger(commitTotal)) throw new Error('the PR: no commit count');
+  // GitHub lists at most 250 commits of a PR: past that the head rule cannot be decided.
+  if (prCommits.length < commitTotal) throw new Error(`the PR has ${commitTotal} commits, more than the ${prCommits.length} GitHub lists: cannot check the head rule`);
   const commits = prCommits.map((n) => {
-    const total = n?.commit?.parents?.totalCount;
-    if (!/^[0-9a-f]{40}$/.test(n?.commit?.oid ?? '') || !Number.isInteger(total)) throw new Error('the PR: an unreadable commit in its commit list');
-    return { oid: n.commit.oid, merge: total > 1 };
+    const parents = n?.commit?.parents;
+    const oid = n?.commit?.oid ?? '';
+    if (!/^[0-9a-f]{40}$/.test(oid) || !Array.isArray(parents?.nodes) || parents.nodes.length !== parents.totalCount
+      || parents.nodes.some((p) => !/^[0-9a-f]{40}$/.test(p?.oid ?? ''))) throw new Error('the PR: an unreadable commit in its commit list');
+    return { oid, parents: parents.nodes.map((p) => p.oid) };
   });
-  if (commits.at(-1)?.oid !== head) throw new Error(`the PR: its commit list does not end at the head ${head}`);
+  if (!commits.some((c) => c.oid === head)) throw new Error(`the PR: its commit list does not contain the head ${head}`);
   const prAuthor = prNode?.author?.login;
   const prAuthorTrusted = trusted(prNode, 'the PR');
   if (!prAuthor) throw new Error('the PR: no author login');

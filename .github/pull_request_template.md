@@ -14,14 +14,16 @@
 <!--
 REVIEW COMMENTS: post findings and dispositions as PR comments in these formats.
 `node tools/pr-findings.mjs <PR>` reads them (all pages) and exits 0 PASS, 1 open
-findings, 2 inconclusive. Merge needs `All checks` green and the `PR findings` status
+findings or no review of the head, 2 inconclusive. Merge needs `All checks` green and the `PR findings` status
 green: CI runs this same script on every push, comment, review and resolved thread and
 posts its verdict on the head commit (pending while the PR is a draft). Hiding a comment
 fires no event, and a failed PR findings run may leave the status out of date: re-run it
 then (Actions, PR findings, Run workflow, the PR number).
-The latest review must be of the PR head commit, or of an earlier commit followed only by
-merge commits (merges of main): otherwise the script prints "no review of head <sha>" and
-exits 1. Full and short shas both match by prefix; an unknown or ambiguous sha exits 2.
+The latest review must be of the PR head commit, or of an earlier commit from which
+every other commit reachable from the head is a merge commit (for example merges of
+main): otherwise the script prints "no review of head <sha>" and exits 1. A merge
+commit's own content (conflict resolutions) is not reviewed, so "merges of main" is not
+verified. Full and short shas both match by prefix; an unknown or ambiguous sha exits 2.
 
 1. Findings, one comment per review round. The heading names the reviewed commit:
 
