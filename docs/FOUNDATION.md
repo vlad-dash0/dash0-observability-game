@@ -136,7 +136,7 @@ mode: 'live'|'practice'|null, host}`, `stats() -> {buffered, dropped}`, `liveAva
 `connect({mode, endpoint, token, dataset}) -> {ok:true} | {ok:false, field, reason}` (validates, sends
 nothing), `sendTest(opts?: {signal}) -> Promise<Outcome>` (single-flight), `emit(draft)` (no-op unless
 connected, never throws), `flush(opts?) -> Promise<Outcome|null>`, `sendBatch(drafts, opts?)`,
-`incident()` (null until the incident lab), `disconnect()`. Contract: docs/DASH0-LAB.md §Telemetry session.
+`incident()` (the seeded lab incident, built once per session: docs/DASH0-LAB.md §Incident), `disconnect()`. Contract: docs/DASH0-LAB.md §Telemetry session.
 Levels wire buttons by assigning `el.onclick = …` after `renderStep` (CSP-safe), as in R.
 
 `finish` computes `stars = scoreStars({mistakes, hintsUsed, elapsedMs: now() - startedAt}, level)`
