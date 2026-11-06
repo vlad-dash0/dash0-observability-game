@@ -196,6 +196,12 @@ test('a chip never overflows its container: capped at the container width, and i
   assert.equal(chip['overflow-wrap'], 'anywhere', 'and break inside a long word');
 });
 
+test('lesson code breaks inside a long token: the lesson card clips, so an unbreakable token would be cut off', () => {
+  const pick = (sel) => Object.fromEntries(sheetRules('kit.css').filter((r) => r.selector === sel).flatMap((r) => decls(r.body)));
+  assert.equal(pick('.ui-lesson').overflow, 'hidden', 'premise: the card clips');
+  assert.equal(pick('.ui-lesson code')['overflow-wrap'], 'anywhere');
+});
+
 test('palette rule 5: kit.css puts no shadow or glow on anything, only inset rings', () => {
   let rings = 0;
   for (const r of sheetRules('kit.css')) {

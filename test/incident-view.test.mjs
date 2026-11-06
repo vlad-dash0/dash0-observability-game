@@ -283,7 +283,7 @@ test('V7 a board that needs no clue has no counter, and its causes are open from
 // ---- V8 lock line ------------------------------------------------------------------------
 
 const LOCKED = (n, need) => `Locked until you find ${need} clue${need === 1 ? '' : 's'} in Step 1 (${n} of ${need} so far). A clue is a view that helps explain the alert.`;
-const UNLOCKED = 'Unlocked. Pick the cause the evidence supports. A wrong pick costs a star.';
+const UNLOCKED = 'Unlocked. Pick the cause the evidence supports. A wrong pick counts as one penalty.';
 
 test('V8 the lock line counts clues only, describes the causes group, and is not a live region', () => {
   setup();
@@ -354,7 +354,7 @@ test('V9 an unlocking open that also spends the budget clears the pick line and 
   assert.equal(feedback().hidden, false, 'a neutral look leaves the pick line');
   open('b');
   assert.deepEqual(feedback(), { text: '', tone: null, hidden: true });
-  assert.deepEqual(status(), { text: 'The error budget is spent, which costs a star. The causes in Step 3 are now unlocked. You can keep investigating.', tone: 'error', hidden: false });
+  assert.deepEqual(status(), { text: 'The error budget is spent, which counts as one penalty. The causes in Step 3 are now unlocked. You can keep investigating.', tone: 'error', hidden: false });
 });
 
 // ---- V10 penalties, once each ------------------------------------------------------------
@@ -364,7 +364,7 @@ test('V10 a herring that also spends the budget costs two, in one combined error
   open('a');
   open('h');
   assert.equal(counts.mistakes, 2);
-  assert.deepEqual(status(), { text: 'Herring was misleading, and the error budget is spent. Each costs a star.', tone: 'error', hidden: false });
+  assert.deepEqual(status(), { text: 'Herring was misleading, and the error budget is spent. Each counts as one penalty.', tone: 'error', hidden: false });
   assert.deepEqual(tally(ID), { wrong: 0, misleading: 1, budget: 1, hints: 0 });
   open('h');
   open('b');
@@ -419,7 +419,7 @@ test('V11 D7 tones: opens speak in the status bar, picks in the feedback; error 
   open('status-page');
   assert.equal(status().tone, 'neutral');
   open('deploys');
-  assert.deepEqual([status().tone, status().text], ['error', 'Deploy log was misleading: it does not explain the alert. That costs a star.']);
+  assert.deepEqual([status().tone, status().text], ['error', 'Deploy log was misleading: it does not explain the alert. That counts as one penalty.']);
   pick('network');
   assert.equal(feedback().tone, 'neutral', 'a locked pick is free');
   assert.equal(status().text.startsWith('Deploy log'), true, 'a pick leaves the status bar alone');
