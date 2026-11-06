@@ -186,6 +186,10 @@ test('ladderText: a rule that never changes says any number of penalties; a late
   assert.equal(ladderText((p) => (p < 60 ? 5 : 1)), '0 to 59 penalties give 5 stars, more give 1.');
 });
 
+test('ladderText: a rung wider than the margin is read as the last rung (the documented limit)', () => {
+  assert.equal(ladderText((p) => (p < 4899 ? 5 : 1)), 'any number of penalties give 5 stars.');
+});
+
 test('ladderText: a rule that never settles is refused, not printed', () => {
   assert.throws(() => ladderText((p) => p % 2), /still changing/);
 });

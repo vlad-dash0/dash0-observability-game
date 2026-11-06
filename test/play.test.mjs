@@ -330,6 +330,9 @@ test('a play level derives its hintless list; a declared one must equal it', () 
   assert.deepEqual(errorsOf({ ...playFixture(), hintless: ['sort'] }), [
     `${AT}: declares hintless ["sort"] but its steps give ["sort","spot"]; fix or remove hintless`,
   ]);
+  assert.deepEqual(errorsOf({ ...playFixture(), hintless: ['spot', 'sort'] }), [
+    `${AT}: declares hintless ["spot","sort"] but its steps give ["sort","spot"]; fix or remove hintless`,
+  ]);
 });
 
 test('registry errors for run and play together, no kit, differing mechanics, a function', () => {
