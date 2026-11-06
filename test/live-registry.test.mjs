@@ -218,6 +218,7 @@ const HINTLESS = {
   'tail-sampling': ['spot'],
   'ottl-and-transforms': ['spot'],
   'good-alerts': ['spot'],
+  'semantic-convention-versions': ['spot'],
 };
 
 test('which widgets have no hints on each live level is pinned, and the how-to-play help says so', () => {

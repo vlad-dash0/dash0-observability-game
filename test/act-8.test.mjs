@@ -116,7 +116,7 @@ test('step 1: a valid span board of eight attributes, hints off, faults at F...F
   assert.equal(spotRun(['http-target', 'net-host-port']).solved, false, 'two of three do not');
   assert.equal(spotRun([...spec.faults, 'route']).solved, false, 'http.route, which did not change, picked too does not');
   assert.equal(plain(SPOT_STEP.question), 'Spot the attributes that stop arriving once the opt-in is set to http.');
-  assert.match(plain(SPOT_STEP.intro), /OTEL_SEMCONV_STABILITY_OPT_IN=http\/dup/);
+  assert.match(plain(SPOT_STEP.intro), /OTEL_SEMCONV_STABILITY_OPT_IN to http\/dup/);
   assert.match(plain(SPOT_STEP.intro), /http\.user_agent became user_agent\.original/, 'the intro example is not on the board');
   assert.equal(spec.lines.some((l) => l.text.startsWith('http.user_agent=') || l.text.startsWith('user_agent.original=')), false, 'the intro example is not a line');
 });
@@ -179,6 +179,7 @@ test('step 2: one right answer, move the queries first; labels give nothing away
   assert.equal(plain(right.label).length < Math.max(...lens), true, `the right label is not the longest: ${lens}`);
   assert.equal(Math.max(...lens) - Math.min(...lens) <= 10, true, `plain label lengths ${lens}`);
   assert.match(plain(choices.find((c) => c.key === 'switch-now').why), /matches nothing/);
+  assert.match(plain(choices.find((c) => c.key === 'switch-now').why), /http\.status_code/);
   for (const c of choices) assert.equal(typeof c.why === 'string' && c.why.length > 0, true, `${c.key} has a why`);
 });
 
