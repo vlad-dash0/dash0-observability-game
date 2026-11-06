@@ -238,38 +238,6 @@ async function tells() {
   return solving;
 }
 
-// Known and deferred: 6.2 has five lines and one answer, so some skip rule always lands (#193).
-// Pinned to exactly the rules that pass today: fixing #193 fails this test until the entry goes.
-// No other board may be listed here.
-const KNOWN = {
-  '6.2 ts-spot': [
-    'most length, skipping 1',
-    'most length, skipping 2',
-    'fewest length, skipping 1',
-    'fewest length, skipping 2',
-    'most digits, skipping 2',
-    'fewest digits, skipping 1',
-    'most words, skipping 1',
-    'most words, skipping 2',
-    'fewest words, skipping 1',
-    'fewest words, skipping 2',
-    'most commas, skipping 1',
-    'most commas, skipping 2',
-    'fewest commas, skipping 1',
-    'fewest commas, skipping 2',
-    // Field lengths (the first three with no skip: its answer has the longest pipeline lists).
-    'longest `processors:`',
-    'longest `exporters:`',
-    'shortest `receivers:`',
-    'longest `processors:`, skipping 1',
-    'longest `receivers:`, skipping 1',
-    'shortest `processors:`, skipping 1',
-    'shortest `processors:`, skipping 2',
-    'shortest `exporters:`, skipping 1',
-    'shortest `exporters:`, skipping 2',
-  ],
-};
-
 test('the rules see every Spot board, read its fields, each board is solved by its own answer, and the retry model counts mistakes', async () => {
   const specs = await allSpotSpecs();
   assert.equal(specs.length, 7, 'all seven Spot boards');
@@ -292,7 +260,6 @@ test('the rules see every Spot board, read its fields, each board is solved by i
     assert.equal(rankings(spec, () => 0).length, factorial(ids.length), `${key}: ${ids.length}! orders`);
   }
   assert.throws(() => rankings({ id: 'wide', lines: [...Array(9).keys()].map((i) => ({ id: `l${i}` })) }, () => 0), /more than 50000 tie-breaks/, 'nine tied lines (9! orders) throw before they are built');
-  assert.deepEqual(Object.keys(KNOWN), ['6.2 ts-spot'], 'only 6.2 is a known, deferred board (#193)');
 
   // The readers, on literal lines: what each measure and field sees.
   const line = 'x{route="/a/{id}", az="eu-1", n: 2} count=12 sum=3.5s exemplar: value=250ms trace_id=ab12 span_id=00f0c7 build_id="2411" p95_s=0.61';
@@ -317,8 +284,5 @@ test('the rules see every Spot board, read its fields, each board is solved by i
 });
 
 test('no Spot board is solved, even with one wrong Check, by taking the lines with the most or fewest of anything countable, first or after skipping one or two, ties tried every way (#190)', async () => {
-  const found = await tells();
-  const { [Object.keys(KNOWN)[0]]: known = {}, ...others } = found;
-  assert.deepEqual(others, {}, 'boards a blind rule solves without reading them');
-  assert.deepEqual(Object.keys(known).sort(), [...KNOWN['6.2 ts-spot']].sort(), '6.2: the KNOWN tells (#193) are exactly the ones that still pass; drop any that no longer do');
+  assert.deepEqual(await tells(), {}, 'boards a blind rule solves without reading them');
 });

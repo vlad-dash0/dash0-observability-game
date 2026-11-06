@@ -343,20 +343,31 @@ const spotRun = (ids) => {
   return { outcome: r.outcome, extra: r.extra, missing: r.missing };
 };
 
-test('spot: the lines are valid, five of them, and exactly one, the traces pipeline that feeds span_metrics after tail_sampling, is the fault', () => {
+const FIELD_LINE = /^service: \{pipelines: \{([a-z/]+): \{(receivers|processors|exporters): \[([^\]]*)\]\}\}\}$/;
+
+test('spot: the lines are valid, eight of them, and exactly two, the processors and the exporters of the traces pipeline that feeds span_metrics after tail_sampling, are the faults', () => {
   const spec = spot();
   assert.deepEqual(validateSpotSpec(spec), []);
   assert.equal(spec.target, 'config');
   const ids = spec.lines.map((l) => l.id);
-  assert.deepEqual([...ids].sort(), ['connector-def', 'logs', 'metrics-spans', 'sampler-def', 'traces']);
-  // #190: the answer is not the focused first line (nor the last), and sits below metrics-spans and connector-def, the two lines it refers to.
-  assert.equal(ids.indexOf('traces') > 0 && ids.indexOf('traces') < ids.length - 1, true, `traces is neither first nor last: ${ids}`);
-  assert.equal(ids.indexOf('traces') > ids.indexOf('metrics-spans') && ids.indexOf('traces') > ids.indexOf('connector-def'), true, `traces below metrics-spans and connector-def: ${ids}`);
-  const rule = (l) => /processors: \[[^\]]*tail_sampling[^\]]*\]/.test(l.text) && /exporters: \[[^\]]*span_metrics[^\]]*\]/.test(l.text);
-  assert.deepEqual(spec.lines.filter(rule).map((l) => l.id), ['traces'], 'the one line that matches the rule');
-  assert.deepEqual([...spec.faults], ['traces']);
-  assert.equal(spec.lines.find((l) => l.id === 'traces').text, 'traces: receivers: [otlp] processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0, span_metrics]');
-  assert.equal(spec.lines.find((l) => l.id === 'metrics-spans').text, 'metrics/spans: receivers: [span_metrics] processors: [batch] exporters: [otlp_grpc/dash0]');
+  assert.deepEqual([...ids].sort(), ['connector-def', 'logs-processors', 'memory-def', 'metrics-processors', 'metrics-receivers', 'sampler-def', 'traces-exporters', 'traces-processors']);
+  // #190: no answer is the focused first line or the last, and both sit below connector-def and metrics-receivers, the two lines they refer to. #193: eight lines and two answers.
+  for (const id of ['traces-processors', 'traces-exporters']) {
+    assert.equal(ids.indexOf(id) > 0 && ids.indexOf(id) < ids.length - 1, true, `${id} is neither first nor last: ${ids}`);
+    assert.equal(ids.indexOf(id) > ids.indexOf('metrics-receivers') && ids.indexOf(id) > ids.indexOf('connector-def'), true, `${id} below metrics-receivers and connector-def: ${ids}`);
+  }
+  // Each fault is right alone; together they are the rule: tail_sampling among the processors and span_metrics among the exporters of one pipeline.
+  const field = (l) => { const m = FIELD_LINE.exec(l.text); return m && { pipeline: m[1], field: m[2], list: m[3].split(',').map((x) => x.trim()) }; };
+  const parsed = spec.lines.map((l) => ({ id: l.id, ...field(l) }));
+  const sampled = parsed.filter((x) => x.field === 'processors' && x.list.includes('tail_sampling')).map((x) => x.pipeline);
+  const feeding = parsed.filter((x) => x.field === 'exporters' && x.list.includes('span_metrics')).map((x) => x.pipeline);
+  assert.deepEqual(sampled, ['traces']);
+  assert.deepEqual(feeding, ['traces']);
+  assert.deepEqual(parsed.filter((x) => x.pipeline === 'traces').map((x) => x.id).sort(), ['traces-exporters', 'traces-processors'], 'the pipeline of the two lines is the same');
+  assert.deepEqual([...spec.faults], ['traces-processors', 'traces-exporters']);
+  assert.equal(spec.lines.find((l) => l.id === 'traces-processors').text, 'service: {pipelines: {traces: {processors: [memory_limiter, tail_sampling, batch]}}}');
+  assert.equal(spec.lines.find((l) => l.id === 'traces-exporters').text, 'service: {pipelines: {traces: {exporters: [otlp_grpc/dash0, span_metrics]}}}');
+  assert.equal(spec.lines.find((l) => l.id === 'metrics-receivers').text, 'service: {pipelines: {metrics/spans: {receivers: [span_metrics]}}}');
   assert.equal(spec.lines.every((l) => !l.text.includes('spanmetrics')), true, 'the current component name, span_metrics');
 });
 
@@ -365,11 +376,14 @@ test('spot: the lines are valid, five of them, and exactly one, the traces pipel
 // is defined (the real checkConfig), and every connector is the exporter of a traces pipeline AND the receiver of a metrics
 // pipeline (checkConfig does not model that pairing, the Collector refuses to start without it, so it is checked here).
 const assembled = (lines) => {
-  const pipelines = lines.filter((text) => /^(traces|metrics|logs)(\/[a-z]+)?: /.test(text)).map((text) => {
-    const [, name, body] = text.match(/^([a-z/]+): (.*)$/);
-    const fields = Object.fromEntries([...body.matchAll(/(receivers|processors|exporters): \[([^\]]*)\]/g)].map((m) => [m[1], m[2].split(',').map((s) => s.trim())]));
-    return { name, receivers: fields.receivers ?? ['otlp'], processors: fields.processors ?? [], exporters: fields.exporters };
-  });
+  // Each pipeline line is one field of one pipeline; the fields a pipeline shows are merged, and one it leaves out is the part of the config
+  // the board does not show: the otlp receiver, no processors, the one backend exporter.
+  const byName = new Map();
+  for (const text of lines) {
+    const m = FIELD_LINE.exec(text);
+    if (m) byName.set(m[1], { ...byName.get(m[1]), [m[2]]: m[3].split(',').map((x) => x.trim()) });
+  }
+  const pipelines = [...byName].map(([name, f]) => ({ name, receivers: f.receivers ?? ['otlp'], processors: f.processors ?? [], exporters: f.exporters ?? ['otlp_grpc/dash0'] }));
   const ids = (key) => [...new Set(pipelines.flatMap((p) => p[key]))];
   const connectors = [...new Set(ids('exporters').concat(ids('receivers')).filter((id) => id.startsWith('span_metrics')))];
   const yaml = [
@@ -407,21 +421,22 @@ const accepted = (cfg) => {
   assert.deepEqual(instances(cfg), ['span_metrics'], 'exactly one span_metrics instance: a single writer');
 };
 // The fix the explain describes: span_metrics gets its own traces pipeline with no sampling, and tail_sampling stays on the pipeline to the backend.
-const FIXED = [
-  'traces/metrics: receivers: [otlp] processors: [memory_limiter] exporters: [span_metrics]',
-  'traces: receivers: [otlp] processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0]',
+const fixedLines = (spec) => [
+  'service: {pipelines: {traces/metrics: {processors: [memory_limiter]}}}',
+  'service: {pipelines: {traces/metrics: {exporters: [span_metrics]}}}',
+  'service: {pipelines: {traces: {exporters: [otlp_grpc/dash0]}}}',
+  ...spec.lines.filter((l) => l.id !== 'traces-exporters').map((l) => l.text),
 ];
 
 test('spot: the lines together are one config the Collector accepts: every component defined, the connector exported by a traces pipeline and received by a metrics one, one writer', () => {
   const cfg = assembled(spot().lines.map((l) => l.text));
   accepted(cfg);
-  assert.deepEqual(cfg.pipelines.map((p) => p.name).sort(), ['logs', 'metrics/spans', 'traces']);
+  assert.deepEqual(cfg.pipelines.map((p) => p.name).sort(), ['logs', 'metrics', 'metrics/spans', 'traces']);
 });
 
 test('spot: the fix the explain describes is also one valid, single-writer config, and has no sampling before the connector', () => {
   const spec = spot();
-  const lines = [...FIXED, ...spec.lines.filter((l) => l.id !== 'traces').map((l) => l.text)];
-  const cfg = assembled(lines);
+  const cfg = assembled(fixedLines(spec));
   accepted(cfg);
   const feeding = cfg.pipelines.filter((p) => p.exporters.includes('span_metrics'));
   assert.deepEqual(feeding.map((p) => [p.name, p.processors.includes('tail_sampling')]), [['traces/metrics', false]]);
@@ -439,23 +454,33 @@ test('spot: the config check has teeth: a second span_metrics instance, a connec
   assert.deepEqual(connectorProblems(assembled(noExporter)), ['span_metrics is received but never an exporter']);
 });
 
-test('spot: the real grader accepts exactly the traces line; any decoy, or all lines, fail', () => {
-  assert.deepEqual(spotRun(['traces']), { outcome: 'right', extra: [], missing: [] });
-  assert.deepEqual(spotRun(spot().lines.map((l) => l.id)).outcome, 'wrong');
-  assert.deepEqual(spotRun(['sampler-def']), { outcome: 'wrong', extra: ['sampler-def'], missing: ['traces'] }, 'tail_sampling alone is not the fault');
+test('spot: the real grader accepts exactly the two traces lines together; either alone, any decoy, or all lines, fail', () => {
+  assert.deepEqual(spotRun(['traces-processors', 'traces-exporters']), { outcome: 'right', extra: [], missing: [] });
+  assert.deepEqual(spotRun(['traces-exporters', 'traces-processors']), { outcome: 'right', extra: [], missing: [] }, 'in either order');
+  assert.equal(spotRun(spot().lines.map((l) => l.id)).outcome, 'wrong');
+  assert.deepEqual(spotRun(['traces-processors']), { outcome: 'wrong', extra: [], missing: ['traces-exporters'] }, 'the sampler on the traces pipeline alone is not the fault');
+  assert.deepEqual(spotRun(['traces-exporters']), { outcome: 'wrong', extra: [], missing: ['traces-processors'] }, 'the connector on the traces pipeline alone is not the fault');
+  assert.deepEqual(spotRun(['sampler-def']), { outcome: 'wrong', extra: ['sampler-def'], missing: ['traces-processors', 'traces-exporters'] }, 'tail_sampling alone is not the fault');
   assert.deepEqual(spotRun(['connector-def']).extra, ['connector-def'], 'the connector alone is not the fault');
-  assert.deepEqual(spotRun(['metrics-spans']), { outcome: 'wrong', extra: ['metrics-spans'], missing: ['traces'] });
-  assert.deepEqual(spotRun(['logs']).extra, ['logs']);
-  assert.deepEqual(spotRun(['traces', 'metrics-spans']), { outcome: 'wrong', extra: ['metrics-spans'], missing: [] });
+  assert.deepEqual(spotRun(['metrics-receivers', 'traces-exporters']), { outcome: 'wrong', extra: ['metrics-receivers'], missing: ['traces-processors'] });
+  assert.deepEqual(spotRun(['traces-processors', 'traces-exporters', 'logs-processors']), { outcome: 'wrong', extra: ['logs-processors'], missing: [] });
   assert.equal(spotRun([]).outcome, 'empty');
 });
 
-test('spot: every decoy says why it is fine, and the fault is never explained as fine', () => {
+test('spot: every decoy says why it is fine, no reason names the traces pipeline, a fault or either of its fields, and the fault is never explained as fine', () => {
   const spec = spot();
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['connector-def', 'logs', 'metrics-spans', 'sampler-def']);
-  assert.equal(/receiv/.test(plain(spec.whyNot['metrics-spans'])), true);
-  assert.equal(/singular|the connector/.test(plain(spec.whyNot['metrics-spans'])) && !/four/.test(plain(spec.whyNot['metrics-spans'])), true, 'one connector again');
-  assert.equal(/connector is not in it/.test(plain(spec.whyNot.logs)), true);
+  const decoys = spec.lines.filter((l) => !spec.faults.includes(l.id)).map((l) => l.id).sort();
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), decoys);
+  for (const [id, why] of Object.entries(spec.whyNot)) {
+    const t = plain(why);
+    assert.equal(/tail_sampling|traces|feed/.test(t.replace(/\bthe pipelines that feed the connector\b/, '')), false, `${id}: names no fault, the traces pipeline, or the sampler on it`);
+    for (const fault of spec.lines.filter((l) => spec.faults.includes(l.id))) assert.equal(t.includes(fault.text), false, `${id}: not the full text of ${fault.id}`);
+  }
+  assert.equal(/receiv/.test(plain(spec.whyNot['metrics-receivers'])), true);
+  assert.equal(/the connector/.test(plain(spec.whyNot['metrics-receivers'])) && !/four/.test(plain(spec.whyNot['metrics-receivers'])), true, 'one connector again');
+  assert.equal(/logs never reach it/.test(plain(spec.whyNot['logs-processors'])), true);
+  assert.equal(/never sees metrics/.test(plain(spec.whyNot['metrics-processors'])), true);
+  assert.equal(/memory/.test(plain(spec.whyNot['memory-def'])), true);
   assert.equal(/definition|only defines/.test(plain(spec.whyNot['connector-def'])), true);
   assert.equal(/definition|only defines/.test(plain(spec.whyNot['sampler-def'])), true);
 });

@@ -127,7 +127,7 @@ const ANSWERS = {
   ],
   'tail-sampling': [
     'tradeoff ts-budget: policies=errors-slow-baseline wait=wait-30s',
-    'spot ts-spot: traces',
+    'spot ts-spot: traces-processors,traces-exporters',
   ],
   'good-alerts': ['spot ga-spot: counter-value,cause-cpu,no-for', 'choice ga-fix: increase'],
   'filter-or-sampler': ['choice fos-verdict: wrong', 'sort fos-sort: errors-whole=tail healthz=filter slow-no-cache=both slow=tail debug-logs=filter many-spans=tail production-only=filter via-payments=tail errors-no-keepalive=both'],
