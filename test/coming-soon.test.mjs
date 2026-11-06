@@ -1,7 +1,8 @@
-// Act 8 as "coming soon" on the live data (#177 P7; Act 7 left the list when 7.1 shipped). It lives
-// in hub/coming-soon.mjs, never in levels/index.mjs ACTS, so the registry, unlock, progress, stars
-// and cards cannot see it; only the hub's act list and the globe read it. The mechanism itself, for
-// any list, is also covered by fixtures in test/game.test.mjs and test/globe-view.test.mjs.
+// "Coming soon" acts on the live data (#177 P7). The list in hub/coming-soon.mjs is empty now: Act 7
+// left it with 7.1 and Act 8 with 8.2. It stays, never in levels/index.mjs ACTS, so a future soon act
+// is invisible to the registry, unlock, progress, stars and cards; only the hub's act list and the
+// globe read it. The mechanism itself, for any list, is covered by fixtures in test/game.test.mjs and
+// test/globe-view.test.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -10,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { makeDom } from './helpers/dom.mjs';
 import { fakeStorage } from './helpers/fake-storage.mjs';
 import { COMING_SOON } from '../hub/coming-soon.mjs';
-import { ACT_REGIONS, LEVEL_COUNTRY, actOfCountry } from '../hub/globe-map.mjs';
+import { ACT_REGIONS, actOfCountry } from '../hub/globe-map.mjs';
 import { COUNTRIES, DOTS } from '../hub/globe-data.mjs';
 import { createGame, liveRegistry } from '../app.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
@@ -37,23 +38,11 @@ function liveGame(extra = {}) {
   return { game, store };
 }
 
-test('Act 8 from the outline, data only; act-7 is playable now', () => {
-  assert.deepEqual(SOON_IDS, ['act-8']);
-  assert.deepEqual(COMING_SOON, [
-    {
-      id: 'act-8',
-      no: 8,
-      name: 'Operating at scale',
-      sub: 'As code',
-      teaser:
-        'Dashboards as code, semantic convention upgrades, migrating vendors, browser telemetry and AI-assisted debugging.',
-    },
-  ]);
+test('COMING_SOON is empty and frozen; acts 7 and 8 are in ACTS', () => {
+  assert.deepEqual([...COMING_SOON], []);
   assert.equal(Object.isFrozen(COMING_SOON), true, 'the list is frozen');
-  for (const s of COMING_SOON) {
-    assert.equal(Object.isFrozen(s), true, `${s.id} is frozen`);
-    assert.deepEqual(Object.keys(s), ['id', 'no', 'name', 'sub', 'teaser'], `${s.id} has no levels or boss`);
-  }
+  const live = liveRegistry();
+  assert.deepEqual(live.acts.filter((a) => a.no === 7 || a.no === 8).map((a) => a.id), ['act-7', 'act-8']);
 });
 
 test('Never in the registry', () => {
@@ -68,15 +57,11 @@ test('Never in the registry', () => {
   }
 });
 
-test('Each has its own region with dots and no level country', () => {
-  assert.equal(ACT_REGIONS['act-7'].region, 'East Asia', 'act-7 keeps its region now it is playable');
+test('no two acts share a subregion', () => {
+  assert.equal(ACT_REGIONS['act-7'].region, 'East Asia');
   assert.equal(ACT_REGIONS['act-8'].region, 'Southeast Asia');
-  for (const id of SOON_IDS) {
+  for (const id of ['act-7', 'act-8']) {
     assert.ok(DOTS.filter((d) => actOfCountry(d[2], d[3]) === id).length > 0, `${id} has dots on the globe`);
-  }
-  const subregionOf = Object.fromEntries(COUNTRIES);
-  for (const [level, iso] of Object.entries(LEVEL_COUNTRY)) {
-    assert.equal(SOON_IDS.includes(actOfCountry(iso, subregionOf[iso])), false, `${level} (${iso}) is in a soon region`);
   }
   const entries = Object.entries(ACT_REGIONS);
   for (let i = 0; i < entries.length; i++) {
@@ -87,46 +72,27 @@ test('Each has its own region with dots and no level country', () => {
   }
 });
 
-test('The live hub lists them in act order, unplayable even in debug, changing no total', () => {
+test('the live hub lists no soon act; acts 7 and 8 are playable, even a debug hub opens them', () => {
   const { game, store } = liveGame({ debug: true });
-  for (const s of COMING_SOON) {
-    const act = game.acts.find((a) => a.id === s.id);
-    assert.ok(act, `${s.id} is listed`);
-    assert.equal(act.soon, true);
-    assert.deepEqual(act.ids, []);
-    assert.equal(act.teaser, s.teaser);
-  }
-  assert.equal(game.acts.filter((a) => a.soon).length, COMING_SOON.length, 'no registry act is soon');
+  assert.equal(game.acts.filter((a) => a.soon).length, 0);
   const nos = game.acts.map((a) => a.no);
   assert.equal(nos.every((n, i) => i === 0 || n > nos[i - 1]), true, `act numbers increase: ${nos}`);
-  assert.equal(game.levelState('act-8'), 'locked');
-  assert.equal(game.openLevel('act-8'), false);
-  const act7 = game.acts.find((a) => a.id === 'act-7');
-  assert.equal(act7.soon, false, 'act-7 is a playable act on the hub');
-  assert.deepEqual([...act7.ids], ['good-alerts']);
+  const act8 = game.acts.find((a) => a.id === 'act-8');
+  assert.equal(act8.soon, false, 'act-8 is a playable act on the hub');
+  assert.deepEqual([...act8.ids], ['semantic-convention-versions']);
+  assert.deepEqual([...game.acts.find((a) => a.id === 'act-7').ids], ['good-alerts']);
   assert.equal(game.nudgeId, null);
   assert.equal(game.overlayOpen, false);
   assert.equal(store.data.has(STORAGE_KEY), false);
-  const without = liveGame({ debug: true, comingSoon: [] }).game;
-  assert.deepEqual(game.stars, without.stars);
-  assert.deepEqual(game.cards, without.cards);
-  assert.equal(without.acts.some((a) => a.soon), false, 'an empty list adds no act');
+  assert.equal(game.mapLabel(), `World map: 0 of ${liveRegistry().order.length} levels done.`);
 });
 
-test('Live globe: soon regions dimmed, not counted, not targeted', () => {
-  const live = liveRegistry();
+test('no live globe dot is SOON', () => {
   const { game } = liveGame();
   const states = game.globeView().states;
   assert.equal(states.length, DOTS.length);
-  let soonDots = 0;
-  DOTS.forEach((d, k) => {
-    const isSoon = SOON_IDS.includes(actOfCountry(d[2], d[3]));
-    if (isSoon) soonDots++;
-    assert.equal(states[k] === DOT.SOON, isSoon, `dot ${k} (${d[2]}, ${d[3]})`);
-  });
-  assert.ok(soonDots > 0);
-  const label = game.mapLabel();
-  assert.equal(label, `World map: 0 of ${live.order.length} levels done. Coming soon: Southeast Asia.`);
+  assert.equal(states.every((s) => s !== DOT.SOON), true);
+  const live = liveRegistry();
   const p = emptyProgress();
   for (const id of live.order) p.levels[id] = { stars: 3, at: null };
   assert.equal(globeTarget(live, p, DOTS).actId, live.acts[live.acts.length - 1].id);

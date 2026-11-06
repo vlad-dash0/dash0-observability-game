@@ -130,6 +130,7 @@ const ANSWERS = {
     'spot ts-spot: traces',
   ],
   'good-alerts': ['spot ga-spot: counter-value,cause-cpu,no-for', 'choice ga-fix: increase'],
+  'semantic-convention-versions': ['spot scv-spot: http-method,http-status-code,net-host-port', 'choice scv-switch: move-queries'],
   'filter-or-sampler': ['choice fos-verdict: wrong', 'sort fos-sort: errors-whole=tail healthz=filter slow-no-cache=both slow=tail debug-logs=filter many-spans=tail production-only=filter via-payments=tail errors-no-keepalive=both'],
   'the-34-percent-error-rate': ['choice ser-verdict: wrong', 'tradeoff ser-plan: sampler=errors-10pct rate=red-before'],
   'errors-tripled': [
