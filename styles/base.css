@@ -63,7 +63,7 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
   border: 1px solid var(--color-border); box-shadow: none;
 }
 .btn.small { font-size: 14px; padding: 11px; margin-top: 10px; }
-.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
 
 /* ---------- Choices ---------- */
 .choices { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 8px; }
@@ -167,7 +167,7 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 }
 .build-opt:hover:not(:disabled) { border-color: var(--color-accent); }
 .build-opt[aria-pressed="true"] { border: 3px solid var(--color-text); padding: 5.5px 9px; }
-.build-opt:disabled { opacity: .4; cursor: not-allowed; }
+.build-opt:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
 .build-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
 .build-issues { margin: 8px 0 0 18px; }
 .build-issues li { max-width: 100%; overflow-wrap: anywhere; }
@@ -197,7 +197,6 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
   background: radial-gradient(circle at 50% 52%, color-mix(in srgb, var(--color-swirl-dot) 30%, transparent) 0%, color-mix(in srgb, var(--color-swirl-dot) 12%, transparent) 32%, transparent 62%);
 }
 .help-swirl canvas, .help-swirl svg { display: block; width: 100%; height: 100%; }
-.help-swirl-ring circle { fill: currentColor; }
 .help-win-text { padding: 0 14px 14px; display: grid; }
 .help-win-title { font-size: 18px; font-weight: 600; }
 .help-win-title:focus { outline: none; }

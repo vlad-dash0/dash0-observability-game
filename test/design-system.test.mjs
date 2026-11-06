@@ -466,3 +466,35 @@ test('prose tables scroll in the kit wrap, regions and the prose column can shri
   }
   assert.equal(props('.ui-meter-cells')['grid-auto-columns'], 'minmax(0, 1fr)');
 });
+
+// ---- Kit follow-ups (#176) ---------------------------------------------------------------
+
+test('waiting and invalid waterfall rows fade bars and marks, never the row text', () => {
+  const wf = sheetRules('widgets.css');
+  const withOpacity = (r) => decls(r.body).some(([p]) => p === 'opacity');
+  for (const state of ['[data-mark="invalid"]', '[data-waiting]']) {
+    const row = `.wf-row${state}`;
+    const own = wf.filter((r) => splitTop(r.selector).includes(row));
+    assert.ok(own.length > 0, `${row} rule exists`);
+    assert.ok(!own.some(withOpacity), `${row} must not set opacity on the row (text would drop below 4.5:1)`);
+    const fade = wf.find((r) => withOpacity(r) && splitTop(r.selector).includes(`${row} .wf-bar`));
+    assert.ok(fade, `${row} fades its bar`);
+    for (const part of ['.wf-conn', '.wf-sw']) assert.ok(splitTop(fade.selector).includes(`${row} ${part}`), `${row} fades ${part}`);
+  }
+});
+
+test('disabled legacy controls use the disabled-opacity token, not a literal', () => {
+  const dis = sheetRules('base.css').filter((r) => /:disabled/.test(r.selector) && decls(r.body).some(([p]) => p === 'opacity'));
+  assert.ok(dis.length >= 2, 'base.css still styles disabled controls');
+  for (const r of dis) {
+    assert.equal(decls(r.body).find(([p]) => p === 'opacity')[1], 'var(--opacity-disabled)', r.selector);
+  }
+});
+
+test('the swirl ring and canvas do not depend on the legacy .help-swirl block', () => {
+  assert.ok(!/help-swirl-ring/.test(stripComments(read('styles/base.css'))), 'base.css no longer styles the ring');
+  const ring = sheetRules('widgets.css').find((r) => splitTop(r.selector).includes('.help-swirl-ring circle'));
+  assert.ok(ring, 'widgets.css styles the ring dots');
+  assert.deepEqual(decls(ring.body).find(([p]) => p === 'fill'), ['fill', 'currentColor']);
+  assert.ok(!/help-swirl-canvas/.test(read('lib/swirl-render.mjs')), 'the unstyled canvas class is gone');
+});
