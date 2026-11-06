@@ -200,6 +200,8 @@ test('lesson code breaks inside a long token: the lesson card clips, so an unbre
   const pick = (sel) => Object.fromEntries(sheetRules('kit.css').filter((r) => r.selector === sel).flatMap((r) => decls(r.body)));
   assert.equal(pick('.ui-lesson').overflow, 'hidden', 'premise: the card clips');
   assert.equal(pick('.ui-lesson code')['overflow-wrap'], 'anywhere');
+  assert.equal(pick('.ui-panel').overflow, 'hidden', 'premise: the panel clips too');
+  assert.equal(pick('.ui-panel code')['overflow-wrap'], 'anywhere', 'a long trace id in a panel breaks instead of clipping');
 });
 
 test('palette rule 5: kit.css puts no shadow or glow on anything, only inset rings', () => {

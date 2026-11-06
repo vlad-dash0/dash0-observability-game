@@ -404,7 +404,63 @@ const DRIVERS = {
       expect: { stars: 2, cards: [] },
     },
   },
+  // The lab boss in practice (the session was never connected): filter the simulated Trace Explorer by the
+  // session id, open the trace, open the spans, read the failing one, and type what the page shows. The expected values come from the page, so
+  // the driver breaks if the view stops showing them. Sloppy: a wrong operation and a wrong retry count.
+  'its-us': {
+    async: true,
+    telemetry: practiceTelemetry,
+    async play({ telemetry }) {
+      await findIncident(telemetry);
+      click('#its-finish');
+    },
+    expect: { stars: 5, cards: [] },
+    sloppy: {
+      telemetry: practiceTelemetry,
+      async play({ telemetry }) {
+        await findIncident(telemetry, { operation: 'progress.sync', retryCount: '9' });
+        await fixAnswers(telemetry);
+        click('#its-finish');
+      },
+      expect: { stars: 3, cards: [] },
+    },
+  },
 };
+
+/** Read the failing span off the practice trace view and type the four answers (with `over` swapped in). */
+async function findIncident(telemetry, over = {}) {
+  click('#its-practice');
+  // The Trace Explorer lists several sessions' traces: filter by the session id the page shows.
+  for (const r of qa('input[name="its-fkey"]')) r.checked = r.value === 'session.id';
+  for (const r of qa('input[name="its-fop"]')) r.checked = r.value === 'is';
+  type('#its-fvalue', q('#its-session').textContent.trim());
+  click('#its-filter-apply');
+  assert.equal(qa('#its-explorer tbody tr').length, 1, 'the filter narrows the list to one trace');
+  click('#its-open-trace-0');
+  const spans = telemetry.incident().spans;
+  const rows = qa('#its-explorer tbody tr');
+  const bad = rows.findIndex((tr) => tr.lastElementChild.textContent.trim() === 'Error');
+  assert.ok(bad >= 0, 'the failing span is marked in the list');
+  click(`#its-open-${bad}`);
+  const detail = q('#its-detail');
+  const code = [...detail.querySelectorAll('tr')].find((tr) => tr.textContent.includes('game.fault.code')).querySelectorAll('td')[1].textContent.trim();
+  const retries = [...detail.querySelectorAll('tr')].filter((tr) => tr.querySelector('td')?.textContent.trim() === 'retry').length;
+  type('#its-q-operation', over.operation ?? spans[bad].name);
+  type('#its-q-faultCode', code);
+  type('#its-q-retryCount', over.retryCount ?? String(retries));
+  type('#its-q-traceId', q('#its-trace').textContent.trim());
+  click('#its-check');
+  await Promise.resolve();
+}
+
+/** After a sloppy first check: type the right operation and retry count from the same page. */
+async function fixAnswers(telemetry) {
+  const bad = telemetry.incident().spans.findIndex((s) => s.status?.code === 'error');
+  const detail = q('#its-detail');
+  type('#its-q-operation', telemetry.incident().spans[bad].name);
+  type('#its-q-retryCount', String([...detail.querySelectorAll('tr')].filter((tr) => tr.querySelector('td')?.textContent.trim() === 'retry').length));
+  click('#its-check');
+}
 
 function practiceTelemetry() {
   return createTelemetry({ randomBytes: (n) => new Uint8Array(n).fill(7), setTimeout, clearTimeout });
