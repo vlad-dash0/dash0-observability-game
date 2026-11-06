@@ -112,7 +112,7 @@ entry). `CURRENT_VERSION = 1`; `MIGRATIONS = {}` where `MIGRATIONS[n]` maps v n 
 - With `levelIds`/`cardIds`: drop ids not in the set (the in-memory view). Without: keep
   every well-formed id (what gets persisted).
 
-### 2.6 ctx (`createLevelContext({level, ovBody, ovActions, now, shuffle, reduceMotion, onFinish, signal})`)
+### 2.6 ctx (`createLevelContext({level, ovBody, ovActions, now, shuffle, reduceMotion, onFinish, signal, reportError?, telemetry?})`)
 
 ```
 ctx = {
@@ -126,8 +126,15 @@ ctx = {
   reduceMotion: boolean
   ovBody, ovActions: Element
   signal: AbortSignal      // aborted when the overlay closes; timer callbacks check it
+  telemetry: facade | null // the injected lib/telemetry.mjs facade (below), null when the app has none
 }
 ```
+`ctx.telemetry` has no token getter. `sessionId`, `status() -> {state: 'off'|'configured'|'connected',
+mode: 'live'|'practice'|null, host}`, `stats() -> {buffered, dropped}`, `liveAvailable()`,
+`connect({mode, endpoint, token, dataset}) -> {ok:true} | {ok:false, field, reason}` (validates, sends
+nothing), `sendTest(opts?: {signal}) -> Promise<Outcome>` (single-flight), `emit(draft)` (no-op unless
+connected, never throws), `flush(opts?) -> Promise<Outcome|null>`, `sendBatch(drafts, opts?)`,
+`incident()` (null until the incident lab), `disconnect()`. Contract: docs/DASH0-LAB.md §Telemetry session.
 Levels wire buttons by assigning `el.onclick = …` after `renderStep` (CSP-safe), as in R.
 
 `finish` computes `stars = scoreStars({mistakes, hintsUsed, elapsedMs: now() - startedAt}, level)`
