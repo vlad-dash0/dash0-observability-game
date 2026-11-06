@@ -321,7 +321,6 @@ test('validatePlay names the widgets with no hint on any step, the way each moun
     return c;
   };
   assert.deepEqual(hintless([bare(query, 'query', 'helps'), bare(configure, 'configure', 'helps')]), ['query', 'configure']);
-  assert.deepEqual(hintless([bare(configure, 'configure', 'hint')]), [], 'a configure step with helps.hints has hints even with no authored hint (the widget rule)');
   assert.deepEqual(hintless([bare(query, 'query', 'hint')]), [], 'a query step with helps.hints has hints even with no authored hint (the widget rule)');
   const hintsOff = (step) => Object.assign(structuredClone(step), { query: { ...step.query, helps: { hints: false } } });
   assert.deepEqual(hintless([hintsOff(query)]), ['query']);
@@ -482,8 +481,10 @@ test('a configure step with an authored hint and no helps.hints fails validation
   assert.deepEqual(problems((p) => { p.steps[7].configure.helps = { hints: true, q: true }; }).length, 1);
 });
 
-test('a configure step may leave out the target and the hint', () => {
-  assert.deepEqual(problems((p) => { delete p.steps[7].configure.target; delete p.steps[7].configure.hint; }), []);
+test('a configure step may leave out the target, and its hint only with hints off', () => {
+  assert.deepEqual(problems((p) => { delete p.steps[7].configure.target; }), []);
+  assert.deepEqual(problems((p) => { delete p.steps[7].configure.hint; delete p.steps[7].configure.helps; }), []);
+  assert.match(problems((p) => { delete p.steps[7].configure.hint; }).join(), /hint: required when helps\.hints is on/);
 });
 
 test('no step type is reserved any more: configure is live', () => {

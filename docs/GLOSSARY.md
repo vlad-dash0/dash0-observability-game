@@ -91,6 +91,7 @@ links level text to these anchors. "(Act N)" is where it's taught.
 
 - **Collector**: a standalone service that receives, processes and exports telemetry.
   (Act 5)
+- **Component id**: the type, then an optional slash and name (`type/name`).
 - **Pipeline**: receivers, then processors, then exporters, per signal, declared under
   `service.pipelines`.
 - **Connector**: a component that is an exporter in one pipeline and a receiver in
