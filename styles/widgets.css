@@ -47,14 +47,16 @@
 .wf-row[data-mark="likely"] { background: color-mix(in srgb, var(--color-success) 8%, transparent); border-color: var(--color-success); border-style: solid; }
 .wf-row[data-mark="valid"] { background: color-mix(in srgb, var(--color-success) 8%, transparent); border-color: var(--color-success); border-style: dashed; }
 .wf-row[data-mark="overflow"] { border-color: var(--color-success); border-style: dashed; }
-.wf-row[data-mark="invalid"] { opacity: .3; cursor: not-allowed; }
+.wf-row[data-mark="invalid"] { cursor: not-allowed; }
+.wf-row[data-mark="invalid"] .wf-bar, .wf-row[data-mark="invalid"] .wf-conn, .wf-row[data-mark="invalid"] .wf-sw { opacity: .3; }
 /* Faded targets (contains it in time only partly; another trace): the bars, connectors and
    swatches fade, the words stay at full contrast (T13). */
 .wf-row[data-mark="overflow"] .wf-bar, .wf-row[data-mark="overflow"] .wf-conn, .wf-row[data-mark="overflow"] .wf-sw { opacity: .45; }
 .wf-row[data-other] .wf-bar, .wf-row[data-other] .wf-conn, .wf-row[data-other] .wf-sw, .wf-row[data-other] .wf-grip { opacity: .35; }
 .wf-row[data-hint-cand], .wf-root[data-hint-cand] { outline: 2px solid var(--color-hint); outline-offset: 2px; }
 .wf-row[data-arriving] { background: color-mix(in srgb, var(--color-parent) 7%, transparent); border-color: var(--color-parent); }
-.wf-row[data-waiting] { opacity: .5; cursor: not-allowed; }
+.wf-row[data-waiting] { cursor: not-allowed; }
+.wf-row[data-waiting] .wf-bar, .wf-row[data-waiting] .wf-conn, .wf-row[data-waiting] .wf-sw { opacity: .5; }
 .wf-row[data-waiting]:hover { background: transparent; }
 .wf-row[aria-disabled="true"] { cursor: not-allowed; }
 
@@ -163,3 +165,6 @@
 
 /* Editor kit (lib/widgets/editor.mjs, #159): the action row under a code editor. */
 .editor-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* Build it success swirl ring (lib/swirl.mjs, #176): the dots take the swirl colour from .ui-win-swirl. */
+.help-swirl-ring circle { fill: currentColor; }
