@@ -217,7 +217,7 @@
 }
 .reward-card h2 { font-weight: 800; font-size: 24px; margin-bottom: 6px; }
 .reward-card p { font-size: 14.5px; color: var(--color-text-muted); line-height: 1.5; margin-bottom: 8px; }
-.reward-card .reward-stars { font-size: 30px; letter-spacing: 6px; color: var(--color-accent); margin: 6px 0 12px; }
+.reward-card .reward-stars { font-size: 30px; letter-spacing: 6px; color: var(--color-parent); margin: 6px 0 12px; }
 .reward-cards { margin: 12px 0 6px; text-align: left; }
 .reward-card .reward-cards-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
 .reward-card .nuance-card {
