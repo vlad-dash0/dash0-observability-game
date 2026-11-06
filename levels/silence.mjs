@@ -175,7 +175,7 @@ const SCENARIO = {
   hypotheses: [
     {
       id: 'exporter-renamed',
-      label: 'The exporter was renamed but the pipelines list the old id so the eu-west cluster cannot start',
+      label: 'The exporter was renamed but pipelines list the old id so the eu-west Collector sends no data',
       right: true,
       why: 'All three signals stopped in eu-west at 14:02 and nowhere else, the Collector pods there restart and are never ready, and their log says the configuration is invalid: a pipeline references exporter "otlp_grpc/dash0", which is not configured. The diff, merged at 14:01 and applied to eu-west at 14:02, renamed that exporter to otlp_grpc/dash0-eu and left the three pipelines listing the old id. An id a pipeline lists must be defined, so the Collector exits at validation.',
     },

@@ -148,3 +148,12 @@ test('the label tell rules have teeth: they flag a longest or fewest-words answe
   assert.deepEqual(Object.keys(tellsOf('x', ['a user_id one', 'a plain words', 'one plain bit', 'two plain bit'], 0)), ['x: most code-like words']);
   assert.equal(pickShare([3, 3, 1, 1], 0, 'most'), 0.5, 'a tie of two is a coin flip, not a tell');
 });
+
+test('no cause label carries a clock time: a time in a label can contradict the alert and rule that cause out before any view is opened', async () => {
+  const CLOCK = /\b\d{1,2}:\d{2}\b/;
+  for (const b of await incidentBosses()) {
+    for (const h of b.scenario.hypotheses) {
+      assert.equal(CLOCK.test(plain(h.label)), false, `${b.id}/${h.id}: "${plain(h.label)}" has a time; keep times in the views and the why`);
+    }
+  }
+});

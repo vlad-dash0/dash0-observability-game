@@ -172,7 +172,7 @@ const SCENARIO = {
     },
     {
       id: 'provider-failing',
-      label: 'The payment provider is failing more requests, as its 03:30 to 03:40 incident shows',
+      label: 'The payment provider is failing more of the payment.authorize calls checkout sends it',
       right: false,
       why: `Its incident ended at 03:40 and the ratio did not come down. The error count is ${ERRORS} a second before and after.`,
     },
