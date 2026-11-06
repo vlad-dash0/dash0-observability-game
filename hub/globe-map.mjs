@@ -79,6 +79,7 @@ export const LEVEL_COUNTRY = Object.freeze({
   // act-9 Oceania
   'filter-or-sampler': 'NZL',
   'the-34-percent-error-rate': 'AUS',
+  'connect-to-dash0': 'PNG',
 });
 
 // ADM0_A3 code -> display name, for every country in LEVEL_COUNTRY (the ignite announcement,
@@ -93,7 +94,7 @@ export const COUNTRY_NAMES = Object.freeze({
   IND: 'India', IRN: 'Iran', PAK: 'Pakistan',
   JPN: 'Japan',
   THA: 'Thailand',
-  AUS: 'Australia', NZL: 'New Zealand',
+  AUS: 'Australia', NZL: 'New Zealand', PNG: 'Papua New Guinea',
 });
 
 /** The act id whose region a country (ADM0_A3 code, Natural Earth SUBREGION) is in, else null. */

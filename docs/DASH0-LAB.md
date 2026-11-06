@@ -32,7 +32,7 @@ Draft: `{traceId, spanId, parentSpanId?, name, kind? (default internal), startMs
 Absence is never success. Thrown error text is never passed through.
 
 ## Practice ingress: `lib/otlp/practice-ingress.mjs`
-`createPracticeIngress({token, readOnlyToken})` returns a fetch-compatible fake. Rules in order: foreign host throws TypeError; not POST 405; path other than `/v1/traces` 404; content type not JSON 415; body not an OTLP traces request 400; missing or wrong token 401; the read-only token 403; else 200 `{}`. It goes through the same `sendTraces`, so practice and live cannot diverge. Practice never calls the real fetch.
+`createPracticeIngress({token, readOnlyToken})` (`token` is one string or an array) returns a fetch-compatible fake. Rules in order: foreign host throws TypeError; not POST 405; path other than `/v1/traces` 404; content type not JSON 415; body not an OTLP traces request 400; missing or wrong token 401; the read-only token 403; else 200 `{}`. It goes through the same `sendTraces`, so practice and live cannot diverge. Practice never calls the real fetch.
 
 ## Telemetry session: `lib/telemetry.mjs`
 `createTelemetry({fetch, randomBytes, now, setTimeout, clearTimeout, reportError, hosts, allowLocal})` returns the facade `ctx.telemetry` exposes (FOUNDATION §2.6). Everything is injected; `main.mjs` supplies the browser's.
@@ -47,17 +47,31 @@ Absence is never success. Thrown error text is never passed through.
 `telemetry.incident()` builds it lazily, once per session, with the seed drawn from the injected `randomBytes` (4 bytes, big-endian). `telemetry.incident()` only builds and caches the incident. Nothing is sent until a caller passes the spans to `sendBatch` (P5), so this phase adds no request.
 `answersFrom(spans)` -> `{operation, faultCode, retryCount, traceId}` read from the spans (the array that P5 renders and exports), or `null` unless exactly one span of all of them is in error (the encoder's rule: code `2` or `error` in any case), it is a candidate with a fault code and 2..4 retries, and every span shares one trace id. `gradeAnswer(spans, question, value)` -> `pass`, `fail` or `inconclusive`, `question` in `QUESTION` (`operation`, `faultCode`, `retryCount`, `traceId`). Missing or malformed input (empty, wrong type, a retry count that is not a whole number, a trace id that is not 32 hex) and an unreadable key are `inconclusive`; the code is trimmed and case-insensitive, a retry count may be `3` or `"3"`; a well-formed wrong answer is `fail`.
 
+## The connect level: `levels/connect-to-dash0.mjs` (9.3, PNG)
+A hand-written level (`widgets: []`, scored, no par). Screens: mode (practice, or live while `liveAvailable()`); connect (practice shows a labelled simulated settings page with the endpoint reference and a token creator; live shows where to look); connected (session id, Finish with `data-finish`, only after `accepted` and `status().state === 'connected'`).
+- Validation is `ctx.telemetry.connect` (`parseEndpoint`, `checkToken`, `checkDataset`); the level only words the reason from `REASONS`. An empty endpoint or token is a nudge and costs nothing.
+- One charge rule, the same in both modes: each distinct cause costs one mistake, once, held in one Set: a wrong permission (`scope:<key>`), a form error (`<field>:<reason>`) or a rejected token (`rejected:<status>`). An emptied token field right after a form error or a rejection keeps the earlier reason only while the endpoint and dataset are unchanged (a double press); after a change it shows the token's empty reason, free, and asks for the token again ("Create a token again" in practice, "Paste the token again" in live).
+- Permissions: practice mints a token per permission in a token creator; live cannot see a token's permission, so the player declares it ("Which permission did you give this token?") before Connect, charged by the same rule. Ingesting is right; All permissions and Reading are wrong. In live, a declared Reading stops before sending ("Nothing was sent"), so it costs one charge, as in practice.
+- Practice tokens come from `telemetry.practiceCredential(scope)`: `auth_practice_` plus a suffix from the session's `randomBytes`, so the name does not say what the token can do and a replay cannot type it. Reading's token is the one the practice ingress refuses with 403; the other two are accepted.
+- Outcomes: `accepted` goes to Finish; `rejected` with `auth` costs a mistake in both modes and says only "refused this token", with the remedy (complete, from this organization, has the Ingesting permission), never the status code; `rejected` without `auth` and every `unreachable` cause cost nothing and offer a retry (live unreachable also offers practice).
+- The player is never told the answer: the screens give the reason (the game sends from a browser tab, the token sits where anyone can open dev tools) and the endpoint field is "Endpoint", not a label to match. The port is not asserted: the copy says to copy the address exactly as Dash0 shows it.
+- The token: the secret field (`field kind: 'secret'`, a write-only password input) is read and emptied in the same click, before validation. The shown practice token is scrubbed from the page at the same moment. The secret field asks password managers not to offer to save it, but a browser may ignore that, so the copy only says the game never saves the token and tells the player to decline a save prompt. After a failed send the held token is retried without retyping; to change it the player types a new one. The level file never touches storage, the URL, the console or `reportError` (`test/connect-to-dash0.test.mjs` scans its source).
+
 ## Phase ledger
 | Phase | Content | State |
 |---|---|---|
 | P1 | encoder, sender, validators, practice ingress, this doc, derived CSP test | merged (#197) |
 | P2 | `lib/telemetry.mjs`, `ctx.telemetry`, completion spans, FOUNDATION §2.6 | merged |
 | P4 | `lib/incident-lab.mjs`: seeded incident, `answersFrom`, `gradeAnswer` | in review (#210) |
-| P3 | Act 9 level "Connect the game to Dash0" (PNG), secret field kind, connect form | planned |
+| P3 | Act 9 level 9.3 "Connect the game to Dash0" (PNG), secret field kind, connect form, practice mode | in review |
 | P5 | the lab boss "It's us" | planned |
 | P6 | fill `INGRESS_HOSTS`, `vercel.json`, cite Dash0 docs; relay only if CORS is refused | needs owner inputs |
 
 Merge order: P1, P2, P4, P3, P5, P6.
+
+### P6 live QA list
+- In a real browser (Chrome, Firefox, Safari), connect live and check that no password-manager save prompt appears when the token field disappears on success. If one does, the opt-out attributes of the secret field are not enough.
+- Check that the ingress answers CORS preflights (owner input 1) and what a rejected token returns (owner input 2).
 
 ### Notes for P5 (incident send)
 - The cached incident keeps the build time. A send much later carries old timestamps that a Dash0 time filter could hide.

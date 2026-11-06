@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import { makeDom, q, qa, click as domClick } from './helpers/dom.mjs';
 import { definedClasses } from './helpers/css.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
+import { createTelemetry } from '../lib/telemetry.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
 import { runPlay, validatePlay } from '../lib/play.mjs';
 import { liveRegistry } from '../app.mjs';
@@ -372,7 +373,63 @@ const DRIVERS = {
       expect: { stars: 3, cards: ['unknown-service'] },
     },
   },
+  // Practice mode against the simulated Dash0 (no network). Plays what the player does: reads the
+  // endpoint and the minted token off the screen, types them in, waits for the test span.
+  'connect-to-dash0': {
+    async: true,
+    telemetry: practiceTelemetry,
+    async play() {
+      await connectPractice('ingest');
+      click('#ctd-finish');
+    },
+    expect: { stars: 5, cards: [] },
+    sloppy: {
+      telemetry: practiceTelemetry,
+      async play() {
+        click('#ctd-practice');
+        const ep = practiceEndpoint();
+        type('#ctd-endpoint', q('#ctd-ep-grpc').textContent.trim()); // the gRPC row: a mistake
+        type('#ctd-token', 'auth_whatever_0000');
+        click('#ctd-connect');
+        type('#ctd-endpoint', `${ep}/v1/traces`); // the signal path already added: a mistake
+        type('#ctd-token', 'auth_whatever_0000');
+        click('#ctd-connect');
+        await sendPractice('read', ep); // a read-only token: a mistake at the pick, then a 403
+        await until('#ctd-feedback[data-outcome="rejected"]');
+        assert.ok(q('#ctd-feedback').textContent.includes('refused this token'), 'the refusal is explained');
+        await sendPractice('ingest', ep);
+        await until('#ctd-finish');
+        click('#ctd-finish');
+      },
+      expect: { stars: 2, cards: [] },
+    },
+  },
 };
+
+function practiceTelemetry() {
+  return createTelemetry({ randomBytes: (n) => new Uint8Array(n).fill(7), setTimeout, clearTimeout });
+}
+
+/** The OTLP/HTTP endpoint the simulated Dash0 settings panel shows. */
+function practiceEndpoint() {
+  return q('#ctd-ep-http').textContent.trim();
+}
+
+/** Pick a permission, create the token, type endpoint and the shown token, press Connect. */
+async function sendPractice(scope, endpoint) {
+  click(`#ctd-scope-${scope}`);
+  click('#ctd-mint');
+  type('#ctd-endpoint', endpoint);
+  type('#ctd-token', q('#ctd-minted').textContent.trim());
+  click('#ctd-connect');
+}
+
+/** The happy path through screen 2: practice, the right permission, the shown endpoint. */
+async function connectPractice(scope) {
+  click('#ctd-practice');
+  await sendPractice(scope, practiceEndpoint());
+  await until('#ctd-finish');
+}
 
 // The same registry the app boots with (levels/index.mjs, the deck and the map's node ids),
 // so a level the app accepts is a level this file plays, and vice versa.
@@ -423,8 +480,8 @@ function clickUntil(sel, next, until, max = 30) {
   assert.ok(q(until), `never reached ${until}`);
 }
 
-/** Run a level with the real ctx, play it synchronously, return what happened. */
-function playLevel(level, play) {
+/** Open a level with the real ctx (and the run's telemetry, if any); `end()` collects what happened. */
+function openLevel(level, { telemetry = null } = {}) {
   const dom = makeDom();
   const calls = [];
   const steps = [];
@@ -441,6 +498,7 @@ function playLevel(level, play) {
     reportError: (e) => {
       throw e;
     },
+    telemetry,
   });
   const render = ctx.renderStep;
   ctx.renderStep = (body, actions) => {
@@ -449,24 +507,60 @@ function playLevel(level, play) {
   };
   const classes = new Set();
   seenClasses = classes;
+  let first;
+  const injected = [];
   try {
     level.run(ctx);
     pageClasses(classes);
-    const first = {
+    first = {
       rendered: steps.length,
       finishEnabled: qa('[data-finish]').some((b) => !b.disabled),
       finishedEarly: calls.length,
     };
     // The live overlay, not just renderStep's strings: setAttribute, innerHTML and
     // insertAdjacentHTML can add Alpine attributes too.
-    const injected = [...liveAlpineAttrs(dom.body, dom.actions)];
-    play();
     injected.push(...liveAlpineAttrs(dom.body, dom.actions));
-    pageClasses(classes);
-    return { calls, steps, first, injected, classes };
+  } catch (e) {
+    seenClasses = null;
+    throw e;
+  }
+  return {
+    ctx,
+    telemetry,
+    end() {
+      injected.push(...liveAlpineAttrs(dom.body, dom.actions));
+      pageClasses(classes);
+      return { calls, steps, first, injected, classes };
+    },
+  };
+}
+
+/** Run a level with the real ctx, play it synchronously, return what happened. */
+function playLevel(level, play, opts) {
+  const session = openLevel(level, opts);
+  try {
+    play(session);
+    return session.end();
   } finally {
     seenClasses = null;
   }
+}
+
+/** playLevel for a driver that awaits (a level that sends a request); `play` may return a promise. */
+async function playLevelAsync(level, play, opts) {
+  const session = openLevel(level, opts);
+  try {
+    await play(session);
+    return session.end();
+  } finally {
+    seenClasses = null;
+  }
+}
+
+/** Wait (a few event-loop turns) until `sel` is on the page; fails if it never appears. */
+async function until(sel, max = 50) {
+  for (let i = 0; i < max && !q(sel); i++) await new Promise((r) => setImmediate(r));
+  assert.ok(q(sel), `never appeared: ${sel}`);
 }
 
 // ---- T8 (#158): every class a level shows has a CSS rule --------------------------------
@@ -525,7 +619,15 @@ function alpineAttrs(html) {
 
 /** Every check a play-through must pass; returns the stars earned. */
 function checkRun(level, run) {
-  const { calls, steps, first, injected, classes } = playLevel(level, run.play);
+  return assertRun(level, run, playLevel(level, run.play, { telemetry: run.telemetry?.() }));
+}
+
+/** checkRun for a driver whose play awaits (`async: true` on the DRIVERS entry). */
+async function checkRunAsync(level, run) {
+  return assertRun(level, run, await playLevelAsync(level, run.play, { telemetry: run.telemetry?.() }));
+}
+
+function assertRun(level, run, { calls, steps, first, injected, classes }) {
   assert.deepEqual(injected, [], 'the overlay holds an Alpine attribute (set outside renderStep)');
   const missing = undefinedClasses(steps, classes);
   for (const c of missing) if (UNDEFINED_ALLOW.includes(c)) undefinedSeen.add(c);
@@ -554,17 +656,29 @@ function checkRun(level, run) {
 
 /** Happy run, then sloppy: required and worse for scored levels; optional and 0 if unscored. */
 function checkLevel(level, driver) {
-  const happy = checkRun(level, driver);
+  return judge(level, driver, checkRun(level, driver), () => driver.sloppy && checkRun(level, driver.sloppy));
+}
+
+async function checkLevelAsync(level, driver) {
+  return judge(level, driver, await checkRunAsync(level, driver),
+    () => driver.sloppy && checkRunAsync(level, driver.sloppy));
+}
+
+// `sloppy` is a thunk giving the sloppy run's stars (or a promise of them).
+function judge(level, driver, happy, sloppyRun) {
   if (!driver.sloppy) {
     assert.ok(!level.scored, `DRIVERS["${level.id}"] needs a sloppy run`);
-    return;
+    return undefined;
   }
-  const sloppy = checkRun(level, driver.sloppy);
-  if (!level.scored) {
-    assert.equal(sloppy, 0, 'an unscored level earns 0 stars on any run');
-    return;
-  }
-  assert.ok(sloppy < happy, `sloppy run (${sloppy}) must score fewer stars than happy (${happy})`);
+  const after = (sloppy) => {
+    if (!level.scored) {
+      assert.equal(sloppy, 0, 'an unscored level earns 0 stars on any run');
+      return;
+    }
+    assert.ok(sloppy < happy, `sloppy run (${sloppy}) must score fewer stars than happy (${happy})`);
+  };
+  const ran = sloppyRun();
+  return ran instanceof Promise ? ran.then(after) : after(ran);
 }
 
 test('every registered run-level has a driver and every driver is registered', () => {
@@ -579,8 +693,9 @@ test('driverGaps catches a missing driver and a driver without a level', () => {
 
 for (const id of LIVE.order) {
   if (!DRIVERS[id] && LIVE.levels[id].play) continue; // played with a derived driver below
-  test(`level "${id}" plays through (happy and sloppy)`, () => {
-    checkLevel(LIVE.levels[id], DRIVERS[id]);
+  test(`level "${id}" plays through (happy and sloppy)`, async () => {
+    if (DRIVERS[id].async) await checkLevelAsync(LIVE.levels[id], DRIVERS[id]);
+    else checkLevel(LIVE.levels[id], DRIVERS[id]);
   });
 }
 
@@ -758,6 +873,22 @@ test('harness: an earlier Finish click does not cover a finish from outside a cl
       /finished from a \[data-finish\] click, not from no click/,
     );
   }
+});
+
+test('harness: an async level whose sloppy run equals its happy run fails', async () => {
+  const same = { async: true, async play() { FIXTURE_DRIVER.play(); }, expect: FIXTURE_DRIVER.expect };
+  await checkLevelAsync(FIXTURE, { ...same, sloppy: { ...FIXTURE_DRIVER.sloppy, async play() { FIXTURE_DRIVER.sloppy.play(); } } });
+  await assert.rejects(
+    checkLevelAsync(FIXTURE, { ...same, sloppy: { ...same } }),
+    /must score fewer/,
+  );
+});
+
+test('harness: an async run that finishes from a stray button fails', async () => {
+  await assert.rejects(
+    checkRunAsync(FIXTURES['fx-other-button'], { async play() { click('#go'); }, expect: { stars: 5, cards: [] } }),
+    /finished from a \[data-finish\] click/,
+  );
 });
 
 test('harness: a wrong expectation, a missing sloppy run or an equal sloppy run fails', () => {
