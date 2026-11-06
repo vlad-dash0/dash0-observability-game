@@ -56,7 +56,7 @@ test('readHiddenHelp: a throwing storage is unavailable and empty', () => {
   }
 });
 
-test('readHiddenHelp: only well-formed ids, deduped, own keys, capped at 100', () => {
+test('readHiddenHelp: only well-formed ids, deduped, capped at 100', () => {
   const r = read(at(JSON.stringify({ v: 1, hidden: ['sort', 7, 'Bad Id', '__proto__', 'sort', null, 'constructor-x'] })));
   assert.deepEqual(sorted(r.hidden), ['constructor-x', 'sort']);
   const many = Array.from({ length: 150 }, (_, i) => `w-${i}`);
@@ -70,10 +70,18 @@ test('hideHelp: reads, unions and writes sorted, keeping unknown stored keys', (
   assert.equal(store.data.get(HELP_KEY), '{"v":1,"hidden":["build","choice","sort","zz-later"]}');
 });
 
-test('hideHelp: a fresh store gets just the keys; bad keys are not written', () => {
+test('hideHelp: a fresh store gets only the keys; bad keys are not written', () => {
   const store = at();
   assert.equal(hideHelp(() => store, ['sort', 'Bad Id', 'sort']).saved, true);
   assert.equal(store.data.get(HELP_KEY), '{"v":1,"hidden":["sort"]}');
+});
+
+test('hideHelp: a full store refuses new keys with reason full and is left byte-unchanged', () => {
+  const text = JSON.stringify({ v: 1, hidden: Array.from({ length: 100 }, (_, i) => `w-${String(i).padStart(3, '0')}`) });
+  const store = at(text);
+  assert.deepEqual(hideHelp(() => store, ['zz']), { saved: false, reason: 'full' });
+  assert.equal(store.data.get(HELP_KEY), text);
+  assert.deepEqual(hideHelp(() => store, ['w-005']), { saved: true }, 'a key already stored still fits');
 });
 
 test('hideHelp: a corrupt value is overwritten, with no backup key', () => {

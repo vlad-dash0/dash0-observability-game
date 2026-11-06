@@ -258,12 +258,12 @@ Absence (`storageGetter = () => window.localStorage`, called inside try/catch):
 | `future` | `v > CURRENT_VERSION` | sanitized best effort | refused `{saved:false, reason:'future'}` |
 | `unavailable` | getter / `getItem` / `setItem` throws | memory only | `{saved:false, reason:'unavailable'}` |
 
-The how-to-play opt-out ("Don't show again", #199) is a preference, not progress, so it has its own key
+The "Don't show again" choice for the How to play card (#199) is a preference, not progress, so it has its own key
 `oncall.help`, `{"v":1,"hidden":["build","sort"]}` (widget keys, sorted, unique, at most 100), and never
 touches `oncall.progress`. `readHiddenHelp` gives `fresh`, `ok`, `corrupt`, `future` or `unavailable` with a
 set of the well-formed keys (empty unless `ok` or `future`); a corrupt or unreadable value shows the card.
 `hideHelp` reads, unions and writes in one task (unknown well-formed keys are kept), overwrites a corrupt
-value with no backup, refuses `future` (store untouched) and answers `unavailable` when storage throws; the
+value with no backup, refuses `future` (store untouched) and a full store (`full`: the union would pass 100 keys; nothing written), and answers `unavailable` when storage throws; the
 game raises no notice for any of these. Debug (`?mode=debug`) never writes it.
 
 `game.notice` is set for corrupt, future and unavailable; null for fresh and ok. On save,
