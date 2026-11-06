@@ -562,6 +562,21 @@ test('the About dialog: opens on the heading, Close returns focus to ?', () => {
   assert.equal(game.aboutSummary, GAME_SUMMARY);
 });
 
+test('closeAbout is a no-op when About is not open (stale call)', () => {
+  const { game } = setup();
+  const focused = [];
+  game.focusSoon = (selector) => focused.push(selector);
+  game.closeAbout();
+  assert.deepEqual(focused, []);
+  assert.equal(game.aboutOpen, false);
+  game.openLevel('x');
+  assert.equal(game.overlayOpen, true);
+  const before = focused.length;
+  game.closeAbout();
+  assert.equal(game.overlayOpen, true);
+  assert.equal(focused.length, before, 'no focus call from the stale closeAbout');
+});
+
 test('Escape closes the About dialog; no level opens behind it', () => {
   const { game, dom } = setup();
   game.openAbout();

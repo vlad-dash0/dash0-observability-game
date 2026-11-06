@@ -157,5 +157,6 @@ test('every act, live and coming soon, has a one-line plain-text teaser', () => 
     assert.ok(act.teaser.trim().length > 0, `${act.id} teaser is not blank`);
     assert.ok(act.teaser.length <= 160, `${act.id} teaser is ${act.teaser.length} characters`);
     assert.ok(!act.teaser.includes('<'), `${act.id} teaser is plain text`);
+    assert.ok(!/[\r\n]/.test(act.teaser), `${act.id} teaser is one line`);
   }
 });
