@@ -163,5 +163,8 @@
 .spot-instr { color: var(--color-text-muted); font-size: 13.5px; margin: 0; }
 [data-spot] [data-line] code { background: none; border: none; padding: 0; font-size: inherit; }
 
+/* Editor kit (lib/widgets/editor.mjs, #159): the action row under a code editor. */
+.editor-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
 /* Build it success swirl ring (lib/swirl.mjs, #176): the dots take the swirl colour from .ui-win-swirl. */
 .help-swirl-ring circle { fill: currentColor; }

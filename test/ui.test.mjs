@@ -147,7 +147,7 @@ test('field, radio, checkbox', () => {
     '<input type="text" class="ui-input" id="svc" value=""></div>');
   assert.equal(field({ id: 'cfg', label: 'Config', kind: 'code', rows: 6, value: 'a: "1"', readonly: true, noteHtml: 'Read <b>only</b>' }),
     '<div class="ui-field"><label class="ui-field-label" for="cfg">Config</label>' +
-    '<textarea class="ui-input ui-input--code" id="cfg" rows="6" spellcheck="false" readonly aria-describedby="cfg-note">a: &quot;1&quot;</textarea>' +
+    '<textarea class="ui-input ui-input--code" id="cfg" rows="6" spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off" readonly aria-describedby="cfg-note">a: &quot;1&quot;</textarea>' +
     '<p class="ui-note" id="cfg-note">Read <b>only</b></p></div>');
   assert.equal(radio({ name: 'k', value: 'v', labelHtml: 'V', checked: true }),
     '<label class="ui-check"><input type="radio" class="ui-check-input" name="k" value="v" checked><span class="ui-check-label">V</span></label>');

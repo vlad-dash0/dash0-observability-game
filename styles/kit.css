@@ -266,6 +266,7 @@
 .ui-input--code {
   font-family: var(--font-mono); font-size: 13px; line-height: 1.6; background: var(--color-code-bg);
   padding: var(--space-3) 14px; resize: vertical;
+  white-space: pre; overflow-wrap: normal; overflow-x: auto;
 }
 .ui-input[readonly] { color: var(--color-text-muted); }
 .ui-check { display: flex; gap: 10px; align-items: center; cursor: pointer; }
