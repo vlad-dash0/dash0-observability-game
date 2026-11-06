@@ -67,7 +67,7 @@
           <span><i class="globe-key lit" aria-hidden="true"></i>Lit: level completed</span>
           <span><i class="globe-key pulse" aria-hidden="true"></i>Pulsing: incident open</span>
           <span><i class="globe-key" aria-hidden="true"></i>Not reached</span>
-          <span><i class="globe-key soon" aria-hidden="true"></i>Coming soon</span>
+          <span x-show="hasSoon()"><i class="globe-key soon" aria-hidden="true"></i>Coming soon</span>
         </p>
       </div>
       <ul class="globe-fallback" x-show="globeFallback" x-cloak>

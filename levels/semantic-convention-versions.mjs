@@ -18,8 +18,9 @@
 // OpenTelemetry attributes (`service.name`, `http.response.status_code`), written with underscores in PromQL (`service_name`). Not
 // claimed: that Dash0 reads both the old and the stable names, or that anything keeps working in Dash0 after the switch.
 //
-// The board is built so no namespace reads the answer: the old names are in `http.` and `net.`, and so are three stable names
-// (`http.request.method`, `http.route`, `http.request.header.content-type`). Pinned in test/spot-tells.test.mjs.
+// The board is built so no first-segment namespace reads the answer: the old names are in `http.` and `net.`, and so are three stable names
+// (`http.request.method`, `http.route`, `http.request.header.content-type`). A depth-2 rule ("not under `http.request.`")
+// does pick the faults plus `http.route`; that is accepted as the concept (#207). Pinned in test/spot-tells.test.mjs.
 //
 // Invented for the game: the company, the checkout service, the values on the span (/checkout, /checkout?step=pay, POST, 500, 8443, gw.kettle.example) and the
 // scenario of the week-ahead switch. Each attribute is shown as `key=value`.
@@ -48,7 +49,7 @@ const SPOT = {
   },
   explain:
     'Those three are the old names: <code>http.target</code> (now split into <code>url.path</code> and <code>url.query</code>), <code>net.host.port</code> (now <code>server.port</code>) and <code>http.status_code</code> (now <code>http.response.status_code</code>). ' +
-    'With <code>OTEL_SEMCONV_STABILITY_OPT_IN=http/dup</code> the instrumentation sends the old and the stable names side by side; ' +
+    'With <code>OTEL_SEMCONV_STABILITY_OPT_IN</code> set to <code>http/dup</code> the instrumentation sends the old and the stable names side by side; ' +
     'with <code>http</code> it sends only the stable ones, and the old names stop arriving. <code>http.route</code> did not change.',
 };
 
@@ -56,7 +57,7 @@ const SWITCH = [
   {
     key: 'switch-now',
     label: 'Switch now: the stable names are the same data, so everything keeps working',
-    why: 'The data is the same, the names are not. A query, a dashboard panel or an alert rule that filters on <code>http.method</code> matches nothing once it stops arriving, and an alert that matches nothing stays quiet.',
+    why: 'The data is the same, the names are not. A query, a dashboard panel or an alert rule that filters on <code>http.status_code</code> matches nothing once that name stops arriving, and an alert that matches nothing stays quiet.',
   },
   {
     key: 'move-queries',
@@ -64,7 +65,7 @@ const SWITCH = [
     right: true,
     why:
       'While <code>http/dup</code> is on, both names arrive, so you can move each query, dashboard and alert rule to <code>http.response.status_code</code>, <code>server.port</code> and <code>url.path</code> plus <code>url.query</code> and see it still returns data. ' +
-      'Then set <code>OTEL_SEMCONV_STABILITY_OPT_IN=http</code> and the old names stop. ' +
+      'Then set <code>OTEL_SEMCONV_STABILITY_OPT_IN</code> to <code>http</code> and the old names stop. ' +
       'In Dash0, a chart\'s PromQL filters name OpenTelemetry attributes, with the dots written as underscores (<code>service.name</code> is <code>service_name</code>), so check your charts for the old names too.',
   },
   {
@@ -90,7 +91,7 @@ export default {
       {
         intro:
           'OpenTelemetry\'s HTTP semantic conventions went stable with new names: <code>http.user_agent</code> became <code>user_agent.original</code>. ' +
-          'Kettle &amp; Co\'s checkout upgraded its instrumentation and set <code>OTEL_SEMCONV_STABILITY_OPT_IN=http/dup</code>, so its HTTP spans carry the old and the stable names side by side. ' +
+          'Kettle &amp; Co\'s checkout upgraded its instrumentation and set <code>OTEL_SEMCONV_STABILITY_OPT_IN</code> to <code>http/dup</code>, so its HTTP spans carry the old and the stable names side by side. ' +
           'Next week the team sets it to <code>http</code>, which sends the stable names only. Here are eight attributes from one checkout server span. Each line is one attribute, as key=value.',
         question: 'Spot the attributes that stop arriving once the opt-in is set to http.',
         qid: 'scv-q-spot',
