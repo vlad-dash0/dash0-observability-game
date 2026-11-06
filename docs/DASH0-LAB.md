@@ -42,17 +42,27 @@ Absence is never success. Thrown error text is never passed through.
 - `emit` is a no-op unless connected and never throws (a bad draft is reported and counted dropped). Missing ids and times are filled in. The buffer holds 200 spans; more are dropped and counted. `flush` takes the buffer synchronously, so spans emitted meanwhile go in the next batch; a failed flush drops its snapshot and counts it; a flush that finishes after the config changed returns `unreachable/aborted` and touches no counter. `stats()` is `{buffered, dropped}`. `sendBatch` bypasses the buffer and rejects on an invalid draft.
 - `app.mjs` `completeLevel` emits `level.complete` (`game.level.id`, `game.act.id`, `game.level.stars` = the result's stars, `game.cards.count`, `game.debug`) and flushes without awaiting, inside try/catch with `reportError`. No request is made unless connected. Completion never waits on telemetry.
 
+## Incident: `lib/incident-lab.mjs`
+`buildIncident(seed, {now})` is pure: `seed` is an integer 0..2^32-1, `now` the injected clock (read once, for the root's start); no `Math.random`, `Date.now` or crypto inside, so the same seed and clock give a deep-equal incident. Returns `{seed, traceId, spans}` with encoder drafts: root `progress.sync` and children `progress.serialize`, `storage.write`, `cards.award`, `globe.ignite`, one trace. The seed picks one of the last three to fail: it alone has status `error` (generic message), the attribute `game.fault.code` (6 characters from `FAULT_ALPHABET`, no I, O, 0, 1), 2 to 4 `retry` events and an `exception` event (`exception.type` from a fixed list). The code appears nowhere else. `session.id` is stamped by the encoder.
+`telemetry.incident()` builds it lazily, once per session, with the seed drawn from the injected `randomBytes` (4 bytes, big-endian). `telemetry.incident()` only builds and caches the incident. Nothing is sent until a caller passes the spans to `sendBatch` (P5), so this phase adds no request.
+`answersFrom(spans)` -> `{operation, faultCode, retryCount, traceId}` read from the spans (the array that P5 renders and exports), or `null` unless exactly one span of all of them is in error (the encoder's rule: code `2` or `error` in any case), it is a candidate with a fault code and 2..4 retries, and every span shares one trace id. `gradeAnswer(spans, question, value)` -> `pass`, `fail` or `inconclusive`, `question` in `QUESTION` (`operation`, `faultCode`, `retryCount`, `traceId`). Missing or malformed input (empty, wrong type, a retry count that is not a whole number, a trace id that is not 32 hex) and an unreadable key are `inconclusive`; the code is trimmed and case-insensitive, a retry count may be `3` or `"3"`; a well-formed wrong answer is `fail`.
+
 ## Phase ledger
 | Phase | Content | State |
 |---|---|---|
 | P1 | encoder, sender, validators, practice ingress, this doc, derived CSP test | merged (#197) |
-| P2 | `lib/telemetry.mjs`, `ctx.telemetry`, completion spans, FOUNDATION §2.6 | this PR |
-| P4 | `lib/incident-lab.mjs`: seeded incident, `answersFrom`, `gradeAnswer` | planned |
+| P2 | `lib/telemetry.mjs`, `ctx.telemetry`, completion spans, FOUNDATION §2.6 | merged |
+| P4 | `lib/incident-lab.mjs`: seeded incident, `answersFrom`, `gradeAnswer` | in review (#210) |
 | P3 | Act 9 level "Connect the game to Dash0" (PNG), secret field kind, connect form | planned |
 | P5 | the lab boss "It's us" | planned |
 | P6 | fill `INGRESS_HOSTS`, `vercel.json`, cite Dash0 docs; relay only if CORS is refused | needs owner inputs |
 
 Merge order: P1, P2, P4, P3, P5, P6.
+
+### Notes for P5 (incident send)
+- The cached incident keeps the build time. A send much later carries old timestamps that a Dash0 time filter could hide.
+- Each `sendBatch` re-sends the same span ids, so P5 sends the incident once.
+- Open P5 question: should P5 rebase the span and event times to the send time (shift every `startMs`, `endMs` and `timeMs` by one delta, ids unchanged) before the one send? Leaning yes, because the lab's questions are answered from what the player finds in Dash0 and a stale time window would hide it; P5 decides and records it here. Not implemented in P4.
 
 ## Owner inputs (VERIFY)
 1. Does the OTLP/HTTP ingress answer browser CORS preflights for `Authorization`, `Content-Type` and `Dash0-Dataset`, including on 401/403? If not, the relay is needed.

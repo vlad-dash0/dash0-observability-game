@@ -1,6 +1,6 @@
 // The Spot it help ladder per level (#160): every Spot it step declares its helps explicitly,
-// and the seven Spot levels follow the default ladder: hints on in act 3 (3.2, 3.5, 3.6) and off
-// later (5.2, 5.5, 6.2, 7.1). A step with no helps key would have hints off (spotHelps), but the
+// and the eight Spot levels follow the default ladder: hints on in act 3 (3.2, 3.5, 3.6) and off
+// later (5.2, 5.5, 6.2, 7.1, 8.2). A step with no helps key would have hints off (spotHelps), but the
 // ladder is a decision, so it is written down on each step. The specs are read from each
 // level's `play` and its CONTENT export.
 import { test } from 'node:test';
@@ -22,6 +22,7 @@ const LADDER = {
   '5.5': false,
   '6.2': false,
   '7.1': false,
+  '8.2': false,
 };
 
 const LEVELS = join(dirname(fileURLToPath(import.meta.url)), '..', 'levels');
@@ -39,7 +40,7 @@ async function spotLevels() {
   return out;
 }
 
-test('the Spot levels are exactly the seven on the ladder', async () => {
+test('the Spot levels are exactly the eight on the ladder', async () => {
   const found = (await spotLevels()).map((l) => l.no).sort();
   assert.deepEqual(found, Object.keys(LADDER).sort());
 });
@@ -137,7 +138,7 @@ test('no two Spot boards share an answer layout', async () => {
   }
   const shared = Object.entries(byLayout).filter(([, boards]) => boards.length > 1);
   assert.deepEqual(shared, [], JSON.stringify(byLayout));
-  assert.equal(Object.values(byLayout).flat().length, 7, 'all seven Spot boards were compared');
+  assert.equal(Object.values(byLayout).flat().length, 8, 'all eight Spot boards were compared');
 });
 
 test('no position rule (every odd or even line, the first or last k lines) solves any Spot board through checkSpot (#190)', async () => {
@@ -155,6 +156,6 @@ test('no position rule (every odd or even line, the first or last k lines) solve
       }
     }
   }
-  assert.equal(boards, 7, 'all seven Spot boards were tried');
+  assert.equal(boards, 8, 'all eight Spot boards were tried');
   assert.deepEqual(solving, {}, 'boards a position rule solves without reading them');
 });

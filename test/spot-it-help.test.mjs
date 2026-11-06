@@ -80,8 +80,8 @@ test('hintFor tier 1: the authored hint, else the generic rule, in a <p>; the sa
   }
 });
 
-test('the tier 1 rule says a hint costs a star too, not only a wrong Check', () => {
-  assert.match(SPOT_RULE, /hint costs a star/);
+test('the tier 1 rule says a hint counts as one penalty too, not only a wrong Check', () => {
+  assert.match(SPOT_RULE, /hint counts as one penalty/);
   assert.doesNotMatch(SPOT_RULE, /only a wrong Check/);
 });
 

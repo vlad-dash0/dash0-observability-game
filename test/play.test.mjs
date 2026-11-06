@@ -125,7 +125,7 @@ for (const level of LEVELS) {
           const { calls } = playAll(level, (i) => {
             if (i !== at) return;
             for (const sel of [...slip.clicks, ...slip.clicks]) click(sel);
-            assert.match(text(`#${spec.id}-feedback`), /^Same as last time:/);
+            assert.match(text(`#${spec.id}-feedback`), /^(Same as last time:|You already checked)/);
           });
           assert.equal(calls[0].result.stars, level.scored ? 4 : 0);
           ran += 1;

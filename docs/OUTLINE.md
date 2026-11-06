@@ -148,7 +148,7 @@ Each level lists **concept** / **OTel nuance** / **Dash0 tie-in** / **mechanic**
 | Level | Concept | Nuance | Dash0 tie-in | Mechanic |
 | --- | --- | --- | --- | --- |
 | 8.1 Dashboards as code | Versioned, reviewed dashboards | n/a | Dash0 dashboards are Perses-based; manage them with Terraform or the Kubernetes operator | Configure it |
-| 8.2 Semantic convention versions | Conventions evolve: `http.method` became `http.request.method` | `OTEL_SEMCONV_STABILITY_OPT_IN` and dual-emitting during migration | Dash0 understands semantic conventions, so the views work out of the box | Spot it |
+| 8.2 Semantic convention versions | Conventions evolve: `http.method` became `http.request.method` | `OTEL_SEMCONV_STABILITY_OPT_IN` and dual-emitting during migration | Dash0 chart filters name these attributes (dots as underscores in PromQL), so move them before the switch | Spot it |
 | 8.3 Migrating vendors | Moving dashboards and alerts off a proprietary tool | Proprietary query languages don't map 1:1 | DART: Datadog/Sentry/etc. to Dash0 + Terraform | Sort it |
 | 8.4 Frontend / RUM | Browser telemetry, Web Vitals, sessions | Browser spans and CORS for the OTLP endpoint | Dash0 website monitoring | Build it |
 | 8.5 AI-assisted debugging | Letting an agent query your telemetry | Agents need good semantic conventions as much as humans do | Dash0 MCP server and Agent0 | Incident (with the guide as copilot) |
@@ -192,7 +192,7 @@ case by showing the "before" (the player struggling with raw data in the game's
 simplified UI) and then the "after" view in Dash0. Points to make, one per act:
 
 - **OTel-native ingestion**: OTLP straight in, no proprietary agent, semantic
-  conventions understood out of the box (Acts 0, 1, 8).
+  conventions understood (Acts 0, 1, 8).
 - **Resource-centric**: everything hangs off the resource it came from; Kubernetes
   operator for auto-instrumentation and metadata (Act 1).
 - **One query language**: PromQL across metrics, logs and spans (Acts 3, 4, 7).

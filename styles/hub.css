@@ -132,6 +132,7 @@
   font-size: 13px; color: var(--color-text-muted);
 }
 .act-soon-chip, .act-soon-teaser { margin: 0; }
+.act-badges { margin: 0 6px 10px; display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .level-list { display: flex; flex-direction: column; gap: 12px; }
 .level-card {
   display: flex; align-items: center; gap: 14px;
@@ -255,6 +256,7 @@
 .about-acts li { padding: 10px 0; border-top: 1px solid var(--color-border); }
 .about-acts h3 { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
 .about-acts p { margin-bottom: 4px; }
+.about-acts .act-badges { margin-left: 0; margin-right: 0; }
 .about-sub { font-weight: 600; }
 
 /* ---------- Confetti: colour by class, motion by the Web Animations API ---------- */
