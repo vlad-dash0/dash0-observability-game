@@ -13,6 +13,7 @@ import { fakeStorage } from './helpers/fake-storage.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
 import { STORAGE_KEY } from '../lib/storage.mjs';
 import { THEME_KEY } from '../lib/theme.mjs';
+import { HELP_KEY, hideHelp } from '../lib/help-prefs.mjs';
 import { createGame, liveRegistry } from '../app.mjs';
 import { endSentence } from '../lib/text.mjs';
 import { GAME_SUMMARY } from '../hub/about.mjs';
@@ -1059,6 +1060,201 @@ test('confetti is skipped under reduced motion and uses class colours, never sty
   assert.ok(bits.every((b) => !b.hasAttribute('style') && /\bc[1-6]\b/.test(b.className)));
 });
 
+// ---- the How to play card (#199) ---------------------------------------------------
+
+// Level x declares no widgets (no card); w and v declare theirs; the-pager style: none.
+const REG_CARD = buildRegistry(
+  [
+    {
+      id: 'a0',
+      no: 0,
+      name: 'First act',
+      levels: [
+        L('x', '0.1'),
+        L('w', '0.2', { mechanics: ['sort'], widgets: ['choice', 'sort'] }),
+        L('v', '0.3', { mechanics: ['build'], widgets: ['choice', 'build'] }),
+      ],
+      boss: null,
+    },
+  ],
+  { deck: [], nodeIds: [] },
+);
+const cardGame = (opts = {}) => {
+  const s = setup({ registry: REG_CARD, ...opts });
+  s.focused = [];
+  s.game.focusSoon = (selector) => s.focused.push(selector);
+  return s;
+};
+const escapeOn = (s, target = s.dom.document.body) => s.game.onEscape({ target, defaultPrevented: false });
+
+test('a level with widgets opens its card the first time, focused; one without has none', () => {
+  const s = cardGame();
+  assert.equal(s.game.openLevel('w'), true);
+  assert.equal(s.game.howToOpen, true);
+  assert.deepEqual(s.game.howTo.topics.map((t) => t.key), ['choice', 'sort']);
+  assert.deepEqual(s.focused, ['#ov-howto-title']);
+  s.game.closeOverlay();
+  s.focused.length = 0;
+  const none = cardGame();
+  assert.equal(none.game.openLevel('x'), true);
+  assert.equal(none.game.howToOpen, false);
+  assert.deepEqual(none.game.howTo.topics, []);
+  assert.deepEqual(none.focused, ['#ov-back']);
+  assert.equal(none.game.toggleHowTo(), false, 'no card to toggle');
+  assert.equal(none.game.howToOpen, false);
+});
+
+test('howToExpanded mirrors the card as the aria-expanded string', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  assert.equal(s.game.howToExpanded(), 'true');
+  s.game.closeHowTo();
+  assert.equal(s.game.howToExpanded(), 'false');
+});
+
+test('Close dismisses for this visit only', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  s.game.closeHowTo();
+  assert.equal(s.game.howToOpen, false);
+  assert.equal(s.focused.at(-1), '#ov-howto-open');
+  assert.equal(s.store.data.has(HELP_KEY), false, 'Close stores nothing');
+  s.game.closeOverlay();
+  s.game.openLevel('w');
+  assert.equal(s.game.howToOpen, false, 'seen this visit: no auto-open');
+  assert.equal(s.game.howTo.topics.length, 2, 'the topics are still there');
+  s.focused.length = 0;
+  s.game.toggleHowTo();
+  assert.equal(s.game.howToOpen, true, 'the reopen button opens it');
+  assert.deepEqual(s.focused, ['#ov-howto-title']);
+  s.game.toggleHowTo();
+  assert.equal(s.game.howToOpen, false, 'and closes it');
+  assert.equal(s.focused.at(-1), '#ov-howto-open');
+  const fresh = cardGame({ storage: () => s.store });
+  fresh.game.openLevel('w');
+  assert.equal(fresh.game.howToOpen, true, 'a reload opens it again');
+});
+
+test("Don't show again is stored per widget and respected later", () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  s.game.hideHowTo();
+  assert.equal(s.game.howToOpen, false);
+  assert.equal(s.focused.at(-1), '#ov-howto-open');
+  assert.equal(s.store.data.get(HELP_KEY), '{"v":1,"hidden":["choice","sort"]}');
+  const later = cardGame({ storage: () => s.store });
+  later.game.openLevel('w');
+  assert.equal(later.game.howToOpen, false);
+  assert.deepEqual(later.game.howTo.topics.map((t) => t.key), ['choice', 'sort'], 'still listed');
+  later.game.closeOverlay();
+  later.game.openLevel('v');
+  assert.equal(later.game.howToOpen, true, 'build is new to this player');
+});
+
+test('a level opens its card unless every widget is seen or hidden', () => {
+  const s = cardGame({ initial: { [HELP_KEY]: '{"v":1,"hidden":["choice"]}' } });
+  s.game.openLevel('v');
+  assert.equal(s.game.howToOpen, true, 'one unseen widget is enough');
+  s.game.closeOverlay();
+  s.game.openLevel('w');
+  assert.equal(s.game.howToOpen, true, 'sort is not hidden');
+  s.game.hideHowTo();
+  assert.deepEqual(JSON.parse(s.store.data.get(HELP_KEY)).hidden, ['choice', 'sort']);
+});
+
+test('Escape with the card open closes the card, not the level', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  escapeOn(s);
+  assert.equal(s.game.howToOpen, false);
+  assert.equal(s.game.overlayOpen, true);
+  assert.equal(ctxs.w.signal.aborted, false);
+  escapeOn(s);
+  assert.equal(s.game.overlayOpen, false, 'the second Escape closes the level');
+  const typing = cardGame();
+  typing.game.openLevel('w');
+  const area = typing.dom.document.createElement('textarea');
+  typing.dom.document.body.appendChild(area);
+  escapeOn(typing, area);
+  assert.equal(typing.game.howToOpen, false, 'typing: the card still closes');
+  assert.equal(typing.game.overlayOpen, true);
+});
+
+test('Escape that a widget already handled leaves the card alone', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  s.game.onEscape({ target: s.dom.document.body, defaultPrevented: true });
+  assert.equal(s.game.howToOpen, true);
+});
+
+test('the card never blocks finishing and is not level DOM', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  assert.equal(s.game.howToOpen, true);
+  assert.equal(s.dom.document.querySelector('#ov-body #ov-howto') === null, true);
+  assert.ok(s.dom.document.querySelector('.overlay #ov-howto'), 'the card is overlay markup');
+  assert.equal(s.dom.document.querySelector('[data-finish]').disabled, false);
+  ctxs.w.finish({ text: 'finished with the card open' });
+  assert.equal(s.game.rewardOpen, true);
+  assert.equal(s.game.howToOpen, false);
+  assert.deepEqual(s.game.howTo.topics, []);
+});
+
+test('closing the level resets the card; stale Close and Hide are no-ops', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  s.game.closeOverlay();
+  assert.equal(s.game.howToOpen, false);
+  assert.deepEqual(s.game.howTo, { topics: [], footer: '' });
+  s.focused.length = 0;
+  s.game.closeHowTo();
+  s.game.hideHowTo();
+  s.game.toggleHowTo();
+  assert.deepEqual(s.focused, []);
+  assert.equal(s.store.data.has(HELP_KEY), false);
+});
+
+test("debug: the card shows, Don't show again writes nothing", () => {
+  const s = cardGame({ debug: true });
+  s.game.openLevel('w');
+  assert.equal(s.game.howToOpen, true);
+  s.game.hideHowTo();
+  assert.equal(s.store.data.has(HELP_KEY), false);
+  assert.equal(s.store.sets.length, 0);
+  s.game.closeOverlay();
+  s.game.openLevel('w');
+  assert.equal(s.game.howToOpen, false, 'hidden for this visit');
+});
+
+test("storage unavailable: Don't show again still hides for this visit, nothing throws", () => {
+  const s = cardGame({ throwOn: ['setItem'] });
+  s.game.openLevel('w');
+  s.game.hideHowTo();
+  assert.equal(s.game.howToOpen, false);
+  assert.equal(s.store.data.has(HELP_KEY), false);
+  s.game.closeOverlay();
+  s.game.openLevel('w');
+  assert.equal(s.game.howToOpen, false);
+  assert.deepEqual(s.errors, []);
+  const blocked = cardGame({
+    storage: () => {
+      throw new Error('blocked');
+    },
+  });
+  blocked.game.openLevel('w');
+  assert.equal(blocked.game.howToOpen, true, 'an unreadable preference shows the card');
+  blocked.game.hideHowTo();
+  assert.equal(blocked.game.howToOpen, false);
+});
+
+test("another tab's hide is picked up at the next open", () => {
+  const a = cardGame();
+  const b = cardGame({ storage: () => a.store });
+  hideHelp(() => a.store, ['choice', 'sort']);
+  b.game.openLevel('w');
+  assert.equal(b.game.howToOpen, false);
+});
+
 // ---- shell markup -------------------------------------------------------------------
 
 const shell = parseHTML(read('index.html')).document;
@@ -1081,7 +1277,9 @@ test('index.html: each element the game focuses on opening a level and the rewar
   ctxs.x.finish({ text: 'whatever text here' });
   assert.equal(game.rewardOpen, true);
   assert.deepEqual(focused, ['#ov-back', '#reward-close'], 'the back button on open, the reward close on finish');
-  for (const sel of focused) assert.equal(shell.querySelectorAll(sel).length, 1, `${sel} matches one element in index.html`);
+  for (const sel of [...focused, '#ov-howto-title', '#ov-howto-open']) {
+    assert.equal(shell.querySelectorAll(sel).length, 1, `${sel} matches one element in index.html`);
+  }
 });
 
 test('index.html: the level overlay elements live inside an x-ignore wrapper', () => {
@@ -1179,6 +1377,40 @@ test('index.html: ? is a kit icon button with a name; the About dialog is outsid
   assert.ok(deepQuery(shell, '[x-for="act in aboutActs()"]'), 'the acts list iterates aboutActs()');
   assert.ok(about.querySelector('#about-close'), 'Close exists');
   assert.equal(read('index.html').includes('x-html'), false, 'no x-html');
+});
+
+test('index.html: the How to play control and card', () => {
+  const open = shell.querySelector('#ov-howto-open');
+  assert.ok(open.closest('.lesson-top'), 'the reopen button is in the level header');
+  assert.deepEqual(open.getAttribute('class').split(' '), ['ui-btn', 'ui-btn--ghost']);
+  assert.equal(open.getAttribute('type'), 'button');
+  assert.equal(open.getAttribute('x-show'), 'howTo.topics.length > 0');
+  assert.equal(open.getAttribute(':aria-expanded'), 'howToExpanded()');
+  assert.equal(open.getAttribute('aria-controls'), 'ov-howto');
+  assert.equal(open.getAttribute('@click'), 'toggleHowTo()');
+  const card = shell.querySelector('#ov-howto');
+  assert.ok(card.closest('.overlay'), 'the card is overlay markup');
+  assert.equal(card.closest('[x-ignore]') === null, true, 'Alpine renders it');
+  assert.equal(card.closest('.level-host') === null, true, 'a step never wipes it');
+  assert.equal(card.getAttribute('aria-labelledby'), 'ov-howto-title');
+  assert.equal(card.closest('[x-show="howToOpen"]') !== null, true, 'shown by howToOpen');
+  assert.equal(card.hasAttribute('aria-modal'), false, 'not modal');
+  assert.equal(shell.querySelector('#ov-howto-title').getAttribute('tabindex'), '-1');
+  for (const [id, click] of [['ov-howto-close', 'closeHowTo()'], ['ov-howto-hide', 'hideHowTo()']]) {
+    const b = card.querySelector(`#${id}`);
+    assert.deepEqual(b.getAttribute('class').split(' '), ['ui-btn', 'ui-btn--ghost'], `${id} is ghost: one primary per screen`);
+    assert.equal(b.getAttribute('@click'), click);
+  }
+  assert.equal(card.querySelector('#ov-howto-hide').textContent.trim(), "Don't show again");
+  assert.equal(card.querySelector('#ov-howto-close').textContent.trim(), 'Close');
+  assert.equal(card.querySelector('.ui-btn--primary') === null, true);
+  const loop = card.querySelector('template[x-for="topic in howTo.topics"]');
+  assert.ok(loop, 'one section per topic');
+  for (const field of ['title', 'play', 'stars', 'hints']) {
+    assert.ok(loop.content.querySelector(`[x-text="topic.${field}"]`), `topic.${field} by x-text`);
+  }
+  assert.ok(card.querySelector('[x-text="howTo.footer"]'), 'the footer by x-text');
+  assert.equal(card.innerHTML.includes('x-html'), false);
 });
 
 test('index.html: the notice and star live regions stay rendered and carry text', () => {
