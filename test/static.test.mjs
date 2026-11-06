@@ -231,12 +231,30 @@ test('every local src and href in index.html exists on disk', () => {
 
 // ---- the favicon (#39) --------------------------------------------------------------
 
-test('index.html links the SVG favicon, so browsers do not probe /favicon.ico', () => {
-  const icons = [...document.head.querySelectorAll('link')]
-    .filter((l) => (l.getAttribute('rel') ?? '').toLowerCase().split(/\s+/).includes('icon'));
-  assert.equal(icons.length, 1, 'expected exactly one <link rel="icon">');
+test('index.html links the SVG favicon first, then PNG fallbacks', () => {
+  const links = [...document.head.querySelectorAll('link')];
+  const rel = (l) => (l.getAttribute('rel') ?? '').toLowerCase().split(/\s+/);
+  const icons = links.filter((l) => rel(l).includes('icon'));
+  assert.equal(icons.length, 2, 'expected an SVG and a PNG <link rel="icon">');
   assert.equal(icons[0].getAttribute('href'), '/favicon.svg');
   assert.equal(icons[0].getAttribute('type'), 'image/svg+xml');
+  assert.equal(icons[1].getAttribute('href'), '/favicon-32.png');
+  assert.equal(icons[1].getAttribute('type'), 'image/png');
+  assert.equal(icons[1].getAttribute('sizes'), '32x32');
+  const touch = links.filter((l) => rel(l).includes('apple-touch-icon'));
+  assert.equal(touch.length, 1, 'expected one apple-touch-icon');
+  assert.equal(touch[0].getAttribute('href'), '/apple-touch-icon.png');
+});
+
+test('the PNG favicon fallbacks exist, are deployed and have the right size', () => {
+  const ignored = ignoreMatcher(read('.vercelignore'));
+  for (const [file, px] of [['favicon-32.png', 32], ['apple-touch-icon.png', 180]]) {
+    assert.ok(isFile(join(ROOT, file)), `${file} does not exist`);
+    assert.equal(ignored(file), false, `${file} is not deployed`);
+    const png = readFileSync(join(ROOT, file));
+    assert.equal(png.subarray(1, 4).toString(), 'PNG', `${file} is not a PNG`);
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [px, px], `${file} must be ${px}x${px}`);
+  }
 });
 
 /**
