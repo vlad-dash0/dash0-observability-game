@@ -22,7 +22,8 @@ Evidence:
 **Facts each level states twice today:**
 - **Cards:** listed on the level and again in `finish`, always the same list. Examples: `auto-vs-manual.mjs:114` and `:191`; `status-and-errors.mjs` (`cards` and `finish`); `span-kinds.mjs:90` and `:149`; `the-pager.mjs:53` and `:96`; `checkout-is-slow.mjs:153` and `:172`.
 - **`mechanics`:** written by hand, and always equal to the non-choice widgets the level uses. No UI reads it; the only reader is `lib/registry.mjs`.
-- **`widgets`** (#199, for the how-to-play help): the widgets a level plays, `choice` included, in play order. Run levels declare it by hand (absent means none, so no help card), and every non-choice entry must be in `mechanics`. It is not the same list as `mechanics`: `the-pager` declares `incident` but is a custom board with no help, and `naming-your-service` declares `configure` but uses the env checker.
+- **`widgets`** (#199, for the how-to-play help): the widgets a level plays, `choice` included, in play order. Run levels declare it by hand (absent means none, so no help card), and every non-choice entry must be in `mechanics`. It is not the same list as `mechanics`: `the-pager` lists `incident` in `mechanics` but declares no `widgets` (no help card), and `naming-your-service` declares `configure` but uses the env checker.
+- **`hintless`** (#199): the widgets of the level with no Hint button on any step. A play level derives it from its steps (`hints(spec)` of each step type, which mirrors its mount; choice and tradeoff never have hints and are never listed). A run level declares it by hand, as a unique subset of its `widgets` (absent means none); `test/live-registry.test.mjs` pins it for every live level.
 
 **Bespoke:**
 

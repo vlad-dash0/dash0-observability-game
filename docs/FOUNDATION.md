@@ -47,6 +47,7 @@ default with an explicit light toggle; star rule as §2.6 (five stars since #155
 | rewardTitle | string | required | non-empty, unique |
 | mechanics | string[] | required with `run`; with `play` derived, optional | ≥1, unique, from `sort build configure query spot incident tradeoff`; with `play` a declared list must equal the one derived from the steps (docs/DECLARATIVE-LEVELS.md §2) |
 | widgets | string[] | `[]` with `run`; with `play` derived, optional | the widgets the level plays, in play order, for the how-to-play help (#199): unique, from `WIDGETS` (`lib/registry.mjs`: `choice` plus the mechanics); every non-`choice` entry must also be in `mechanics`. Absent means no help card (help is never guessed from `mechanics`). With `play` a declared list must equal the one derived from the steps |
+| hintless | string[] | `[]` with `run`; with `play` derived, optional | the widgets of the level with no Hint button on any step, for the how-to-play help (#199): unique; a `run` level's must be in its `widgets`; with `play` a declared list must equal the one derived from the steps (choice and tradeoff never have hints and are not listed). Absent means none |
 | cards | string[] | `[]` | ids that exist in DECK, unique |
 | lights | string[] | `[]` | ids in `NODE_IDS` (`hub/map-data.mjs`), unique; not drawn since #150 |
 | scored | boolean | `true` | `false`: always 0 stars, excluded from both sides of star totals |
@@ -140,8 +141,10 @@ finished or `signal.aborted`. Non-array `cards` → `[]`.
 `p = mistakes + hintsUsed + (parMs != null && elapsedMs > parMs ? 1 : 0)`;
 `MAX_STARS` is 5. Penalties 0 → 5, 1 → 4, 2 → 3, 3 or 4 → 2, 5 or more → 1 (never 0 for a
 scored level). `scoreStars` is the one star rule and `MAX_STARS` the one place the maximum is
-written (the ladder as player text is `LADDER` in `lib/widgets/help-ladder.mjs`, generated from `scoreStars`, and the star rules each board states are composed from it plus the widget's `PENALTY`): `lib/progress.mjs` (clamp, totals) and every star display (`★` filled, `☆` empty, always
-`MAX_STARS` glyphs, the reward label `n of 5 stars`) derive it.
+written. The ladder as player text is `LADDER` in `lib/widgets/help-ladder.mjs`, generated from
+`scoreStars`; the star rules each board states are composed from `LADDER` plus the widget's
+`PENALTY`. `lib/progress.mjs` (clamp, totals) and every star display (`★` filled, `☆` empty,
+always `MAX_STARS` glyphs, the reward label `n of 5 stars`) derive the maximum from `MAX_STARS`.
 
 ### 2.7 Map: the globe (#150; replaced the SVG system map)
 

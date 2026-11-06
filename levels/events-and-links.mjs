@@ -98,6 +98,7 @@ export default {
   rewardTitle: 'Link keeper',
   mechanics: ['build'],
   widgets: ['choice', 'build'],
+  hintless: ['build'], // both builds have helps: {}: a Check button, no Hint button
   cards: ['exception-no-status', 'batch-links'],
   lights: [],
   scoring: { parMs: null },

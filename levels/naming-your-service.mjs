@@ -79,7 +79,7 @@ export default {
   icon: '\u{1F3F7}\u{FE0F}',
   rewardTitle: 'Service namer',
   mechanics: ['configure'],
-  // Its .env step is the env checker (lib/widgets/env-config.mjs), which follows Configure it's penalty rules.
+  // Its .env step is the env checker (lib/widgets/env-config.mjs), which follows the penalty rules of Configure it.
   widgets: ['choice', 'configure'],
   cards: ['unknown-service'],
   lights: ['checkout'],

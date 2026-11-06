@@ -18,6 +18,7 @@ links level text to these anchors. "(Act N)" is where it's taught.
 - **Misleading view**: an evidence view that does not explain the alert (a red herring).
   Opening one costs a star.
 - **MTTD / MTTR**: mean time to detect / to resolve an incident.
+- **Par time**: the time a level sets as its target. Finishing slower costs one penalty.
 
 ## OpenTelemetry
 
