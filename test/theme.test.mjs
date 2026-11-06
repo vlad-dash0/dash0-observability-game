@@ -368,8 +368,6 @@ test('every star display (#221): each star rule takes a --color-* token and reac
           const fg = tint ? resolveColor(tint[1], theme).map((c, i) => c * tint[2] / 100 + u[i] * (1 - tint[2] / 100)) : resolveColor(value, theme);
           const [a, b] = [luminance(fg), luminance(u)];
           const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-          // The lost star is a dashed border-coloured outline: its state is also carried by the dash, not colour alone.
-          if (/data-star="lost"/.test(r.selector)) continue;
           assert.ok(ratio >= 3, `${theme}: ${r.selector} ${prop} ${value} on ${bg} is ${ratio.toFixed(2)}, needs 3`);
           checked++;
         }
