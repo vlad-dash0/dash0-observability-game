@@ -106,7 +106,7 @@ export default {
   id: 'connect-to-dash0',
   no: '9.3',
   name: 'Connect the game to Dash0',
-  sub: 'The endpoint and a token that can only send',
+  sub: 'An endpoint and a token for a browser tab',
   icon: '\u{1F50C}',
   rewardTitle: 'Connected',
   mechanics: ['configure'],
@@ -303,9 +303,11 @@ export default {
         };
       }
 
-      // The last reason shown for a bad form or a rejected token, kept when the next press has
-      // nothing new to say (an emptied token field).
+      // The last reason shown for a bad form or a rejected token, and the endpoint and dataset it
+      // was shown for. It is kept only while a press has nothing new to say: an emptied token field
+      // over the same endpoint and dataset. Once either changed, the old reason would be stale.
       let lastProblem = false;
+      let lastInput = '';
 
       const send = async () => {
         setActions({ busy: true });
@@ -339,6 +341,9 @@ export default {
         scrub();
         const endpoint = endpointEl.value;
         const dataset = datasetEl.value;
+        const input = `${endpoint}\n${dataset}`;
+        const same = input === lastInput;
+        lastInput = input;
         if (endpoint.trim() === '') {
           say('neutral', 'Enter the endpoint first. Nothing was sent.');
           return;
@@ -349,11 +354,24 @@ export default {
             return;
           }
           declareScope($('#ctd-scope-feedback'));
+          if (scope.key === 'read') {
+            // Declared and already charged above: sending would only earn a second charge for it.
+            lastProblem = false;
+            say('error', 'A Reading token cannot send telemetry. Create an Ingesting token. Nothing was sent.');
+            return;
+          }
         }
         const verdict = tele.connect({ mode, endpoint, token, dataset });
         if (!verdict.ok) {
-          // An emptied token field is a nudge, not a wrong answer, and keeps the last useful reason.
-          if (verdict.reason === 'empty' && lastProblem) return;
+          // An emptied token field is a nudge, not a wrong answer. Over the same endpoint and dataset it
+          // keeps the last useful reason (a double click); after a change that reason is stale.
+          if (verdict.reason === 'empty' && lastProblem && same) return;
+          if (verdict.reason === 'empty' && lastProblem) {
+            lastProblem = false;
+            fb.removeAttribute('data-outcome');
+            say('neutral', `${connectProblem(e, verdict)} ${practice ? 'Create a token again.' : 'Paste the token again.'} Nothing was sent.`);
+            return;
+          }
           if (verdict.reason !== 'empty') {
             charge(`${verdict.field}:${verdict.reason}`);
             lastProblem = true;
