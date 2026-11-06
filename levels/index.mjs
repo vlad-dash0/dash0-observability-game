@@ -141,7 +141,7 @@ export const ACTS = [
     no: 9,
     name: 'Live Demo',
     sub: 'Does that answer hold?',
-    teaser: 'Judge confident answers about filters and error rates, connect the game to your own Dash0, then find its incident there.',
+    teaser: 'Judge confident answers about filters and error rates, connect the game to a Dash0 (practice works without an account), then find its incident in a trace view.',
     levels: [filterOrSampler, the34PercentErrorRate, connectToDash0],
     boss: itsUs,
   },
