@@ -3,7 +3,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  MECHANICS,
   RegistryError,
+  WIDGETS,
   buildRegistry,
   nodeLitBy,
   validateDeck,
@@ -136,9 +138,33 @@ test('building copies: the source level modules are neither frozen nor annotated
 test('the built level holds exactly the §2.1 fields plus actId and kind', () => {
   const reg = buildRegistry(baseline(), { deck: DECK, nodeIds: ['n1'] });
   assert.deepEqual(Object.keys(reg.levels.x).sort(), [
-    'actId', 'cards', 'icon', 'id', 'kind', 'lights', 'mechanics', 'name', 'no', 'play',
-    'rewardTitle', 'run', 'scored', 'scoring', 'sub',
+    'actId', 'cards', 'hintless', 'icon', 'id', 'kind', 'lights', 'mechanics', 'name', 'no', 'play',
+    'rewardTitle', 'run', 'scored', 'scoring', 'sub', 'widgets',
   ]);
+});
+
+test('widgets: declared on run levels, absent is none (not the mechanics)', () => {
+  const built = (extra) => buildRegistry([{ id: 'a0', no: 0, levels: [L('x', '0.1', extra)], boss: null }], { deck: DECK, nodeIds: ['n1'] }).levels.x;
+  assert.deepEqual([...built({ mechanics: ['sort'], widgets: ['choice', 'sort'] }).widgets], ['choice', 'sort']);
+  assert.deepEqual([...built({ mechanics: ['sort'] }).widgets], []);
+  assert.deepEqual([...built({ mechanics: ['sort'], widgets: [] }).widgets], []);
+  const lv = (extra) => [{ id: 'a0', no: 0, levels: [L('x', '0.1', { mechanics: ['sort'], ...extra })], boss: null }];
+  rejects(lv({ widgets: ['build'] }), 'level "x": widget "build" is not in mechanics');
+  rejects(lv({ widgets: ['quiz'] }), 'level "x": unknown widget "quiz"');
+  rejects(lv({ widgets: ['choice', 'choice'] }), 'level "x": duplicate widget "choice"');
+  rejects(lv({ widgets: 'sort' }), 'level "x": widgets must be an array');
+  assert.deepEqual(WIDGETS, ['choice', ...MECHANICS]);
+});
+
+test('hintless: declared on run levels (absent is none), a unique subset of its widgets', () => {
+  const lvl = (extra) => [{ id: 'a0', no: 0, levels: [L('x', '0.1', { mechanics: ['sort'], widgets: ['choice', 'sort'], ...extra })], boss: null }];
+  const built = (extra) => buildRegistry(lvl(extra), { deck: DECK, nodeIds: ['n1'] }).levels.x;
+  assert.deepEqual([...built({ hintless: ['sort'] }).hintless], ['sort']);
+  assert.deepEqual([...built({}).hintless], []);
+  rejects(lvl({ hintless: ['build'] }), 'level "x": hintless widget "build" is not in widgets');
+  rejects(lvl({ hintless: ['sort', 'sort'] }), 'level "x": duplicate hintless "sort"');
+  rejects(lvl({ hintless: 'sort' }), 'level "x": hintless must be an array');
+  rejects(lvl({ widgets: undefined, hintless: ['sort'] }), 'level "x": hintless widget "sort" is not in widgets');
 });
 
 test('unknown keys on levels, acts and cards are rejected, with a hint when close', () => {

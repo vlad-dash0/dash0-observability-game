@@ -9,6 +9,8 @@ import { NODE_IDS } from '../hub/map-data.mjs';
 import { liveRegistry } from '../app.mjs';
 import { COMING_SOON } from '../hub/coming-soon.mjs';
 import { runPlay, validatePlay } from '../lib/play.mjs';
+import { WIDGETS } from '../lib/registry.mjs';
+import { NO_HINTS, howToView } from '../lib/how-to-play.mjs';
 
 const nodeIds = NODE_IDS;
 
@@ -158,6 +160,78 @@ test('lights ids: the §2.7 ids, unique (levels name them in `lights`; the globe
     'payment-provider', 'payments', 'postgres', 'recommendations', 'redis', 'shipping', 'storefront',
   ]);
   assert.equal(new Set(nodeIds).size, nodeIds.length, 'ids are unique');
+});
+
+// What each hand-written level plays, in the order its run() plays it (verified against the
+// mount calls). Not derived: `mechanics` has no choice and is wrong for these two.
+const HAND_WRITTEN_WIDGETS = {
+  'monitoring-vs-observability': ['sort', 'choice'],
+  'the-signals': ['sort', 'choice'],
+  'why-opentelemetry': ['sort', 'choice'],
+  'the-pager': [],
+  'naming-your-service': ['choice', 'configure'],
+  'spans-and-traces': ['choice', 'build'],
+  'span-kinds': ['build', 'choice'],
+  'status-and-errors': ['sort', 'choice'],
+  'context-propagation': ['choice', 'build'],
+  'baggage': ['sort', 'choice'],
+  'events-and-links': ['choice', 'build'],
+  'checkout-is-slow': ['incident'],
+};
+// Declares a mechanic its board is not (custom, unscored, unwinnable), so no help is offered.
+const NOT_A_WIDGET = { 'the-pager': 'No help card: its intro explains the board (it is not scored).' };
+
+test('hand-written levels declare their widgets', () => {
+  const reg = liveRegistry();
+  const hand = reg.order.filter((id) => !reg.levels[id].play);
+  assert.deepEqual(Object.fromEntries(hand.map((id) => [id, [...reg.levels[id].widgets]])), HAND_WRITTEN_WIDGETS);
+  for (const id of hand) {
+    const lv = reg.levels[id];
+    if (id in NOT_A_WIDGET) continue;
+    assert.deepEqual([...lv.widgets].filter((w) => w !== 'choice').sort(), [...lv.mechanics].sort(), id);
+  }
+});
+
+test('every play level has widgets, all known; non-choice ones equal its mechanics', () => {
+  const reg = liveRegistry();
+  const plays = reg.order.filter((id) => reg.levels[id].play);
+  assert.ok(plays.length > 0);
+  for (const id of plays) {
+    const lv = reg.levels[id];
+    assert.ok(lv.widgets.length > 0, id);
+    assert.ok(lv.widgets.every((w) => WIDGETS.includes(w)), id);
+    assert.deepEqual([...lv.widgets].filter((w) => w !== 'choice').sort(), [...lv.mechanics].sort(), id);
+  }
+});
+
+// The widgets with no Hint button on any step of the level (every other live level
+// has none listed). Play levels derive it from their steps; the two hand-written ones declare it.
+const HINTLESS = {
+  baggage: ['sort'],
+  'events-and-links': ['build'],
+  'auto-vs-manual': ['sort'],
+  instruments: ['sort'],
+  'structured-logs': ['sort'],
+  distributions: ['sort'],
+  'filter-or-sampler': ['sort'],
+  'order-matters': ['spot'],
+  'tail-sampling': ['spot'],
+  'ottl-and-transforms': ['spot'],
+  'good-alerts': ['spot'],
+};
+
+test('which widgets have no hints on each live level is pinned, and the how-to-play help says so', () => {
+  const reg = liveRegistry();
+  assert.deepEqual(Object.keys(HINTLESS).filter((id) => !reg.order.includes(id)), []);
+  for (const id of reg.order) {
+    const lv = reg.levels[id];
+    const want = HINTLESS[id] ?? [];
+    assert.deepEqual([...lv.hintless], want, id);
+    for (const t of howToView(lv).topics) {
+      const none = want.includes(t.key) || t.key === 'choice' || t.key === 'tradeoff';
+      assert.equal(t.hints === NO_HINTS, none, `${id} ${t.key}`);
+    }
+  }
 });
 
 test('every act, live and coming soon, has a one-line plain-text teaser', () => {

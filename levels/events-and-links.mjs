@@ -97,6 +97,8 @@ export default {
   icon: '\u{1F4CE}',
   rewardTitle: 'Link keeper',
   mechanics: ['build'],
+  widgets: ['choice', 'build'],
+  hintless: ['build'], // both builds have helps: {}: a Check button, no Hint button
   cards: ['exception-no-status', 'batch-links'],
   lights: [],
   scoring: { parMs: null },

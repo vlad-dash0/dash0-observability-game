@@ -111,6 +111,8 @@ export default {
   icon: '\u{1F4DF}',
   rewardTitle: 'First page',
   mechanics: ['incident'],
+  // No help card: its intro explains the board (it is not scored).
+  widgets: [],
   cards: [],
   lights: [],
   scored: false,

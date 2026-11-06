@@ -22,6 +22,8 @@ Evidence:
 **Facts each level states twice today:**
 - **Cards:** listed on the level and again in `finish`, always the same list. Examples: `auto-vs-manual.mjs:114` and `:191`; `status-and-errors.mjs` (`cards` and `finish`); `span-kinds.mjs:90` and `:149`; `the-pager.mjs:53` and `:96`; `checkout-is-slow.mjs:153` and `:172`.
 - **`mechanics`:** written by hand, and always equal to the non-choice widgets the level uses. No UI reads it; the only reader is `lib/registry.mjs`.
+- **`widgets`** (#199, for the how-to-play help): the widgets a level plays, `choice` included, in play order. Run levels declare it by hand (absent means none, so no help card), and every non-choice entry must be in `mechanics`. It is not the same list as `mechanics`: `the-pager` lists `incident` in `mechanics` but declares no `widgets` (no help card), and `naming-your-service` declares `configure` but uses the env checker.
+- **`hintless`** (#199): the widgets of the level with no Hint button on any step. A play level derives it from its steps (`hints(spec)` of each step type, which mirrors its mount; choice and tradeoff never have hints and are never listed). A run level declares it by hand, as a unique subset of its `widgets` (absent means none); `test/live-registry.test.mjs` pins it for every live level.
 
 **Bespoke:**
 
@@ -42,6 +44,7 @@ A level file keeps today's metadata (FOUNDATION §2.1) and declares `play` inste
 |---|---|
 | `id`, `no`, `name`, `sub`, `icon`, `rewardTitle`, `cards`, `lights`, `scored`, `scoring` | unchanged (FOUNDATION §2.1) |
 | `mechanics` | derived from the step types, in order of first appearance. Optional with `play`: if declared it must equal the derived list (registry error otherwise). Migrated levels keep it because existing tests read it from the raw export (`act-2.test.mjs:349`, `act-0.test.mjs:145`); new levels omit it |
+| `widgets` | derived from the step types (`choice` included), in order of first appearance. Optional with `play`: if declared it must equal the derived list (registry error otherwise); new levels omit it |
 | `run` | forbidden with `play`; required without it |
 | `play.prefix` | optional plain token; default is `id`. Sets the button ids `<prefix>-next` and `<prefix>-finish` |
 | `play.steps` | non-empty array of steps |
@@ -144,13 +147,13 @@ Derived `mechanics`: `['build']`, as pinned (`act-2.test.mjs:46`).
 
 ## 3. The generic runner
 
-**Where it lives.** `lib/play.mjs` exports `STEP_TYPES`, `validatePlay(play) → {errors, mechanics}` and `runPlay(level, ctx)`.
+**Where it lives.** `lib/play.mjs` exports `STEP_TYPES`, `validatePlay(play) → {errors, mechanics, widgets}` and `runPlay(level, ctx)`.
 - `buildRegistry(acts, {deck, nodeIds, play})` takes the kit `{validatePlay, runPlay}` as an option. The registry does not import it, because widgets import `isId` from the registry (`sort-it.mjs:8`, `incident.mjs:12`), which would create a cycle.
 - `liveRegistry` (`app.mjs:26-28`) passes it in. `openLevel` is unchanged: it calls `level.run(ctx)` (`app.mjs:231`).
 
 **What the registry builds for a `play` level** (`registry.mjs:342-361`):
 - `play`: a plain-data copy, deep-frozen.
-- `mechanics`: the derived list.
+- `mechanics` and `widgets`: the derived lists.
 - `run: (ctx) => runPlay(built, ctx)`.
 - Run-level entries get `play: null`.
 
@@ -230,6 +233,7 @@ Each type also has a test driver in `test/helpers/step-drivers.mjs` (§4). Addin
 |---|---|---|
 | cards awarded on finish | `level.cards` plus `finish({cards})` in all 13 levels | `runPlay` passes `level.cards`; one home. Run-levels keep theirs, guarded by `levels-play` "card … is not in level.cards" (`levels-play.test.mjs:488-490`) |
 | level mechanics | hand-written per level | derived by `validatePlay`, the one source; a declared value must equal it (registry error otherwise) |
+| level widgets (#199) | none | derived by `validatePlay` in the same loop as `mechanics`; run levels declare them by hand, checked against `mechanics` |
 | choice spec validity | only inside `mountChoice` (`choice.mjs:51-63`) | `validateChoiceSpec`; `mountChoice` calls it (like `mountSort` → `validateSortSpec`, called from `renderSort`) |
 | Next/Finish markup, gating, `data-finish` | 13 copies | `runPlay` only |
 | reference answer solvable (I7) | per-act test loops (`act-2.test.mjs:358-393`), plus `validateBuildSpec` and `validateScenario` | each type's `validate`, run when the registry is built, plus the generated suite. The per-act loops stay (not deleted in M2) |
@@ -295,12 +299,13 @@ Run when the registry is built; all errors are collected into one `RegistryError
 - the `finish` text length;
 - every type's `validate`.
 
-The registry adds: run and play are mutually exclusive, play requires the kit, a declared `mechanics` equals the derived list, and the derived mechanics are non-empty.
+The registry adds: run and play are mutually exclusive, play requires the kit, a declared `mechanics` equals the derived list, a declared `widgets` equals the derived list, and the derived mechanics are non-empty.
 
 **Messages an author sees** (prefix `level "<id>": `):
 - `declares both run and play; use one`
 - `play needs the step kit (buildRegistry option "play")`
 - `declares mechanics ["build"] but its steps give ["sort"]; fix or remove mechanics`
+- `declares widgets ["sort"] but its steps give ["choice","sort"]; fix or remove widgets`
 - `play must be plain data: steps[1].choice.choices[0].why is a function; write run(ctx) for custom behaviour`
 - `step 2: unknown key "inrto" (did you mean "intro"?)`
 - `step 2 has no step type (one of choice, sort, build, incident, spot, tradeoff, query, configure)` / `step 2 has two step types ("choice", "sort")`

@@ -84,6 +84,7 @@ export default {
   icon: '\u{1F6A6}',
   rewardTitle: 'Status checker',
   mechanics: ['sort'],
+  widgets: ['sort', 'choice'],
   cards: ['span-status'],
   lights: ['catalog'],
   scoring: { parMs: null },

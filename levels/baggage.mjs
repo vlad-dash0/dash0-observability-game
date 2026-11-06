@@ -82,6 +82,8 @@ export default {
   icon: '\u{1F9F3}',
   rewardTitle: 'Light packer',
   mechanics: ['sort'],
+  hintless: ['sort'], // its one sort has helps.hints off: no Hint button
+  widgets: ['sort', 'choice'],
   cards: ['baggage-leaks'],
   lights: [],
   scoring: { parMs: null },

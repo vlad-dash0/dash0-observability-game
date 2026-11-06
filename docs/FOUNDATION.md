@@ -46,6 +46,8 @@ default with an explicit light toggle; star rule as §2.6 (five stars since #155
 | icon | string | required | non-empty |
 | rewardTitle | string | required | non-empty, unique |
 | mechanics | string[] | required with `run`; with `play` derived, optional | ≥1, unique, from `sort build configure query spot incident tradeoff`; with `play` a declared list must equal the one derived from the steps (docs/DECLARATIVE-LEVELS.md §2) |
+| widgets | string[] | `[]` with `run`; with `play` derived, optional | the widgets the level plays, in play order, for the how-to-play help (#199): unique, from `WIDGETS` (`lib/registry.mjs`: `choice` plus the mechanics); every non-`choice` entry must also be in `mechanics`. Absent means no help card (help is never guessed from `mechanics`). With `play` a declared list must equal the one derived from the steps |
+| hintless | string[] | `[]` with `run`; with `play` derived, optional | the widgets of the level with no Hint button on any step, for the how-to-play help (#199): unique; a `run` level's must be in its `widgets`; with `play` a declared list must equal the one derived from the steps (choice and tradeoff never have hints and are not listed). Absent means none |
 | cards | string[] | `[]` | ids that exist in DECK, unique |
 | lights | string[] | `[]` | ids in `NODE_IDS` (`hub/map-data.mjs`), unique; not drawn since #150 |
 | scored | boolean | `true` | `false`: always 0 stars, excluded from both sides of star totals |
@@ -78,7 +80,7 @@ non-empty string or `null`. Checked by `validateDeck`.
 Registry = {
   acts:   [{ id, no, name, sub, teaser, levelIds: string[], bossId: string|null }],
   levels: { [id]: Level },  // null-prototype; Level = §2.1 + defaults + actId + kind:'level'|'boss';
-                            // `play` is a deep-frozen copy of the declared play, or null; `mechanics` derived for play levels
+                            // `play` is a deep-frozen copy of the declared play, or null; `mechanics` and `widgets` derived for play levels
   order:  string[],         // per act: its levels, then its boss
   cardIds: string[],        // sorted DECK ids
 }
@@ -112,7 +114,7 @@ entry). `CURRENT_VERSION = 1`; `MIGRATIONS = {}` where `MIGRATIONS[n]` maps v n 
 - With `levelIds`/`cardIds`: drop ids not in the set (the in-memory view). Without: keep
   every well-formed id (what gets persisted).
 
-### 2.6 ctx (`createLevelContext({level, ovBody, ovActions, now, shuffle, reduceMotion, onFinish, signal})`)
+### 2.6 ctx (`createLevelContext({level, ovBody, ovActions, now, shuffle, reduceMotion, onFinish, signal, reportError?, telemetry?})`)
 
 ```
 ctx = {
@@ -126,8 +128,15 @@ ctx = {
   reduceMotion: boolean
   ovBody, ovActions: Element
   signal: AbortSignal      // aborted when the overlay closes; timer callbacks check it
+  telemetry: facade | null // the injected lib/telemetry.mjs facade (below), null when the app has none
 }
 ```
+`ctx.telemetry` has no token getter. `sessionId`, `status() -> {state: 'off'|'configured'|'connected',
+mode: 'live'|'practice'|null, host}`, `stats() -> {buffered, dropped}`, `liveAvailable()`,
+`connect({mode, endpoint, token, dataset}) -> {ok:true} | {ok:false, field, reason}` (validates, sends
+nothing), `sendTest(opts?: {signal}) -> Promise<Outcome>` (single-flight), `emit(draft)` (no-op unless
+connected, never throws), `flush(opts?) -> Promise<Outcome|null>`, `sendBatch(drafts, opts?)`,
+`incident()` (null until the incident lab), `disconnect()`. Contract: docs/DASH0-LAB.md §Telemetry session.
 Levels wire buttons by assigning `el.onclick = …` after `renderStep` (CSP-safe), as in R.
 
 `finish` computes `stars = scoreStars({mistakes, hintsUsed, elapsedMs: now() - startedAt}, level)`
@@ -139,8 +148,10 @@ finished or `signal.aborted`. Non-array `cards` → `[]`.
 `p = mistakes + hintsUsed + (parMs != null && elapsedMs > parMs ? 1 : 0)`;
 `MAX_STARS` is 5. Penalties 0 → 5, 1 → 4, 2 → 3, 3 or 4 → 2, 5 or more → 1 (never 0 for a
 scored level). `scoreStars` is the one star rule and `MAX_STARS` the one place the maximum is
-written: `lib/progress.mjs` (clamp, totals) and every star display (`★` filled, `☆` empty, always
-`MAX_STARS` glyphs, the reward label `n of 5 stars`) derive it.
+written. The ladder as player text is `LADDER` in `lib/widgets/help-ladder.mjs`, generated from
+`scoreStars`; the star rules each board states are composed from `LADDER` plus the widget's
+`PENALTY`. `lib/progress.mjs` (clamp, totals) and every star display (`★` filled, `☆` empty,
+always `MAX_STARS` glyphs, the reward label `n of 5 stars`) derive the maximum from `MAX_STARS`.
 
 ### 2.7 Map: the globe (#150; replaced the SVG system map)
 
@@ -192,7 +203,7 @@ disposes the globe, which cancels the effect.
 Registry (`validateRegistry` reports all at once): act and level ids unique across all acts
 and bosses (same module twice, or boss also in `levels`, is an error); each act ≥1
 non-boss level; card and node references exist; `no` format and order; no `act`/`kind`
-declared; valid mechanics; `run` is a function; reward titles unique.
+declared; valid mechanics; valid widgets (known, unique, non-choice ones in `mechanics`); `run` is a function; reward titles unique.
 
 Progress: never downgrades (best stars, earliest non-null `at`, card union); stars
 integers 0–5 (`MAX_STARS`); corrupt input → empty, no throw; `recordCompletion` idempotent;
