@@ -19,6 +19,8 @@ import { endSentence } from './lib/text.mjs';
 import { globeState } from './lib/globe.mjs';
 import { freshlyLit, igniteView, litText } from './lib/globe-ignite.mjs';
 import { dotStates, globeLabel, globeLines, globeTarget } from './lib/globe-view.mjs';
+import { hideHelp, readHiddenHelp } from './lib/help-prefs.mjs';
+import { howToView } from './lib/how-to-play.mjs';
 import { createLevelContext } from './lib/level-context.mjs';
 import { cardTotals, mergeProgress, recordCompletion, registryIds, starTotals } from './lib/progress.mjs';
 import { MAX_STARS } from './lib/scoring.mjs';
@@ -121,6 +123,10 @@ export function createGame(deps) {
   // for before the globe finished loading.
   let pendingLit = null;
   let queuedIgnite = null;
+  // How to play cards: the widget keys whose card was closed or hidden since the page loaded.
+  // Close lasts until reload; Don't show again also lands here, so a blocked or full storage
+  // (or debug, which writes nothing) still hides the card for this visit.
+  const seenHelp = new Set();  const NO_HOW_TO = Object.freeze({ topics: Object.freeze([]), footer: '' });
 
   return {
     debug: debug === true,
@@ -157,6 +163,8 @@ export function createGame(deps) {
     rewardOpen: false,
     aboutOpen: false,
     aboutSummary: GAME_SUMMARY,
+    howTo: NO_HOW_TO,
+    howToOpen: false,
     rewardTitle: '',
     rewardText: '',
     rewardStars: null,
@@ -352,6 +360,12 @@ export function createGame(deps) {
       this.currentLevelId = id;
       this.overlayTitle = level.name;
       this.overlayOpen = true;
+      // The card is decided before the level runs; stored choices are read at every open, so
+      // another tab's Don't show again counts. A failed read shows the card.
+      this.howTo = howToView(level);
+      const hidden = readHiddenHelp(storage).hidden;
+      const auto = this.howTo.topics.some((t) => !hidden.has(t.key) && !seenHelp.has(t.key));
+      this.howToOpen = auto;
       try {
         const ctx = createLevelContext({
           level,
@@ -369,7 +383,7 @@ export function createGame(deps) {
       } catch (e) {
         report(e);
       }
-      this.focusSoon('#ov-back');
+      this.focusSoon(auto ? '#ov-howto-title' : '#ov-back');
       return true;
     },
 
@@ -381,10 +395,45 @@ export function createGame(deps) {
       }, NUDGE_MS);
     },
 
+    // ---------- How to play card ----------
+    // The card lives in .overlay markup, outside the level's DOM: a step never wipes it, it is
+    // not modal and never blocks Finish. Focus returns to the reopen button when it closes.
+    howToExpanded() {
+      return this.howToOpen ? 'true' : 'false';
+    },
+    toggleHowTo() {
+      if (!this.overlayOpen || this.howTo.topics.length === 0) return false;
+      if (this.howToOpen) this.closeHowTo();
+      else {
+        this.howToOpen = true;
+        this.focusSoon('#ov-howto-title');
+      }
+      return true;
+    },
+    // Close: gone until the page reloads, nothing stored.
+    closeHowTo() {
+      if (!this.overlayOpen || !this.howToOpen) return;
+      for (const t of this.howTo.topics) seenHelp.add(t.key);
+      this.howToOpen = false;
+      this.focusSoon('#ov-howto-open');
+    },
+    // Don't show again: every widget on the card, stored per widget (not in debug), and always
+    // hidden for this visit, whether or not the write went through.
+    hideHowTo() {
+      if (!this.overlayOpen || !this.howToOpen) return;
+      const keys = this.howTo.topics.map((t) => t.key);
+      for (const k of keys) seenHelp.add(k);
+      if (!this.debug) hideHelp(storage, keys);
+      this.howToOpen = false;
+      this.focusSoon('#ov-howto-open');
+    },
+
     // Abort the open level (its timers stop, a stale finish is a no-op) and clear its DOM.
     endSession() {
       if (session) session.abort();
       session = null;
+      this.howTo = NO_HOW_TO;
+      this.howToOpen = false;
       for (const id of ['ov-body', 'ov-actions']) {
         const el = doc.getElementById(id);
         if (el) el.innerHTML = '';
@@ -492,7 +541,7 @@ export function createGame(deps) {
       this.refreshGlobe();
     },
 
-    // One window-level Escape handler: closes the reward, else the About dialog, else the level, but never the
+    // One window-level Escape handler: closes the reward, else the About dialog, else the How to play card, else the level, but never the
     // level while the player is typing in it. A widget that handled the Escape (it called
     // preventDefault, e.g. Build it cancelling a pick) owns it.
     onEscape(e) {
@@ -506,6 +555,10 @@ export function createGame(deps) {
         return;
       }
       if (!this.overlayOpen) return;
+      if (this.howToOpen) {
+        this.closeHowTo();
+        return;
+      }
       if (!isTyping(e?.target)) this.closeOverlay();
     },
 

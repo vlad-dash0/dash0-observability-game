@@ -125,6 +125,30 @@
     <div class="lesson-top">
       <button type="button" class="ui-btn ui-btn--icon" id="ov-back" aria-label="Back to the map" @click="closeOverlay()"><span aria-hidden="true">&larr;</span></button>
       <h2 x-text="overlayTitle"></h2>
+      <button type="button" class="ui-btn ui-btn--ghost" id="ov-howto-open" x-show="howTo.topics.length > 0" x-cloak
+              :aria-expanded="howToExpanded()" aria-controls="ov-howto" @click="toggleHowTo()">How to play</button>
+    </div>
+    <!-- HOW TO PLAY: Alpine markup in the overlay, never inside .level-host (a step rewrites
+         #ov-body and Alpine skips x-ignore). Not modal; the level stays usable behind it. -->
+    <div class="howto" x-show="howToOpen" x-cloak>
+      <section class="ui-panel" id="ov-howto" aria-labelledby="ov-howto-title">
+        <div class="ui-panel-head"><h3 id="ov-howto-title" tabindex="-1">How to play</h3></div>
+        <template x-for="topic in howTo.topics" :key="topic.key">
+          <div class="ui-panel-sec">
+            <h4 x-text="topic.title"></h4>
+            <p x-text="topic.play"></p>
+            <p x-show="topic.stars" x-text="topic.stars"></p>
+            <p x-text="topic.hints"></p>
+          </div>
+        </template>
+        <div class="ui-panel-sec">
+          <p x-show="howTo.footer" x-text="howTo.footer"></p>
+          <div class="howto-actions">
+            <button type="button" class="ui-btn ui-btn--ghost" id="ov-howto-close" @click="closeHowTo()">Close</button>
+            <button type="button" class="ui-btn ui-btn--ghost" id="ov-howto-hide" @click="hideHowTo()">Don't show again</button>
+          </div>
+        </div>
+      </section>
     </div>
     <div class="level-host" x-ignore>
       <div class="lesson-scroll" id="ov-body"></div>

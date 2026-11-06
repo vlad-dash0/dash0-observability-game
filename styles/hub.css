@@ -181,7 +181,18 @@
   flex: 0 0 auto; z-index: 5; display: flex; align-items: center; gap: 12px;
   padding: 16px 18px; background: var(--color-surface); border-bottom: 1px solid var(--color-border);
 }
-.lesson-top h2 { font-weight: 700; font-size: 17px; }
+.lesson-top h2 { font-weight: 700; font-size: 17px; flex: 1 1 auto; min-width: 0; }
+/* The How to play card: between the header and the level, so a step never wipes it. It keeps
+   to the step's width and scrolls inside itself, so the level stays visible at 320px. */
+.howto {
+  flex: 0 0 auto; max-height: 45vh; overflow-y: auto;
+  width: 100%; max-width: var(--layout-narrow); margin: 0 auto;
+  padding: var(--space-3) 20px 0;
+}
+.howto h3:focus { outline: none; }
+.howto h4 { font-size: var(--text-base); font-weight: var(--weight-semibold); }
+.howto p { color: var(--color-text-muted); line-height: 1.5; }
+.howto-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 /* The x-ignore wrapper: takes the rest of the overlay and stacks body over actions. */
 .level-host { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .lesson-scroll {
