@@ -397,7 +397,7 @@ export function createGame(deps) {
       this.recordTelemetry(levelId, level, result);
     },
 
-    // Telemetry never blocks play (docs/DASH0-LAB.md I6): a span for the completion, then a
+    // Telemetry never blocks play (docs/DASH0-LAB.md, Telemetry session): a span for the completion, then a
     // flush that is not awaited. Any failure is reported and nothing else happens.
     recordTelemetry(levelId, level, result) {
       try {
