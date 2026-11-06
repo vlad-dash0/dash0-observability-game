@@ -4,6 +4,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { gradeQuery, referenceResult } from '../lib/promql/grade.mjs';
+import histograms from '../levels/histograms.mjs';
+import promqlBasics from '../levels/promql-basics.mjs';
+import redAndUse from '../levels/red-and-use.mjs';
 import { hintFor, QUERY_HELPS, QUERY_RULE, queryHelps, validateQueryHelps } from '../lib/widgets/query-it-help.mjs';
 import { at, ds } from './helpers/promql.mjs';
 
@@ -91,7 +94,7 @@ test('tier 2 comparison, one assertion per branch', () => {
     `<p>${HEAD} Yours has 2, grouped by service.</p>`,
     'wrong-labels',
   );
-  assert.equal(h(`${REF} * 2`), `<p>${HEAD} Your series match; the values do not.</p>`, 'wrong-values');
+  assert.equal(h(`${REF} * 2`), `<p>${HEAD} Yours is higher than the answer for 1 of 2 series.</p>`, 'wrong-values (/quote is 0, so doubling leaves it)');
   assert.equal(h(`${REF} + 0`), `<p>${HEAD} Yours already gives the answer: press Run.</p>`, 'ok');
   assert.equal(h(REF), `<p>${HEAD} Yours already gives the answer: press Run.</p>`);
 });
@@ -107,9 +110,58 @@ test('tier 2 for an answer with no labels and for a scalar answer', () => {
   const num = spec({ reference: '1 + 1' });
   assert.equal(h('', 2, num), '<p>It is a single number.</p>', 'no metric, so no metric sentence');
   assert.equal(h('2', 2, num), '<p>It is a single number. Yours already gives the answer: press Run.</p>');
-  assert.equal(h('3', 2, num), '<p>It is a single number. Your series match; the values do not.</p>');
+  assert.equal(h('3', 2, num), '<p>It is a single number. Yours is higher than the answer.</p>');
+  assert.equal(h('1', 2, num), '<p>It is a single number. Yours is lower than the answer.</p>');
   assert.equal(h(`sum(rate(${MET}[5m]))`, 2, num), '<p>It is a single number. Yours has 1, grouped by nothing.</p>');
-  assert.equal(h(REF, 2, one.reference ? spec({ reference: '1 + 1' }) : num).includes('Yours has 2, grouped by route'), true);
+  assert.equal(
+    h(REF, 2, num),
+    '<p>It is a single number. Yours has 2, grouped by route.</p>',
+    'a grouped vector against a number',
+  );
+});
+
+test('tier 2 wrong values says which way, per series, with no numbers', () => {
+  assert.equal(h(`${REF} + 1`), `<p>${HEAD} Yours is higher than the answer for all 2 series.</p>`, 'all higher');
+  assert.equal(h(`${REF} - 1`), `<p>${HEAD} Yours is lower than the answer for all 2 series.</p>`, 'all lower');
+  assert.equal(
+    h(`${REF} * 2`),
+    `<p>${HEAD} Yours is higher than the answer for 1 of 2 series.</p>`,
+    'one of two higher',
+  );
+  // Two series, one above and one below the answer: matched by labels, not by position.
+  const rows = [[{ __name__: 'x', k: 'a' }, [[100, 0], [300, 60]]], [{ __name__: 'x', k: 'b' }, [[100, 0], [300, 60]]], [{ __name__: 'y', k: 'a' }, [[100, 0], [300, 120]]], [{ __name__: 'y', k: 'b' }, [[100, 0], [300, 30]]]];
+  const mixed = spec({ dataset: ds(...rows), at: 300, reference: 'sum by (k) (rate(x[5m]))' });
+  assert.equal(
+    h('sum by (k) (rate(y[5m]))', 2, mixed),
+    '<p>The answer reads x. It returns 2 series, one per k. Yours reads y. Yours is higher for 1 and lower for 1 of 2 series.</p>',
+    'mixed (and a different metric)',
+  );
+  const num = spec({ reference: '1 + 1' });
+  assert.equal(h('5', 2, num), '<p>It is a single number. Yours is higher than the answer.</p>');
+  assert.equal(h('0', 2, num), '<p>It is a single number. Yours is lower than the answer.</p>');
+});
+
+test('tier 2 wrong values with the right shape but another metric says what it reads', () => {
+  const s = spec({
+    dataset: ds([{ __name__: 'x', route: '/a' }, [[100, 0], [300, 60]]], [{ __name__: 'x', route: '/b' }, [[100, 0], [300, 60]]], [{ __name__: 'z', route: '/a' }, [[100, 0], [300, 6]]], [{ __name__: 'z', route: '/b' }, [[100, 0], [300, 6]]]),
+    at: 300,
+    reference: 'sum by (route) (rate(x[5m]))',
+  });
+  assert.equal(
+    h('sum by (route) (rate(z[5m]))', 2, s),
+    '<p>The answer reads x. It returns 2 series, one per route. Yours reads z. Yours is lower than the answer for all 2 series.</p>',
+  );
+  assert.equal(
+    h('sum by (route) (rate(x[5m])) * 2', 2, s),
+    '<p>The answer reads x. It returns 2 series, one per route. Yours is higher than the answer for all 2 series.</p>',
+    'the same metric: no metric sentence',
+  );
+  // the real case from review: hist-avg answered with a request counter
+  const avg = histograms.play.steps.find((st) => st.query?.id === 'hist-avg').query;
+  assert.equal(
+    h(`sum(rate(${MET}{route="/pay"}[5m]))`, 2, avg),
+    '<p>The answer reads http_server_request_duration_seconds_sum, http_server_request_duration_seconds_count. It returns one series with no labels. Yours reads http_server_requests_total. Yours is higher than the answer.</p>',
+  );
 });
 
 test('tier 2 names several answer labels and escapes the text it builds', () => {
@@ -144,6 +196,47 @@ test('tier 2 does not leak: no function, no label value, no long piece of the re
       for (let i = 0; i + 12 < stripped.length; i++) {
         assert.ok(!html.includes(stripped.slice(i, i + 13)), `reference piece leaked: ${stripped.slice(i, i + 13)}`);
       }
+    }
+  }
+});
+
+const H = 'http_server_request_duration_seconds';
+const SM = 'traces_span_metrics_calls_total';
+/** Tempting wrong queries per real step (the explain texts name them), besides blank and the answer itself. */
+const WRONG = {
+  'pql-rate': ['sum by (route) (rate(http_server_requests_total{service="checkout"}[5m]))', 'sum by (route) (http_server_requests_total{service="checkout", status="500"})'],
+  'pql-increase': ['sum(rate(http_server_requests_total{route="/pay"}[10m]))', 'sum(increase(http_server_requests_total{route="/pay"}[5m]))'],
+  'hist-avg': [`sum(rate(${H}_sum[5m])) / sum(rate(${H}_count[5m]))`, 'sum(rate(http_server_requests_total{route="/pay"}[5m]))'],
+  'hist-p99': [`histogram_quantile(0.99, sum by (le) (rate(${H}_bucket[5m])))`, `histogram_quantile(0.95, sum by (le) (rate(${H}_bucket{route="/pay"}[5m])))`],
+  'hist-p95': [`histogram_quantile(0.99, sum by (service, le) (rate(${H}_bucket[5m])))`],
+  'ru-rate': [`sum by (service_name) (rate(${SM}[5m]))`],
+  'ru-errors': [
+    `sum by (service_name) (rate(${SM}{status_code="STATUS_CODE_ERROR"}[5m])) / sum by (service_name) (rate(${SM}[5m]))`,
+    `sum by (service_name) (rate(${SM}{span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR"}[5m])) / sum by (service_name) (rate(${SM}{span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_OK"}[5m]))`,
+  ],
+  'ru-duration': ['histogram_quantile(0.95, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket[5m])))'],
+};
+const REAL_STEPS = [promqlBasics, histograms, redAndUse].flatMap((l) => l.play.steps.filter((st) => st.query).map((st) => st.query));
+
+test('tier 2 on every real query step leaks no number, label value or function of the answer', () => {
+  assert.equal(REAL_STEPS.length, 8);
+  for (const q of REAL_STEPS) {
+    assert.ok(WRONG[q.id], `${q.id} needs tempting wrong queries`);
+    const want = referenceResult(q.dataset, q.at, q.reference);
+    const wanted = want.kind === 'scalar' ? [want.value] : want.series.map((x) => x.value);
+    const values = want.kind === 'scalar' ? [] : want.series.flatMap((x) => Object.entries(x.labels)).filter(([k]) => k !== '__name__').map(([, v]) => v);
+    for (const player of ['', q.reference, ...WRONG[q.id]]) {
+      const html = h(player, 2, q);
+      const where = `${q.id} / ${player}: ${html}`;
+      for (const v of wanted) {
+        for (const shown of [String(v), v.toFixed(1), v.toFixed(2), v.toPrecision(3), String(Math.round(v * 100) / 100)]) {
+          assert.ok(shown.length < 3 || !html.includes(shown), `value ${shown} leaked: ${where}`);
+        }
+      }
+      for (const v of values) assert.ok(!html.includes(v), `label value ${v} leaked: ${where}`);
+      const most = Math.max(want.kind === 'scalar' ? 1 : want.series.length, 3);
+      for (const n of html.match(/\d+(\.\d+)?/g) ?? []) assert.ok(/^\d+$/.test(n) && Number(n) <= most, `a number ${n}: ${where}`);
+      assert.ok(!/le\b|histogram_quantile|\brate\b|\bincrease\b/.test(html.replace(/[a-z_]+_(bucket|sum|count|total|milliseconds_bucket)/g, '')), `function leaked: ${where}`);
     }
   }
 });
