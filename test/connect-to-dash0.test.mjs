@@ -7,12 +7,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeDom, q, qa } from './helpers/dom.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
-import { createTelemetry, PRACTICE_READ_ONLY_TOKEN, PRACTICE_TOKEN } from '../lib/telemetry.mjs';
+import { createTelemetry } from '../lib/telemetry.mjs';
 import level from '../levels/connect-to-dash0.mjs';
 
 const HOST = 'ingress.eu-west-1.aws.dash0.com';
 const ENDPOINT = `https://${HOST}`;
 const SECRET = 'auth_LIVESECRETvalue0123456789';
+// Any string with the shape of a token: these cases fail on the endpoint or the token's form.
+const SHAPED = 'auth_shapedlike0000';
 const PRACTICE_BANNER = 'Practice: a simulated Dash0, not your account';
 
 const turn = () => new Promise((r) => setImmediate(r));
@@ -109,6 +111,7 @@ const fill = (sel, text) => {
 /** Live mode, connect form filled with the secret and pressed. */
 async function connectLive(h, { endpoint = ENDPOINT, token = SECRET, dataset = '' } = {}) {
   press('#ctd-live');
+  press('#ctd-scope-ingest');
   fill('#ctd-endpoint', endpoint);
   fill('#ctd-token', token);
   fill('#ctd-dataset', dataset);
@@ -166,14 +169,14 @@ test('practice shows its label on every screen and sends nothing to the real fet
 // ---- plain-language reasons for a bad form ----
 
 const REASON_CASES = [
-  ['ingress.practice.dash0.invalid:4317', PRACTICE_TOKEN, /4317 is the default OTLP\/gRPC port/],
-  ['ingress.practice.dash0.invalid', PRACTICE_TOKEN, /no https:\/\//],
-  ['http://ingress.practice.dash0.invalid', PRACTICE_TOKEN, /must be https/],
-  ['https://ingress.practice.dash0.invalid/v1/traces', PRACTICE_TOKEN, /already ends in \/v1\/traces/],
-  ['https://evil.example', PRACTICE_TOKEN, /not a known Dash0 ingress/],
+  ['https://ingress.practice.dash0.invalid:4317', SHAPED, /4317 is the default OTLP\/gRPC port.*browser cannot make gRPC calls/],
+  ['ingress.practice.dash0.invalid', SHAPED, /no https:\/\//],
+  ['http://ingress.practice.dash0.invalid', SHAPED, /must be https/],
+  ['https://ingress.practice.dash0.invalid/v1/traces', SHAPED, /already ends in \/v1\/traces/],
+  ['https://evil.example', SHAPED, /not a known Dash0 ingress/],
   ['https://ingress.practice.dash0.invalid', 'notauth_abcdefgh', /does not look like a Dash0 token/],
-  ['https://ingress.practice.dash0.invalid', `Bearer ${PRACTICE_TOKEN}`, /Paste only the token/],
-  ['https://ingress.practice.dash0.invalid', `${PRACTICE_TOKEN} `, /space or a line break/],
+  ['https://ingress.practice.dash0.invalid', `Bearer ${SHAPED}`, /Paste only the token/],
+  ['https://ingress.practice.dash0.invalid', `${SHAPED} `, /space or a line break/],
 ];
 
 for (const [endpoint, token, expected] of REASON_CASES) {
@@ -199,7 +202,7 @@ test('an empty endpoint or token is a nudge, not a mistake; a bad dataset is a m
   press('#ctd-connect');
   assert.equal(h.mistakes(), 0);
   fill('#ctd-endpoint', 'https://ingress.practice.dash0.invalid');
-  fill('#ctd-token', PRACTICE_TOKEN);
+  fill('#ctd-token', SHAPED);
   fill('#ctd-dataset', '-bad dataset');
   press('#ctd-connect');
   assert.match(q('#ctd-feedback').textContent, /Dataset: A dataset identifier uses letters/);
@@ -209,7 +212,8 @@ test('an empty endpoint or token is a nudge, not a mistake; a bad dataset is a m
 // ---- the creating-a-token step ----
 
 test('a permission other than Ingesting costs one mistake, once, and the token still comes out', () => {
-  const h = open(practiceTelemetry().tele);
+  const { tele } = practiceTelemetry();
+  const h = open(tele);
   press('#ctd-practice');
   press('#ctd-mint');
   assert.match(q('#ctd-mint-feedback').textContent, /Pick a permission first/);
@@ -218,19 +222,19 @@ test('a permission other than Ingesting costs one mistake, once, and the token s
   press('#ctd-mint');
   press('#ctd-mint');
   assert.equal(h.mistakes(), 1, 'the same wrong permission twice is one mistake');
-  assert.equal(q('#ctd-minted').textContent, PRACTICE_READ_ONLY_TOKEN);
+  assert.equal(q('#ctd-minted').textContent, tele.practiceCredential('read'));
   assert.match(q('#ctd-mint-feedback').textContent, /cannot send telemetry/);
   press('#ctd-scope-all');
   press('#ctd-mint');
   assert.equal(h.mistakes(), 2);
-  assert.match(q('#ctd-mint-feedback').textContent, /Dash0 recommends restricting tokens to Ingesting/);
+  assert.match(q('#ctd-mint-feedback').textContent, /Dash0 recommends Ingesting-only tokens whenever you distribute a token publicly, for example in browser instrumentation\./);
   press('#ctd-scope-ingest');
   press('#ctd-mint');
   assert.equal(h.mistakes(), 2, 'Ingesting is right and free');
-  assert.equal(q('#ctd-minted').textContent, PRACTICE_TOKEN);
+  assert.equal(q('#ctd-minted').textContent, tele.practiceCredential('ingest'));
 });
 
-test('practice: the 403 of a read-only token adds no mistake beyond the permission pick', async () => {
+test('practice: a read-only token costs the pick and then the refusal, in words that split no status', async () => {
   const h = open(practiceTelemetry().tele);
   press('#ctd-practice');
   press('#ctd-scope-read');
@@ -240,9 +244,164 @@ test('practice: the 403 of a read-only token adds no mistake beyond the permissi
   fill('#ctd-token', q('#ctd-minted').textContent);
   press('#ctd-connect');
   await settle('#ctd-feedback[data-outcome]');
-  assert.match(q('#ctd-feedback').textContent, /knows this token but refused the test span \(403\)/);
-  assert.equal(h.mistakes(), 1, 'the pick was the mistake; the practice rejection is the lesson');
+  assert.match(q('#ctd-feedback').textContent, /^The simulated Dash0 refused this token and would not take the test span\. Check that you copied all of the token, that it is from this organization, and that it has the Ingesting permission\./);
+  assert.doesNotMatch(q('#ctd-feedback').textContent, /40[13]|knows this token/);
+  assert.equal(h.mistakes(), 2, 'the refusal is charged in practice too');
   assert.equal(qa('[data-finish]').length, 0);
+});
+
+test('practice: a token that was never minted is refused and costs one mistake, as live does', async () => {
+  const h = open(practiceTelemetry().tele);
+  press('#ctd-practice');
+  fill('#ctd-endpoint', q('#ctd-ep-http').textContent);
+  fill('#ctd-token', 'auth_guess12345');
+  press('#ctd-connect');
+  await settle('#ctd-feedback[data-outcome]');
+  assert.match(q('#ctd-feedback').textContent, /refused this token/);
+  assert.equal(h.mistakes(), 1);
+});
+
+test('the same total in both modes: All permissions costs one mistake and the connection still completes', async () => {
+  const practice = open(practiceTelemetry().tele);
+  press('#ctd-practice');
+  press('#ctd-scope-all');
+  press('#ctd-mint');
+  fill('#ctd-endpoint', q('#ctd-ep-http').textContent);
+  fill('#ctd-token', q('#ctd-minted').textContent);
+  press('#ctd-connect');
+  await settle('#ctd-finish');
+  press('#ctd-finish');
+  assert.equal(practice.mistakes(), 1);
+  assert.equal(practice.finished[0].result.stars, 4);
+
+  const live = open(liveTelemetry([ok()]).tele);
+  press('#ctd-live');
+  press('#ctd-scope-all');
+  fill('#ctd-endpoint', ENDPOINT);
+  fill('#ctd-token', SECRET);
+  press('#ctd-connect');
+  await settle('#ctd-finish');
+  press('#ctd-finish');
+  assert.equal(live.mistakes(), 1);
+  assert.equal(live.finished[0].result.stars, 4);
+});
+
+test('live: the declared permission is required before anything is sent, and is charged like the practice mint', async () => {
+  const { tele, sent } = liveTelemetry([ok()]);
+  const h = open(tele);
+  press('#ctd-live');
+  assert.match(q('label[for="ctd-token"]').textContent, /Auth token/);
+  assert.match(h.text(), /Which permission did you give this token\?/);
+  fill('#ctd-endpoint', ENDPOINT);
+  fill('#ctd-token', SECRET);
+  press('#ctd-connect');
+  assert.match(q('#ctd-feedback').textContent, /Say which permission you gave the token first\. Nothing was sent/);
+  assert.equal(h.mistakes(), 0);
+  assert.equal(sent.length, 0);
+  press('#ctd-scope-read');
+  fill('#ctd-token', SECRET);
+  press('#ctd-connect');
+  assert.equal(h.mistakes(), 1);
+  assert.match(q('#ctd-scope-feedback').textContent, /cannot send telemetry/);
+  await settle('#ctd-finish');
+  assert.equal(sent.length, 1);
+});
+
+test('live: declaring the same wrong permission again is not charged again; Ingesting is free', async () => {
+  const { tele } = liveTelemetry([reply(401), reply(401), ok()]);
+  const h = open(tele);
+  press('#ctd-live');
+  press('#ctd-scope-read');
+  fill('#ctd-endpoint', ENDPOINT);
+  for (const t of [SECRET, `${SECRET}2`]) {
+    fill('#ctd-token', t);
+    press('#ctd-connect');
+    await settle('#ctd-feedback[data-outcome]');
+    q('#ctd-feedback').removeAttribute('data-outcome');
+  }
+  assert.equal(h.mistakes(), 2, 'one for Reading, one for the 401 (the second 401 is the same cause)');
+  press('#ctd-scope-ingest');
+  fill('#ctd-token', `${SECRET}3`);
+  press('#ctd-connect');
+  await settle('#ctd-finish');
+  assert.equal(h.mistakes(), 2);
+});
+
+// ---- one charge rule for form errors ----
+
+test('the same bad form pressed twice costs one mistake; a different bad form costs another', () => {
+  const h = open(practiceTelemetry().tele);
+  press('#ctd-practice');
+  for (let i = 0; i < 2; i++) {
+    fill('#ctd-endpoint', q('#ctd-ep-grpc').textContent);
+    fill('#ctd-token', SHAPED);
+    press('#ctd-connect');
+  }
+  assert.equal(h.mistakes(), 1);
+  fill('#ctd-endpoint', `${q('#ctd-ep-http').textContent}/v1/traces`);
+  fill('#ctd-token', SHAPED);
+  press('#ctd-connect');
+  assert.equal(h.mistakes(), 2);
+});
+
+test('an emptied token right after a form error keeps the useful reason and costs nothing', () => {
+  const h = open(practiceTelemetry().tele);
+  press('#ctd-practice');
+  fill('#ctd-endpoint', q('#ctd-ep-http').textContent);
+  fill('#ctd-token', `Bearer ${SHAPED}`);
+  press('#ctd-connect');
+  press('#ctd-connect'); // the field is empty now
+  assert.match(q('#ctd-feedback').textContent, /Paste only the token/);
+  assert.doesNotMatch(q('#ctd-feedback').textContent, /Nothing entered yet/);
+  assert.equal(h.mistakes(), 1);
+});
+
+// ---- the choice is not given away ----
+
+test('the screens give neither answer: the reason is stated, the endpoint and permission are not', () => {
+  const h = open(practiceTelemetry().tele);
+  const first = h.text();
+  assert.match(first, /The game sends from a browser tab/);
+  assert.doesNotMatch(first, /HTTP|gRPC|https:\/\//);
+  press('#ctd-practice');
+  const second = h.text();
+  assert.match(second, /anyone can open with dev tools/);
+  assert.doesNotMatch(second, /can only send|Two of the three|starting with|port 443|4318/);
+  assert.equal(q('label[for="ctd-endpoint"]').textContent, 'Endpoint');
+  assert.match(q('#ctd-endpoint-note').textContent, /copied exactly as Dash0 shows it/);
+  assert.doesNotMatch(q('#ctd-feedback').textContent + [...qa('label')].map((l) => l.textContent).join(' '), /OTLP over HTTP/);
+  for (const sel of ['#ctd-ep-grpc', '#ctd-ep-http']) assert.match(q(sel).textContent, /^https:\/\/ingress\.practice\.dash0\.invalid(:4317)?$/);
+});
+
+test('both fields opt out of autofill and of password managers', () => {
+  open(practiceTelemetry().tele);
+  press('#ctd-practice');
+  assert.equal(q('#ctd-endpoint').getAttribute('autocomplete'), 'off');
+  for (const [name, value] of [['data-1p-ignore', ''], ['data-lpignore', 'true'], ['data-bwignore', ''], ['data-form-type', 'other']]) {
+    assert.equal(q('#ctd-token').getAttribute(name), value, name);
+  }
+  assert.doesNotMatch(q('#ctd-token-note').textContent, /memory only|held in/);
+  assert.match(q('#ctd-token-note').textContent, /never saves it.*browser may offer to save it\. Decline/);
+});
+
+test('practice tokens are opaque, differ per permission and per session, and only the minted ones are accepted', async () => {
+  const mk = (fill) => practiceTelemetry({ randomBytes: (n) => new Uint8Array(n).fill(fill) }).tele;
+  const a = mk(3);
+  const names = ['all', 'ingest', 'read'].map((k) => a.practiceCredential(k));
+  assert.equal(new Set(names).size, 3);
+  for (const n of names) assert.match(n, /^auth_practice_[0-9a-f]{12}$/, 'nothing in the name says what it can do');
+  assert.notEqual(mk(4).practiceCredential('ingest'), a.practiceCredential('ingest'), 'not a fixed string');
+  assert.equal(a.practiceCredential('nope'), null);
+  assert.equal(a.practiceCredential('constructor'), null);
+  // the other session's token is unknown here
+  const h = open(a);
+  press('#ctd-practice');
+  fill('#ctd-endpoint', q('#ctd-ep-http').textContent);
+  fill('#ctd-token', mk(4).practiceCredential('ingest'));
+  press('#ctd-connect');
+  await settle('#ctd-feedback[data-outcome]');
+  assert.equal(q('#ctd-feedback').getAttribute('data-outcome'), 'rejected');
+  assert.equal(h.mistakes(), 1);
 });
 
 // ---- outcomes, one per OUTCOME shape ----
@@ -250,9 +409,10 @@ test('practice: the 403 of a read-only token adds no mistake beyond the permissi
 const OUTCOME_CASES = [
   ['a thrown fetch', () => { throw new TypeError('Failed to fetch'); }, 'unreachable', /never got an answer.*CORS.*Content Security Policy/, { mistakes: 0, retry: true, practice: true }],
   ['no usable response', undefined, 'unreachable', /not with a usable HTTP response/, { mistakes: 0, retry: true, practice: true }],
-  ['401', reply(401), 'rejected', /did not accept this token \(401\)/, { mistakes: 1, retry: false, practice: false }],
-  ['403', reply(403), 'rejected', /refused the test span \(403\).*permission Ingesting/, { mistakes: 1, retry: false, practice: false }],
-  ['500', reply(500, '{"message":"boom"}'), 'rejected', /refused the test span \(HTTP 500\).*Dash0 said: boom/, { mistakes: 0, retry: true, practice: false }],
+  ['401', reply(401), 'rejected', /^Dash0 refused this token and would not take the test span\. .*copied all of the token.*from this organization.*Ingesting permission/, { mistakes: 1, retry: false, practice: false }],
+  ['403', reply(403), 'rejected', /^Dash0 refused this token and would not take the test span\. .*Ingesting permission/, { mistakes: 1, retry: false, practice: false }],
+  ['500', reply(500, '{"message":"boom"}'), 'rejected', /^Dash0 refused the test span \(HTTP 500\)\..*Dash0 said: boom/, { mistakes: 0, retry: true, practice: false }],
+  ['500 with markup in its message', reply(500, '{"message":"<b id=x>hi</b>"}'), 'rejected', /Dash0 said: <b id=x>hi<\/b>/, { mistakes: 0, retry: true, practice: false, noElement: '#x' }],
   ['rejected spans in a 200', reply(200, '{"partialSuccess":{"rejectedSpans":"2"}}'), 'rejected', /refused the test span \(HTTP 200\)/, { mistakes: 0, retry: true, practice: false }],
 ];
 
@@ -266,6 +426,7 @@ for (const [name, answer, kind, copy, want] of OUTCOME_CASES) {
     assert.equal(q('#ctd-feedback').getAttribute('data-tone'), 'error');
     assert.match(q('#ctd-feedback').textContent, copy);
     assert.equal(h.mistakes(), want.mistakes);
+    if (want.noElement) assert.equal(q(want.noElement) === null, true, 'the server message is escaped, not parsed');
     assert.equal(qa('#ctd-retry').length, want.retry ? 1 : 0);
     assert.equal(qa('#ctd-switch').length, want.practice ? 1 : 0);
     assert.equal(qa('[data-finish]').length, 0, 'Finish only after accepted');
@@ -360,6 +521,7 @@ test('a second press while the test span is in flight sends nothing more', async
   const { tele, sent } = liveTelemetry([() => gate.then(ok)]);
   const h = open(tele);
   press('#ctd-live');
+  press('#ctd-scope-ingest');
   fill('#ctd-endpoint', ENDPOINT);
   fill('#ctd-token', SECRET);
   const stale = q('#ctd-connect');
@@ -394,6 +556,7 @@ test('the token is in no part of the page, at any step, success or failure', asy
     const { tele } = liveTelemetry([answer], { reportError: () => {} });
     const h = open(tele);
     press('#ctd-live');
+    press('#ctd-scope-ingest');
     fill('#ctd-endpoint', ENDPOINT);
     fill('#ctd-token', SECRET);
     press('#ctd-connect');
@@ -408,6 +571,7 @@ test('a token that fails validation is cleared and never echoed either', () => {
   for (const bad of ['LIVESECRET', `Bearer ${SECRET}`, `${SECRET} x`, `x${SECRET}`]) {
     const h = open(liveTelemetry([ok()]).tele);
     press('#ctd-live');
+    press('#ctd-scope-ingest');
     fill('#ctd-endpoint', ENDPOINT);
     fill('#ctd-token', bad);
     press('#ctd-connect');
@@ -428,17 +592,18 @@ test('the token reaches no error report, no status, no result and no hint to ctx
 
 test('the practice token shown after Create token is gone from the page once Connect is pressed', async () => {
   const { tele } = practiceTelemetry();
+  const shown = tele.practiceCredential('ingest');
   const h = open(tele);
   press('#ctd-practice');
   press('#ctd-scope-ingest');
   press('#ctd-mint');
-  assert.ok(h.page().includes(PRACTICE_TOKEN), 'shown once, as a copyable value');
+  assert.ok(h.page().includes(shown), 'shown once, as a copyable value');
   fill('#ctd-endpoint', q('#ctd-ep-http').textContent);
-  fill('#ctd-token', PRACTICE_TOKEN);
+  fill('#ctd-token', shown);
   press('#ctd-connect');
-  assert.ok(!h.page().includes(PRACTICE_TOKEN), 'gone while the request is out');
+  assert.ok(!h.page().includes(shown), 'gone while the request is out');
   await settle('#ctd-finish');
-  assert.ok(!h.page().includes(PRACTICE_TOKEN), 'and after');
+  assert.ok(!h.page().includes(shown), 'and after');
   assert.equal(qa('#ctd-token').length, 0, 'the form is gone on the connected screen');
 });
 

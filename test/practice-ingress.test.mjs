@@ -71,3 +71,14 @@ test('a foreign host throws TypeError, as an unreachable host does, and the prac
   const out = await send({ token: 'practice_ingest_7Hq3' });
   assert.ok(!JSON.stringify(out).includes('practice_ingest'), 'no token in the outcome');
 });
+
+test('a list of tokens: each is accepted, the read-only one is still refused, others are unknown', async () => {
+  const fetch = createPracticeIngress({ token: [TOKEN, 'auth_second_ok_0000'], readOnlyToken: READ_ONLY });
+  const of = (token) => sendTraces({ fetch, tracesUrl: endpoint.tracesUrl, token, body: BODY, ...noTimers });
+  assert.deepEqual(await of(TOKEN), { kind: 'accepted' });
+  assert.deepEqual(await of('auth_second_ok_0000'), { kind: 'accepted' });
+  assert.equal((await of(READ_ONLY)).status, 403);
+  assert.equal((await of('auth_third_0000')).status, 401);
+  assert.throws(() => createPracticeIngress({ token: [] }), TypeError);
+  assert.throws(() => createPracticeIngress({ token: [TOKEN, ''] }), TypeError);
+});

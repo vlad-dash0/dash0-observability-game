@@ -388,7 +388,7 @@ const DRIVERS = {
       async play() {
         click('#ctd-practice');
         const ep = practiceEndpoint();
-        type('#ctd-endpoint', `${new URL(ep).host}:4317`); // the gRPC shape: a mistake
+        type('#ctd-endpoint', q('#ctd-ep-grpc').textContent.trim()); // the gRPC row: a mistake
         type('#ctd-token', 'auth_whatever_0000');
         click('#ctd-connect');
         type('#ctd-endpoint', `${ep}/v1/traces`); // the signal path already added: a mistake
@@ -396,7 +396,7 @@ const DRIVERS = {
         click('#ctd-connect');
         await sendPractice('read', ep); // a read-only token: a mistake at the pick, then a 403
         await until('#ctd-feedback[data-outcome="rejected"]');
-        assert.ok(q('#ctd-feedback').textContent.includes('403'), 'the 403 is explained');
+        assert.ok(q('#ctd-feedback').textContent.includes('refused this token'), 'the refusal is explained');
         await sendPractice('ingest', ep);
         await until('#ctd-finish');
         click('#ctd-finish');
@@ -873,6 +873,22 @@ test('harness: an earlier Finish click does not cover a finish from outside a cl
       /finished from a \[data-finish\] click, not from no click/,
     );
   }
+});
+
+test('harness: an async level whose sloppy run equals its happy run fails', async () => {
+  const same = { async: true, async play() { FIXTURE_DRIVER.play(); }, expect: FIXTURE_DRIVER.expect };
+  await checkLevelAsync(FIXTURE, { ...same, sloppy: { ...FIXTURE_DRIVER.sloppy, async play() { FIXTURE_DRIVER.sloppy.play(); } } });
+  await assert.rejects(
+    checkLevelAsync(FIXTURE, { ...same, sloppy: { ...same } }),
+    /must score fewer/,
+  );
+});
+
+test('harness: an async run that finishes from a stray button fails', async () => {
+  await assert.rejects(
+    checkRunAsync(FIXTURES['fx-other-button'], { async play() { click('#go'); }, expect: { stars: 5, cards: [] } }),
+    /finished from a \[data-finish\] click/,
+  );
 });
 
 test('harness: a wrong expectation, a missing sloppy run or an equal sloppy run fails', () => {

@@ -159,9 +159,12 @@ test('field kind secret: a labelled password input that never carries a value', 
   const html = field({ id: 'tok', label: 'Token', kind: 'secret', noteHtml: 'Kept in memory' });
   assert.equal(html,
     '<div class="ui-field"><label class="ui-field-label" for="tok">Token</label>' +
-    '<input type="password" class="ui-input" id="tok" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="tok-note">' +
+    '<input type="password" class="ui-input" id="tok" autocomplete="off" autocapitalize="off" spellcheck="false" data-1p-ignore data-lpignore="true" data-bwignore data-form-type="other" aria-describedby="tok-note">' +
     '<p class="ui-note" id="tok-note">Kept in memory</p></div>');
   assert.ok(!/\svalue=/.test(html), 'no value attribute');
+  const plain = field({ id: 'ep', label: 'Endpoint', autocompleteOff: true });
+  assert.ok(plain.includes('type="text"') && plain.includes(' autocomplete="off"'), 'a text field can opt out of autofill');
+  assert.ok(!field({ id: 'ep', label: 'Endpoint' }).includes('autocomplete'), 'and does not by default');
   assert.throws(() => field({ id: 'tok', label: 'Token', kind: 'secret', value: 'auth_x' }), /field: .*secret/);
   assert.throws(() => field({ id: 'tok', label: 'Token', kind: 'secret', readonly: true }), /field: .*secret/);
 });

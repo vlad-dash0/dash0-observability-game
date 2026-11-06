@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PRACTICE_HOSTS } from '../lib/dash0/ingress.mjs';
-import { BUFFER_CAP, createTelemetry, PRACTICE_TOKEN } from '../lib/telemetry.mjs';
+import { BUFFER_CAP, createTelemetry } from '../lib/telemetry.mjs';
 
 const HOST = 'ingress.eu-west-1.aws.dash0.com';
 const ENDPOINT = `https://${HOST}`;
@@ -370,14 +370,14 @@ test('the buffer cap drops overflow and counts it (cap+5 gives 5 dropped)', asyn
 test('practice mode never calls the injected real fetch', async () => {
   const f = instantFetch();
   const { telemetry } = make({ fetch: f.fetch });
-  assert.deepEqual(telemetry.connect({ mode: 'practice', endpoint: PRACTICE_ENDPOINT, token: PRACTICE_TOKEN, dataset: '' }), { ok: true });
+  assert.deepEqual(telemetry.connect({ mode: 'practice', endpoint: PRACTICE_ENDPOINT, token: telemetry.practiceCredential('ingest'), dataset: '' }), { ok: true });
   assert.deepEqual(telemetry.status(), { state: 'configured', mode: 'practice', host: PRACTICE_HOSTS[0] });
   assert.deepEqual(await telemetry.sendTest(), { kind: 'accepted' }, 'the practice ingress accepted it');
   assert.equal(telemetry.status().state, 'connected');
   telemetry.emit(draft('practice-span'));
   assert.deepEqual(await telemetry.flush(), { kind: 'accepted' });
   assert.equal(f.calls.length, 0, 'the real fetch was never called');
-  assert.equal(telemetry.connect({ mode: 'practice', endpoint: ENDPOINT, token: PRACTICE_TOKEN, dataset: '' }).reason, 'unknown-host', 'practice accepts only the practice host');
+  assert.equal(telemetry.connect({ mode: 'practice', endpoint: ENDPOINT, token: telemetry.practiceCredential('ingest'), dataset: '' }).reason, 'unknown-host', 'practice accepts only the practice host');
 });
 
 test('a wrong practice token is an auth rejection from the practice ingress, not the network', async () => {
