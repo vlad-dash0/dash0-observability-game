@@ -211,8 +211,8 @@ h3.q { font-weight: 700; font-size: 19px; margin-bottom: 14px; text-align: cente
 .help-stars { display: flex; gap: 3px; color: var(--color-parent); }
 .help-star svg { display: block; width: 13px; height: 13px; }
 .help-star path { fill: none; stroke: currentColor; stroke-width: 1.1; stroke-linejoin: round; }
-.help-star[data-star="possible"] { color: color-mix(in srgb, var(--color-parent) 55%, transparent); }
-.help-star[data-star="lost"] { color: var(--color-border); }
+.help-star[data-star="possible"] { color: color-mix(in srgb, var(--color-parent) 75%, transparent); }
+.help-star[data-star="lost"] { color: var(--color-text-muted); }
 .help-star[data-star="lost"] path { stroke-dasharray: 1.6 1.4; }
 .help-star[data-star="earned"] path { fill: currentColor; }
 .help-rule { font-size: 11.5px; color: var(--color-text-muted); }
