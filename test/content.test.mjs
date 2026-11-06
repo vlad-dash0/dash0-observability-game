@@ -16,10 +16,6 @@ const LEVEL_FILES = readdirSync(join(ROOT, 'levels'))
   .sort();
 const SPEC_HOSTS = ['opentelemetry.io', 'www.w3.org', 'prometheus.io', 'www.dash0.com'];
 
-// M0's level 1.2 predates the rule: its Spec line cites docs/FOUNDATION.md. Remove it
-// from this list when that file gains an https Spec line (the last test below insists).
-const NO_SPEC_URL_YET = ['naming-your-service.mjs'];
-
 /** The https URLs on a file's `// Spec:` lines (a line may list several, comma-separated). */
 function specUrls(src) {
   return src
@@ -37,7 +33,6 @@ test('the level files are the registered levels (nothing scanned is unregistered
 
 test('every level file has a `// Spec: <https URL>` line on opentelemetry.io, www.w3.org, prometheus.io or www.dash0.com', () => {
   for (const f of LEVEL_FILES) {
-    if (NO_SPEC_URL_YET.includes(f)) continue;
     const urls = specUrls(read(`levels/${f}`));
     assert.notEqual(urls.length, 0, `${f} has no // Spec: https line`);
     for (const url of urls) {
@@ -69,14 +64,11 @@ test('a Dash0 docs Spec line is accepted and lookalike hosts are not', () => {
   }
 });
 
-test('the scanners have teeth: Spec line URLs, hosts and the exemption list', () => {
+test('the scanners have teeth: Spec line URLs and hosts', () => {
   const src = '// Spec: https://opentelemetry.io/a/#b , https://www.w3.org/TR/x/\n//Spec: https://no.example/\n';
   assert.deepEqual(specUrls(src), ['https://opentelemetry.io/a/#b', 'https://www.w3.org/TR/x/']);
   assert.deepEqual(specUrls('// Spec: docs/FOUNDATION.md §5'), []);
   assert.equal(SPEC_HOSTS.includes(hostOf('https://opentelemetry.io.evil.example/')), false);
-  for (const f of NO_SPEC_URL_YET) {
-    assert.deepEqual(specUrls(read(`levels/${f}`)), [], `${f} has a Spec URL now: drop it from NO_SPEC_URL_YET`);
-  }
 });
 
 // A penalty is not always a star (at 3+ penalties it may cost none), so player copy says
