@@ -2,7 +2,7 @@
 // up as unknown_service:node; the player spots the fallback, fixes the .env with the
 // level 1.2 checker (lib/widgets/env-config.mjs), then answers which name wins when
 // OTEL_SERVICE_NAME and service.name in OTEL_RESOURCE_ATTRIBUTES disagree.
-// Spec: https://opentelemetry.io/docs/specs/semconv/registry/attributes/service/ , https://opentelemetry.io/docs/specs/otel/resource/sdk/#specifying-resource-information-via-an-environment-variable , https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/
+// Spec: https://opentelemetry.io/docs/specs/semconv/registry/attributes/service/ , https://opentelemetry.io/docs/specs/semconv/registry/attributes/deployment/ , https://opentelemetry.io/docs/specs/otel/resource/sdk/#specifying-resource-information-via-an-environment-variable , https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/
 // Design: docs/FOUNDATION.md §5 and §6 F6. Player text reaches HTML only via escapeHtml.
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { escapeFromHint } from '../lib/widgets/focus.mjs';
@@ -26,7 +26,7 @@ const SHOWS_UP_AS = [
   {
     key: 'name',
     label: '<code>checkout</code>',
-    why: 'Nothing in this config says checkout, and nothing here lets the SDK work it out: it does not read the repository, the image or the host name. (A few cloud detectors, such as Azure App Service\'s, do fill in <code>service.name</code>.)',
+    why: 'Nothing in this config says checkout, and nothing here lets the SDK work it out: it does not read the repository, the image or the host name. (SDKs can fall back to language- or platform-specific sources, but on a plain VM there is nothing to find.)',
   },
   {
     key: 'fallback',
@@ -137,8 +137,8 @@ export default {
           <textarea class="env-editor" id="nys-env" rows="6" spellcheck="false"
             autocapitalize="off" autocomplete="off">${ctx.escapeHtml(GIVEN_ENV)}</textarea>
           <p class="env-note"><code>OTEL_RESOURCE_ATTRIBUTES</code> is a comma-separated list of
-            <code>key=value</code> pairs. If one pair is malformed, the Node SDK drops the whole
-            variable; the spec says SDKs should, and some languages keep the valid pairs instead.</p>
+            <code>key=value</code> pairs. If one pair is malformed, the spec says the whole value
+            should be discarded and an error reported, so check every pair.</p>
           <button class="btn" id="nys-check">Check</button>
           <button class="btn ghost small" id="nys-hint">Show a hint</button>
           <div class="feedback info" id="nys-hint-text" tabindex="-1"></div>

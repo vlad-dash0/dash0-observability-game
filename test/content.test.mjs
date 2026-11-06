@@ -64,7 +64,7 @@ test('a Dash0 docs Spec line is accepted and lookalike hosts are not', () => {
   }
 });
 
-test('the scanners have teeth: Spec line URLs, hosts and the exemption list', () => {
+test('the scanners have teeth: Spec line URLs and hosts', () => {
   const src = '// Spec: https://opentelemetry.io/a/#b , https://www.w3.org/TR/x/\n//Spec: https://no.example/\n';
   assert.deepEqual(specUrls(src), ['https://opentelemetry.io/a/#b', 'https://www.w3.org/TR/x/']);
   assert.deepEqual(specUrls('// Spec: docs/FOUNDATION.md §5'), []);
