@@ -17,7 +17,7 @@
 import { PRACTICE_HOSTS, REASONS, TOKEN_PREFIX } from '../lib/dash0/ingress.mjs';
 import { OUTCOME, TIMEOUT_MS } from '../lib/otlp/send.mjs';
 import { MODE, STATE } from '../lib/telemetry.mjs';
-import { actions as actionsBar, button, chip, feedback, field, note, panel, prose, radio, setFeedback, step } from '../lib/ui/index.mjs';
+import { actions as actionsBar, button, chip, feedback, field, note, panel, prose, radio, radioGroup, setFeedback, step } from '../lib/ui/index.mjs';
 
 // The Permissions options of an auth token (glossary/auth-tokens). Only Ingesting is right. The
 // keys are the telemetry session's PRACTICE_SCOPE values (it mints the practice token per key).
@@ -150,12 +150,12 @@ export default {
               (live
                 ? '<p>Your own Dash0: the game sends one test span, and a level-complete span for each level you finish ' +
                   'until you reload the page, to the endpoint you enter. Nothing goes to the game\'s servers.</p>'
-                : '<p>Your own Dash0 is not open yet. Practice works the same way.</p>'),
+                : '<p id="ctd-live-why">Your own Dash0 is not open yet. Practice works the same way.</p>'),
           ),
         ),
         bar(
           button({ id: 'ctd-practice', label: 'Practice with a simulated Dash0', variant: 'primary' }) +
-            button({ id: 'ctd-live', label: 'Use my own Dash0', variant: 'ghost', disabled: !live }),
+            button({ id: 'ctd-live', label: 'Use my own Dash0', variant: 'ghost', disabled: !live, ...(live ? {} : { describedBy: 'ctd-live-why' }) }),
         ),
       );
       actions.querySelector('#ctd-practice').onclick = () => stepConnect(MODE.practice);
@@ -181,9 +181,11 @@ export default {
               '</tbody></table>',
           ),
           '<h4>Settings, Auth Tokens: create a token</h4>' +
-            '<p>Permissions</p>' +
-            SCOPES.map((s) =>
-              radio({ id: `ctd-scope-${s.key}`, name: 'ctd-scope', value: s.key, labelHtml: s.label })).join('') +
+            radioGroup({
+              legend: 'Permissions',
+              itemsHtml: SCOPES.map((s) =>
+                radio({ id: `ctd-scope-${s.key}`, name: 'ctd-scope', value: s.key, labelHtml: s.label })).join(''),
+            }) +
             `<p>${button({ id: 'ctd-mint', label: 'Create token', variant: 'ghost' })}</p>` +
             feedback({ id: 'ctd-mint-feedback' }) +
             '<div id="ctd-minted-row" hidden>Your new token: <code id="ctd-minted"></code></div>',
@@ -198,8 +200,10 @@ export default {
       // Live cannot see a token's permission, so the player says which one they gave it. It is
       // charged by the same rule as the practice mint (chargeScope below).
       const liveScope =
-        '<p>Which permission did you give this token?</p>' +
-        SCOPES.map((s) => radio({ id: `ctd-scope-${s.key}`, name: 'ctd-scope', value: s.key, labelHtml: s.label })).join('') +
+        radioGroup({
+          legend: 'Which permission did you give this token?',
+          itemsHtml: SCOPES.map((s) => radio({ id: `ctd-scope-${s.key}`, name: 'ctd-scope', value: s.key, labelHtml: s.label })).join(''),
+        }) +
         feedback({ id: 'ctd-scope-feedback' });
       ctx.renderStep(
         screen(
@@ -402,6 +406,7 @@ export default {
             ? { text: 'Practice: a simulated Dash0, not your account', tone: 'attention' }
             : { text: `Connected to ${status.host ?? ''}`, tone: 'success' }),
           prose(
+            '<h4 id="ctd-connected-title" tabindex="-1">Connected</h4>' +
             `<p>Session id: <code id="ctd-session">${e(tele.sessionId)}</code>. Every span the game sends carries it as ` +
               '<code>session.id</code>, so you can find your own among everyone else\'s.</p>' +
               '<p>The game keeps the token only in this tab\'s memory. It was cleared from the form, and a page reload drops the ' +
@@ -410,6 +415,7 @@ export default {
         ),
         bar(button({ id: 'ctd-finish', label: 'Finish', variant: 'primary', finish: true })),
       );
+      $('#ctd-connected-title').focus();
       actions.querySelector('#ctd-finish').onclick = () =>
         ctx.finish({
           text: practice
