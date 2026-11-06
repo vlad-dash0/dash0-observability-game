@@ -131,6 +131,7 @@ export const ACTS = [
     no: 7,
     name: 'Alerting and SLOs',
     sub: 'Wake me only when it matters',
+    badges: ['dash0'],
     teaser: 'Good alerts, SLOs and error budgets, burn-rate alerts and synthetic checks.',
     levels: [goodAlerts],
     boss: null,
@@ -140,6 +141,7 @@ export const ACTS = [
     no: 8,
     name: 'Operating at scale',
     sub: 'As code',
+    badges: ['dash0'],
     teaser:
       'Dashboards as code, semantic convention upgrades, migrating vendors, browser telemetry and AI-assisted debugging.',
     levels: [semanticConventionVersions],
@@ -150,6 +152,7 @@ export const ACTS = [
     no: 9,
     name: 'Live Demo',
     sub: 'Does that answer hold?',
+    badges: ['customer-calls'],
     teaser: 'Judge a confident answer about filters, tail sampling and an error rate before it goes to a customer.',
     levels: [filterOrSampler, the34PercentErrorRate],
     boss: null,
