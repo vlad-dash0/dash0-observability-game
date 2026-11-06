@@ -913,10 +913,10 @@ test('V1 selecting a record presses it and offers "No span context" first, then 
   assert.equal(q('[data-build-panel] [data-panel-title="log"]').textContent, 'Span context for "Retry worker gave up on charge" (payments, 75 ms)');
   assert.deepEqual(qa('[data-attach]').map((b) => b.textContent), [
     'No span context',
-    'POST /checkout (checkout, trace 4bf9) · 0–100 ms',
+    'POST /checkout (checkout, trace 4bf92f35) · 0–100 ms',
     'validate cart (checkout) · 20–40 ms',
     'POST /charge (payments) · 50–90 ms',
-    'POST /checkout (checkout, trace 0af7) · 30–80 ms',
+    'POST /checkout (checkout, trace 0af76519) · 30–80 ms',
   ]);
   assert.equal(counts.mistakes, 0, 'selecting is free');
 });
@@ -928,7 +928,7 @@ test('V2 attaching fills in the record ids, ticks the record time on the span ro
   assert.equal(logLines()[2], `60 ms · INFO · checkout · trace_id=${T2} · span_id=${S4} · Order accepted · order.id=8842`);
   assert.deepEqual(ticks(), [`${S4}@71.43%`]);
   assert.equal(label(S4).endsWith(', 1 record'), true);
-  assert.equal(lstatus(), `"Order accepted" now carries span_id=${S4} and trace_id=${T2} from POST /checkout (checkout, trace 0af7).`);
+  assert.equal(lstatus(), `"Order accepted" now carries span_id=${S4} and trace_id=${T2} from POST /checkout (checkout, trace 0af76519).`);
   attach('l-boot', S1);
   assert.deepEqual(ticks(), [`${S1}@0%`, `${S4}@71.43%`], 'a time outside the bar hangs off it');
   attach('l-boot', 'none');
@@ -1089,40 +1089,74 @@ test('the box still cancels a pick on an Escape nothing else handled, and ignore
 test('same-name, same-service spans get distinct names in the controls and the announcements (#69)', async () => {
   const { CONTENT } = await import('../levels/events-and-links.mjs');
   const spec = CONTENT.steps[2].build; // 2.6's batch step: three "orders publish (orders)" spans
-  const [p1, p2, p3, send] = spec.spans;
-  const { dom, mount } = setup(spec);
+  const [p1, p2, , send] = spec.spans;
+  const { mount } = setup(spec);
   mount();
   click(`[data-span="${send.spanId}"]`);
   const names = qa('[data-link]').map((b) => b.textContent.trim());
   assert.deepEqual(names, [
-    'orders publish (orders, trace 6512)',
-    'orders publish (orders, trace c20a)',
-    'orders publish (orders, trace c51c)',
+    'orders publish (orders, trace 6512bd43)',
+    'orders publish (orders, trace c20ad4d7)',
+    'orders publish (orders, trace c51ce410)',
   ]);
   assert.equal(new Set(names).size, 3);
   click(`[data-link="${p2.spanId}"]`);
-  assert.match(status(), /orders publish/);
-  assert.ok(status().includes('(orders, trace c20a)'), status());
-  // A span with a unique name keeps the plain label.
+  assert.equal(status(), 'send batch (notifications) now links to orders publish (orders, trace c20ad4d7).');
+  // The panel already prints the trace code, so its note uses the plain label.
   click(`[data-span="${p1.spanId}"]`);
-  assert.match(dom.body.querySelector('[data-build-panel]').textContent, /Editing orders publish \(orders, trace 6512\)/);
-  assert.ok(p3);
+  assert.equal(q('[data-build-panel] .ui-note').textContent, 'Editing orders publish (orders), trace 6512bd43');
 });
 
-test('same-name spans in one trace are told apart by span id (#69)', () => {
-  const spec = {
-    id: 'dup',
-    spans: [
-      { spanId: 'aaaaaaaaaaaaaaa1', traceId: '1111aaaa1111aaaa1111aaaa1111aaaa', name: 'retry', service: 'api', kind: 'INTERNAL', startMs: 0, endMs: 5, status: 'UNSET', attributes: {}, events: [], links: [] },
-      { spanId: 'aaaaaaaaaaaaaaa2', traceId: '1111aaaa1111aaaa1111aaaa1111aaaa', name: 'retry', service: 'api', kind: 'INTERNAL', startMs: 6, endMs: 9, status: 'UNSET', attributes: {}, events: [], links: [] },
-      { spanId: 'aaaaaaaaaaaaaaa3', traceId: '2222bbbb2222bbbb2222bbbb2222bbbb', name: 'solo', service: 'api', kind: 'INTERNAL', startMs: 10, endMs: 12, status: 'UNSET', attributes: {}, events: [], links: [] },
-    ],
-    edit: ['links'],
-    answer: {},
-    helps: {},
-  };
-  const html = renderBuild(spec, newBuildState(spec), { escapeHtml, selected: 'aaaaaaaaaaaaaaa3' });
-  assert.ok(html.includes('retry (api, trace 1111, span aaaaaaaaaaaaaaa1)'));
-  assert.ok(html.includes('retry (api, trace 1111, span aaaaaaaaaaaaaaa2)'));
+const twin = (spanId, traceId, name = 'retry', startMs = 0) => ({
+  spanId, traceId, name, service: 'api', kind: 'INTERNAL', startMs, endMs: startMs + 3, status: 'UNSET', attributes: {}, events: [], links: [],
+});
+const twinSpec = (spans) => ({ id: 'dup', spans, edit: ['links'], answer: {}, helps: {} });
+const labelsOf = (spec) => {
+  const html = renderBuild(spec, newBuildState(spec), { escapeHtml, selected: spec.spans.at(-1).spanId });
+  return html;
+};
+
+test('same-name spans in one trace are told apart by a short span id (#69)', () => {
+  const T = '1111aaaa1111aaaa1111aaaa1111aaaa';
+  const spec = twinSpec([
+    twin('aaaaaaaaaaaaa1b2', T), twin('aaaaaaaaaaaaa3c4', T, 'retry', 4), twin('aaaaaaaaaaaaa5d6', '2222bbbb2222bbbb2222bbbb2222bbbb', 'solo', 8),
+  ]);
+  const html = labelsOf(spec);
+  assert.ok(html.includes('retry (api, trace 1111aaaa, span id \u2026a1b2)'));
+  assert.ok(html.includes('retry (api, trace 1111aaaa, span id \u2026a3c4)'));
   assert.ok(html.includes('Editing solo (api),'));
+});
+
+test('twins whose traces share the 8-hex code but differ after it are told apart by span id (#69)', () => {
+  const spec = twinSpec([
+    twin('aaaaaaaaaaaaa1b2', '1111aaaa00000000000000000000000a'),
+    twin('aaaaaaaaaaaaa3c4', '1111aaaa00000000000000000000000b', 'retry', 4),
+    twin('aaaaaaaaaaaaa5d6', '2222bbbb2222bbbb2222bbbb2222bbbb', 'solo', 8),
+  ]);
+  const html = labelsOf(spec);
+  const got = [...html.matchAll(/retry \(api, [^)]*\)/g)].map((m) => m[0]);
+  const set = new Set(got);
+  assert.deepEqual([...set].sort(), ['retry (api, trace 1111aaaa, span id \u2026a1b2)', 'retry (api, trace 1111aaaa, span id \u2026a3c4)']);
+  assert.equal(set.size, 2);
+});
+
+test('twins sharing the trace code and the last 4 of the span id fall back to the full span id (#69)', () => {
+  const spec = twinSpec([
+    twin('aaaaaaaaaaaaaaaa', '1111aaaa00000000000000000000000a'),
+    twin('ccccccccccccaaaa', '1111aaaa00000000000000000000000b', 'retry', 4),
+    twin('aaaaaaaaaaaaa5d6', '2222bbbb2222bbbb2222bbbb2222bbbb', 'solo', 8),
+  ]);
+  const html = labelsOf(spec);
+  assert.ok(html.includes('retry (api, trace 1111aaaa, span id aaaaaaaaaaaaaaaa)'));
+  assert.ok(html.includes('retry (api, trace 1111aaaa, span id ccccccccccccaaaa)'));
+});
+
+test('the hint header names a hinted twin like the button and the status do (#69)', () => {
+  const spec = { ...b1Spec(), helps: ALL };
+  const [, b] = spec.spans; // the first hint is for B, POST (storefront)
+  Object.assign(spec.spans[4], { name: b.name, service: b.service }); // E becomes B's twin in another trace
+  const { mount } = setup(spec);
+  mount();
+  click('#b1-hint');
+  assert.equal(q('#b1-hint-text .ui-eyebrow').textContent, 'Hint 1 of 3 \u00b7 POST (storefront, trace 4bf92f35)');
 });
