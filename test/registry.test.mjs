@@ -63,13 +63,25 @@ function withEdit(f) {
   return acts;
 }
 
+test('act teaser is carried through; absent is \'\'; non-string is an error', () => {
+  const acts = baseline();
+  acts[0].teaser = 'Signals first.';
+  assert.deepEqual(validateRegistry(acts, REFS), { ok: true, errors: [] });
+  const reg = buildRegistry(acts, { deck: DECK, nodeIds: ['n1'] });
+  assert.equal(reg.acts[0].teaser, 'Signals first.');
+  assert.equal(reg.acts[1].teaser, '');
+  const bad = baseline();
+  bad[0].teaser = 7;
+  rejects(bad, 'act "a0": teaser must be a string');
+});
+
 test('the baseline is valid and builds into ordered, defaulted, typed levels', () => {
   assert.deepEqual(validateRegistry(baseline(), REFS), { ok: true, errors: [] });
   const reg = buildRegistry(baseline(), { deck: DECK, nodeIds: ['n1'] });
   assert.deepEqual(reg.order, ['x', 'y', 'bx', 'z']);
   assert.deepEqual(reg.acts, [
-    { id: 'a0', no: 0, name: '', sub: '', levelIds: ['x', 'y'], bossId: 'bx' },
-    { id: 'a1', no: 1, name: '', sub: '', levelIds: ['z'], bossId: null },
+    { id: 'a0', no: 0, name: '', sub: '', teaser: '', levelIds: ['x', 'y'], bossId: 'bx' },
+    { id: 'a1', no: 1, name: '', sub: '', teaser: '', levelIds: ['z'], bossId: null },
   ]);
   assert.equal(reg.levels.bx.kind, 'boss');
   assert.equal(reg.levels.bx.actId, 'a0');

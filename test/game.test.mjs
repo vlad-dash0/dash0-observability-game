@@ -15,6 +15,7 @@ import { STORAGE_KEY } from '../lib/storage.mjs';
 import { THEME_KEY } from '../lib/theme.mjs';
 import { createGame, liveRegistry } from '../app.mjs';
 import { endSentence } from '../lib/text.mjs';
+import { GAME_SUMMARY } from '../hub/about.mjs';
 import { litText } from '../lib/globe-ignite.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -516,16 +517,90 @@ test('the globe text alternative counts levels done and names the lit regions', 
 test('acts list registry and soon acts in act order; a soon act has no level ids', () => {
   const REG9 = buildRegistry(
     [
-      { id: 'a0', no: 0, name: 'First act', sub: 'Begin', levels: [L('x', '0.1')], boss: null },
+      { id: 'a0', no: 0, name: 'First act', sub: 'Begin', teaser: 'Learn x.', levels: [L('x', '0.1')], boss: null },
       { id: 'a9', no: 9, name: 'Last act', levels: [L('n', '9.1')], boss: null },
     ],
     { deck: [], nodeIds: [] },
   );
   assert.deepEqual(setup({ registry: REG9, comingSoon: [S7] }).game.acts, [
-    { id: 'a0', no: 0, name: 'First act', sub: 'Begin', ids: ['x'], soon: false, teaser: '' },
-    { id: 's7', no: 7, name: 'Later', sub: 'Not yet', ids: [], soon: true, teaser: 'Soon.' },
-    { id: 'a9', no: 9, name: 'Last act', sub: '', ids: ['n'], soon: false, teaser: '' },
+    { id: 'a0', no: 0, name: 'First act', title: 'Act 0: First act', sub: 'Begin', ids: ['x'], soon: false, teaser: 'Learn x.' },
+    { id: 's7', no: 7, name: 'Later', title: 'Act 7: Later', sub: 'Not yet', ids: [], soon: true, teaser: 'Soon.' },
+    { id: 'a9', no: 9, name: 'Last act', title: 'Act 9: Last act', sub: '', ids: ['n'], soon: false, teaser: '' },
   ]);
+});
+
+test('aboutActs: every act in act order, live and coming soon, the same titles the hub shows', () => {
+  const REG9 = buildRegistry(
+    [
+      { id: 'a0', no: 0, name: 'First act', sub: 'Begin', teaser: 'Learn x.', levels: [L('x', '0.1')], boss: null },
+      { id: 'a9', no: 9, name: 'Last act', levels: [L('n', '9.1')], boss: null },
+    ],
+    { deck: [], nodeIds: [] },
+  );
+  const { game } = setup({ registry: REG9, comingSoon: [S7] });
+  assert.deepEqual(game.aboutActs(), [
+    { id: 'a0', title: 'Act 0: First act', sub: 'Begin', teaser: 'Learn x.', soon: false },
+    { id: 's7', title: 'Act 7: Later', sub: 'Not yet', teaser: 'Soon.', soon: true },
+    { id: 'a9', title: 'Act 9: Last act', sub: '', teaser: '', soon: false },
+  ]);
+  assert.deepEqual(game.aboutActs().map((a) => a.title), game.acts.map((a) => a.title));
+});
+
+test('the About dialog: opens on the heading, Close returns focus to ?', () => {
+  const { game } = setup();
+  const focused = [];
+  game.focusSoon = (selector) => focused.push(selector);
+  assert.equal(game.hubInert(), false);
+  assert.equal(game.openAbout(), true);
+  assert.equal(game.aboutOpen, true);
+  assert.deepEqual(focused, ['#about-title']);
+  assert.equal(game.hubInert(), true);
+  game.closeAbout();
+  assert.equal(game.aboutOpen, false);
+  assert.equal(focused.at(-1), '#about-open');
+  assert.equal(game.hubInert(), false);
+  assert.equal(game.aboutSummary, GAME_SUMMARY);
+});
+
+test('Escape closes the About dialog; no level opens behind it', () => {
+  const { game, dom } = setup();
+  game.openAbout();
+  assert.equal(game.openLevel('x'), false);
+  assert.equal(game.overlayOpen, false);
+  game.onEscape({ defaultPrevented: true, target: dom.document.body });
+  assert.equal(game.aboutOpen, true, 'a handled Escape leaves it open');
+  game.onEscape({ target: dom.document.body });
+  assert.equal(game.aboutOpen, false);
+});
+
+test('openAbout is refused while a level or the reward is open', () => {
+  const { game } = setup();
+  game.openLevel('x');
+  assert.equal(game.openAbout(), false);
+  assert.equal(game.aboutOpen, false);
+  ctxs.x.finish({ text: 'x is finished now' });
+  assert.equal(game.rewardOpen, true);
+  assert.equal(game.openAbout(), false);
+  assert.equal(game.aboutOpen, false);
+});
+
+test('hubInert is true while any dialog is open', () => {
+  const { game } = setup();
+  assert.equal(game.hubInert(), false);
+  game.overlayOpen = true;
+  assert.equal(game.hubInert(), true);
+  game.overlayOpen = false;
+  game.rewardOpen = true;
+  assert.equal(game.hubInert(), true);
+  game.rewardOpen = false;
+  game.aboutOpen = true;
+  assert.equal(game.hubInert(), true);
+});
+
+test('acts carry their display title and the hub template renders it', () => {
+  const { game } = setup();
+  assert.equal(game.acts[0].title, 'Act 0: First act');
+  assert.ok(deepQuery(shell, '.act-title [x-text="act.title"]'), 'the hub renders act.title');
 });
 
 test('a soon act changes nothing: not playable, not counted, nothing saved', () => {
@@ -945,7 +1020,7 @@ test('index.html: the hub goes inert while a dialog is open; dialogs stay outsid
   // An id, not a class: the wrapper has no styles (test/static.test.mjs T9).
   const hub = shell.querySelector('#hub');
   assert.ok(hub, '#hub wrapper exists');
-  assert.equal(hub.getAttribute(':inert'), 'overlayOpen || rewardOpen');
+  assert.equal(hub.getAttribute(':inert'), 'hubInert()');
   for (const sel of ['.hub-header', '.globe-stage', '.globe-fallback', '.levels']) {
     assert.ok(hub.querySelector(sel), `${sel} is inside #hub`);
   }
@@ -953,6 +1028,25 @@ test('index.html: the hub goes inert while a dialog is open; dialogs stay outsid
     assert.equal(shell.querySelector(sel).closest('#hub') === null, true, `${sel} is outside #hub`);
   }
   assert.equal(shell.querySelector('.app').getAttribute('@keydown.escape.window'), 'onEscape($event)');
+});
+
+test('index.html: ? is a kit icon button with a name; the About dialog is outside #hub', () => {
+  const open = shell.querySelector('#about-open');
+  assert.ok(open, '#about-open exists');
+  assert.deepEqual(open.getAttribute('class').split(' '), ['ui-btn', 'ui-btn--icon']);
+  assert.equal(open.getAttribute('type'), 'button');
+  assert.equal(open.getAttribute('aria-label'), 'How this game works');
+  assert.equal(open.getAttribute('@click'), 'openAbout()');
+  assert.ok(open.closest('.hub-header'), '? is in the header');
+  const about = shell.querySelector('.about');
+  assert.equal(about.getAttribute('role'), 'dialog');
+  assert.equal(about.getAttribute('aria-modal'), 'true');
+  assert.equal(about.getAttribute('aria-labelledby'), 'about-title');
+  assert.equal(about.closest('#hub') === null, true);
+  assert.equal(shell.querySelector('#about-title').getAttribute('tabindex'), '-1');
+  assert.ok(deepQuery(shell, '[x-for="act in aboutActs()"]'), 'the acts list iterates aboutActs()');
+  assert.ok(about.querySelector('#about-close'), 'Close exists');
+  assert.equal(read('index.html').includes('x-html'), false, 'no x-html');
 });
 
 test('index.html: the notice and star live regions stay rendered and carry text', () => {
