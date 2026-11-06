@@ -144,7 +144,8 @@ const CONFIG = {
   given: GIVEN,
   reference: REFERENCE,
   uses: { traces: ['transform/pii'], logs: ['transform/pii'] },
-  hint: 'The Collector will not start: look at the processors the <code>logs</code> pipeline names. And is <code>transform/pii</code> listed in <code>traces</code>?',
+  helps: { hints: true },
+  hint: 'A processor changes data only in the pipelines that list it, and a pipeline can only list a processor that is defined, spelled exactly. The email travels in more than one signal, so check every pipeline\'s processor list, not only the one that stops the Collector.',
   explain:
     'A processor works on the data between the receivers and the exporters, so it has to be listed in every pipeline that carries what it removes, ' +
     'or that pipeline sends the data as it is. Here the email is on spans and in logs, so <code>transform/pii</code> goes in <code>traces</code> and ' +

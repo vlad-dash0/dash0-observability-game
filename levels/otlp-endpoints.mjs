@@ -106,7 +106,8 @@ const CONFIG = {
   given: GIVEN,
   reference: REFERENCE,
   uses: { traces: ['otlp_grpc/dash0'], metrics: ['otlp_grpc/dash0'] },
-  hint: 'Two things are off. Which exporter does the <code>metrics</code> pipeline name, and is it defined? And which exporters does <code>traces</code> list: does any of them reach Dash0?',
+  helps: { hints: true },
+  hint: 'A pipeline sends data only to the exporters its list holds, and it can only list one that is defined. Read each pipeline\'s exporter list and ask two things: is every name in it defined, and does the list reach Dash0 the way the task says? Keep what already works.',
   explain:
     'A pipeline sends data only to the exporters it lists, and an exporter that is defined but not listed does nothing: <code>otlp_grpc/dash0</code> was defined and listed nowhere, ' +
     'while <code>metrics</code> named an <code>otlp_http/dash0</code> that nobody defined, so the Collector would not start. ' +

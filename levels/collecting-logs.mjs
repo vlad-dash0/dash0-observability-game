@@ -127,7 +127,8 @@ const CONFIG = {
   given: GIVEN,
   reference: REFERENCE,
   uses: { logs: ['filelog/shipping', 'otlp_grpc/dash0'] },
-  hint: 'The logs pipeline lists a receiver called <code>filelog</code>. Compare it, letter for letter, with the id defined under <code>receivers</code>.',
+  helps: { hints: true },
+  hint: 'A pipeline list names a receiver by its exact id, and the id includes anything after a slash. Read the id where the receiver is defined, then compare it with the one the logs pipeline lists, character by character. Keep the pipeline reading the file; do not swap in another receiver.',
   explain:
     'A receiver reads nothing until a pipeline lists it, and a pipeline can only list what is defined, spelled the same: ' +
     '<code>filelog</code> and <code>filelog/shipping</code> are different components, because the part after the slash names an ' +

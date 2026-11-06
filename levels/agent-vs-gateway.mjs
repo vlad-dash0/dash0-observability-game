@@ -110,7 +110,8 @@ const CONFIG = {
   given: GIVEN,
   reference: REFERENCE,
   uses: { traces: ['load_balancing'] },
-  hint: 'The <code>traces</code> pipeline lists an exporter. Look under <code>exporters</code>: is it defined there?',
+  helps: { hints: true },
+  hint: 'A pipeline can only list an exporter that is defined, and traces and metrics do not have to share one. The task wants traces sent through a different exporter than metrics use, so define the one the traces list names and leave the metrics exporter as it is.',
   explain:
     'A pipeline can only list an exporter that is defined, and one that is defined but not listed does nothing. Pointing traces at <code>otlp_grpc/gateway</code>, the Service in front of the replicas, ' +
     'would start the Collector and still split traces between them. <code>load_balancing</code> picks a replica by hashing a routing key: with <code>routing_key: traceID</code> every span of a trace goes to the same replica, ' +

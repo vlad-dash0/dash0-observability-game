@@ -101,7 +101,8 @@ const CONFIG = {
   given: GIVEN,
   reference: REFERENCE,
   uses: { traces: ['memory_limiter'], metrics: ['memory_limiter'] },
-  hint: 'Two things are off. The Collector names an extension it does not define. And look at <code>processors</code>: is <code>memory_limiter</code> listed in either pipeline?',
+  helps: { hints: true },
+  hint: 'A name in a list is only a promise. Every name a list under <code>service</code> holds must be defined, under that exact name, in its own section, and a defined component does nothing until a list enables it. Check the lists against the definitions, then the definitions against the lists, and fix by adding what is missing, not by deleting what the task asks for.',
   explain:
     'A component takes effect only when it is both defined in its section and enabled: receivers, processors and exporters by listing them in a pipeline, ' +
     'extensions under <code>service.extensions</code>. Listed but not defined, the Collector refuses to start, as with <code>health_check</code> here. ' +
