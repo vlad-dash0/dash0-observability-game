@@ -460,12 +460,12 @@ export const DECK = [
   {
     id: 'spanmetrics-before-sampling',
     front:
-      'Compute span metrics before sampling: a connector fed from a tail_sampling pipeline counts only the traces that were kept.',
+      'Compute span metrics before sampling: a connector fed from a tail_sampling pipeline counts only the spans of the traces kept.',
     back:
       'The span_metrics connector counts the spans it receives, for each set of dimensions, into calls and duration metrics. ' +
       'A connector is an exporter at the end of one pipeline and a receiver at the start of another, so it receives what leaves ' +
       'the processors of the traces pipeline that lists it. List it in a pipeline that has tail_sampling and it sees only the ' +
-      'kept traces: the request rate comes out too low, and when the policies keep every error the error ratio comes out too ' +
+      'spans of the kept traces: the request rate comes out too low, and when the policies keep every error the error ratio comes out too ' +
       'high. Give the connector a traces pipeline of its own with no sampling processor, and let the sampled pipeline feed the ' +
       'backend. A receiver can be listed in more than one pipeline, so both pipelines can read the same one. The component was ' +
       'renamed from spanmetrics to span_metrics, and the old name still works but is deprecated.',
