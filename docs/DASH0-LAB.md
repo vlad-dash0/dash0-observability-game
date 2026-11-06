@@ -32,7 +32,7 @@ Draft: `{traceId, spanId, parentSpanId?, name, kind? (default internal), startMs
 Absence is never success. Thrown error text is never passed through.
 
 ## Practice ingress: `lib/otlp/practice-ingress.mjs`
-`createPracticeIngress({token, readOnlyToken})` returns a fetch-compatible fake. Rules in order: foreign host throws TypeError; not POST 405; path other than `/v1/traces` 404; content type not JSON 415; body not an OTLP traces request 400; missing or wrong token 401; the read-only token 403; else 200 `{}`. It goes through the same `sendTraces`, so practice and live cannot diverge. Practice never calls the real fetch.
+`createPracticeIngress({token, readOnlyToken})` (`token` is one string or an array) returns a fetch-compatible fake. Rules in order: foreign host throws TypeError; not POST 405; path other than `/v1/traces` 404; content type not JSON 415; body not an OTLP traces request 400; missing or wrong token 401; the read-only token 403; else 200 `{}`. It goes through the same `sendTraces`, so practice and live cannot diverge. Practice never calls the real fetch.
 
 ## Telemetry session: `lib/telemetry.mjs`
 `createTelemetry({fetch, randomBytes, now, setTimeout, clearTimeout, reportError, hosts, allowLocal})` returns the facade `ctx.telemetry` exposes (FOUNDATION §2.6). Everything is injected; `main.mjs` supplies the browser's.
@@ -44,10 +44,13 @@ Absence is never success. Thrown error text is never passed through.
 
 ## The connect level: `levels/connect-to-dash0.mjs` (9.3, PNG)
 A hand-written level (`widgets: []`, scored, no par). Screens: mode (practice, or live while `liveAvailable()`); connect (practice shows a labelled simulated settings page with the endpoint reference and a token creator; live shows where to look); connected (session id, Finish with `data-finish`, only after `accepted` and `status().state === 'connected'`).
-- Validation is `ctx.telemetry.connect` (`parseEndpoint`, `checkToken`, `checkDataset`); the level only words the reason from `REASONS`. A bad form costs one mistake per submission; an empty endpoint or token is a nudge and costs nothing.
-- Permissions of the practice token creator: Ingesting is right; All permissions and Reading each cost one mistake, once. Reading mints `PRACTICE_READ_ONLY_TOKEN`, so the test span is refused with 403.
-- Outcomes: `accepted` goes to Finish; `rejected` with `auth` costs a mistake in live mode only (practice already charged the permission pick); `rejected` without `auth` and every `unreachable` cause cost nothing and offer a retry (live unreachable also offers practice).
-- The token: the secret field (`field kind: 'secret'`, a write-only password input) is read and emptied in the same click, before validation. The shown practice token is scrubbed from the page at the same moment. After a failed send the held token is retried without retyping; to change it the player types a new one. The level file never touches storage, the URL, the console or `reportError` (`test/connect-to-dash0.test.mjs` scans its source).
+- Validation is `ctx.telemetry.connect` (`parseEndpoint`, `checkToken`, `checkDataset`); the level only words the reason from `REASONS`. An empty endpoint or token is a nudge and costs nothing.
+- One charge rule, the same in both modes: each distinct cause costs one mistake, once, held in one Set: a wrong permission (`scope:<key>`), a form error (`<field>:<reason>`) or a rejected token (`rejected:<status>`). An emptied token field right after a form error or a rejection keeps the earlier reason.
+- Permissions: practice mints a token per permission in a token creator; live cannot see a token's permission, so the player declares it ("Which permission did you give this token?") before Connect, charged by the same rule. Ingesting is right; All permissions and Reading are wrong.
+- Practice tokens come from `telemetry.practiceCredential(scope)`: `auth_practice_` plus a suffix from the session's `randomBytes`, so the name does not say what the token can do and a replay cannot type it. Reading's token is the one the practice ingress refuses with 403; the other two are accepted.
+- Outcomes: `accepted` goes to Finish; `rejected` with `auth` costs a mistake in both modes and says only "refused this token", with the remedy (complete, from this organization, has the Ingesting permission), never the status code; `rejected` without `auth` and every `unreachable` cause cost nothing and offer a retry (live unreachable also offers practice).
+- The player is never told the answer: the screens give the reason (the game sends from a browser tab, the token sits where anyone can open dev tools) and the endpoint field is "Endpoint", not a label to match. The port is not asserted: the copy says to copy the address exactly as Dash0 shows it.
+- The token: the secret field (`field kind: 'secret'`, a write-only password input) is read and emptied in the same click, before validation. The shown practice token is scrubbed from the page at the same moment. The secret field asks password managers not to offer to save it, but a browser may ignore that, so the copy only says the game never saves the token and tells the player to decline a save prompt. After a failed send the held token is retried without retyping; to change it the player types a new one. The level file never touches storage, the URL, the console or `reportError` (`test/connect-to-dash0.test.mjs` scans its source).
 
 ## Phase ledger
 | Phase | Content | State |
@@ -60,6 +63,10 @@ A hand-written level (`widgets: []`, scored, no par). Screens: mode (practice, o
 | P6 | fill `INGRESS_HOSTS`, `vercel.json`, cite Dash0 docs; relay only if CORS is refused | needs owner inputs |
 
 Merge order: P1, P2, P4, P3, P5, P6.
+
+### P6 live QA list
+- In a real browser (Chrome, Firefox, Safari), connect live and check that no password-manager save prompt appears when the token field disappears on success. If one does, the opt-out attributes of the secret field are not enough.
+- Check that the ingress answers CORS preflights (owner input 1) and what a rejected token returns (owner input 2).
 
 ## Owner inputs (VERIFY)
 1. Does the OTLP/HTTP ingress answer browser CORS preflights for `Authorization`, `Content-Type` and `Dash0-Dataset`, including on 401/403? If not, the relay is needed.

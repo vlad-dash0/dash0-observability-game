@@ -1,37 +1,38 @@
 // Level 9.3: Connect the game to Dash0. The player works out the two things a sender needs, the
-// OTLP over HTTP endpoint of an organization and an auth token that may only ingest, enters
+// endpoint of an organization (the one a browser can use) and an auth token that may only ingest, enters
 // them in a connect form, and sends one test span. The game connects to the player's own Dash0
-// (live, not open until INGRESS_HOSTS is filled) or to a simulated one (practice, same stars).
+// (live, not open until INGRESS_HOSTS is filled) or to a simulated one (practice, scored the same:
+// a wrong permission, a bad form and a rejected token each cost one mistake, once per distinct cause).
 // The token is typed into a secret field, handed to ctx.telemetry.connect and cleared from the
 // DOM in the same click; it is never kept, shown or logged by this file (docs/DASH0-LAB.md).
-// Spec: https://www.dash0.com/docs/dash0/miscellaneous/glossary/auth-tokens , https://www.dash0.com/docs/dash0/miscellaneous/glossary/endpoints , https://opentelemetry.io/docs/specs/otlp/
+// Spec: https://www.dash0.com/docs/dash0/miscellaneous/glossary/auth-tokens , https://www.dash0.com/docs/dash0/miscellaneous/glossary/endpoints , https://www.dash0.com/docs/dash0/miscellaneous/glossary/datasets , https://opentelemetry.io/docs/specs/otlp/
 // Dash0 docs: auth tokens are `auth_...`, belong to one organization and are created by Admins in
 // Settings -> Auth Tokens; the Permissions options are All permissions, Ingesting and Reading;
 // "Restrict tokens to Ingesting whenever you distribute them publicly, for example in
 // OpenTelemetry instrumentation running in web browsers" (glossary/auth-tokens). The endpoint
 // reference is in the organization's settings and its hosts name the region (glossary/endpoints).
-// Teaching copy only: the 401 and 403 wording, the endpoint row labels and the Create token button
-// of the practice panel are marked VERIFY (#195) below and listed for owner sign-off.
+// Teaching copy only: the endpoint row labels and the Create token button of the practice panel,
+// and the 401 and 403 behaviour practice simulates, are marked VERIFY (#195) below and listed for
+// owner sign-off.
 import { PRACTICE_HOSTS, REASONS, TOKEN_PREFIX } from '../lib/dash0/ingress.mjs';
 import { OUTCOME, TIMEOUT_MS } from '../lib/otlp/send.mjs';
-import { MODE, PRACTICE_READ_ONLY_TOKEN, PRACTICE_TOKEN, STATE } from '../lib/telemetry.mjs';
+import { MODE, STATE } from '../lib/telemetry.mjs';
 import { actions as actionsBar, button, chip, feedback, field, note, panel, prose, radio, setFeedback, step } from '../lib/ui/index.mjs';
 
-// The Permissions options of an auth token (glossary/auth-tokens). Only Ingesting is right.
+// The Permissions options of an auth token (glossary/auth-tokens). Only Ingesting is right. The
+// keys are the telemetry session's PRACTICE_SCOPE values (it mints the practice token per key).
 const SCOPES = [
   {
     key: 'all',
     label: 'All permissions',
-    token: PRACTICE_TOKEN,
     wrong:
       'That token works, but it can also query your data and change your configuration. ' +
-      'A token the game keeps in a browser tab should only send telemetry: Dash0 recommends ' +
-      'restricting tokens to Ingesting whenever they sit in code that people can read.',
+      'Dash0 recommends Ingesting-only tokens whenever you distribute a token publicly, ' +
+      'for example in browser instrumentation.',
   },
   {
     key: 'ingest',
     label: 'Ingesting',
-    token: PRACTICE_TOKEN,
     right:
       'Right. An Ingesting token can only send telemetry. It cannot read your data back or ' +
       'change your configuration, so a leaked one does little harm.',
@@ -39,7 +40,6 @@ const SCOPES = [
   {
     key: 'read',
     label: 'Reading',
-    token: PRACTICE_READ_ONLY_TOKEN,
     wrong:
       'A Reading token can only query data. It cannot send telemetry, so Dash0 will refuse the ' +
       'test span. Create an Ingesting token instead.',
@@ -73,21 +73,21 @@ function connectProblem(e, { field: which, reason }) {
 
 /** The tone, words and whether to offer a retry for an outcome of the test span. */
 function describeOutcome(outcome, mode) {
-  const where = mode === MODE.practice ? 'the simulated Dash0' : 'Dash0';
+  const where = mode === MODE.practice ? 'The simulated Dash0' : 'Dash0';
   switch (outcome.kind) {
     case OUTCOME.accepted:
       return { tone: 'success', html: `${where} accepted the test span.`, retry: false };
     case OUTCOME.rejected:
       if (outcome.auth) {
-        // VERIFY (#195): that live Dash0 answers 401 for an unknown token and 403 for a token
-        // that may not ingest. Practice teaches this split; the live ingress is not confirmed.
-        const html =
-          outcome.status === 403
-            ? `${where} knows this token but refused the test span (403). The token is not allowed to send telemetry. ` +
-              'Create a token with the permission Ingesting.'
-            : `${where} did not accept this token (${outcome.status}). Check that you copied all of it, ` +
-              'and that it belongs to the organization of this endpoint.';
-        return { tone: 'error', html, retry: false };
+        // VERIFY (#195): that live Dash0 answers 401 for an unknown token and 403 for a token that
+        // may not ingest. Practice simulates both; no Dash0 page says it, so the copy does not
+        // split them: either way the remedy is the same three checks.
+        return {
+          tone: 'error',
+          html: `${where} refused this token and would not take the test span. Check that you copied all of ` +
+            'the token, that it is from this organization, and that it has the Ingesting permission.',
+          retry: false,
+        };
       }
       return {
         tone: 'error',
@@ -140,13 +140,13 @@ export default {
         screen(
           ctx.speech(
             'Every level so far ran against a simulation. This one connects the game to a Dash0. ' +
-              'A sender needs two things: the <b>OTLP over HTTP endpoint</b> of your organization, and an ' +
-              '<b>auth token</b>. Then the game sends one test span, and you will see whether it was accepted.',
+              'A sender needs two things: the <b>endpoint</b> of your organization, and an <b>auth token</b>. ' +
+              'The game sends from a browser tab. Then it sends one test span, and you will see whether it was accepted.',
           ),
           chip({ text: 'Practice: a simulated Dash0, not your account', tone: 'attention' }),
           prose(
             '<p>Practice shows a simulated Dash0 settings page to read the endpoint from and to create a token in. ' +
-              'Nothing leaves this page, and it earns the same stars as your own Dash0.</p>' +
+              'Nothing leaves this page, and it is scored the same way as your own Dash0.</p>' +
               (live
                 ? '<p>Your own Dash0: the game sends one test span, and a level-complete span for each level you finish ' +
                   'until you reload the page, to the endpoint you enter. Nothing goes to the game\'s servers.</p>'
@@ -163,10 +163,10 @@ export default {
     };
 
     // ---- screen 2: find the endpoint, make a token, connect ----
-    const stepConnect = (mode, keep = {}) => {
+    const stepConnect = (mode) => {
       const practice = mode === MODE.practice;
       const host = PRACTICE_HOSTS[0];
-      // VERIFY (#195): the row labels of the endpoint reference ("OTLP via gRPC", "OTLP via HTTP")
+      // VERIFY (#195): the row labels of the endpoint reference ("OTLP over gRPC", "OTLP over HTTP")
       // and the Create token button. The docs say the endpoint reference lives in the
       // organization's settings and that tokens are created in Settings -> Auth Tokens.
       const simulated = panel({
@@ -176,8 +176,8 @@ export default {
           prose(
             '<h4>Settings, Endpoints</h4>' +
               '<table><caption>Endpoints of this organization</caption><thead><tr><th scope="col">Name</th><th scope="col">Address</th></tr></thead><tbody>' +
-              `<tr><td>OTLP via gRPC</td><td><code id="ctd-ep-grpc">${e(host)}:4317</code></td></tr>` +
-              `<tr><td>OTLP via HTTP</td><td><code id="ctd-ep-http">https://${e(host)}</code></td></tr>` +
+              `<tr><td>OTLP over gRPC</td><td><code id="ctd-ep-grpc">https://${e(host)}:4317</code></td></tr>` +
+              `<tr><td>OTLP over HTTP</td><td><code id="ctd-ep-http">https://${e(host)}</code></td></tr>` +
               '</tbody></table>',
           ),
           '<h4>Settings, Auth Tokens: create a token</h4>' +
@@ -189,20 +189,26 @@ export default {
             '<div id="ctd-minted-row" hidden>Your new token: <code id="ctd-minted"></code></div>',
         ],
       });
-      // VERIFY (#195): the name of the OTLP over HTTP row the live guide asks for.
-      // Live: where to look. Cited in the header: the endpoint reference and Auth Tokens are in the
-      // organization's Settings, and only Admins create tokens.
+      // Live: where to look, without naming the answer. Cited in the header: the endpoint
+      // reference and Auth Tokens are in the organization's Settings, and only Admins create tokens.
       const guide =
         '<p>In Dash0, open the organization settings and find the endpoint reference. Copy the ' +
-        'OTLP over HTTP endpoint. Then open Settings, Auth Tokens and create a token ' +
-        'with the permission <b>Ingesting</b>. Only Admins can create tokens.</p>';
+        'endpoint the game should send to. Then open Settings, Auth Tokens and create a token ' +
+        'for this job. Only Admins can create tokens.</p>';
+      // Live cannot see a token's permission, so the player says which one they gave it. It is
+      // charged by the same rule as the practice mint (chargeScope below).
+      const liveScope =
+        '<p>Which permission did you give this token?</p>' +
+        SCOPES.map((s) => radio({ id: `ctd-scope-${s.key}`, name: 'ctd-scope', value: s.key, labelHtml: s.label })).join('') +
+        feedback({ id: 'ctd-scope-feedback' });
       ctx.renderStep(
         screen(
           ctx.speech(
             practice
-              ? 'Find the endpoint the game should send to, and make a token that can only send. ' +
-                  'Two of the three permissions are wrong for this job.'
-              : 'Find your endpoint and make a token that can only send.',
+              ? 'Find the endpoint the game should send to, and make a token for the job. ' +
+                  'The token will sit in a browser tab that anyone can open with dev tools.'
+              : 'Find your endpoint and make a token for the job. ' +
+                  'The token will sit in a browser tab that anyone can open with dev tools.',
           ),
           chip(practice
             ? { text: 'Practice: a simulated Dash0, not your account', tone: 'attention' }
@@ -210,21 +216,22 @@ export default {
           practice ? simulated : prose(guide),
           field({
             id: 'ctd-endpoint',
-            label: 'OTLP over HTTP endpoint',
-            value: keep.endpoint ?? '',
-            noteHtml: 'The address of your organization, starting with https://. The game adds the signal path itself.',
+            label: 'Endpoint',
+            autocompleteOff: true,
+            noteHtml: 'The address of your organization, copied exactly as Dash0 shows it. The game adds the signal path itself.',
           }),
           field({
             id: 'ctd-token',
             label: 'Auth token',
             kind: 'secret',
-            noteHtml: `A token looks like <code>${e(TOKEN_PREFIX)}abc123...</code>. It is held in this tab's memory only, ` +
-              'cleared from this field the moment you press Connect, and forgotten when you reload the page.',
+            noteHtml: `A token looks like <code>${e(TOKEN_PREFIX)}abc123...</code>. The game keeps it only in this tab's ` +
+              'memory and never saves it: it is cleared from this field the moment you press Connect and forgotten ' +
+              'when you reload the page. Your browser may offer to save it. Decline.',
           }),
+          practice ? '' : liveScope,
           field({
             id: 'ctd-dataset',
             label: 'Dataset (optional)',
-            value: keep.dataset ?? '',
             noteHtml: "Leave it empty to use the token's default ingestion dataset.",
           }),
           practice ? '' : note('The test span is named <code>connection.test</code>, and carries your session id and nothing you typed.'),
@@ -264,26 +271,41 @@ export default {
         if (sw) sw.onclick = () => stepConnect(MODE.practice);
       };
 
-      // Practice: create a token. A permission other than Ingesting costs one mistake, once each.
+      // One charge rule for everything the player gets wrong here: each distinct cause costs one
+      // mistake, once. A cause is a permission (`scope:<key>`), a form error (`<field>:<reason>`) or a
+      // rejected token (`rejected:<status>`).
+      const charged = new Set();
+      const charge = (cause) => {
+        if (charged.has(cause)) return;
+        charged.add(cause);
+        ctx.mistake();
+      };
+
+      let scope = null;
+      for (const s of SCOPES) $(`#ctd-scope-${s.key}`).onclick = () => { scope = s; };
+      // A permission other than Ingesting is a mistake; `fbEl` says why.
+      const declareScope = (fbEl) => {
+        if (scope.wrong) charge(`scope:${scope.key}`);
+        setFeedback(fbEl, scope.wrong ? 'error' : 'success', scope.wrong ?? scope.right);
+      };
+
+      // Practice: create a token. The token's name does not say what it can do.
       if (practice) {
-        let scope = null;
-        const charged = new Set();
         const mintFb = $('#ctd-mint-feedback');
-        for (const s of SCOPES) $(`#ctd-scope-${s.key}`).onclick = () => { scope = s; };
         $('#ctd-mint').onclick = () => {
           if (!scope) {
             setFeedback(mintFb, 'neutral', 'Pick a permission first.');
             return;
           }
-          if (scope.wrong) {
-            if (!charged.has(scope.key)) ctx.mistake();
-            charged.add(scope.key);
-          }
-          minted.textContent = scope.token; // the public practice token, only ever shown here
+          minted.textContent = tele.practiceCredential(scope.key); // a public practice token, only ever shown here
           mintedRow.removeAttribute('hidden');
-          setFeedback(mintFb, scope.wrong ? 'error' : 'success', scope.wrong ?? scope.right);
+          declareScope(mintFb);
         };
       }
+
+      // The last reason shown for a bad form or a rejected token, kept when the next press has
+      // nothing new to say (an emptied token field).
+      let lastProblem = false;
 
       const send = async () => {
         setActions({ busy: true });
@@ -300,8 +322,9 @@ export default {
           outcome.kind === OUTCOME.accepted ? { kind: OUTCOME.unreachable, cause: 'not-connected' } : outcome,
           mode,
         );
-        // Only the player's own token counts against them, and only against a real account.
-        if (outcome.kind === OUTCOME.rejected && outcome.auth && mode === MODE.live) ctx.mistake();
+        // Only the player's own token counts against them: the network's and Dash0's faults do not.
+        if (outcome.kind === OUTCOME.rejected && outcome.auth) charge(`rejected:${outcome.status}`);
+        lastProblem = outcome.kind === OUTCOME.rejected && outcome.auth;
         const message = shown.message ? ` Dash0 said: ${e(shown.message)}` : '';
         say(shown.tone, `${shown.html}${message}`);
         fb.setAttribute('data-outcome', outcome.kind);
@@ -320,13 +343,26 @@ export default {
           say('neutral', 'Enter the endpoint first. Nothing was sent.');
           return;
         }
+        if (!practice) {
+          if (!scope) {
+            say('neutral', 'Say which permission you gave the token first. Nothing was sent.');
+            return;
+          }
+          declareScope($('#ctd-scope-feedback'));
+        }
         const verdict = tele.connect({ mode, endpoint, token, dataset });
         if (!verdict.ok) {
-          // An empty token is a nudge, not a wrong answer; any other bad input costs one mistake.
-          if (verdict.reason !== 'empty') ctx.mistake();
+          // An emptied token field is a nudge, not a wrong answer, and keeps the last useful reason.
+          if (verdict.reason === 'empty' && lastProblem) return;
+          if (verdict.reason !== 'empty') {
+            charge(`${verdict.field}:${verdict.reason}`);
+            lastProblem = true;
+          }
+          fb.removeAttribute('data-outcome');
           say('error', `${connectProblem(e, verdict)} Nothing was sent.`);
           return;
         }
+        lastProblem = false;
         send();
       }
 
@@ -350,7 +386,7 @@ export default {
           prose(
             `<p>Session id: <code id="ctd-session">${e(tele.sessionId)}</code>. Every span the game sends carries it as ` +
               '<code>session.id</code>, so you can find your own among everyone else\'s.</p>' +
-              '<p>The token lives in this tab\'s memory only. It was cleared from the form, and a page reload drops the ' +
+              '<p>The game keeps the token only in this tab\'s memory. It was cleared from the form, and a page reload drops the ' +
               'connection. Levels you finish from now on send a <code>level.complete</code> span to the same place.</p>',
           ),
         ),
@@ -359,7 +395,7 @@ export default {
       actions.querySelector('#ctd-finish').onclick = () =>
         ctx.finish({
           text: practice
-            ? 'You read the OTLP over HTTP endpoint off the settings page, created a token that can only ingest and got a test span accepted by a simulated Dash0. Your own Dash0 takes the same two steps.'
+            ? 'You read the endpoint off the settings page, created a token that can only ingest and got a test span accepted by a simulated Dash0. Your own Dash0 takes the same two steps.'
             : 'The game is connected to your Dash0: the endpoint was right, the token can only ingest and the test span was accepted.',
           cards: [],
         });
