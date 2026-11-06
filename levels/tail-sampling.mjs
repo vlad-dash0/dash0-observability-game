@@ -4,7 +4,8 @@
 // it computes come from the kept traces only.
 // Spec: docs/OUTLINE.md §4 Act 6.
 // Spec: https://opentelemetry.io/docs/concepts/sampling/#tail-sampling , https://opentelemetry.io/docs/collector/configuration/#connectors
-// Docs (GitHub READMEs, not an allowed Spec host): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md , https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/connector/spanmetricsconnector/README.md , https://github.com/open-telemetry/opentelemetry-collector/blob/main/connector/README.md
+// Docs (GitHub READMEs, not an allowed Spec host): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md , https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/connector/spanmetricsconnector/README.md , https://github.com/open-telemetry/opentelemetry-collector/blob/main/connector/README.md , https://github.com/open-telemetry/opentelemetry-collector/blob/main/processor/memorylimiterprocessor/README.md
+// (the memory_limiter README's example sets check_interval: 1s and limit_percentage: 80, which the memory line copies; the spanmetrics README's histogram example sets explicit: buckets: [100us, 1ms, ...], the connector line's shape with two buckets; the config page shows pipelines under service: pipelines: with receivers, processors and exporters lists)
 // (the connector README shows one connector as the exporter of several pipelines, which then all feed that one connector; the spanmetrics README's "Known Limitation: the Single Writer Principle" warns that several pipelines using one instance, or several instances writing the same streams, can conflict or drop series, so the config here has one pipeline exporting to exactly one span_metrics connector)
 //
 // Facts used (each read on the page above): tail sampling decides on all or most of the spans of a trace, so it can always keep
@@ -19,8 +20,9 @@
 // processors run in the order listed, and a receiver may be used in more than one pipeline (the Collector configuration page).
 //
 // Widgets: Trade-off for the memory and decision-wait cost (an authored table, not a simulation), and Spot it for the placement.
-// Spot it does not parse the config or check any wiring: it grades which of five config lines the player selects against a seeded
-// set. The seeded fault is the one traces pipeline whose processors list tail_sampling and whose exporters list span_metrics. Configure it
+// Spot it does not parse the config or check any wiring: it grades which of eight config lines the player selects against a seeded
+// set. The seeded fault is two lines of one pipeline, the processors of the traces pipeline (tail_sampling among them) and its exporters
+// (span_metrics among them): each is right alone, and together they feed the connector what the sampler kept. Configure it
 // cannot grade this, because its `uses` can only require a component, never forbid one. There is no Configure it step.
 // The numbers are one invented table: 400 traces a second, a gateway replica that holds each for the decision wait at 0.05 MiB a trace.
 // Error and slow traces are taken as distinct sets, so the kept figures add up.
@@ -132,31 +134,41 @@ const BUDGET = {
 };
 
 // Step 2: the placement, on the smallest config that shows it: one span_metrics connector (the spanmetrics README's single writer
-// rule: two connectors writing the same metrics conflict). The `traces` pipeline lists tail_sampling and span_metrics together,
-// which is the one fault; the other four lines are correct. Together the five lines are one config the Collector accepts (the
-// connector is exported by a traces pipeline and received by a metrics one); the fix the explain describes is a valid one-connector
-// config too. test/act-6.test.mjs assembles both and checks that.
+// rule: two connectors writing the same metrics conflict). Each pipeline line is one field of one pipeline, written as the YAML
+// flow mapping it is under service: pipelines:. The processors line and the exporters line of the traces pipeline are the two
+// faults: each is right alone (tail_sampling belongs on the pipeline that goes to the backend, and a connector must be listed as an
+// exporter somewhere), together they feed the connector what the sampler kept. The six other lines are correct, and the eight
+// together are part of one config the Collector accepts (the connector is exported by a traces pipeline and received by a metrics
+// one; the traces pipelines read the otlp receiver and send to otlp_grpc/dash0, which the lines leave out); the fix the explain
+// describes is a valid one-connector config too. test/act-6.test.mjs assembles both and checks that. Eight lines and two answers
+// are what keeps test/spot-tells.test.mjs from finding a counting rule that lands within one wrong Check (#193): do not trim the board.
 const SPOT = {
   id: 'ts-spot',
   target: 'config',
   helps: { hints: false },
   lines: [
-    { id: 'metrics-spans', text: 'metrics/spans: receivers: [span_metrics] processors: [batch] exporters: [otlp_grpc/dash0]' },
-    { id: 'logs', text: 'logs: receivers: [otlp] processors: [memory_limiter, k8sattributes, resource, redaction, batch] exporters: [otlp_grpc/dash0]' },
-    { id: 'connector-def', text: 'connectors: span_metrics:' },
-    { id: 'traces', text: 'traces: receivers: [otlp] processors: [memory_limiter, tail_sampling, batch] exporters: [otlp_grpc/dash0, span_metrics]' },
-    { id: 'sampler-def', text: 'processors: tail_sampling: decision_wait: 30s policies: [{name: errors, type: status_code, status_code: {status_codes: [ERROR]}}, {name: slow, type: latency, latency: {threshold_ms: 2000}}, {name: baseline, type: probabilistic, probabilistic: {sampling_percentage: 5}}]' },
+    { id: 'memory-def', text: 'processors: {memory_limiter: {check_interval: 1s, limit_percentage: 80}}' },
+    { id: 'metrics-receivers', text: 'service: {pipelines: {metrics/spans: {receivers: [span_metrics]}}}' },
+    { id: 'connector-def', text: 'connectors: {span_metrics: {histogram: {explicit: {buckets: [100ms, 1s]}}}}' },
+    { id: 'traces-processors', text: 'service: {pipelines: {traces: {processors: [memory_limiter, tail_sampling, batch]}}}' },
+    { id: 'logs-processors', text: 'service: {pipelines: {logs: {processors: [memory_limiter, k8sattributes, batch]}}}' },
+    { id: 'sampler-def', text: 'processors: {tail_sampling: {decision_wait: 30s, policies: [{name: errors, type: status_code, status_code: {status_codes: [ERROR]}}, {name: slow, type: latency, latency: {threshold_ms: 2000}}, {name: baseline, type: probabilistic, probabilistic: {sampling_percentage: 5}}]}}' },
+    { id: 'traces-exporters', text: 'service: {pipelines: {traces: {exporters: [otlp_grpc/dash0, span_metrics]}}}' },
+    { id: 'metrics-processors', text: 'service: {pipelines: {metrics: {processors: [memory_limiter, resource, batch]}}}' },
   ],
-  faults: ['traces'],
+  faults: ['traces-processors', 'traces-exporters'],
   whyNot: {
-    'metrics-spans': 'This is the receiving end of the connector, a metrics pipeline: a connector has to be received somewhere, or the Collector will not start. What the connector gives it depends on the traces pipeline that lists it, and that is where to look.',
-    logs: 'A logs pipeline with its own processors: the connector is not in it and there is no sampler, so nothing here touches the span metrics.',
-    'connector-def': 'This only defines the connector. Defining a component does not decide what it receives: that is decided by the pipelines that list it.',
-    'sampler-def': 'This only defines the sampler and its wait. What it does to the span metrics depends on which pipeline lists it next to the connector.',
+    'memory-def': 'This sets up the memory limiter to protect the Collector\'s memory: it checks every second and refuses data when the Collector nears its limit, 80% of the memory available. It says nothing about which spans reach the connector.',
+    'metrics-receivers': 'This is the receiving end of the connector, a metrics pipeline: a connector has to be received somewhere, or the Collector will not start. What the connector hands it depends on the pipelines that feed the connector, not on this line.',
+    'connector-def': 'This only defines the connector, with the buckets of its duration histogram. Defining a component does not decide what it receives: that is decided by the pipelines that list it.',
+    'logs-processors': 'A logs pipeline: the connector counts spans, and logs never reach it, so nothing in this line touches the span metrics.',
+    'sampler-def': 'This only defines the sampler and its wait. A definition does nothing until a pipeline lists the component, and the pipeline lines say which ones do.',
+    'metrics-processors': 'The processors of a pipeline of application metrics: the span_metrics connector counts spans, it never sees metrics, so this line cannot change what it counts.',
   },
   explain:
     'A connector is an exporter at the end of one pipeline and a receiver at the start of another, so it receives what comes out of the processors of the traces pipeline that lists it. ' +
-    `In <code>traces</code>, <code>tail_sampling</code> runs first and <code>span_metrics</code> gets only what it kept: ${n(KEPT)} of ${n(TRACES)} traces a second. ` +
+    'Two lines of the <code>traces</code> pipeline do it together, and neither is wrong alone: its processors list <code>tail_sampling</code>, which belongs on the pipeline that goes to the backend, and its exporters list <code>span_metrics</code>, which a connector needs. ' +
+    `Because <code>tail_sampling</code> runs first, <code>span_metrics</code> gets only what it kept: ${n(KEPT)} of ${n(TRACES)} traces a second. ` +
     `The request rate it computes is ${n(KEPT)} a second, not ${n(TRACES)}, and the error ratio is ${n(ERRORS)} of ${n(KEPT)}, ${ERROR_SHARE}%, not the real ${pct(ERROR_RATE)}, because the sampler kept every error and few of the rest. ` +
     'Compute span metrics before sampling: give the connector its own traces pipeline with no sampling processor, <code>traces/metrics</code>, ' +
     'with <code>exporters: [span_metrics]</code>. Keep <code>tail_sampling</code> only on the <code>traces</code> pipeline that goes to the backend, and take <code>span_metrics</code> out of the exporters of <code>traces</code>, so <code>traces/metrics</code> is the only pipeline that feeds it. ' +
@@ -191,8 +203,8 @@ export default {
       {
         intro:
           'The same gateway computes request and error rates from spans with one <code>span_metrics</code> connector, and a metrics pipeline sends them to the dashboards. Since the <code>tail_sampling</code> processor went in, the dashboards are wrong: the request rate fell to a tenth and the error ratio jumped. ' +
-          'Here is part of the gateway\'s config, one line each.',
-        question: 'Spot the line that makes the connector count the wrong spans.',
+          'Here is part of the gateway\'s config, one line each: a definition, or one field of one pipeline.',
+        question: 'Spot the lines that make the connector count the wrong spans.',
         qid: 'ts-q-spot',
         spot: SPOT,
       },
