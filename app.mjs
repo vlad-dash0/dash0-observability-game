@@ -179,6 +179,10 @@ export function createGame(deps) {
     },
 
     // ---------- derived ----------
+    // True when some act is shown as coming soon; the globe legend's "Coming soon" key hides without one.
+    hasSoon() {
+      return this.acts.some((a) => a.soon);
+    },
     get hasLevels() {
       return registry.order.length > 0;
     },

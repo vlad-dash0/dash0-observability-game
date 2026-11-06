@@ -1218,3 +1218,11 @@ test('every star display shows five: filled then empty, for each value 0 to 5 an
   assert.equal(game.rewardStarsText(), '');
   assert.equal(game.rewardStarsLabel(), 'Not scored');
 });
+
+test('hasSoon: false for the live registry, true with a coming-soon act; the legend key shows only then', () => {
+  assert.equal(setup({ registry: liveRegistry() }).game.hasSoon(), false);
+  assert.equal(setup({ registry: liveRegistry(), comingSoon: [S7] }).game.hasSoon(), true);
+  const m = read('index.html').match(/<span([^>]*)><i class="globe-key soon"[^>]*><\/i>Coming soon<\/span>/);
+  assert.ok(m, 'the legend has a Coming soon key');
+  assert.match(m[1], /x-show="hasSoon\(\)"/);
+});

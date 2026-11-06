@@ -173,8 +173,8 @@ disposes it while a level covers the hub and on `pagehide`, and shows the text f
 three.js, the colours or WebGL are unavailable. Level `lights` stay level data, validated
 against `hub/map-data.mjs` `NODE_IDS`, and are no longer drawn.
 
-Coming soon (#177 P7): `hub/coming-soon.mjs` `COMING_SOON` lists Act 8 (`{id, no, name,
-sub, teaser}`, frozen; Act 7 left it for `ACTS` with level 7.1). It is never passed to `buildRegistry`, so unlock, progress, stars, cards
+Coming soon (#177 P7): `hub/coming-soon.mjs` `COMING_SOON` lists announced acts (`{id, no, name,
+sub, teaser}`, frozen); it is empty now, since Acts 7 and 8 left it for `ACTS` with levels 7.1 and 8.2. It is never passed to `buildRegistry`, so unlock, progress, stars, cards
 and ignite cannot see those acts. `createGame` (`comingSoon` dep) merges them into `acts` by
 `no` (`soon: true`, `ids: []`, no level to open, even in debug); `globeState` returns them in
 `soon` (never in `regions`, so they count for nothing); their region's dots are `DOT.SOON`
