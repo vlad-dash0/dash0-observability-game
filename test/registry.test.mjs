@@ -139,9 +139,12 @@ test('the built registry is deep-frozen with a null-prototype level map', () => 
 test('building copies: the source level modules are neither frozen nor annotated', () => {
   const acts = withEdit((a) => {
     Object.assign(a[0].levels[0], { cards: ['c1'], scoring: { parMs: 5000 } });
+    a[0].badges = ['dash0'];
   });
   const reg = buildRegistry(acts, { deck: DECK, nodeIds: ['n1'] });
   const x = acts[0].levels[0];
+  assert.equal(Object.isFrozen(acts[0].badges), false);
+  assert.notEqual(reg.acts[0].badges, acts[0].badges);
   assert.equal(Object.isFrozen(x), false);
   assert.equal(Object.isFrozen(x.scoring), false, 'nested source object stays unfrozen');
   assert.equal(Object.isFrozen(x.cards), false);
