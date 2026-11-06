@@ -322,3 +322,18 @@ test('validateChoiceSpec collects every problem', () => {
   assert.deepEqual(validateChoiceSpec([null, { key: 'a', why: 1 }]), ['choice 0 is not an object', 'choice "a" needs a string why']);
   assert.deepEqual(validateChoiceSpec([null]), ['choice 0 is not an object']);
 });
+
+test('choiceHtml refuses choices that are not an array or hold a non-object, naming the question (#57)', () => {
+  const { ctx } = setup();
+  assert.throws(() => choiceHtml(ctx, { a: CHOICES[0] }, { id: 'q1' }), { name: 'TypeError', message: 'choice "q1": choices must be an array' });
+  assert.throws(() => choiceHtml(ctx, undefined, { id: 'q1' }), { name: 'TypeError', message: 'choice "q1": choices must be an array' });
+  for (const bad of [null, 'x', 7]) {
+    assert.throws(() => choiceHtml(ctx, [CHOICES[0], bad], { id: 'q1' }), { name: 'TypeError', message: 'choice "q1": choice 1 is not an object' }, String(bad));
+  }
+});
+
+test('labelledBy null means not given, like undefined (#57)', () => {
+  setup(CHOICES, 'q1', { labelledBy: null });
+  assert.equal(q('#q1-choices').hasAttribute('role'), false);
+  assert.equal(q('#q1-choices').hasAttribute('aria-labelledby'), false);
+});
