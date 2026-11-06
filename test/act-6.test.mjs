@@ -16,6 +16,7 @@ import { isActComplete, isActUnlocked, levelState, lockReason } from '../lib/unl
 import { allPlans, checkTradeoff, evaluatePlan, newTradeoffState, pickOption, validateTradeoffSpec } from '../lib/widgets/trade-off.mjs';
 import { checkSpot, newSpotState, toggleLine, validateSpotSpec } from '../lib/widgets/spot-it.mjs';
 import { checkConfig } from '../lib/configure/check.mjs';
+import { parseYaml } from '../lib/configure/parse.mjs';
 import { COLLECTOR_SCHEMA } from '../lib/configure/collector.mjs';
 
 const LIVE = liveRegistry();
@@ -140,12 +141,12 @@ const CARDS = {
   },
   'spanmetrics-before-sampling': {
     front:
-      'Compute span metrics before sampling: a connector fed from a tail_sampling pipeline counts only the traces that were kept.',
+      'Compute span metrics before sampling: a connector fed from a tail_sampling pipeline counts only the spans of the traces kept.',
     back:
       'The span_metrics connector counts the spans it receives, for each set of dimensions, into calls and duration metrics. ' +
       'A connector is an exporter at the end of one pipeline and a receiver at the start of another, so it receives what leaves ' +
       'the processors of the traces pipeline that lists it. List it in a pipeline that has tail_sampling and it sees only the ' +
-      'kept traces: the request rate comes out too low, and when the policies keep every error the error ratio comes out too ' +
+      'spans of the kept traces: the request rate comes out too low, and when the policies keep every error the error ratio comes out too ' +
       'high. Give the connector a traces pipeline of its own with no sampling processor, and let the sampled pipeline feed the ' +
       'backend. A receiver can be listed in more than one pipeline, so both pipelines can read the same one. The component was ' +
       'renamed from spanmetrics to span_metrics, and the old name still works but is deprecated.',
@@ -343,15 +344,17 @@ const spotRun = (ids) => {
   return { outcome: r.outcome, extra: r.extra, missing: r.missing };
 };
 
-const FIELD_LINE = /^service: \{pipelines: \{([a-z/]+): \{(receivers|processors|exporters): \[([^\]]*)\]\}\}\}$/;
+const FIELD_LINE = /^service: \{pipelines: \{([a-z_/]+): \{(receivers|processors|exporters): \[([^\]]*)\]\}\}\}$/;
+const DEF_LINE = /^(receivers|processors|exporters|connectors): \{(.*)\}$/;
+const PIPELINES = ['metrics/span_metrics', 'traces/archive', 'traces/main'];
 
-test('spot: the lines are valid, eight of them, and exactly two, the processors and the exporters of the traces pipeline that feeds span_metrics after tail_sampling, are the faults', () => {
+test('spot: the lines are valid, nine of them, and exactly two, the processors and the exporters of the traces/main pipeline that feeds span_metrics after tail_sampling, are the faults', () => {
   const spec = spot();
   assert.deepEqual(validateSpotSpec(spec), []);
   assert.equal(spec.target, 'config');
   const ids = spec.lines.map((l) => l.id);
-  assert.deepEqual([...ids].sort(), ['connector-def', 'logs-processors', 'memory-def', 'metrics-processors', 'metrics-receivers', 'sampler-def', 'traces-exporters', 'traces-processors']);
-  // #190: no answer is the focused first line or the last, and both sit below connector-def and metrics-receivers, the two lines they refer to. #193: eight lines and two answers.
+  assert.deepEqual([...ids].sort(), ['archive-exporters', 'archive-processors', 'connector-def', 'memory-def', 'metrics-exporters', 'metrics-receivers', 'sampler-def', 'traces-exporters', 'traces-processors']);
+  // #190: no answer is the focused first line or the last, and both sit below connector-def and metrics-receivers, the two lines they refer to. #193: nine lines, two answers.
   for (const id of ['traces-processors', 'traces-exporters']) {
     assert.equal(ids.indexOf(id) > 0 && ids.indexOf(id) < ids.length - 1, true, `${id} is neither first nor last: ${ids}`);
     assert.equal(ids.indexOf(id) > ids.indexOf('metrics-receivers') && ids.indexOf(id) > ids.indexOf('connector-def'), true, `${id} below metrics-receivers and connector-def: ${ids}`);
@@ -361,36 +364,45 @@ test('spot: the lines are valid, eight of them, and exactly two, the processors 
   const parsed = spec.lines.map((l) => ({ id: l.id, ...field(l) }));
   const sampled = parsed.filter((x) => x.field === 'processors' && x.list.includes('tail_sampling')).map((x) => x.pipeline);
   const feeding = parsed.filter((x) => x.field === 'exporters' && x.list.includes('span_metrics')).map((x) => x.pipeline);
-  assert.deepEqual(sampled, ['traces']);
-  assert.deepEqual(feeding, ['traces']);
-  assert.deepEqual(parsed.filter((x) => x.pipeline === 'traces').map((x) => x.id).sort(), ['traces-exporters', 'traces-processors'], 'the pipeline of the two lines is the same');
+  assert.deepEqual(sampled, ['traces/main', 'traces/archive'], 'two pipelines are sampled; only one of them is also the connector\'s');
+  assert.deepEqual(feeding, ['traces/main']);
+  const lines = (name) => parsed.filter((x) => x.pipeline === name).map((x) => x.id).sort();
+  assert.deepEqual(lines('traces/main'), ['traces-exporters', 'traces-processors'], 'the pipeline of the two lines is the same');
+  for (const name of PIPELINES) assert.equal(lines(name).length, 2, `${name}: two lines each, so the pair is one of several`);
   assert.deepEqual([...spec.faults], ['traces-processors', 'traces-exporters']);
-  assert.equal(spec.lines.find((l) => l.id === 'traces-processors').text, 'service: {pipelines: {traces: {processors: [memory_limiter, tail_sampling, batch]}}}');
-  assert.equal(spec.lines.find((l) => l.id === 'traces-exporters').text, 'service: {pipelines: {traces: {exporters: [otlp_grpc/dash0, span_metrics]}}}');
-  assert.equal(spec.lines.find((l) => l.id === 'metrics-receivers').text, 'service: {pipelines: {metrics/spans: {receivers: [span_metrics]}}}');
+  assert.equal(spec.lines.find((l) => l.id === 'traces-processors').text, 'service: {pipelines: {traces/main: {processors: [memory_limiter, tail_sampling, batch]}}}');
+  assert.equal(spec.lines.find((l) => l.id === 'traces-exporters').text, 'service: {pipelines: {traces/main: {exporters: [otlp_grpc/dash0, span_metrics]}}}');
+  assert.equal(spec.lines.find((l) => l.id === 'metrics-receivers').text, 'service: {pipelines: {metrics/span_metrics: {receivers: [prometheus, span_metrics]}}}');
   assert.equal(spec.lines.every((l) => !l.text.includes('spanmetrics')), true, 'the current component name, span_metrics');
+  assert.equal(plain(LIVE.levels['tail-sampling'].play.steps[1].question).includes('two lines that together'), true, 'the question says how many');
 });
 
 // The Spot it lines are pipelines of one gateway, so together they must be a config the Collector accepts. They are assembled
-// into one config here (the traces pipelines read the otlp receiver, which the lines leave out) and checked: every component
-// is defined (the real checkConfig), and every connector is the exporter of a traces pipeline AND the receiver of a metrics
-// pipeline (checkConfig does not model that pairing, the Collector refuses to start without it, so it is checked here).
+// into one config here, the definition lines exactly as shown (their text is the flow mapping that goes under the section) and the
+// pipeline lines merged by pipeline; what the lines leave out is the part of the config the board does not show: the otlp receiver, the
+// one backend exporter, an empty entry for a component a pipeline lists and no line defines. The real checkConfig then checks every
+// reference, and the connector pairing it does not model (the Collector refuses to start without it) is checked here.
 const assembled = (lines) => {
-  // Each pipeline line is one field of one pipeline; the fields a pipeline shows are merged, and one it leaves out is the part of the config
-  // the board does not show: the otlp receiver, no processors, the one backend exporter.
   const byName = new Map();
+  const defs = { receivers: [], processors: [], exporters: [], connectors: [] };
   for (const text of lines) {
     const m = FIELD_LINE.exec(text);
     if (m) byName.set(m[1], { ...byName.get(m[1]), [m[2]]: m[3].split(',').map((x) => x.trim()) });
+    const d = DEF_LINE.exec(text);
+    if (d) defs[d[1]].push(d[2]);
   }
   const pipelines = [...byName].map(([name, f]) => ({ name, receivers: f.receivers ?? ['otlp'], processors: f.processors ?? [], exporters: f.exporters ?? ['otlp_grpc/dash0'] }));
   const ids = (key) => [...new Set(pipelines.flatMap((p) => p[key]))];
-  const connectors = [...new Set(ids('exporters').concat(ids('receivers')).filter((id) => id.startsWith('span_metrics')))];
+  const isConnector = (id) => id.startsWith('span_metrics');
+  const connectors = [...new Set(ids('exporters').concat(ids('receivers')).filter(isConnector))];
+  const referenced = { receivers: ids('receivers').filter((id) => !isConnector(id)), processors: ids('processors'), exporters: ids('exporters').filter((id) => !isConnector(id)), connectors };
+  const section = (kind) => {
+    const defined = defs[kind].flatMap((inner) => Object.keys(parseYaml(`${kind}: {${inner}}`).doc[kind]));
+    const empty = referenced[kind].filter((id) => !defined.includes(id)).map((id) => `${id}: {}`);
+    return `${kind}: {${[...defs[kind], ...empty].join(', ')}}`;
+  };
   const yaml = [
-    'receivers:\n  otlp:',
-    `processors:\n${ids('processors').map((id) => `  ${id}:`).join('\n')}`,
-    'exporters:\n  otlp_grpc/dash0:',
-    `connectors:\n${connectors.map((id) => `  ${id}:`).join('\n')}`,
+    ...['receivers', 'processors', 'exporters', 'connectors'].map(section),
     `service:\n  pipelines:\n${pipelines.map((p) => `    ${p.name}:\n      receivers: [${p.receivers.join(', ')}]\n      processors: [${p.processors.join(', ')}]\n      exporters: [${p.exporters.join(', ')}]`).join('\n')}`,
   ].join('\n');
   return { pipelines, yaml };
@@ -420,18 +432,19 @@ const accepted = (cfg) => {
   assert.deepEqual(connectorProblems(cfg), []);
   assert.deepEqual(instances(cfg), ['span_metrics'], 'exactly one span_metrics instance: a single writer');
 };
-// The fix the explain describes: span_metrics gets its own traces pipeline with no sampling, and tail_sampling stays on the pipeline to the backend.
+// The fix the explain describes: span_metrics gets its own traces pipeline with no sampling, and tail_sampling stays on the pipelines to a backend.
 const fixedLines = (spec) => [
   'service: {pipelines: {traces/metrics: {processors: [memory_limiter]}}}',
   'service: {pipelines: {traces/metrics: {exporters: [span_metrics]}}}',
-  'service: {pipelines: {traces: {exporters: [otlp_grpc/dash0]}}}',
+  'service: {pipelines: {traces/main: {exporters: [otlp_grpc/dash0]}}}',
   ...spec.lines.filter((l) => l.id !== 'traces-exporters').map((l) => l.text),
 ];
 
 test('spot: the lines together are one config the Collector accepts: every component defined, the connector exported by a traces pipeline and received by a metrics one, one writer', () => {
   const cfg = assembled(spot().lines.map((l) => l.text));
   accepted(cfg);
-  assert.deepEqual(cfg.pipelines.map((p) => p.name).sort(), ['logs', 'metrics', 'metrics/spans', 'traces']);
+  assert.deepEqual(cfg.pipelines.map((p) => p.name).sort(), PIPELINES);
+  for (const l of spot().lines.filter((x) => DEF_LINE.test(x.text))) assert.equal(cfg.yaml.includes(DEF_LINE.exec(l.text)[2]), true, `${l.id} is in the assembled config exactly as shown`);
 });
 
 test('spot: the fix the explain describes is also one valid, single-writer config, and has no sampling before the connector', () => {
@@ -440,17 +453,101 @@ test('spot: the fix the explain describes is also one valid, single-writer confi
   accepted(cfg);
   const feeding = cfg.pipelines.filter((p) => p.exporters.includes('span_metrics'));
   assert.deepEqual(feeding.map((p) => [p.name, p.processors.includes('tail_sampling')]), [['traces/metrics', false]]);
-  assert.equal(plain(spec.explain).includes('traces/metrics'), true, 'the explain names the pipeline of the fix');
+  const text = plain(spec.explain);
+  assert.equal(text.includes('traces/metrics'), true, 'the explain names the pipeline of the fix');
+  assert.equal(text.includes('the fix keeps them apart rather than making either one wrong'), true, 'the explain says why the answer is two lines and what the fix changes');
+});
+
+// Checkable settings of the three definition lines: Configure it's schema does not validate component settings, so the keys are
+// checked here against the READMEs at the repo's Collector tag, v0.164.0 (memory_limiter and tail_sampling processor settings, the
+// span_metrics connector's).
+const DURATION = /^(\d+)(ms|s|m|h)$/;
+const seconds = (d) => Number(DURATION.exec(d)[1]) * { ms: 1e-3, s: 1, m: 60, h: 3600 }[DURATION.exec(d)[2]];
+const subset = (obj, allowed, what) => assert.deepEqual(Object.keys(obj).filter((k) => !allowed.includes(k)), [], `${what}: only README fields`);
+const MEMORY_FIELDS = ['check_interval', 'limit_mib', 'spike_limit_mib', 'limit_percentage', 'spike_limit_percentage', 'max_gc_interval_when_soft_limited'];
+const SAMPLER_FIELDS = ['sampling_strategy', 'decision_wait', 'decision_wait_after_root_received', 'num_traces', 'expected_new_traces_per_sec', 'decision_cache', 'policies', 'sample_on_first_match', 'drop_pending_traces_on_shutdown', 'maximum_trace_size_bytes', 'num_shards'];
+const POLICY_BLOCKS = { status_code: ['status_codes'], latency: ['threshold_ms', 'upper_threshold_ms'], probabilistic: ['sampling_percentage', 'hash_salt'] };
+const CONNECTOR_FIELDS = ['histogram', 'dimensions', 'calls_dimensions', 'exclude_dimensions', 'dimensions_cache_size', 'include_instrumentation_scope', 'resource_metrics_cache_size', 'aggregation_temporality', 'namespace', 'metrics_flush_interval', 'metrics_expiration', 'series_expiration', 'metric_timestamp_cache_size', 'exemplars', 'events', 'resource_metrics_key_attributes', 'aggregation_cardinality_limit', 'add_resource_attributes', 'enable_metrics_sampling_method'];
+
+/** What a definition line sets: { memory, sampler, connector } as the settings of the one component each defines. */
+function settingsOf(lines) {
+  const out = {};
+  for (const l of lines) {
+    const doc = parseYaml(l.text);
+    assert.equal(doc.ok, true, `${l.id} parses`);
+    const [kind] = Object.keys(doc.doc);
+    const [name] = Object.keys(doc.doc[kind]);
+    out[{ memory_limiter: 'memory', tail_sampling: 'sampler', span_metrics: 'connector' }[name]] = { kind, name, settings: doc.doc[kind][name] };
+  }
+  return out;
+}
+
+function definitionProblems(lines) {
+  const problems = [];
+  const check = (ok, text) => { if (!ok) problems.push(text); };
+  const d = settingsOf(lines);
+  const { memory, sampler, connector } = d;
+  check(memory?.kind === 'processors' && sampler?.kind === 'processors' && connector?.kind === 'connectors', 'sections');
+  const m = memory.settings;
+  check(Object.keys(m).every((k) => MEMORY_FIELDS.includes(k)), 'memory_limiter: unknown field');
+  check(DURATION.test(m.check_interval) && seconds(m.check_interval) > 0, 'memory_limiter: check_interval is a duration above 0');
+  check(Number.isInteger(m.limit_percentage) && m.limit_percentage > 0 && m.limit_percentage <= 100, 'memory_limiter: limit_percentage is 1 to 100');
+  check(m.limit_mib !== undefined || m.limit_percentage !== undefined, 'memory_limiter: limit_mib or limit_percentage must be set');
+  const t = sampler.settings;
+  check(Object.keys(t).every((k) => SAMPLER_FIELDS.includes(k)), 'tail_sampling: unknown field');
+  check(DURATION.test(t.decision_wait), 'tail_sampling: decision_wait is a duration');
+  check(Number.isInteger(t.num_traces) && t.num_traces > 0, 'tail_sampling: num_traces is a positive integer');
+  check(Array.isArray(t.policies) && t.policies.length > 0, 'tail_sampling: policies is a list');
+  const names = (t.policies ?? []).map((p) => p.name);
+  check(new Set(names).size === names.length && names.every((n) => typeof n === 'string'), 'tail_sampling: policy names are unique strings');
+  for (const p of t.policies ?? []) {
+    check(Object.hasOwn(POLICY_BLOCKS, p.type), `tail_sampling: policy ${p.name} has a known type`);
+    check(Object.keys(p).every((k) => ['name', 'type', p.type].includes(k)) && typeof p[p.type] === 'object', `tail_sampling: policy ${p.name} has name, type and the block named for its type`);
+    check(Object.keys(p[p.type] ?? {}).every((k) => (POLICY_BLOCKS[p.type] ?? []).includes(k)), `tail_sampling: policy ${p.name} block has only README fields`);
+  }
+  const by = Object.fromEntries((t.policies ?? []).map((p) => [p.type, p[p.type] ?? {}]));
+  check((by.status_code?.status_codes ?? []).length > 0 && by.status_code.status_codes.every((c) => ['OK', 'ERROR', 'UNSET'].includes(c)), 'tail_sampling: status_codes are OK, ERROR or UNSET');
+  check(Number.isInteger(by.latency?.threshold_ms) && by.latency.threshold_ms > 0, 'tail_sampling: threshold_ms is a positive integer');
+  check(typeof by.probabilistic?.sampling_percentage === 'number' && by.probabilistic.sampling_percentage > 0 && by.probabilistic.sampling_percentage <= 100, 'tail_sampling: sampling_percentage is above 0, at most 100');
+  const c = connector.settings;
+  check(Object.keys(c).every((k) => CONNECTOR_FIELDS.includes(k)), 'span_metrics: unknown field');
+  check(Object.keys(c.histogram ?? {}).length === 1 && Object.keys(c.histogram).every((k) => ['explicit', 'exponential'].includes(k)), 'span_metrics: histogram is explicit or exponential');
+  const buckets = c.histogram?.explicit?.buckets ?? [];
+  check(Object.keys(c.histogram?.explicit ?? {}).every((k) => k === 'buckets') && buckets.length > 0 && buckets.every((b) => DURATION.test(b)), 'span_metrics: histogram.explicit.buckets is a list of durations');
+  check(buckets.every((b, i) => i === 0 || (DURATION.test(b) && DURATION.test(buckets[i - 1]) && seconds(b) > seconds(buckets[i - 1]))), 'span_metrics: buckets ascend');
+  check(DURATION.test(c.metrics_flush_interval), 'span_metrics: metrics_flush_interval is a duration');
+  return problems;
+}
+
+test('spot: the three definition lines parse and set only fields the READMEs list, with values of the right kind (memory_limiter, tail_sampling, span_metrics at v0.164.0)', () => {
+  const spec = spot();
+  const defLines = ['memory-def', 'sampler-def', 'connector-def'].map((id) => spec.lines.find((l) => l.id === id));
+  assert.deepEqual(definitionProblems(defLines), []);
+  const d = settingsOf(defLines);
+  assert.deepEqual(d.memory.settings, { check_interval: '1s', limit_percentage: 80 });
+  assert.equal(d.sampler.settings.decision_wait, '30s');
+  assert.equal(d.sampler.settings.num_traces, 50000, 'the processor\'s default, as the Trade-off explain says');
+  assert.deepEqual(d.connector.settings.histogram.explicit.buckets, ['100ms', '1s']);
+  // Teeth: a misspelt field, a wrong block, a value out of range, an unsorted bucket list, each is refused.
+  const swap = (id, from, to) => defLines.map((l) => (l.id === id ? { ...l, text: l.text.replace(from, to) } : l));
+  const refused = (id, from, to) => definitionProblems(swap(id, from, to));
+  assert.deepEqual(refused('memory-def', 'limit_percentage', 'limit_percent'), ['memory_limiter: unknown field', 'memory_limiter: limit_percentage is 1 to 100', 'memory_limiter: limit_mib or limit_percentage must be set']);
+  assert.deepEqual(refused('memory-def', 'limit_percentage: 80', 'limit_percentage: 180'), ['memory_limiter: limit_percentage is 1 to 100']);
+  assert.deepEqual(refused('sampler-def', 'decision_wait', 'decision_wiat'), ['tail_sampling: unknown field', 'tail_sampling: decision_wait is a duration']);
+  assert.deepEqual(refused('sampler-def', 'latency: {threshold_ms', 'latency: {threshold'), ['tail_sampling: policy slow block has only README fields', 'tail_sampling: threshold_ms is a positive integer']);
+  assert.deepEqual(refused('sampler-def', 'status_codes: [ERROR]', 'status_codes: [FAILED]'), ['tail_sampling: status_codes are OK, ERROR or UNSET']);
+  assert.deepEqual(refused('connector-def', 'buckets: [100ms, 1s]', 'buckets: [1s, 100ms]'), ['span_metrics: buckets ascend']);
+  assert.deepEqual(refused('connector-def', 'metrics_flush_interval', 'flush_interval'), ['span_metrics: unknown field', 'span_metrics: metrics_flush_interval is a duration']);
 });
 
 test('spot: the config check has teeth: a second span_metrics instance, a connector nobody receives, or one received but never exported, is refused', () => {
   const lines = spot().lines.map((l) => l.text);
   const second = lines.map((l) => l.replace('otlp_grpc/dash0, span_metrics]', 'otlp_grpc/dash0, span_metrics, span_metrics/2]'));
   assert.deepEqual(instances(assembled(second)), ['span_metrics', 'span_metrics/2']);
-  assert.deepEqual(connectorProblems(assembled(second)), ['span_metrics/2 is an exporter of traces but no pipeline receives it']);
-  const noReceiver = lines.map((l) => l.replace('receivers: [span_metrics]', 'receivers: [otlp]'));
-  assert.deepEqual(connectorProblems(assembled(noReceiver)), ['span_metrics is an exporter of traces but no pipeline receives it']);
-  const noExporter = lines.map((l) => l.replace(', span_metrics]', ']'));
+  assert.deepEqual(connectorProblems(assembled(second)), ['span_metrics/2 is an exporter of traces/main but no pipeline receives it']);
+  const noReceiver = lines.map((l) => l.replace('receivers: [prometheus, span_metrics]', 'receivers: [otlp]'));
+  assert.deepEqual(connectorProblems(assembled(noReceiver)), ['span_metrics is an exporter of traces/main but no pipeline receives it']);
+  const noExporter = lines.map((l) => l.replace('otlp_grpc/dash0, span_metrics]', 'otlp_grpc/dash0]'));
   assert.deepEqual(connectorProblems(assembled(noExporter)), ['span_metrics is received but never an exporter']);
 });
 
@@ -463,7 +560,9 @@ test('spot: the real grader accepts exactly the two traces lines together; eithe
   assert.deepEqual(spotRun(['sampler-def']), { outcome: 'wrong', extra: ['sampler-def'], missing: ['traces-processors', 'traces-exporters'] }, 'tail_sampling alone is not the fault');
   assert.deepEqual(spotRun(['connector-def']).extra, ['connector-def'], 'the connector alone is not the fault');
   assert.deepEqual(spotRun(['metrics-receivers', 'traces-exporters']), { outcome: 'wrong', extra: ['metrics-receivers'], missing: ['traces-processors'] });
-  assert.deepEqual(spotRun(['traces-processors', 'traces-exporters', 'logs-processors']), { outcome: 'wrong', extra: ['logs-processors'], missing: [] });
+  assert.deepEqual(spotRun(['traces-processors', 'traces-exporters', 'archive-processors']), { outcome: 'wrong', extra: ['archive-processors'], missing: [] });
+  assert.deepEqual(spotRun(['archive-processors', 'traces-exporters']), { outcome: 'wrong', extra: ['archive-processors'], missing: ['traces-processors'] }, 'the other sampled pipeline is no fault');
+  assert.deepEqual(spotRun(['traces-processors', 'archive-exporters']), { outcome: 'wrong', extra: ['archive-exporters'], missing: ['traces-exporters'] });
   assert.equal(spotRun([]).outcome, 'empty');
 });
 
@@ -478,20 +577,27 @@ test('spot: every decoy says why it is fine, no reason names the traces pipeline
   }
   assert.equal(/receiv/.test(plain(spec.whyNot['metrics-receivers'])), true);
   assert.equal(/the connector/.test(plain(spec.whyNot['metrics-receivers'])) && !/four/.test(plain(spec.whyNot['metrics-receivers'])), true, 'one connector again');
-  assert.equal(/logs never reach it/.test(plain(spec.whyNot['logs-processors'])), true);
-  assert.equal(/never sees metrics/.test(plain(spec.whyNot['metrics-processors'])), true);
+  assert.equal(/archive of its own/.test(plain(spec.whyNot['archive-processors'])) && /archive of its own/.test(plain(spec.whyNot['archive-exporters'])), true);
+  assert.equal(/counted/.test(plain(spec.whyNot['metrics-exporters'])), true);
+  // The memory limiter refuses data at the soft limit (limit minus spike), a little below its 80%, which is the hard limit (the memory_limiter README).
+  const memory = plain(spec.whyNot['memory-def']);
+  assert.equal(memory.includes('starts refusing data a little below its 80% limit, at the soft limit'), true);
+  assert.equal(memory.includes('of the memory available'), false);
+  // A definition's reason ends at the rule, and points at no pipeline line.
+  for (const id of ['connector-def', 'sampler-def']) assert.equal(plain(spec.whyNot[id]).endsWith('A definition does not decide what it receives.'), true, id);
+  assert.equal(/pipeline lines?\b|that list it/.test(plain(spec.whyNot['connector-def'] + spec.whyNot['sampler-def'] + spec.whyNot['metrics-receivers'])), false, 'no reason points at the one line that lists the component');
   assert.equal(/memory/.test(plain(spec.whyNot['memory-def'])), true);
   assert.equal(/definition|only defines/.test(plain(spec.whyNot['connector-def'])), true);
   assert.equal(/definition|only defines/.test(plain(spec.whyNot['sampler-def'])), true);
 });
 
-test('spot: the explain teaches the nuance with the recomputed figures: 39 of 400 requests a second, 8 errors of 39 is 21%, not 2%', () => {
+test('spot: the explain teaches the nuance with the recomputed figures: the spans of 39 of 400 traces a second, 8 errors of 39 is 21%, not 2%', () => {
   assert.equal(Math.round((KEPT_ERRORS / KEPT) * 100), 21);
   assert.equal(KEPT_ERRORS / TRACES, 0.02);
   const t = plain(spot().explain);
   for (const w of ['39', '400', '21%', '2%', 'exporter', 'end of', 'before', 'its own', 'span_metrics', 'spanmetrics', 'deprecated']) assert.equal(t.includes(w), true, w);
   for (const w of ['39 of 400', '8 of 39', 'traces/metrics', 'no sampling processor', 'one span_metrics']) assert.equal(t.includes(w), true, w);
-  assert.equal(t.includes('take span_metrics out of the exporters of traces, so traces/metrics is the only pipeline that feeds it'), true, 'the fix removes the connector from traces, or two pipelines feed one instance');
+  assert.equal(t.includes('take span_metrics out of the exporters of traces/main, so traces/metrics is the only pipeline that feeds it'), true, 'the fix removes the connector from traces, or two pipelines feed one instance');
   // The sampler decoy shows the policies of the Trade-off answer, derived from that option, so the 39 of 400 holds.
   const answerOption = ts().knobs.find((k) => k.id === 'policies').options.find((o) => o.id === ts().answer.policies);
   const answerLabel = answerOption.label;
@@ -509,6 +615,8 @@ test('spot: the explain teaches the nuance with the recomputed figures: 39 of 40
   assert.equal(KEPT_ERRORS + KEPT_SLOW + KEPT_BASELINE, 39);
   assert.equal(/ERROR/.test(samplerLine), true);
   assert.equal(t.includes('the sampler kept every error and few of the rest'), true);
+  assert.equal(t.includes('gets only the spans of the traces it kept: 39 of 400 traces a second'), true, 'the connector counts spans; the figures are traces');
+  assert.equal(/belongs on the pipeline/.test(t), false, 'no uncited placement claim');
   assert.equal(t.split('. ').some((s) => s.length > 260), false, 'no run-on sentence in the explain');
   assert.equal(/four|all of them together|own connector/.test(t), false, 'one connector, no namespaces');
   const intro = plain(LIVE.levels['tail-sampling'].play.steps[1].intro);
@@ -536,9 +644,9 @@ test('the 6.1 and 6.2 level files cite the pages their facts come from: Spec lin
   ]) assert.equal(tail.includes(u), true, u);
   const docs = urls('tail-sampling', '// Docs').join(' ');
   for (const u of [
-    'https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md',
-    'https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/connector/spanmetricsconnector/README.md',
-    'https://github.com/open-telemetry/opentelemetry-collector/blob/main/connector/README.md',
+    'https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.164.0/processor/tailsamplingprocessor/README.md',
+    'https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.164.0/connector/spanmetricsconnector/README.md',
+    'https://github.com/open-telemetry/opentelemetry-collector/blob/v0.164.0/connector/README.md',
   ]) assert.equal(docs.includes(u), true, u);
   for (const f of ['head-sampling', 'tail-sampling']) {
     for (const u of [...urls(f, '// Spec: ')]) assert.equal(['opentelemetry.io', 'www.w3.org', 'prometheus.io'].includes(new URL(u).host), true, `${f} Spec line ${u}`);

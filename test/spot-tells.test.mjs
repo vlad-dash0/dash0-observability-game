@@ -1,6 +1,6 @@
 // Blind strategies must not win any Spot it board (#190). Each rule below ignores what the lines
 // mean: it scores every line by something it can count or read off the text (length, digits,
-// words, commas, quotes, `=` signs, distinct label keys, the length of a labelled field such as
+// words, commas, quotes, `=` signs, underscores, distinct label keys, the length of a labelled field such as
 // `expr:`, or a numeric field such as `count=`), picks the lines with the most or the fewest, first or after skipping one or two, and plays
 // that through the real checkSpot. If it solves a board first time or after one wrong Check,
 // the player earns stars without reading. (Position rules: test/spot-ladder.test.mjs.) Specs
@@ -32,17 +32,42 @@ function perms(list) {
 
 const factorial = (n) => (n <= 1 ? 1 : n * factorial(n - 1));
 
-// Enough for every tie-break of every rule on the current boards (the largest is one board's
-// eight tied lines, 8! = 40320); a board past it fails loudly, before building the orders,
-// instead of being sampled.
+// Up to this many orders are tried per rule. A board whose tied lines have more tie-breaks than that
+// (nine fully tied lines are 9! = 362880; the 6.2 board has nine and quotes, for one, tie them all) is
+// sampled, not enumerated: MAX_RANKINGS random orders from a fixed seed, so the same orders every run.
+// The enumerated case (the largest before 6.2 was eight tied lines, 8! = 40320) stays exact.
 const MAX_RANKINGS = 50000;
+const SAMPLE_SEED = 0x5eed;
+
+/** A small seeded generator (mulberry32): the same numbers in [0, 1) for the same seed, on every Node. */
+function seeded(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** `list` in a random order (Fisher-Yates) drawn from `next`. */
+function shuffled(list, next) {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(next() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
 /** A missing score (the line lacks the field) ranks last, whichever way the rule reads. */
 const MISSING = -Infinity;
 
 /**
- * Every ranking of the line ids by `score` (highest first, MISSING last), ties broken every
- * way: the product of the orders of each group of equal scores.
+ * The rankings of the line ids by `score` (highest first, MISSING last), ties broken every way: the
+ * product of the orders of each group of equal scores. When that product is past MAX_RANKINGS, MAX_RANKINGS
+ * of them, each group of ties shuffled on its own from a fixed seed.
  */
 function rankings(spec, score) {
   const groups = new Map();
@@ -51,10 +76,13 @@ function rankings(spec, score) {
     if (!groups.has(s)) groups.set(s, []);
     groups.get(s).push(l.id);
   }
+  const ordered = [...groups.keys()].sort((a, b) => b - a).map((s) => groups.get(s));
+  if (ordered.reduce((n, g) => n * factorial(g.length), 1) > MAX_RANKINGS) {
+    const next = seeded(SAMPLE_SEED);
+    return Array.from({ length: MAX_RANKINGS }, () => ordered.flatMap((g) => shuffled(g, next)));
+  }
   let out = [[]];
-  for (const s of [...groups.keys()].sort((a, b) => b - a)) {
-    const group = groups.get(s);
-    if (factorial(group.length) * out.length > MAX_RANKINGS) throw new Error(`${spec.id}: more than ${MAX_RANKINGS} tie-breaks`);
+  for (const group of ordered) {
     const orders = perms(group);
     out = out.flatMap((head) => orders.map((o) => [...head, ...o]));
   }
@@ -116,6 +144,7 @@ const MEASURES = {
   quotes: count(/"/g),
   '`=` signs': count(/=/g),
   'distinct label keys': labelKeys,
+  underscores: count(/_/g),
 };
 
 const UNIT = { '': 1, s: 1, ms: 1e-3, us: 1e-6, ns: 1e-9 };
@@ -257,9 +286,17 @@ test('the rules see every Spot board, read its fields, each board is solved by i
     assert.deepEqual(skipping(2)(ids), [...ids.slice(2), ...ids.slice(0, 2)], key);
     // Ties are broken every way: each ranking orders every line once, and a fully tied score gives all n! orders.
     for (const r of rankings(spec, scoresFor(spec)['most length'])) assert.deepEqual([...r].sort(), [...ids].sort(), key);
-    assert.equal(rankings(spec, () => 0).length, factorial(ids.length), `${key}: ${ids.length}! orders`);
+    assert.equal(rankings(spec, () => 0).length, Math.min(factorial(ids.length), MAX_RANKINGS), `${key}: ${ids.length}! orders, or the sample`);
   }
-  assert.throws(() => rankings({ id: 'wide', lines: [...Array(9).keys()].map((i) => ({ id: `l${i}` })) }, () => 0), /more than 50000 tie-breaks/, 'nine tied lines (9! orders) throw before they are built');
+  // Past MAX_RANKINGS tie-breaks the orders are sampled: the same MAX_RANKINGS orders every call, each a permutation, and a higher score still ranks first.
+  const wide = { id: 'wide', lines: [...Array(10).keys()].map((i) => ({ id: `l${i}`, score: i === 0 ? 1 : 0 })) };
+  const sampled = rankings(wide, (l) => l.score);
+  assert.equal(sampled.length, MAX_RANKINGS, 'nine tied lines are 9! = 362880 orders, past the limit: a sample');
+  assert.deepEqual(sampled, rankings(wide, (l) => l.score), 'the same orders on every call');
+  assert.equal(sampled.every((r) => r[0] === 'l0' && [...r].sort().join() === wide.lines.map((l) => l.id).sort().join()), true, 'each is a permutation, the higher score first');
+  assert.equal(new Set(sampled.map((r) => r.join())).size > MAX_RANKINGS * 0.9, true, 'and mostly different ones');
+  assert.equal(rankings({ id: 'eight', lines: wide.lines.slice(2) }, () => 0).length, factorial(8), 'eight tied lines are enumerated in full');
+  assert.equal(new Set(rankings({ id: 'three', lines: wide.lines.slice(1, 4) }, () => 0).map((r) => r.join())).size, 6, 'few ties: every order exactly once');
 
   // The readers, on literal lines: what each measure and field sees.
   const line = 'x{route="/a/{id}", az="eu-1", n: 2} count=12 sum=3.5s exemplar: value=250ms trace_id=ab12 span_id=00f0c7 build_id="2411" p95_s=0.61';
@@ -285,4 +322,29 @@ test('the rules see every Spot board, read its fields, each board is solved by i
 
 test('no Spot board is solved, even with one wrong Check, by taking the lines with the most or fewest of anything countable, first or after skipping one or two, ties tried every way (#190)', async () => {
   assert.deepEqual(await tells(), {}, 'boards a blind rule solves without reading them');
+});
+
+test('the underscore measure: it solves the 6.2 board as first reviewed (sampler 7, memory 3, the answers 2, the rest 1), the counts that put the answers third and fourth (#193)', () => {
+  const lines = (rows) => rows.map(([id, text]) => ({ id, text }));
+  const share = (spec, name, skip) => {
+    const all = rankings(spec, scoresFor(spec)[name]);
+    return all.map(skipping(skip)).filter((r) => mistakes(spec, r) <= 1).length / all.length;
+  };
+  const before = {
+    id: 'before',
+    faults: ['tp', 'te'],
+    lines: lines([
+      ['md', 'processors: {memory_limiter: {check_interval: 1s, limit_percentage: 80}}'],
+      ['mr', 'service: {pipelines: {metrics/spans: {receivers: [span_metrics]}}}'],
+      ['cd', 'connectors: {span_metrics: {histogram: {explicit: {buckets: [100ms, 1s]}}}}'],
+      ['tp', 'service: {pipelines: {traces: {processors: [memory_limiter, tail_sampling, batch]}}}'],
+      ['lp', 'service: {pipelines: {logs: {processors: [memory_limiter, k8sattributes, batch]}}}'],
+      ['sd', 'processors: {tail_sampling: {decision_wait: 30s, policies: [{name: errors, type: status_code, status_code: {status_codes: [ERROR]}}, {name: slow, type: latency, latency: {threshold_ms: 2000}}, {name: baseline, type: probabilistic, probabilistic: {sampling_percentage: 5}}]}}'],
+      ['te', 'service: {pipelines: {traces: {exporters: [otlp_grpc/dash0, span_metrics]}}}'],
+      ['mp', 'service: {pipelines: {metrics: {processors: [memory_limiter, resource, batch]}}}'],
+    ]),
+  };
+  assert.equal(scoresFor(before)['most underscores'](before.lines[3]), 2);
+  assert.equal(share(before, 'most underscores', 2) > TELL_SHARE, true, 'skipping the sampler and the memory line, the next two are the answers');
+  assert.equal(share(before, 'fewest underscores', 2) > TELL_SHARE, true, 'fewest, skipping two, lands on them too');
 });
