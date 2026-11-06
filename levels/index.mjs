@@ -36,6 +36,7 @@ import goodAlerts from './good-alerts.mjs';
 import headSampling from './head-sampling.mjs';
 import histograms from './histograms.mjs';
 import instruments from './instruments.mjs';
+import itsUs from './its-us.mjs';
 import monitoringVsObservability from './monitoring-vs-observability.mjs';
 import namingYourService from './naming-your-service.mjs';
 import orderMatters from './order-matters.mjs';
@@ -140,8 +141,8 @@ export const ACTS = [
     no: 9,
     name: 'Live Demo',
     sub: 'Does that answer hold?',
-    teaser: 'Judge a confident answer about filters, tail sampling and an error rate before it goes to a customer.',
+    teaser: 'Judge confident answers about filters and error rates, connect the game to your own Dash0, then find its incident there.',
     levels: [filterOrSampler, the34PercentErrorRate, connectToDash0],
-    boss: null,
+    boss: itsUs,
   },
 ];

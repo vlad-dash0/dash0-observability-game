@@ -173,7 +173,7 @@ disposes it while a level covers the hub and on `pagehide`, and shows the text f
 three.js, the colours or WebGL are unavailable. Level `lights` stay level data, validated
 against `hub/map-data.mjs` `NODE_IDS`, and are no longer drawn.
 
-Act 9 (Oceania) uses its three countries: `filter-or-sampler` NZL, `the-34-percent-error-rate` AUS, `connect-to-dash0` PNG (docs/DASH0-LAB.md). `test/globe-data.test.mjs` `HOME` has a box for each.
+Act 9 (Oceania) uses its three countries: `filter-or-sampler` NZL, `the-34-percent-error-rate` AUS, `connect-to-dash0` PNG (docs/DASH0-LAB.md). `test/globe-data.test.mjs` `HOME` has a box for each. Its boss `its-us` (the lab) carries no country and pulses, then lights, the whole Oceania region like any boss.
 
 Coming soon (#177 P7): `hub/coming-soon.mjs` `COMING_SOON` lists Act 8 (`{id, no, name,
 sub, teaser}`, frozen; Act 7 left it for `ACTS` with level 7.1). It is never passed to `buildRegistry`, so unlock, progress, stars, cards

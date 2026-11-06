@@ -68,18 +68,28 @@ A hand-written level (`widgets: []`, scored, no par). Screens: mode (practice, o
 
 Merge order: P1, P2, P4, P3, P5, P6.
 
-### Notes for P5 (incident send)
+### Notes for P5 (incident send) and the decision
 - The cached incident keeps the build time. A send much later carries old timestamps that a Dash0 time filter could hide.
 - Each `sendBatch` re-sends the same span ids, so P5 sends the incident once.
-- Open P5 question: should P5 rebase the span and event times to the send time (shift every `startMs`, `endMs` and `timeMs` by one delta, ids unchanged) before the one send? Leaning yes, because the lab's questions are answered from what the player finds in Dash0 and a stale time window would hide it; P5 decides and records it here. Not implemented in P4.
+- **Decision (P5): no rebase.** `telemetry.incident()` is lazy and the boss is its only caller, so the incident is built when the player first opens the boss, seconds before the one send, not when the page started (`test/its-us.test.mjs` "built when the boss first needs it"). A rebase would add a second copy of the times: what the game renders and grades (I5) would differ from what Dash0 holds, and a retry would carry yet another set. Instead the same spans, ids and times go out on every attempt (test "a retry sends the same timestamps"). The remaining stale case is a player who leaves the boss open on a failing send for a long time; the copy says to widen the Dash0 time picker, which also covers a client clock that disagrees with Dash0's.
+- Reconnecting to another Dash0 in the same page does not send the incident again (it is sent once per session, tracked by the cached incident object); reload the page to send it to a new place.
 
-### P6 live QA list
+## The boss: `levels/its-us.mjs` (Act 9 boss, no country)
+A hand-written level (`widgets: []`, `mechanics: ['spot']`, scored, no par, no hints). It opens once 9.1, 9.2 and 9.3 are done (the ordinary boss rule), and Oceania is complete only when it is. It never receives or touches a token: it reads `ctx.telemetry.status()`, builds the incident with `ctx.telemetry.incident()`, and sends with `sendBatch`.
+- **Connected live** (`status()` is `connected` and `live`): one screen to send ("Send the incident to Dash0"), once; accepted goes to the questions. `rejected` with `auth` says only that Dash0 refused the token, never the status, offers practice and no retry; `rejected` otherwise shows the status and a retry; every `unreachable` cause explains itself, offers a retry and practice, and warns that an earlier attempt may have got through. None costs a mistake: the faults are the network's, not the player's. Live shows no trace view at all: the page holds the session id to filter by and the steps in Dash0 (Trace Explorer, a `session.id` filter, Trace View, Span Sidebar), so no answer is on the page.
+- **Not connected** (never connected, or reloaded): the boss explains and offers practice; "Use my own Dash0" is a disabled button with `describedBy` (it needs 9.3 first, and live is not open until P6). **Connected to practice**: straight to the practice view. Practice sends nothing and never calls the real fetch.
+- **Practice view**: a labelled simulated Trace Explorer built from the same `incident.spans` the game sends: the filter chip, the trace id, a span table (name, start, duration, status) and one "Open <span>" button per span. Opening a span shows only that span: its attributes (with `session.id`) and its events. The fault code is therefore in the attributes of the failing span and nowhere else, as in Dash0 (I5; live shows nothing), and it leaves the page when another span is opened.
+- **Questions** (`QUESTION`, graded by `gradeAnswer(incident.spans, ...)`): operation, fault code, retry count, trace id, typed into four fields and checked together. A pass locks its field; an empty or malformed value (`inconclusive`) is a free nudge; a well-formed wrong value costs one mistake, once per distinct value per question. Feedback never repeats an answer. Finish (`data-finish`) is enabled only when all four pass. Practice scores like live (full stars).
+- The result text names the mode ("a simulated Dash0" or "your own Dash0").
+
+## P6 live QA list
 - In a real browser (Chrome, Firefox, Safari), connect live and check that no password-manager save prompt appears when the token field disappears on success. If one does, the opt-out attributes of the secret field are not enough.
 - Check that the ingress answers CORS preflights (owner input 1) and what a rejected token returns (owner input 2).
+- The boss, live: send the incident, then follow the on-screen steps in a real Dash0: filter the Trace Explorer by `session.id` (is the key offered for a span attribute?), open the trace, find the span in error and its events (the sidebar tab named in the copy, "Related Logs & Events"), and check that all four answers can be read there and match. Check that a retry after a failure shows the trace twice at worst, and that the time picker's default range finds a fresh incident.
 
 ## Owner inputs (VERIFY)
 1. Does the OTLP/HTTP ingress answer browser CORS preflights for `Authorization`, `Content-Type` and `Dash0-Dataset`, including on 401/403? If not, the relay is needed.
 2. Scope names (ingest-only, dataset-limited), where tokens are created (the `auth_` prefix and `Dash0-Dataset` header are confirmed in the Dash0 docs), whether 401/403 mean what the game teaches.
 3. Region and ingress host list, OTLP/HTTP port (443 or 4318), JSON body acceptance, the dataset identifier rules (the game's regex is its own check).
-4. Trace explorer view name, how to filter by `session.id`, deep-link format.
+4. Trace explorer view name, how to filter by `session.id`, deep-link format. The boss copy cites the Dash0 docs for the Trace Explorer, its Filter and Time Picker, the Trace View waterfall and the Span Sidebar (tracing/about-tracing, view, span-sidebar, span-events, glossary/filtering). Still VERIFY (#195): that a sender-set `session.id` span attribute is offered as a filter key, and that a span's events are listed under the sidebar's "Related Logs & Events" tab.
 5. A test org with an ingest-only token for the live QA run (never committed).
