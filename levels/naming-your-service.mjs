@@ -2,7 +2,8 @@
 // up as unknown_service:node; the player spots the fallback, fixes the .env with the
 // level 1.2 checker (lib/widgets/env-config.mjs), then answers which name wins when
 // OTEL_SERVICE_NAME and service.name in OTEL_RESOURCE_ATTRIBUTES disagree.
-// Spec: docs/FOUNDATION.md §5 and §6 F6. Player text reaches HTML only via escapeHtml.
+// Spec: https://opentelemetry.io/docs/specs/semconv/registry/attributes/service/ , https://opentelemetry.io/docs/specs/otel/resource/sdk/#specifying-resource-information-via-an-environment-variable , https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/
+// Design: docs/FOUNDATION.md §5 and §6 F6. Player text reaches HTML only via escapeHtml.
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { escapeFromHint } from '../lib/widgets/focus.mjs';
 import { checkConfig, effectiveResource, parseEnv, renderIssues } from '../lib/widgets/env-config.mjs';
