@@ -151,7 +151,7 @@ const SCENARIO = {
   hypotheses: [
     {
       id: 'metrics-after-sampling',
-      label: `The <code>span_metrics</code> connector now counts after <code>tail_sampling</code>: it sees every error but only ${KEEP_PCT}% of the other requests`,
+      label: 'The <code>span_metrics</code> connector counts after sampling so it misses most healthy requests',
       right: true,
       why:
         `The change at 02:04 put <code>tail_sampling</code> in the pipeline that feeds <code>span_metrics</code>. Its policies keep all ${ERRORS} errors a second and ${KEEP_PCT}% of the other ${n(HEALTHY)}, ` +
@@ -160,24 +160,26 @@ const SCENARIO = {
     },
     {
       id: 'payments-regression',
-      label: 'The payments deploy added errors',
+      label: 'The payments deploy at 02:20 added errors to checkout requests',
       right: false,
       why: `The error count is ${ERRORS} a second before and after, and the deploy was at 02:20, fifteen minutes after the ratio moved.`,
     },
     {
       id: 'traffic-fell',
-      label: 'Real traffic fell by two thirds',
+      label: 'Real traffic fell by two thirds overnight and the dashboard shows it',
       right: false,
       why: `The load balancer shows ${n(REQUESTS)} requests a second, flat. Only the span-metric rate fell.`,
     },
     {
       id: 'provider-failing',
-      label: 'The payment provider is failing more requests',
+      label: 'The payment provider is failing more requests and checkout retries raise the error ratio',
       right: false,
       why: `Its incident ended at 03:40 and the ratio did not come down. The error count is ${ERRORS} a second before and after.`,
     },
   ],
   answerAfterViews: 3,
+  hint:
+    '<p>A ratio has two parts. Check which of them moved, and compare each against a number measured somewhere else.</p>',
 };
 
 // Step 2: why the ratio moved when the count did not. `why` follows "Right." or "Not quite.".
@@ -219,9 +221,7 @@ export default {
     prefix: 'eto',
     steps: [
       {
-        intro:
-          `The checkout dashboard shows the error ratio at ${AFTER}, three times yesterday's ${BEFORE}, and the load balancer's request rate is flat. ` +
-          'Every look costs minutes of error budget. Start with the numbers, then find what changed. Open what you need, then name the cause.',
+        intro: `The checkout dashboard shows the error ratio at ${AFTER}, three times yesterday's ${BEFORE}, and the load balancer's request rate is flat. Start with the numbers, then find what changed.`,
         incident: SCENARIO,
       },
       {

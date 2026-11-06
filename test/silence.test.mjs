@@ -127,7 +127,7 @@ test('one exporter id runs through the log, the diff and the answer: the pipelin
   assert.equal(log.includes('naming one of the three pipelines (traces, metrics or logs)'), true, 'the log does not claim a fixed pipeline');
   assert.equal(log.includes('same two lines'), false, 'no claim that every restart prints identical lines');
   const right = plain(S.hypotheses.find((h) => h.id === RIGHT).label + S.hypotheses.find((h) => h.id === RIGHT).why);
-  for (const w of ['otlp_grpc/dash0-eu', 'otlp_grpc/dash0', 'service.pipelines', 'refuses to start']) assert.equal(right.includes(w), true, w);
+  for (const w of ['otlp_grpc/dash0-eu', 'otlp_grpc/dash0', 'pipelines', 'exits at validation']) assert.equal(right.includes(w), true, w);
 });
 
 test('the rollout is a minute before the silence, only eu-west has it, and the other clusters keep sending', () => {
