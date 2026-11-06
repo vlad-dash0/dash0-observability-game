@@ -238,4 +238,4 @@ Decided 2026-10-31: platform before content, so later acts are mostly content.
 5. **M4, content**: Acts 6 to 8; game instrumented into Dash0 (dogfooding); final boss.
 
 Separate track: Ask the guide (#17).
-Endgame: Act 9 (Live Demo), chained after the earlier acts (foundation: [LIVE-DEMO.md](LIVE-DEMO.md), §7).
+Endgame: Act 9 (Live Demo), chained after the earlier acts (foundation: [LIVE-DEMO.md](LIVE-DEMO.md), §7). Level 9.3 connects the game to the player's own Dash0 (or a practice one); the lab boss "It's us" will close Act 9 ([DASH0-LAB.md](DASH0-LAB.md)).

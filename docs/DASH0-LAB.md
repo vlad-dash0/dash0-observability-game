@@ -42,13 +42,20 @@ Absence is never success. Thrown error text is never passed through.
 - `emit` is a no-op unless connected and never throws (a bad draft is reported and counted dropped). Missing ids and times are filled in. The buffer holds 200 spans; more are dropped and counted. `flush` takes the buffer synchronously, so spans emitted meanwhile go in the next batch; a failed flush drops its snapshot and counts it; a flush that finishes after the config changed returns `unreachable/aborted` and touches no counter. `stats()` is `{buffered, dropped}`. `sendBatch` bypasses the buffer and rejects on an invalid draft.
 - `app.mjs` `completeLevel` emits `level.complete` (`game.level.id`, `game.act.id`, `game.level.stars` = the result's stars, `game.cards.count`, `game.debug`) and flushes without awaiting, inside try/catch with `reportError`. No request is made unless connected. Completion never waits on telemetry.
 
+## The connect level: `levels/connect-to-dash0.mjs` (9.3, PNG)
+A hand-written level (`widgets: []`, scored, no par). Screens: mode (practice, or live while `liveAvailable()`); connect (practice shows a labelled simulated settings page with the endpoint reference and a token creator; live shows where to look); connected (session id, Finish with `data-finish`, only after `accepted` and `status().state === 'connected'`).
+- Validation is `ctx.telemetry.connect` (`parseEndpoint`, `checkToken`, `checkDataset`); the level only words the reason from `REASONS`. A bad form costs one mistake per submission; an empty endpoint or token is a nudge and costs nothing.
+- Permissions of the practice token creator: Ingesting is right; All permissions and Reading each cost one mistake, once. Reading mints `PRACTICE_READ_ONLY_TOKEN`, so the test span is refused with 403.
+- Outcomes: `accepted` goes to Finish; `rejected` with `auth` costs a mistake in live mode only (practice already charged the permission pick); `rejected` without `auth` and every `unreachable` cause cost nothing and offer a retry (live unreachable also offers practice).
+- The token: the secret field (`field kind: 'secret'`, a write-only password input) is read and emptied in the same click, before validation. The shown practice token is scrubbed from the page at the same moment. After a failed send the held token is retried without retyping; to change it the player types a new one. The level file never touches storage, the URL, the console or `reportError` (`test/connect-to-dash0.test.mjs` scans its source).
+
 ## Phase ledger
 | Phase | Content | State |
 |---|---|---|
 | P1 | encoder, sender, validators, practice ingress, this doc, derived CSP test | merged (#197) |
 | P2 | `lib/telemetry.mjs`, `ctx.telemetry`, completion spans, FOUNDATION §2.6 | this PR |
 | P4 | `lib/incident-lab.mjs`: seeded incident, `answersFrom`, `gradeAnswer` | planned |
-| P3 | Act 9 level "Connect the game to Dash0" (PNG), secret field kind, connect form | planned |
+| P3 | Act 9 level 9.3 "Connect the game to Dash0" (PNG), secret field kind, connect form, practice mode | in review |
 | P5 | the lab boss "It's us" | planned |
 | P6 | fill `INGRESS_HOSTS`, `vercel.json`, cite Dash0 docs; relay only if CORS is refused | needs owner inputs |
 

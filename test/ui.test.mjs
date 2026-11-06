@@ -155,6 +155,17 @@ test('field, radio, checkbox', () => {
     '<label class="ui-check"><input type="checkbox" class="ui-check-input" id="c1" disabled><span class="ui-check-label">C</span></label>');
 });
 
+test('field kind secret: a labelled password input that never carries a value', () => {
+  const html = field({ id: 'tok', label: 'Token', kind: 'secret', noteHtml: 'Kept in memory' });
+  assert.equal(html,
+    '<div class="ui-field"><label class="ui-field-label" for="tok">Token</label>' +
+    '<input type="password" class="ui-input" id="tok" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="tok-note">' +
+    '<p class="ui-note" id="tok-note">Kept in memory</p></div>');
+  assert.ok(!/\svalue=/.test(html), 'no value attribute');
+  assert.throws(() => field({ id: 'tok', label: 'Token', kind: 'secret', value: 'auth_x' }), /field: .*secret/);
+  assert.throws(() => field({ id: 'tok', label: 'Token', kind: 'secret', readonly: true }), /field: .*secret/);
+});
+
 test('table: escaped cells, scoped headings, numeric columns', () => {
   assert.equal(table({ caption: 'Errors', head: ['service', 'count'], rows: [['a<b', 3]], numeric: [1] }),
     '<div class="ui-table-wrap"><table class="ui-table"><caption>Errors</caption><thead><tr><th scope="col">service</th>' +
