@@ -634,31 +634,31 @@ test('the globe text alternative counts levels done and names the lit regions', 
 test('acts list registry and soon acts in act order; a soon act has no level ids', () => {
   const REG9 = buildRegistry(
     [
-      { id: 'a0', no: 0, name: 'First act', sub: 'Begin', teaser: 'Learn x.', levels: [L('x', '0.1')], boss: null },
-      { id: 'a9', no: 9, name: 'Last act', levels: [L('n', '9.1')], boss: null },
+      { id: 'a0', no: 0, name: 'First act', sub: 'Begin', teaser: 'Learn x.', badges: ['dash0'], levels: [L('x', '0.1')], boss: null },
+      { id: 'a9', no: 9, name: 'Last act', badges: ['customer-calls'], levels: [L('n', '9.1')], boss: null },
     ],
     { deck: [], nodeIds: [] },
   );
   assert.deepEqual(setup({ registry: REG9, comingSoon: [S7] }).game.acts, [
-    { id: 'a0', no: 0, name: 'First act', title: 'Act 0: First act', sub: 'Begin', ids: ['x'], soon: false, teaser: 'Learn x.' },
-    { id: 's7', no: 7, name: 'Later', title: 'Act 7: Later', sub: 'Not yet', ids: [], soon: true, teaser: 'Soon.' },
-    { id: 'a9', no: 9, name: 'Last act', title: 'Act 9: Last act', sub: '', ids: ['n'], soon: false, teaser: '' },
+    { id: 'a0', no: 0, name: 'First act', title: 'Act 0: First act', sub: 'Begin', ids: ['x'], soon: false, teaser: 'Learn x.', badges: [{ id: 'dash0', label: 'Dash0', tone: 'hint' }] },
+    { id: 's7', no: 7, name: 'Later', title: 'Act 7: Later', sub: 'Not yet', ids: [], soon: true, teaser: 'Soon.', badges: [] },
+    { id: 'a9', no: 9, name: 'Last act', title: 'Act 9: Last act', sub: '', ids: ['n'], soon: false, teaser: '', badges: [{ id: 'customer-calls', label: 'From customer calls', tone: 'attention' }] },
   ]);
 });
 
 test('aboutActs: every act in act order, live and coming soon, the same titles the hub shows', () => {
   const REG9 = buildRegistry(
     [
-      { id: 'a0', no: 0, name: 'First act', sub: 'Begin', teaser: 'Learn x.', levels: [L('x', '0.1')], boss: null },
-      { id: 'a9', no: 9, name: 'Last act', levels: [L('n', '9.1')], boss: null },
+      { id: 'a0', no: 0, name: 'First act', sub: 'Begin', teaser: 'Learn x.', badges: ['dash0'], levels: [L('x', '0.1')], boss: null },
+      { id: 'a9', no: 9, name: 'Last act', badges: ['customer-calls'], levels: [L('n', '9.1')], boss: null },
     ],
     { deck: [], nodeIds: [] },
   );
   const { game } = setup({ registry: REG9, comingSoon: [S7] });
   assert.deepEqual(game.aboutActs(), [
-    { id: 'a0', title: 'Act 0: First act', sub: 'Begin', teaser: 'Learn x.', soon: false },
-    { id: 's7', title: 'Act 7: Later', sub: 'Not yet', teaser: 'Soon.', soon: true },
-    { id: 'a9', title: 'Act 9: Last act', sub: '', teaser: '', soon: false },
+    { id: 'a0', title: 'Act 0: First act', sub: 'Begin', teaser: 'Learn x.', soon: false, badges: [{ id: 'dash0', label: 'Dash0', tone: 'hint' }] },
+    { id: 's7', title: 'Act 7: Later', sub: 'Not yet', teaser: 'Soon.', soon: true, badges: [] },
+    { id: 'a9', title: 'Act 9: Last act', sub: '', teaser: '', soon: false, badges: [{ id: 'customer-calls', label: 'From customer calls', tone: 'attention' }] },
   ]);
   assert.deepEqual(game.aboutActs().map((a) => a.title), game.acts.map((a) => a.title));
 });
@@ -1121,6 +1121,26 @@ test('index.html: a soon act shows the kit chip and teaser; the legend has a soo
   const legend = shell.querySelector('.globe-legend').textContent.replace(/\s+/g, ' ').trim();
   assert.equal(legend, 'Lit: level completed Pulsing: incident open Not reached Coming soon');
   assert.ok(shell.querySelector('.globe-legend .globe-key.soon'), 'the soon key has its swatch');
+});
+
+test('index.html: the hub act card and the About list render act.badges as kit chips with x-text', () => {
+  const lists = [];
+  const collect = (root) => {
+    lists.push(...root.querySelectorAll('.act-badges'));
+    for (const t of root.querySelectorAll('template')) if (t.content) collect(t.content);
+  };
+  collect(shell);
+  assert.equal(lists.length, 2, 'one badges row on the hub card, one in the About list');
+  for (const list of lists) {
+    assert.equal(list.getAttribute('x-show'), 'act.badges.length > 0');
+    const loop = list.querySelector('template[x-for="b in act.badges"]');
+    assert.ok(loop, 'loops act.badges');
+    const chip = loop.content.querySelector('span.ui-chip');
+    assert.ok(chip, 'a kit chip');
+    assert.equal(chip.getAttribute(':data-tone'), 'b.tone');
+    assert.equal(chip.getAttribute('x-text'), 'b.label');
+    assert.equal(chip.hasAttribute('x-html'), false);
+  }
 });
 
 test('index.html: the map heading can take focus and a polite live region carries the lit note', () => {

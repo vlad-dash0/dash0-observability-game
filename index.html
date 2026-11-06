@@ -86,6 +86,7 @@
         <div class="act" :class="act.soon ? 'soon' : ''">
           <h3 class="act-title"><span x-text="act.title"></span></h3>
           <p class="act-sub" x-show="act.sub" x-text="act.sub"></p>
+          <p class="act-badges" x-show="act.badges.length > 0"><template x-for="b in act.badges" :key="b.id"><span class="ui-chip" :data-tone="b.tone" x-text="b.label"></span></template></p>
           <div class="act-soon" x-show="act.soon"><p class="act-soon-chip"><span class="ui-chip" data-tone="neutral">Coming soon</span></p><p class="act-soon-teaser" x-text="act.teaser"></p></div>
           <div class="level-list">
             <template x-for="id in act.ids" :key="id">
@@ -163,6 +164,7 @@
             <h3 x-text="act.title"></h3>
             <p class="about-sub" x-show="act.sub" x-text="act.sub"></p>
             <p x-show="act.teaser" x-text="act.teaser"></p>
+            <p class="act-badges" x-show="act.badges.length > 0"><template x-for="b in act.badges" :key="b.id"><span class="ui-chip" :data-tone="b.tone" x-text="b.label"></span></template></p>
             <p x-show="act.soon"><span class="ui-chip" data-tone="neutral">Coming soon</span></p>
           </li>
         </template>
