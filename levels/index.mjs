@@ -31,6 +31,7 @@ import distributions from './distributions.mjs';
 import errorsTripled from './errors-tripled.mjs';
 import eventsAndLinks from './events-and-links.mjs';
 import exemplars from './exemplars.mjs';
+import goodAlerts from './good-alerts.mjs';
 import headSampling from './head-sampling.mjs';
 import histograms from './histograms.mjs';
 import instruments from './instruments.mjs';
@@ -66,6 +67,7 @@ export const ACTS = [
     no: 0,
     name: 'Orientation',
     sub: 'Day one',
+    teaser: 'Monitoring vs observability, the four signals, why OpenTelemetry exists, and your first page.',
     levels: [monitoringVsObservability, theSignals, whyOpentelemetry],
     boss: thePager,
   },
@@ -74,6 +76,7 @@ export const ACTS = [
     no: 1,
     name: 'Resources and identity',
     sub: 'Who is talking?',
+    teaser: 'Say who is talking: resource attributes, service names, detectors and Kubernetes metadata.',
     levels: [resources, namingYourService, detectorsAndKubernetes],
     boss: whoIsTalking,
   },
@@ -82,6 +85,7 @@ export const ACTS = [
     no: 2,
     name: 'Traces',
     sub: 'Follow the request',
+    teaser: 'Follow a request: spans, traces, span kinds, status, context propagation, baggage, events, links and auto vs manual instrumentation.',
     levels: [spansAndTraces, spanKinds, statusAndErrors, contextPropagation, baggage, eventsAndLinks, autoVsManual],
     boss: checkoutIsSlow,
   },
@@ -90,6 +94,7 @@ export const ACTS = [
     no: 3,
     name: 'Metrics',
     sub: 'How much, how often',
+    teaser: 'Measure with metrics: instruments, temporality, histograms, PromQL, cardinality, exemplars, and the RED and USE methods.',
     levels: [instruments, temporality, histograms, promqlBasics, cardinality, exemplars, redAndUse],
     boss: theBill,
   },
@@ -98,6 +103,7 @@ export const ACTS = [
     no: 4,
     name: 'Logs',
     sub: 'What did it say?',
+    teaser: 'Make logs useful: structured logs, correlating them with traces, and collecting them.',
     levels: [structuredLogs, correlation, collectingLogs],
     boss: the3amErrors,
   },
@@ -106,6 +112,7 @@ export const ACTS = [
     no: 5,
     name: 'The Collector',
     sub: 'The plumbing',
+    teaser: 'Run the Collector: pipelines, processor order, OTLP endpoints, agent or gateway, OTTL and distributions.',
     levels: [pipelines, orderMatters, otlpEndpoints, agentVsGateway, ottlAndTransforms, distributions],
     boss: silence,
   },
@@ -114,14 +121,25 @@ export const ACTS = [
     no: 6,
     name: 'Sampling and cost',
     sub: 'You can\'t keep everything',
+    teaser: 'Keep what matters: head sampling, tail sampling, and what costs money.',
     levels: [headSampling, tailSampling, whatCostsMoney],
     boss: errorsTripled,
+  },
+  {
+    id: 'act-7',
+    no: 7,
+    name: 'Alerting and SLOs',
+    sub: 'Wake me only when it matters',
+    teaser: 'Good alerts, SLOs and error budgets, burn-rate alerts and synthetic checks.',
+    levels: [goodAlerts],
+    boss: null,
   },
   {
     id: 'act-9',
     no: 9,
     name: 'Live Demo',
     sub: 'Does that answer hold?',
+    teaser: 'Judge a confident answer about filters, tail sampling and an error rate before it goes to a customer.',
     levels: [filterOrSampler, the34PercentErrorRate],
     boss: null,
   },

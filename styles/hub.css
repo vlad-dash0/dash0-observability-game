@@ -36,7 +36,7 @@
   padding: 6px 11px; border-radius: 20px; font-weight: 700; font-size: 13px;
 }
 .star-count span:first-child { color: var(--color-accent); }
-/* The theme, Back and reward buttons are kit buttons (index.html; D3: the hub changes only its buttons). */
+/* The theme, ?, Back and reward buttons are kit buttons (index.html; D3: the hub changes only its buttons). */
 @media (max-width: 360px) {
   .brand-name span { display: none; }
 }
@@ -224,6 +224,27 @@
   color: var(--color-text); background: var(--color-surface-2); border: 1px solid var(--color-border);
   border-radius: var(--radius-sm); padding: 10px 12px;
 }
+
+/* ---------- About dialog: hub chrome that mirrors the reward card ---------- */
+.about {
+  position: fixed; inset: 0; z-index: 80; display: none;
+  background: color-mix(in srgb, var(--color-bg) 80%, transparent);
+  align-items: center; justify-content: center; padding: 16px;
+}
+.about.open { display: flex; }
+.about-card {
+  background: var(--color-surface); border: 1px solid var(--color-accent);
+  border-radius: 26px; padding: 26px 22px; max-width: 520px; width: 100%;
+  max-height: 100%; overflow: auto;
+}
+.about-card h2 { font-weight: 800; font-size: 24px; margin-bottom: 8px; }
+.about-card h2:focus { outline: none; }
+.about-card p { font-size: 14.5px; color: var(--color-text-muted); line-height: 1.5; margin-bottom: 8px; }
+.about-acts { list-style: none; margin: 12px 0 16px; padding: 0; }
+.about-acts li { padding: 10px 0; border-top: 1px solid var(--color-border); }
+.about-acts h3 { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+.about-acts p { margin-bottom: 4px; }
+.about-sub { font-weight: 600; }
 
 /* ---------- Confetti: colour by class, motion by the Web Animations API ---------- */
 .confetti {

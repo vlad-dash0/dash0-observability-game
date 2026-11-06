@@ -23,9 +23,9 @@
 <body>
 <div class="app" x-data="game" @keydown.escape.window="onEscape($event)">
 
-  <!-- The hub: inert while the level or reward dialog is open, so Tab and Enter cannot
+  <!-- The hub: inert while the level, reward or About dialog is open, so Tab and Enter cannot
        reach the cards behind it. Alpine removes the attribute when the value is false. -->
-  <div id="hub" :inert="overlayOpen || rewardOpen">
+  <div id="hub" :inert="hubInert()">
     <header class="hub-header">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">0</span>
@@ -42,6 +42,8 @@
         </div>
         <!-- The buttons in this file are the kit's (docs/DESIGN-SYSTEM.md; the one static
              place that writes ui- classes by hand): the markup lib/ui/button.mjs makes. -->
+        <button type="button" class="ui-btn ui-btn--icon" id="about-open" aria-label="How this game works"
+                title="How this game works" @click="openAbout()"><span aria-hidden="true">?</span></button>
         <button type="button" class="ui-btn ui-btn--icon" id="theme-toggle" @click="toggleTheme()" :aria-label="themeLabel()"
                 :title="themeLabel()">
           <span aria-hidden="true" x-text="theme === 'light' ? '☾' : '☀'">&#9728;</span>
@@ -82,7 +84,7 @@
       </p>
       <template x-for="act in acts" :key="act.id">
         <div class="act" :class="act.soon ? 'soon' : ''">
-          <h3 class="act-title"><span x-text="'Act ' + act.no"></span>: <span x-text="act.name"></span></h3>
+          <h3 class="act-title"><span x-text="act.title"></span></h3>
           <p class="act-sub" x-show="act.sub" x-text="act.sub"></p>
           <div class="act-soon" x-show="act.soon"><p class="act-soon-chip"><span class="ui-chip" data-tone="neutral">Coming soon</span></p><p class="act-soon-teaser" x-text="act.teaser"></p></div>
           <div class="level-list">
@@ -146,6 +148,26 @@
         </template>
       </div>
       <button type="button" class="ui-btn ui-btn--primary" id="reward-close" @click="closeReward()">Back to the map</button>
+    </div>
+  </div>
+
+  <!-- ABOUT: the game summary and each act, from act data (hub/about.mjs, createGame.aboutActs). -->
+  <div class="about" :class="aboutOpen ? 'open' : ''" x-cloak
+       role="dialog" aria-modal="true" aria-labelledby="about-title">
+    <div class="about-card">
+      <h2 id="about-title" tabindex="-1">How this game works</h2>
+      <p x-text="aboutSummary"></p>
+      <ol class="about-acts">
+        <template x-for="act in aboutActs()" :key="act.id">
+          <li>
+            <h3 x-text="act.title"></h3>
+            <p class="about-sub" x-show="act.sub" x-text="act.sub"></p>
+            <p x-show="act.teaser" x-text="act.teaser"></p>
+            <p x-show="act.soon"><span class="ui-chip" data-tone="neutral">Coming soon</span></p>
+          </li>
+        </template>
+      </ol>
+      <button type="button" class="ui-btn ui-btn--primary" id="about-close" @click="closeAbout()">Close</button>
     </div>
   </div>
 
