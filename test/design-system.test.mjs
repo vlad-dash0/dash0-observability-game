@@ -466,3 +466,9 @@ test('prose tables scroll in the kit wrap, regions and the prose column can shri
   }
   assert.equal(props('.ui-meter-cells')['grid-auto-columns'], 'minmax(0, 1fr)');
 });
+
+test('a code input never soft-wraps: it keeps its lines and scrolls sideways', () => {
+  const p = Object.fromEntries(sheetRules('kit.css').filter((r) => splitTop(r.selector).includes('.ui-input--code')).flatMap((r) => decls(r.body)));
+  assert.equal(p['white-space'], 'pre');
+  assert.equal(p['overflow-x'], 'auto');
+});
