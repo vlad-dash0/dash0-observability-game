@@ -6,17 +6,22 @@
 // Spec: https://opentelemetry.io/docs/specs/semconv/non-normative/http-migration/ , https://opentelemetry.io/docs/specs/semconv/http/http-spans/
 // Dash0 docs: https://www.dash0.com/docs/dash0/dashboards/reference-drilldown-filter-translation
 //
-// Facts used (read on the migration page, 2026-11-05, except where noted): it maps `http.method` to `http.request.method`,
-// `http.status_code` to `http.response.status_code`, `net.host.port` to `server.port` on server spans, and `http.target` to `url.path`
-// plus `url.query`; `http.route` is "No change". `OTEL_SEMCONV_STABILITY_OPT_IN` accepts `http` (emit the stable conventions and stop
-// emitting the old ones the instrumentation emitted before) and `http/dup` (emit both, for a phased rollout). The HTTP spans spec gives
-// `url.path` as the URI path component (`/search`) and `url.query` as the URI query component (`q=OpenTelemetry`, no leading `?`);
-// on server spans `client.address` is Recommended and `client.port` Opt-In ("the port of whichever client was captured in
-// `client.address`"). Dash0 page: its drilldown filter translation page says a chart's PromQL filters and series labels are
+// Facts used (read on the migration page and the HTTP spans page, 2026-11-05, except where noted): the migration page maps `http.method`
+// to `http.request.method`, `http.status_code` to `http.response.status_code`, `net.host.port` to `server.port` on server spans, and
+// `http.target` to `url.path` plus `url.query`; `http.route` is "No change"; `http.user_agent` to `user_agent.original` (the intro
+// example, not a line). `OTEL_SEMCONV_STABILITY_OPT_IN` accepts `http` (emit the stable conventions and stop emitting the old ones the
+// instrumentation emitted before) and `http/dup` (emit both, for a phased rollout). The HTTP spans page: `http.request.method` is a
+// stable name; on server spans `client.address` is Recommended ("domain name if available without reverse DNS lookup"), and
+// `http.request.header.<key>` is Opt-In, a string[], the key the normalized lowercase header name, so a `Content-Type: application/json`
+// header is `http.request.header.content-type` with value `["application/json"]` (the migration page: the dash to underscore
+// normalization was removed). Dash0 page: its drilldown filter translation page says a chart's PromQL filters and series labels are
 // OpenTelemetry attributes (`service.name`, `http.response.status_code`), written with underscores in PromQL (`service_name`). Not
 // claimed: that Dash0 reads both the old and the stable names, or that anything keeps working in Dash0 after the switch.
 //
-// Invented for the game: the company, the checkout service, the values on the span (/checkout, /checkout?step=pay, 500, 8443, gw.kettle.example, 51234) and the
+// The board is built so no namespace reads the answer: the old names are in `http.` and `net.`, and so are three stable names
+// (`http.request.method`, `http.route`, `http.request.header.content-type`). Pinned in test/spot-tells.test.mjs.
+//
+// Invented for the game: the company, the checkout service, the values on the span (/checkout, /checkout?step=pay, POST, 500, 8443, gw.kettle.example) and the
 // scenario of the week-ahead switch. Each attribute is shown as `key=value`.
 
 const SPOT = {
@@ -26,20 +31,20 @@ const SPOT = {
   lines: [
     { id: 'http-target', text: 'http.target=/checkout?step=pay' },
     { id: 'server-port', text: 'server.port=8443' },
+    { id: 'request-method', text: 'http.request.method=POST' },
     { id: 'client-address', text: 'client.address=gw.kettle.example' },
-    { id: 'url-path', text: 'url.path=/checkout' },
     { id: 'net-host-port', text: 'net.host.port=8443' },
     { id: 'route', text: 'http.route=/checkout' },
-    { id: 'client-port', text: 'client.port=51234' },
+    { id: 'request-header', text: 'http.request.header.content-type=["application/json"]' },
     { id: 'http-status-code', text: 'http.status_code=500' },
   ],
   faults: ['http-target', 'net-host-port', 'http-status-code'],
   whyNot: {
     'server-port': 'The stable name for the port the request was addressed to, usually from the Host header.',
-    'url-path': 'The stable name for the path of the URL; it stays when the opt-in is <code>http</code>.',
+    'request-method': 'The stable name for the request method. Stable names can start with <code>http.</code> too.',
     'client-address': 'Not an old name: the address of the client that sent the request, a stable name.',
     route: 'Unchanged: <code>http.route</code> keeps its name with either opt-in, so it stays. Not every name that looks old has changed.',
-    'client-port': 'Not an old name: the port of the client that sent the request.',
+    'request-header': 'A stable name: a request header, recorded as a list of values under <code>http.request.header.</code> plus the header name.',
   },
   explain:
     'Those three are the old names: <code>http.target</code> (now split into <code>url.path</code> and <code>url.query</code>), <code>net.host.port</code> (now <code>server.port</code>) and <code>http.status_code</code> (now <code>http.response.status_code</code>). ' +
@@ -84,7 +89,7 @@ export default {
     steps: [
       {
         intro:
-          'OpenTelemetry\'s HTTP semantic conventions went stable with new names: <code>http.method</code> became <code>http.request.method</code>. ' +
+          'OpenTelemetry\'s HTTP semantic conventions went stable with new names: <code>http.user_agent</code> became <code>user_agent.original</code>. ' +
           'Kettle &amp; Co\'s checkout upgraded its instrumentation and set <code>OTEL_SEMCONV_STABILITY_OPT_IN=http/dup</code>, so its HTTP spans carry the old and the stable names side by side. ' +
           'Next week the team sets it to <code>http</code>, which sends the stable names only. Here are eight attributes from one checkout server span. Each line is one attribute, as key=value.',
         question: 'Spot the attributes that stop arriving once the opt-in is set to http.',
