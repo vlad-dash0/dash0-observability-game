@@ -32,6 +32,7 @@ links level text to these anchors. "(Act N)" is where it's taught.
 - **Instrumentation scope**: the library or module that produced a piece of telemetry.
 - **Semantic conventions**: standard attribute names and meanings (`http.request.method`,
   `db.system.name`, `service.name`). Versioned. (Acts 1, 8)
+- **Stability opt-in**: `OTEL_SEMCONV_STABILITY_OPT_IN`. `http/dup` sends the old and the stable names; `http` sends only the stable names. (Act 8)
 - **Resource**: the entity producing telemetry, described by resource attributes.
   (Act 1)
 - **Resource detector**: SDK component that fills in resource attributes from the

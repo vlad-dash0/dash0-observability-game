@@ -107,7 +107,7 @@ test('step 1: a valid span board of eight attributes, hints off, faults at F...F
   assert.deepEqual(validateSpotHelps(spec), []);
   assert.deepEqual(spec.helps, { hints: false });
   assert.equal(Object.hasOwn(spec, 'hint'), false, 'no authored hint (hints off)');
-  assert.deepEqual(spec.lines.map((l) => l.id), ['http-method', 'url-path', 'request-method', 'server-port', 'http-status-code', 'route', 'response-status-code', 'net-host-port']);
+  assert.deepEqual(spec.lines.map((l) => l.id), ['http-method', 'client-port', 'request-method', 'server-port', 'http-status-code', 'route', 'response-status-code', 'net-host-port']);
   assert.deepEqual(spec.faults, ['http-method', 'http-status-code', 'net-host-port']);
   assert.equal(layout(spec), 'F...F..F');
   for (const l of spec.lines) assert.match(l.text, /^[^=\s]+=/, `${l.id} reads as key=value`);
@@ -123,9 +123,8 @@ test('step 1 oracle: an independent reading of the migration page flags exactly 
     'http.method': 'http.request.method',
     'http.status_code': 'http.response.status_code',
     'net.host.port': 'server.port',
-    'http.target': 'url.path',
   };
-  const UNCHANGED = ['http.route'];
+  const UNCHANGED = ['http.route', 'client.port']; // client.port was never one of the three renamed names
   const pairs = spec.lines.map((l) => {
     const [key, ...rest] = l.text.split('=');
     return { id: l.id, key, value: rest.join('=') };
@@ -147,7 +146,7 @@ test('step 1 oracle: an independent reading of the migration page flags exactly 
 });
 
 test('step 1 whyNot on exactly the five attributes that stay; explain names the three old names, http/dup and http.route', () => {
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['request-method', 'response-status-code', 'route', 'server-port', 'url-path']);
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['client-port', 'request-method', 'response-status-code', 'route', 'server-port']);
   for (const [id, t] of Object.entries(spec.whyNot)) assert.match(plain(t), /\S[\s\S]*\.$/, `${id} ends a sentence`);
   const e = plain(spec.explain);
   for (const s of ['http.method', 'http.status_code', 'net.host.port', 'http/dup', 'OTEL_SEMCONV_STABILITY_OPT_IN', 'http.route']) assert.equal(e.includes(s), true, s);
@@ -184,9 +183,9 @@ test('sources: the two opentelemetry.io pages, a Spec line, a cited Dash0 page b
   for (const url of SRC.match(/https:\/\/[^\s,)]+/g)) assert.equal(hosts.includes(new URL(url).host), true, url);
   // G2-b: the Dash0 sentence ships with the Dash0 semantic conventions page cited, and claims only what it says (#16).
   const copy = plain(JSON.stringify(level.play));
-  assert.deepEqual([/^\/\/ Dash0 docs: https:\/\/www\.dash0\.com\/docs\/dash0\/opentelemetry\/semconvs\/overview/m.test(SRC), /Dash0/.test(copy)], [true, true], 'a Dash0 page is cited, and it backs a Dash0 sentence in the copy');
+  assert.deepEqual([/^\/\/ Dash0 docs: https:\/\/www\.dash0\.com\/docs\/dash0\/dashboards\/reference-drilldown-filter-translation/m.test(SRC), /Dash0/.test(copy)], [true, true], 'a Dash0 page is cited, and it backs a Dash0 sentence in the copy');
   assert.doesNotMatch(copy, /work out of the box|old names keep working|reads both/i, 'not claimed: Dash0 views read the old names, or work with no change');
-  assert.equal(SRC.includes('—'), false, 'no em dash');
+  assert.equal(SRC.includes('\u2014'), false, 'no em dash');
 });
 
 // ---- the globe -----------------------------------------------------------------------------
