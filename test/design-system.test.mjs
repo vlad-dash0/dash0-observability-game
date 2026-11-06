@@ -471,4 +471,5 @@ test('a code input never soft-wraps: it keeps its lines and scrolls sideways', (
   const p = Object.fromEntries(sheetRules('kit.css').filter((r) => splitTop(r.selector).includes('.ui-input--code')).flatMap((r) => decls(r.body)));
   assert.equal(p['white-space'], 'pre');
   assert.equal(p['overflow-x'], 'auto');
+  assert.equal(p['overflow-wrap'], 'normal', 'the card-wide anywhere rule must not break its lines');
 });
