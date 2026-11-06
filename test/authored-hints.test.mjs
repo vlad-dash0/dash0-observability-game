@@ -1,6 +1,8 @@
 // Authored tier-1 hints (#190): every Sort it and Spot it step with hints on declares its own
 // `hint`, tier 1 shows exactly that (not the generic SORT_RULE / SPOT_RULE), the hint does not
-// give the answer away, and it is inline HTML, because tier 1 wraps it in a <p>.
+// give the answer away, and it is inline HTML, because tier 1 wraps it in a <p>. The six incident
+// bosses (#182) author theirs too: one paragraph, shown as written by tier 1, naming neither a clue
+// view nor the cause.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ACTS } from '../levels/index.mjs';
@@ -8,6 +10,8 @@ import { newSortState } from '../lib/widgets/sort-it.mjs';
 import { SORT_RULE, hintFor as sortHint, sortHelps } from '../lib/widgets/sort-it-help.mjs';
 import { newSpotState } from '../lib/widgets/spot-it.mjs';
 import { SPOT_RULE, hintFor as spotHint, spotHelps } from '../lib/widgets/spot-it-help.mjs';
+import { newIncident } from '../lib/widgets/incident.mjs';
+import { GENERIC_HINT, hintFor as incidentHint } from '../lib/widgets/incident-help.mjs';
 
 // The hints-on steps (test/sort-ladder.test.mjs and test/spot-ladder.test.mjs pin the ladders).
 const SORT_ON = ['0.1 mvo-sort', '0.2 sig-ask', '0.2 sig-data', '0.3 otel-parts', '1.1 res-sort', '2.3 status-sort'];
@@ -144,4 +148,96 @@ test('no Spot hint names an answer line, its id, or a timestamp, name, value or 
     if (found.length) leaks[key] = [...new Set(found)];
   }
   assert.deepEqual(leaks, {});
+});
+
+// ---- incident bosses (#182) -----------------------------------------------------------
+
+/** Every incident scenario, as { id, scenario }, from the live registry. */
+async function incidentScenarios() {
+  const out = [];
+  for (const act of ACTS) {
+    for (const level of [...act.levels, ...(act.boss ? [act.boss] : [])]) {
+      const mod = await import(`../levels/${level.id}.mjs`);
+      const step = (mod.default.play?.steps ?? []).find((st) => st.incident);
+      const scenario = step?.incident ?? mod.CONTENT?.scenario;
+      if (scenario) out.push({ id: level.id, scenario });
+    }
+  }
+  return out;
+}
+
+test('there are six incident bosses, and each declares an authored hint that tier 1 shows as written, not the generic rule', async () => {
+  const all = await incidentScenarios();
+  assert.equal(all.length, 6);
+  for (const { id, scenario } of all) {
+    assert.equal(typeof scenario.hint, 'string', `${id}: a hint`);
+    assert.notEqual(scenario.hint.trim(), '', id);
+    const { html } = incidentHint(scenario, newIncident(scenario), 1);
+    assert.equal(html, scenario.hint, id);
+    assert.equal(html.includes(GENERIC_HINT), false, `${id}: not the generic rule`);
+  }
+});
+
+test('an incident hint is one paragraph of inline HTML (the board adds only its "Hint 1 of 3" line)', async () => {
+  for (const { id, scenario } of await incidentScenarios()) {
+    assert.equal(/^<p>[^<]+(?:<(?:code|b|i)>[^<]*<\/(?:code|b|i)>[^<]*)*<\/p>$/.test(scenario.hint), true, `${id}: ${scenario.hint}`);
+  }
+});
+
+/** Words that carry no meaning of their own, so no hint leaks one. */
+const FUNCTION_WORDS = new Set(['the', 'and', 'that', 'one', 'for', 'with', 'are', 'was', 'not', 'its', 'from', 'but', 'all', 'any', 'has', 'this', 'than', 'then', 'what']);
+/** A word's root, so "changed" and "change", "logs" and "log" are one word. */
+const stem = (w) => (w.length > 4 ? w.replace(/(?:ing|ed|es|s|e)$/, '') : w);
+const wordsOfText = (text) =>
+  new Set(spoken(plain(text)).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !FUNCTION_WORDS.has(w)).map(stem));
+
+/**
+ * What `hint` gives away on `scenario`: the label of the cause or of a clue view, or a word that
+ * only that label carries. A word the alert says, or that a wrong cause or a neutral or misleading
+ * view's label also has, tells nothing.
+ */
+function incidentLeaks(scenario, hint) {
+  const text = plain(hint);
+  const right = scenario.hypotheses.find((h) => h.right);
+  const clues = scenario.views.filter((v) => v.kind === 'clue');
+  const elsewhere = new Set([
+    ...wordsOfText(`${scenario.alert.title} ${scenario.alert.html}`),
+    ...scenario.hypotheses.filter((h) => !h.right).flatMap((h) => [...wordsOfText(h.label)]),
+    ...scenario.views.filter((v) => v.kind !== 'clue').flatMap((v) => [...wordsOfText(v.label)]),
+  ]);
+  const found = [];
+  for (const label of [right.label, ...clues.map((v) => v.label)]) if (mentions(text, plain(label))) found.push(`label "${plain(label)}"`);
+  const mine = wordsOfText(text);
+  for (const [what, label] of [['cause', right.label], ...clues.map((v) => ['clue view', v.label])]) {
+    for (const w of wordsOfText(label)) if (!elsewhere.has(w) && mine.has(w)) found.push(`${what} word "${w}"`);
+  }
+  return [...new Set(found)];
+}
+
+// A hint teaches the method. It must not name the cause or a clue view.
+test('no incident hint names the cause or a clue view: not their labels, not a word only they carry', async () => {
+  const leaks = {};
+  for (const { id, scenario } of await incidentScenarios()) {
+    const found = incidentLeaks(scenario, scenario.hint);
+    if (found.length) leaks[id] = found;
+  }
+  assert.deepEqual(leaks, {});
+});
+
+test('the incident leak guard has teeth: it flags a cause label, a clue view label and a word only they carry', () => {
+  const scenario = {
+    alert: { title: 'Checkout is slow', html: '<p>The p95 is high.</p>' },
+    views: [
+      { id: 'a', label: 'Slow traces', kind: 'clue' },
+      { id: 'b', label: 'Gateway load', kind: 'neutral' },
+    ],
+    hypotheses: [
+      { id: 'r', label: 'A runaway cron job', right: true },
+      { id: 'w', label: 'The gateway is overloaded', right: false },
+    ],
+  };
+  assert.deepEqual(incidentLeaks(scenario, 'Look for a cron schedule.'), ['cause word "cron"']);
+  assert.deepEqual(incidentLeaks(scenario, 'Open the traces.'), ['clue view word "trac"']);
+  assert.deepEqual(incidentLeaks(scenario, 'Is it a runaway cron job?'), ['label "A runaway cron job"', 'cause word "runaway"', 'cause word "cron"', 'cause word "job"']);
+  assert.deepEqual(incidentLeaks(scenario, 'Find where the time goes, and what the gateway does.'), []);
 });

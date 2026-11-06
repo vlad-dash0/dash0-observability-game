@@ -52,7 +52,7 @@ const SCENARIO = {
       kind: 'clue',
       html:
         '<p>One slow <code>GET /checkout</code> trace, 2.6 s. Nearly all of it is inside inventory: its <code>GET /stock</code> SERVER span lasts 2.1 s.</p>' +
-        '<p>Under that span sit 40 <code>SELECT stock</code> CLIENT spans, one after another, about 50 ms each. Each starts when the one before it ends, and none overlap.</p>',
+        '<p>Under that span sit 40 <code>SELECT stock</code> CLIENT spans, about 50 ms each, one after another with none overlapping.</p>',
     },
     {
       id: 'triage',
@@ -109,38 +109,43 @@ const SCENARIO = {
   hypotheses: [
     {
       id: 'n-plus-one',
-      label: 'An N+1 query in inventory',
+      label: 'An N+1 query in the inventory service that runs one query per item',
       right: true,
       why: 'One request makes a query per item instead of one query for all items: 40 sequential SELECT stock CLIENT spans under one GET /stock. It started with inventory 2.4.0, which every slow request runs.',
     },
     {
       id: 'provider',
-      label: 'The payment provider is slow',
+      label: 'The payment provider is slow at p95 and drags every checkout request down with it',
       right: false,
       why: 'The slow traces spend their time in inventory, not in the call to the provider.',
     },
     {
       id: 'redis',
-      label: 'Redis is overloaded',
+      label: 'Redis is overloaded by the cart and session lookups',
       right: false,
       why: 'Redis shows no sign of load, and the slow time sits in database spans under inventory.',
     },
     {
       id: 'replicas',
-      label: 'The database needs more replicas',
+      label: 'The database needs more replicas to keep up at p95',
       right: false,
       why: 'The database is not saturated (30% CPU, replica lag near 0). More replicas would not shorten 40 queries that run one after another.',
     },
   ],
   answerAfterViews: 1,
+  hint:
+    '<p>Find where one slow request spends its time, then ask what the slow ones have in common that the fast ones do not.</p>',
 };
 
 const FINISH =
   'You found an N+1 query: inventory 2.4.0 runs one query per item, 40 sequential database CLIENT spans under one request. ' +
   'The trace showed where the time goes, and comparing slow with normal requests showed what changed.';
 
+// The scenario line on the lesson card (incidentLesson adds the generic "How this board works").
+const INTRO = 'Checkout is slow and the alert names no cause. Find where the time goes and what changed.';
+
 /** The boss's data (pinned by test/checkout-is-slow.test.mjs). */
-export const CONTENT = { scenario: SCENARIO, triage: TRIAGE, finish: FINISH };
+export const CONTENT = { scenario: SCENARIO, triage: TRIAGE, finish: FINISH, intro: INTRO };
 
 export default {
   id: 'checkout-is-slow',
@@ -158,7 +163,7 @@ export default {
   run(ctx) {
     ctx.renderStep(
       `<div class="lesson-intro">${ctx.speech(
-        incidentLesson('Checkout is slow and the error budget is burning. Every look costs minutes. Open what you need, then name the cause.'),
+        incidentLesson(INTRO),
       )}</div>
       <div class="lesson-stage">${renderIncident(SCENARIO, newIncident(SCENARIO), { escapeHtml: ctx.escapeHtml })}</div>`,
       '<button class="btn" id="cis-finish" data-finish disabled>Finish</button>',
