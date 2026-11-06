@@ -47,6 +47,7 @@ import promqlBasics from './promql-basics.mjs';
 import resources from './resources.mjs';
 import redAndUse from './red-and-use.mjs';
 import silence from './silence.mjs';
+import semanticConventionVersions from './semantic-convention-versions.mjs';
 import spanKinds from './span-kinds.mjs';
 import spansAndTraces from './spans-and-traces.mjs';
 import statusAndErrors from './status-and-errors.mjs';
@@ -132,8 +133,20 @@ export const ACTS = [
     no: 7,
     name: 'Alerting and SLOs',
     sub: 'Wake me only when it matters',
+    badges: ['dash0'],
     teaser: 'Good alerts, SLOs and error budgets, burn-rate alerts and synthetic checks.',
     levels: [goodAlerts],
+    boss: null,
+  },
+  {
+    id: 'act-8',
+    no: 8,
+    name: 'Operating at scale',
+    sub: 'As code',
+    badges: ['dash0'],
+    teaser:
+      'Dashboards as code, semantic convention upgrades, migrating vendors, browser telemetry and AI-assisted debugging.',
+    levels: [semanticConventionVersions],
     boss: null,
   },
   {
@@ -141,6 +154,7 @@ export const ACTS = [
     no: 9,
     name: 'Live Demo',
     sub: 'Does that answer hold?',
+    badges: ['customer-calls'],
     teaser: 'Judge confident answers about filters and error rates, connect the game to a Dash0 (practice works without an account), then find its incident in a trace view.',
     levels: [filterOrSampler, the34PercentErrorRate, connectToDash0],
     boss: itsUs,

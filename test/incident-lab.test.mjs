@@ -8,7 +8,7 @@ import {
   matchTraces, normaliseAnswer, QUESTION, TRACE_LIST_SIZE,
 } from '../lib/incident-lab.mjs';
 import { encodeTraces, SPAN_KIND, STATUS_CODE } from '../lib/otlp/encode.mjs';
-import { createTelemetry } from '../lib/telemetry.mjs';
+import { createTelemetry, PRACTICE_SCOPE } from '../lib/telemetry.mjs';
 import { PRACTICE_HOSTS } from '../lib/dash0/ingress.mjs';
 
 const NOW = 1762300800123;
@@ -258,7 +258,7 @@ test('telemetry.incident() is lazy, seeded by the big-endian uint32 of randomByt
   assert.equal(tel.incident(), inc);
   assert.deepEqual(asked.slice(before), [4]);
   assert.equal(reads, 1);
-  assert.ok(!JSON.stringify(inc).includes(tel.practiceCredential('ingest')));
+  assert.ok(!JSON.stringify(inc).includes(tel.practiceCredential(PRACTICE_SCOPE.ingest)));
 });
 
 test('telemetry.incident() seed reads the bytes, not the buffer: subarray and plain array', () => {
@@ -275,10 +275,10 @@ test('telemetry.incident() spans go out through sendBatch', async () => {
   const first = tel.incident();
   assert.equal(first.spans.length, 5);
   assert.equal(first.spans[0].startMs, NOW);
-  assert.ok(tel.connect({ mode: 'practice', token: tel.practiceCredential('ingest'), endpoint: `https://${PRACTICE_HOSTS[0]}` }).ok);
+  assert.ok(tel.connect({ mode: 'practice', token: tel.practiceCredential(PRACTICE_SCOPE.ingest), endpoint: `https://${PRACTICE_HOSTS[0]}` }).ok);
   assert.equal((await tel.sendTest()).kind, 'accepted');
   assert.equal((await tel.sendBatch(first.spans)).kind, 'accepted');
-  assert.ok(!JSON.stringify(tel.status()).includes(tel.practiceCredential('ingest')));
+  assert.ok(!JSON.stringify(tel.status()).includes(tel.practiceCredential(PRACTICE_SCOPE.ingest)));
 });
 
 test('normaliseAnswer: one spelling per answer, so "02" and "2" are the same retry count', () => {

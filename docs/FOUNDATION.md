@@ -61,12 +61,18 @@ plays levels synchronously, as R does).
 
 ### 2.2 Acts (`levels/index.mjs`)
 
-`export const ACTS = [{ id, no, name, sub, teaser?, levels: Level[], boss: Level | null }]`.
+`export const ACTS = [{ id, no, name, sub, teaser?, badges?, levels: Level[], boss: Level | null }]`.
 `id` kebab, unique; `no` integer ≥0, strictly increasing (gaps allowed); `levels.length ≥ 1`.
 Acts unlock by array position, unless already entered (§3). Empty `ACTS` is valid.
 `teaser` is optional plain text, one line (the About dialog shows it; every live act in
 `levels/index.mjs` has one of at most 160 characters, `test/live-registry.test.mjs`); it
 builds to `''` when absent and must be a string otherwise. `hub/coming-soon.mjs` uses the same field.
+`badges` is optional: an array of unique badge ids known to `hub/badges.mjs` (`dash0`, `customer-calls`);
+it builds to `[]` when absent, and an unknown id, a duplicate or a non-array is a registry error.
+`hub/badges.mjs` `BADGES` is the only place a label and chip tone live ("Dash0", "From customer calls").
+Acts 7 and 8 carry `dash0`, Act 9 `customer-calls`. `createGame().acts` and `aboutActs()` expose
+`badges: [{id, label, tone}]` (`[]` for a coming-soon act); the hub card and the About list render them as
+kit chips (`ui-chip`, `data-tone`) with `x-text`.
 
 ### 2.3 Nuance card (`cards/deck.mjs`)
 
@@ -78,7 +84,7 @@ non-empty string or `null`. Checked by `validateDeck`.
 
 ```
 Registry = {
-  acts:   [{ id, no, name, sub, teaser, levelIds: string[], bossId: string|null }],
+  acts:   [{ id, no, name, sub, teaser, badges: string[], levelIds: string[], bossId: string|null }],
   levels: { [id]: Level },  // null-prototype; Level = §2.1 + defaults + actId + kind:'level'|'boss';
                             // `play` is a deep-frozen copy of the declared play, or null; `mechanics` and `widgets` derived for play levels
   order:  string[],         // per act: its levels, then its boss
@@ -175,8 +181,8 @@ against `hub/map-data.mjs` `NODE_IDS`, and are no longer drawn.
 
 Act 9 (Oceania) uses its three countries: `filter-or-sampler` NZL, `the-34-percent-error-rate` AUS, `connect-to-dash0` PNG (docs/DASH0-LAB.md). `test/globe-data.test.mjs` `HOME` has a box for each. Its boss `its-us` (the lab) carries no country and pulses, then lights, the whole Oceania region like any boss.
 
-Coming soon (#177 P7): `hub/coming-soon.mjs` `COMING_SOON` lists Act 8 (`{id, no, name,
-sub, teaser}`, frozen; Act 7 left it for `ACTS` with level 7.1). It is never passed to `buildRegistry`, so unlock, progress, stars, cards
+Coming soon (#177 P7): `hub/coming-soon.mjs` `COMING_SOON` lists announced acts (`{id, no, name,
+sub, teaser}`, frozen); it is empty now, since Acts 7 and 8 left it for `ACTS` with levels 7.1 and 8.2. It is never passed to `buildRegistry`, so unlock, progress, stars, cards
 and ignite cannot see those acts. `createGame` (`comingSoon` dep) merges them into `acts` by
 `no` (`soon: true`, `ids: []`, no level to open, even in debug); `globeState` returns them in
 `soon` (never in `regions`, so they count for nothing); their region's dots are `DOT.SOON`

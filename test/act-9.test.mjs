@@ -56,22 +56,23 @@ const sort91 = S91_STEP?.sort;
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-9 "Live Demo" is the last act, after act-7, holding 9.1, 9.2 then 9.3 and the lab boss "It\'s us"', () => {
+test('act-9 "Live Demo" is the last act, after act-8, holding 9.1, 9.2 then 9.3 and the lab boss "It\'s us"', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-9');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
     { no: 9, name: 'Live Demo', sub: 'Does that answer hold?', levelIds: [ID91, ID92, ID93], bossId: BOSS },
   );
-  assert.deepEqual(LIVE.acts.map((a) => a.id).slice(-2), ['act-7', 'act-9']);
-  assert.deepEqual(LIVE.order.slice(LIVE.order.indexOf('good-alerts')), ['good-alerts', ID91, ID92, ID93, BOSS], 'act-9 plays after 7.1, last: 9.1, 9.2, 9.3, then its boss');
+  assert.deepEqual(LIVE.acts.map((a) => a.id).slice(-2), ['act-8', 'act-9']);
+  assert.deepEqual(LIVE.order.slice(LIVE.order.indexOf('semantic-convention-versions')), ['semantic-convention-versions', ID91, ID92, ID93, BOSS], 'act-9 plays after 8.2, last: 9.1, 9.2, 9.3, then its boss');
 });
 
-test('act-9 unlocks like the acts before it: open when acts 0-7 are complete, or once entered', () => {
+test('act-9 unlocks like the acts before it: open when acts 0-8 are complete, or once entered', () => {
   const index = LIVE.acts.findIndex((a) => a.id === 'act-9'); // isActUnlocked takes the position, not the number
-  assert.equal(index, 8);
-  assert.deepEqual(LIVE.acts.slice(0, 8).map((a) => a.id), ['act-0', 'act-1', 'act-2', 'act-3', 'act-4', 'act-5', 'act-6', 'act-7']);
+  assert.equal(index, 9);
+  assert.deepEqual(LIVE.acts.slice(0, 9).map((a) => a.id), ['act-0', 'act-1', 'act-2', 'act-3', 'act-4', 'act-5', 'act-6', 'act-7', 'act-8']);
   const acts0to6 = [0, 1, 2, 3, 4, 5, 6].flatMap((n) => idsOf(`act-${n}`));
-  const before = [...acts0to6, ...idsOf('act-7')];
+  const acts0to7 = [...acts0to6, ...idsOf('act-7')];
+  const before = [...acts0to7, ...idsOf('act-8')];
   assert.equal(isActUnlocked(index, progressOf(before), LIVE), true);
   assert.equal(levelState(ID, progressOf(before), LIVE), 'open');
   assert.equal(levelState(ID, progressOf([ID]), LIVE), 'done', 'completed even when earlier acts are not');
@@ -81,10 +82,12 @@ test('act-9 unlocks like the acts before it: open when acts 0-7 are complete, or
   assert.equal(levelState(ID92, progressOf([ID91]), LIVE), 'open', 'and 9.1 done opens 9.2');
   assert.equal(levelState(ID91, progressOf([ID91]), LIVE), 'done');
 
-  // LIVE-DEMO §7 option A (D1): with act-7 ahead of it, acts 0-6 alone no longer open act-9.
+  // LIVE-DEMO §7 option A (D1): with acts 7 and 8 ahead of it, acts 0-6 (or 0-7) alone no longer open act-9.
   assert.equal(isActUnlocked(index, progressOf(acts0to6), LIVE), false);
   assert.equal(levelState(ID, progressOf(acts0to6), LIVE), 'locked');
   assert.deepEqual(lockReason(ID, progressOf(acts0to6), LIVE), { kind: 'act', actId: 'act-7' });
+  assert.equal(isActUnlocked(index, progressOf(acts0to7), LIVE), false);
+  assert.deepEqual(lockReason(ID, progressOf(acts0to7), LIVE), { kind: 'act', actId: 'act-8' });
   // A player who finished 9.2 has entered act-9: every act-9 level stays open or done.
   for (const id of idsOf('act-9')) {
     const want = id === ID ? 'done' : id === BOSS ? 'locked' : 'open';
@@ -117,9 +120,9 @@ test('act-9 is complete only when all three of its levels and the boss are done'
   assert.equal(isActComplete(act, progressOf([...LEVELS9, BOSS])), true);
 });
 
-test('adding act-9 re-locks nothing in acts 0-7: every level has the state it has in a registry built without it', () => {
+test('adding act-9 re-locks nothing in acts 0-8: every level has the state it has in a registry built without it', () => {
   const without = buildRegistry(ACTS.filter((a) => a.id !== 'act-9'), { deck: DECK, nodeIds: NODE_IDS, play: { validatePlay, runPlay } });
-  const all = [0, 1, 2, 3, 4, 5, 6, 7].flatMap((n) => idsOf(`act-${n}`));
+  const all = [0, 1, 2, 3, 4, 5, 6, 7, 8].flatMap((n) => idsOf(`act-${n}`));
   const fixtures = [
     [],
     ['monitoring-vs-observability'],
@@ -140,8 +143,8 @@ test('adding act-9 re-locks nothing in acts 0-7: every level has the state it ha
   }
 });
 
-test('adding act-7 changes no state outside act-9, and locks act-9 again only for a player who finished 0-6 without entering it', () => {
-  const without = buildRegistry(ACTS.filter((a) => a.id !== 'act-7'), { deck: DECK, nodeIds: NODE_IDS, play: { validatePlay, runPlay } });
+test('adding acts 7 and 8 changes no state outside act-9, and locks act-9 again only for a player who finished 0-6 without entering it', () => {
+  const without = buildRegistry(ACTS.filter((a) => a.id !== 'act-7' && a.id !== 'act-8'), { deck: DECK, nodeIds: NODE_IDS, play: { validatePlay, runPlay } });
   const acts0to6 = [0, 1, 2, 3, 4, 5, 6].flatMap((n) => idsOf(`act-${n}`));
   const fixtures = [
     [],
@@ -156,7 +159,7 @@ test('adding act-7 changes no state outside act-9, and locks act-9 again only fo
     ['head-sampling'],
   ];
   const k = fixtures.indexOf(acts0to6);
-  assert.deepEqual(without.order, LIVE.order.filter((id) => id !== 'good-alerts'));
+  assert.deepEqual(without.order, LIVE.order.filter((id) => id !== 'good-alerts' && id !== 'semantic-convention-versions'));
   const changed = [];
   fixtures.forEach((ids, i) => {
     const p = progressOf(ids);

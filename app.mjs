@@ -10,6 +10,7 @@
 import { DECK } from './cards/deck.mjs';
 import { DOTS } from './hub/globe-data.mjs';
 import { GAME_SUMMARY } from './hub/about.mjs';
+import { badgeViews } from './hub/badges.mjs';
 import { COMING_SOON } from './hub/coming-soon.mjs';
 import { ACT_REGIONS, actOfCountry, COUNTRY_NAMES, LEVEL_COUNTRY } from './hub/globe-map.mjs';
 import { NODE_IDS } from './hub/map-data.mjs';
@@ -138,6 +139,7 @@ export function createGame(deps) {
         ids: [...a.levelIds, ...(a.bossId ? [a.bossId] : [])],
         soon: false,
         teaser: a.teaser,
+        badges: badgeViews(a.badges),
       })),
       ...comingSoon.map((a) => ({
         id: a.id,
@@ -148,6 +150,7 @@ export function createGame(deps) {
         ids: [],
         soon: true,
         teaser: a.teaser,
+        badges: [],
       })),
     ].sort((a, b) => a.no - b.no),
     overlayOpen: false,
@@ -179,6 +182,10 @@ export function createGame(deps) {
     },
 
     // ---------- derived ----------
+    // True when some act is shown as coming soon; the globe legend's "Coming soon" key hides without one.
+    hasSoon() {
+      return this.acts.some((a) => a.soon);
+    },
     get hasLevels() {
       return registry.order.length > 0;
     },
@@ -317,7 +324,7 @@ export function createGame(deps) {
     },
     // The About dialog: the game summary and one entry per act (live and coming soon), from act data.
     aboutActs() {
-      return this.acts.map((a) => ({ id: a.id, title: a.title, sub: a.sub, teaser: a.teaser, soon: a.soon }));
+      return this.acts.map((a) => ({ id: a.id, title: a.title, sub: a.sub, teaser: a.teaser, soon: a.soon, badges: a.badges }));
     },
     openAbout() {
       if (this.dialogOpen()) return false;

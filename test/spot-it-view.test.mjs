@@ -266,13 +266,29 @@ test('repeating the same wrong selection is free, neutral, and says so; a change
   check();
   assert.equal(counts.mistakes, 1);
   assert.equal(q('#bomb-wrong').textContent, '1');
-  assert.equal(feedback(), 'Same as last time: that selection is still wrong.');
+  assert.equal(feedback(), 'You already checked these lines. Nothing new was counted.');
   assert.equal(tone(), 'neutral');
   pickAll('s3');
   check();
   assert.equal(counts.mistakes, 2);
   assert.equal(q('#bomb-wrong').textContent, '2');
   assert.equal(tone(), 'error');
+});
+
+test('a wrong selection checked again after a different wrong one is a repeat: the new copy, nothing new counted', () => {
+  const { counts, mount } = setup();
+  mount();
+  pickAll('s1', 's2');
+  check();
+  click('[data-line="s2"]');
+  check();
+  assert.equal(counts.mistakes, 2);
+  pickAll('s2');
+  check();
+  assert.equal(feedback(), 'You already checked these lines. Nothing new was counted.');
+  assert.equal(tone(), 'neutral');
+  assert.equal(counts.mistakes, 2);
+  assert.equal(q('#bomb-wrong').textContent, '2');
 });
 
 test('exactly the fault set is right: explains, marks the picks correct, locks, completes once, shows the success card and focuses its heading', () => {
