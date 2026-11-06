@@ -124,6 +124,7 @@ export function playFixture() {
             dataset: 'checkout-http',
             at: 3000,
             reference: 'sum by (service) (rate(http_server_requests_total[5m]))',
+            helps: { hints: true },
             hint: 'A counter only grows: take its <code>rate</code> first.',
             explain: 'Rate turns a counter into a per-second figure; sum by keeps one series per service.',
           },

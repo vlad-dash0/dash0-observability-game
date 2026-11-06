@@ -148,7 +148,8 @@ export default {
           dataset: 'checkout-spanmetrics',
           at: 3600,
           reference: 'sum by (service_name) (rate(traces_span_metrics_calls_total{span_kind="SPAN_KIND_SERVER"}[5m]))',
-          hint: 'Select the <code>SPAN_KIND_SERVER</code> spans in braces, take the <code>rate</code>, then <code>sum by (service_name)</code>.',
+          helps: { hints: true },
+          hint: 'Count only the requests a service serves, not the calls it makes; the intro says which spans those are.',
           explain:
             'Checkout serves 12 requests per second and cart 16. Without the span kind, checkout would read 16: ' +
             'its call to the payment provider is a CLIENT span, a request it makes and not one it serves.',
@@ -169,7 +170,8 @@ export default {
           reference:
             'sum by (service_name) (rate(traces_span_metrics_calls_total{span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR"}[5m])) / ' +
             'sum by (service_name) (rate(traces_span_metrics_calls_total{span_kind="SPAN_KIND_SERVER"}[5m]))',
-          hint: 'Divide the rate of the <code>STATUS_CODE_ERROR</code> calls by the rate of all the calls, both summed by <code>service_name</code>.',
+          helps: { hints: true },
+          hint: 'A ratio is the failing requests over all requests, per service; no series says a call went OK.',
           explain:
             'Checkout fails 1 request in 12, about 8.3%, and cart 1 in 240, about 0.4%. Divide by all the calls: ' +
             'no series says OK, so a ratio against the OK calls would match nothing.',
@@ -188,7 +190,8 @@ export default {
           at: 3600,
           reference:
             'histogram_quantile(0.95, sum by (service_name, le) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind="SPAN_KIND_SERVER"}[5m])))',
-          hint: 'Keep <code>service_name</code> as well as <code>le</code> in the <code>sum by</code>, and select the SERVER spans.',
+          helps: { hints: true },
+          hint: 'The percentile recipe from 3.3, on the span histogram, for the requests a service serves.',
           explain:
             'Checkout is at 1,500 milliseconds and cart at 238: the p95 of 3.3 again, now in milliseconds and built from spans.',
         },
