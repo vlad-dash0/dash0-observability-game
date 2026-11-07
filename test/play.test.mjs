@@ -481,10 +481,10 @@ test('a configure step with an authored hint and no helps.hints fails validation
   assert.deepEqual(problems((p) => { p.steps[7].configure.helps = { hints: true, q: true }; }).length, 1);
 });
 
-test('a configure step may leave out the target, and its hint only with hints off', () => {
+test('a configure step may leave out the target, and its hint', () => {
   assert.deepEqual(problems((p) => { delete p.steps[7].configure.target; }), []);
   assert.deepEqual(problems((p) => { delete p.steps[7].configure.hint; delete p.steps[7].configure.helps; }), []);
-  assert.match(problems((p) => { delete p.steps[7].configure.hint; }).join(), /hint: required when helps\.hints is on/);
+  assert.deepEqual(problems((p) => { delete p.steps[7].configure.hint; }), [], 'hints on without an authored hint validates: tier 1 is the default rule');
 });
 
 test('no step type is reserved any more: configure is live', () => {

@@ -97,7 +97,7 @@ test('renderConfigure: labelledBy makes a labelled group; a bad token is a TypeE
   assert.throws(() => renderConfigure(fixture(), newConfigureState(), { escapeHtml, labelledBy: 'a b' }), /configure "cf": labelledBy must be a plain token/);
 });
 
-test('the reference passes: Right plus the explanation as markup, every pipeline Flowing, locked, done once, Finish focused', () => {
+test('the reference passes: Right plus the explanation as markup, every pipeline Flowing, locked, done once, the success heading focused', () => {
   const { counts, focus, swirled, mount } = setup();
   mount();
   check(REF);
@@ -406,7 +406,7 @@ test('each pipeline carries a chip in words: Flowing for one that flows, Stalled
   assert.equal(pipe('traces').querySelector('.ui-chip').getAttribute('data-tone'), 'error');
   assert.equal(stateOf('traces'), 'Stalled');
   check(REF);
-  assert.equal(pipe('traces').querySelector('.ui-chip').getAttribute('data-tone'), 'success');
+  assert.equal(pipe('traces').querySelector('.ui-chip').getAttribute('data-tone'), 'neutral');
   assert.equal(stateOf('traces'), 'Flowing');
   assert.equal(qa('#cf-pipelines [data-pipeline]').length, 1);
 });
@@ -433,7 +433,7 @@ test('hint tiers advance 1, 2, 3 and stop: the label says No more hints once spe
   click('#cf-hint');
   click('#cf-hint');
   assert.ok(q('#cf-hint-text').textContent.includes('Hint 2 of 3'));
-  assert.ok(q('#cf-hint-text').textContent.includes('In the answer, the traces pipeline lists 1 receiver'));
+  assert.ok(q('#cf-hint-text').textContent.includes('In the answer, the traces pipeline lists 1 receiver, 1 processor and 1 exporter; yours lists 1 receiver, 0 processors and 1 exporter. One name yours lists under exporters is not defined under that exact id.'));
   assert.equal(q('#cf-hint-text').textContent.includes('batch'), false, 'the shape, never the ids');
   assert.equal(counts.hints, 2);
   assert.equal(counts.done, 0);
@@ -514,7 +514,6 @@ test('after tier 3 solves the step the Hint button is spent, so Escape on the hi
 });
 
 test('the Configure it markup emits no retired class, no style attribute and no Alpine attribute', () => {
-  setup(fixture(HELPS));
   const { mount } = setup(fixture(HELPS));
   mount();
   check(GIVEN);
