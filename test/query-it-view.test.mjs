@@ -51,7 +51,7 @@ const ask = (text) => {
 const askAll = (...texts) => texts.forEach(ask);
 
 
-test('Q1 renderQuery: a labelled code textarea with no autocorrect, a Run button, a kit feedback region, in a wide split with the side column', () => {
+test('renderQuery: a labelled code textarea with no autocorrect, a Run button, a kit feedback region, in a wide split with the side column', () => {
   const { mount } = setup();
   mount();
   const input = q('#qa-input');
@@ -77,7 +77,7 @@ test('Q1 renderQuery: a labelled code textarea with no autocorrect, a Run button
   assert.equal(q('#qa-result').textContent.trim(), 'Run a query to see its result.');
 });
 
-test('Q1 renderQuery: no helps means no hint button and a tier line that says so; helps.hints adds the Hint button', () => {
+test('renderQuery: no helps means no hint button and a tier line that says so; helps.hints adds the Hint button', () => {
   setup();
   assert.equal(qa('#qa-hint').length, 0);
   assert.equal(q('#qa-hint-tier').textContent, 'No hints on this level.');
@@ -86,7 +86,7 @@ test('Q1 renderQuery: no helps means no hint button and a tier line that says so
   assert.equal(q('[data-help="hints"]').getAttribute('data-on'), 'true');
 });
 
-test('Q1 renderQuery: names the dataset and the evaluation time in the input\'s note, which describes it', () => {
+test('renderQuery: names the dataset and the evaluation time in the input\'s note, which describes it', () => {
   setup();
   assert.equal(q('#qa-input').getAttribute('aria-describedby'), 'qa-input-note');
   assert.ok(q('#qa-input-note').textContent.includes('Checkout and cart HTTP metrics'));
@@ -111,7 +111,7 @@ test('renderQuery: labelledBy makes a labelled group; a bad token is a TypeError
   assert.throws(() => renderQuery(fixture(), newQueryState(fixture()), { escapeHtml, labelledBy: 'a b' }), /query "qa": labelledBy must be a plain token/);
 });
 
-test('Q1 the supported subset is listed in the widget, every item read from SUPPORTED', () => {
+test('the supported subset is listed in the widget, every item read from SUPPORTED', () => {
   setup();
   const box = q('[data-fold="supported"]');
   assert.equal(box.localName, 'details');
@@ -125,7 +125,7 @@ test('Q1 the supported subset is listed in the widget, every item read from SUPP
   assert.ok(text.includes('reported as unsupported, not as wrong'));
 });
 
-test('Q1 the reference passes: Right plus the explanation as markup, a table of the series, locked read-only, done once, the success card focused', () => {
+test('the reference passes: Right plus the explanation as markup, a table of the series, locked read-only, done once, the success card focused', () => {
   const { counts, focus, swirled, mount } = setup();
   mount();
   ask(REF);
@@ -154,7 +154,7 @@ test('an equivalent query written differently passes too', () => {
   assert.equal(counts.done, 1);
 });
 
-test('Q1 wrong answers cost one mistake each and name the category in plain words, never the reference', () => {
+test('wrong answers cost one mistake each and name the category in plain words, never the reference', () => {
   const cases = [
     ['sum(rate(http_server_requests_total[5m]))', 'Not quite. Different series than expected: the number of series is not right.'],
     ['sum by (service) (increase(http_server_requests_total[5m]))', 'Not quite. Right shape, wrong values.'],
@@ -169,6 +169,7 @@ test('Q1 wrong answers cost one mistake each and name the category in plain word
     assert.equal(counts.done, 0);
     assert.equal(tone(), 'error', 'a wrong answer is the error tone (D7)');
     assert.equal(q('#qa-wrong').textContent, '1');
+    assert.equal(q('#qa-wrong-label').textContent, 'wrong query');
     assert.equal(q('#qa-win').hasAttribute('hidden'), true);
     assert.notEqual(q('#qa-input').readOnly, true);
     assert.equal(feedback().includes('sum by (service)'), false);
@@ -178,6 +179,18 @@ test('Q1 wrong answers cost one mistake each and name the category in plain word
   ask('sum by (status) (rate(http_server_requests_total{service="checkout"}[5m]))');
   assert.equal(feedback(), 'Not quite. Different series than expected: the labels are not right.');
   assert.equal(counts.mistakes, 1);
+});
+
+test('the wrong count label is plural from two; the hint cost follows the wrong queries', () => {
+  const { mount } = setup({ ...fixture(), ...HELPS });
+  mount();
+  ask('sum(rate(http_server_requests_total[5m]))');
+  assert.equal(q('#qa-wrong-label').textContent, 'wrong query');
+  assert.equal(q('#qa-hint-cost').textContent, 'costs 1 star');
+  ask('sum by (service) (increase(http_server_requests_total[5m]))');
+  assert.equal(q('#qa-wrong-label').textContent, 'wrong queries');
+  ask('rate(nothing_here[5m])');
+  assert.equal(q('#qa-hint-cost').textContent, 'costs no star now');
 });
 
 test('a wrong query shows its own result as a table', () => {
@@ -261,7 +274,7 @@ test('blank text is free and asks for a query', () => {
   assert.equal(counts.mistakes, 0);
 });
 
-test('Q1 the given text can be run as is, and is graded like any other', () => {
+test('the given text can be run as is, and is graded like any other', () => {
   const { counts, mount } = setup({ ...fixture(), given: 'http_server_requests_total' });
   mount();
   click('#qa-run');
@@ -269,7 +282,7 @@ test('Q1 the given text can be run as is, and is graded like any other', () => {
   assert.equal(counts.mistakes, 1);
 });
 
-test('Q3 hint tier 1 charges once per click: ctx.hint() and the score card, trusted markup, the tier line and the next button label', () => {
+test('hint tier 1 charges once per click: ctx.hint() and the score card, trusted markup, the tier line and the next button label', () => {
   const { counts, mount } = setup({ ...fixture(), ...HELPS, hint: 'Try <code>rate</code> first.' });
   mount();
   assert.equal(q('#qa-hint').textContent.trim(), 'Hint 1 of 3');
@@ -284,7 +297,7 @@ test('Q3 hint tier 1 charges once per click: ctx.hint() and the score card, trus
   assert.equal(counts.mistakes, 0);
 });
 
-test('Q3 hint tiers advance 1, 2, 3 and stop: each click is one ctx.hint(), the fourth does nothing', () => {
+test('hint tiers advance 1, 2, 3 and stop: each click is one ctx.hint(), the fourth does nothing', () => {
   const { counts, mount } = setup({ ...fixture(), ...HELPS });
   mount();
   ask('sum(rate(http_server_requests_total[5m]))');
@@ -303,8 +316,8 @@ test('Q3 hint tiers advance 1, 2, 3 and stop: each click is one ctx.hint(), the 
   assert.equal(counts.hints, 3, 'no fourth charge');
 });
 
-test('Q3 hint tier 3 fills the reference in and runs it without a mistake: neutral, success card, three hints charged', () => {
-  const { counts, swirled, mount } = setup({ ...fixture(), ...HELPS });
+test('hint tier 3 fills the reference in and runs it without a mistake: neutral, success card, three hints charged', () => {
+  const { counts, focus, swirled, mount } = setup({ ...fixture(), ...HELPS });
   mount();
   click('#qa-hint');
   click('#qa-hint');
@@ -322,9 +335,10 @@ test('Q3 hint tier 3 fills the reference in and runs it without a mistake: neutr
   assert.equal(q('#qa-win-stars').textContent, '2 of 5 stars: 0 wrong queries, 3 hints.');
   assert.equal(q('#qa-hint').disabled, true);
   assert.equal(swirled(), 1);
+  assert.equal(focus.last(), '#qa-win-title');
 });
 
-test('Q3 hint tier 2 reads the text typed now; Escape on the hint goes back to the Hint button', () => {
+test('hint tier 2 reads the text typed now; Escape on the hint goes back to the Hint button', () => {
   const { focus, mount } = setup({ ...fixture(), ...HELPS });
   mount();
   q('#qa-input').value = 'rate(nothing_here[5m])';
@@ -338,7 +352,7 @@ test('Q3 hint tier 2 reads the text typed now; Escape on the hint goes back to t
   assert.deepEqual(focus.unfocusable(), []);
 });
 
-test('Q3 the score card follows a wrong query then a hint: stars drop, and the success line counts both', () => {
+test('the score card follows a wrong query then a hint: stars drop, and the success line counts both', () => {
   const { mount } = setup({ ...fixture(), ...HELPS });
   mount();
   ask('sum(rate(http_server_requests_total[5m]))');
@@ -350,7 +364,7 @@ test('Q3 the score card follows a wrong query then a hint: stars drop, and the s
   assert.equal(qa('#qa-stars [data-star="earned"]').length, 3);
 });
 
-test('Q1 focus: the textarea on mount; a failing Run keeps focus where it is', () => {
+test('focus: the textarea on mount; a failing Run keeps focus where it is', () => {
   const { focus, mount } = setup();
   mount();
   assert.deepEqual(focus.names(), ['#qa-input']);
@@ -382,13 +396,14 @@ test('seriesText: name first, labels sorted, values quoted', () => {
   assert.equal(seriesText({ a: 'say "hi"' }), '{a="say \\"hi\\""}');
 });
 
-test('Q1 resultHtml escapes every label and value; a scalar is one captioned row; a long vector is cut with a count; none is a note', () => {
+test('resultHtml escapes every label and value; a scalar is one captioned row; a long vector is cut with a count; none is a note', () => {
   const evil = resultHtml({ kind: 'vector', series: [{ labels: { a: '<img src=x onerror=1>' }, value: 1 }] });
   assert.equal(evil.includes('<img'), false);
   assert.ok(evil.includes('&lt;img'));
   const scalar = resultHtml({ kind: 'scalar', value: 4 });
   assert.ok(scalar.includes('<caption>Query result</caption>'));
   assert.ok(scalar.includes('<td>Scalar</td><td data-num>4</td>'));
+  assert.ok(scalar.includes('>Kind</th>'));
   const many = { kind: 'vector', series: Array.from({ length: 27 }, (_, i) => ({ labels: { i: String(i) }, value: i })) };
   const html = resultHtml(many);
   assert.equal(html.split('<tr>').length - 1, 21);
@@ -418,7 +433,7 @@ test('Escape on the shown hint is handled and moves focus off it to the hint but
   assert.deepEqual(focus.unfocusable(), []);
 });
 
-test('Q1 the Query it markup emits no retired class, no style attribute and no Alpine attribute', () => {
+test('the Query it markup emits no retired class, no style attribute and no Alpine attribute', () => {
   setup({ ...fixture(), ...HELPS });
   const html = q('[data-query]').outerHTML;
   const classes = new Set(qa('[data-query], [data-query] *').flatMap((el) => (el.getAttribute('class') ?? '').split(/\s+/)));
@@ -428,7 +443,7 @@ test('Q1 the Query it markup emits no retired class, no style attribute and no A
   assert.equal(/\sstyle=|\sx-|\s@|\s:[a-z]|\son[a-z]+=/.test(html), false);
 });
 
-test('Q3 after tier 3 solves the step the Hint button is spent, so Escape on the hint goes to the read-only textarea', () => {
+test('after tier 3 solves the step the Hint button is spent, so Escape on the hint goes to the read-only textarea', () => {
   const { focus, mount } = setup({ ...fixture(), ...HELPS });
   mount();
   click('#qa-hint');
