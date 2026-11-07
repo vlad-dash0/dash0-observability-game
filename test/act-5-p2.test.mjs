@@ -321,7 +321,7 @@ test('agent config: the reference sends traces through load_balancing keyed by t
   assert.deepEqual(ref.doc.service.pipelines.metrics.exporters, ['otlp_grpc/gateway']);
   assert.equal(ref.doc.exporters.load_balancing.routing_key, 'traceID');
   assert.equal(ref.doc.exporters.load_balancing.resolver.dns.hostname, 'gateway-collector-headless');
-  assert.deepEqual(agw().uses, { traces: ['load_balancing'] });
+  assert.deepEqual(agw().uses, { traces: ['load_balancing'], metrics: ['otlp_grpc/gateway'] });
   assert.equal(Object.hasOwn(agw(), 'target'), false);
   assert.deepEqual(verdictOf(runAg(AG_REF())), { outcome: 'right', reason: undefined, unmet: undefined });
 });

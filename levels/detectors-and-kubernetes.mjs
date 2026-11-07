@@ -107,7 +107,8 @@ const CONFIG = {
   given: GIVEN,
   reference: REFERENCE,
   uses: { traces: ['k8sattributes'] },
-  hint: 'The traces pipeline already names <code>k8sattributes</code>. Look under <code>processors</code>: the Collector can only run what is defined there.',
+  helps: { hints: true },
+  hint: 'A pipeline list holds only names, and the Collector refuses a name with no definition in its section. The task wants the traces enriched, not left alone.',
   explain:
     'A processor takes effect only when it is both defined under <code>processors</code> and listed in a pipeline. ' +
     'Defined but not listed, it does nothing and the Collector starts without it; listed but not defined, the Collector refuses to start. ' +

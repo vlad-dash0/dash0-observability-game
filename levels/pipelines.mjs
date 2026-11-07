@@ -101,7 +101,8 @@ const CONFIG = {
   given: GIVEN,
   reference: REFERENCE,
   uses: { traces: ['memory_limiter'], metrics: ['memory_limiter'] },
-  hint: 'Two things are off. The Collector names an extension it does not define. And look at <code>processors</code>: is <code>memory_limiter</code> listed in either pipeline?',
+  helps: { hints: true },
+  hint: 'A component works only when it is both defined in its own section and enabled by a list under <code>service</code>. Compare the two both ways: a name listed but not defined stops the Collector, and a component defined but listed nowhere does nothing. Fix by adding what is missing, not by deleting a name.',
   explain:
     'A component takes effect only when it is both defined in its section and enabled: receivers, processors and exporters by listing them in a pipeline, ' +
     'extensions under <code>service.extensions</code>. Listed but not defined, the Collector refuses to start, as with <code>health_check</code> here. ' +
@@ -160,7 +161,7 @@ export default {
         intro:
           'The Collector ran out of memory on Friday and was killed. The platform team added a ' +
           '<code>memory_limiter</code> processor, but the Collector is still unprotected, and today it will not start.',
-        question: 'Fix the config so the Collector starts and <code>memory_limiter</code> runs in both the traces and the metrics pipeline.',
+        question: 'Fix the config so the Collector starts, <code>memory_limiter</code> runs in both the traces and the metrics pipeline, and the <code>health_check</code> extension stays enabled.',
         qid: 'pipe-q-config',
         configure: CONFIG,
       },

@@ -13,7 +13,7 @@
 // together, and traceID is not valid for metrics. The exporter type is now load_balancing; loadbalancing is a deprecated alias.
 //
 // COLLECTOR_SCHEMA (docs/M1-DESIGN.md §4.8) does not model component settings, so the configure step grades the wiring
-// (`uses` requires load_balancing in the traces pipeline) and says so; `routing_key` is graded by the last Choice step.
+// (`uses` requires load_balancing in the traces pipeline and otlp_grpc/gateway in the metrics one) and says so; `routing_key` is graded by the last Choice step.
 // Extending the schema to grade one key of one exporter was not worth it. `uses` can only require a component, not forbid
 // one, so a learner who also lists load_balancing in the metrics pipeline passes; the explain says metrics are not routed by trace ID.
 
@@ -109,8 +109,9 @@ const CONFIG = {
   schema: 'collector',
   given: GIVEN,
   reference: REFERENCE,
-  uses: { traces: ['load_balancing'] },
-  hint: 'The <code>traces</code> pipeline lists an exporter. Look under <code>exporters</code>: is it defined there?',
+  uses: { traces: ['load_balancing'], metrics: ['otlp_grpc/gateway'] },
+  helps: { hints: true },
+  hint: 'Every span of one trace has to reach the same gateway replica; metrics have no such need. That is why the traces list names an exporter of its own: give that name a definition rather than pointing traces where metrics already go.',
   explain:
     'A pipeline can only list an exporter that is defined, and one that is defined but not listed does nothing. Pointing traces at <code>otlp_grpc/gateway</code>, the Service in front of the replicas, ' +
     'would start the Collector and still split traces between them. <code>load_balancing</code> picks a replica by hashing a routing key: with <code>routing_key: traceID</code> every span of a trace goes to the same replica, ' +

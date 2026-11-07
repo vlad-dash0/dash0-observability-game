@@ -164,6 +164,7 @@ export function playFixture() {
             ].join('\n'),
             target: ['traces'],
             uses: { traces: ['batch'] },
+            helps: { hints: true },
             hint: 'Compare the exporter name in the pipeline with the one defined above it.',
             explain: 'A pipeline can only use components that are defined, and the names must match exactly.',
           },

@@ -313,14 +313,14 @@ test('validatePlay names the widgets with no hint on any step, the way each moun
   const off = structuredClone(noHint);
   off.build.helps = {};
   assert.deepEqual(hintless([off]), ['build']);
-  // Incident always has the Hint button; Query needs helps.hints, Configure an authored hint.
+  // Incident always has the Hint button; Query and Configure need helps.hints.
   assert.deepEqual(hintless([incident, query, configure]), []);
   const bare = (step, key, field) => {
     const c = structuredClone(step);
     delete c[key][field];
     return c;
   };
-  assert.deepEqual(hintless([bare(query, 'query', 'helps'), bare(configure, 'configure', 'hint')]), ['query', 'configure']);
+  assert.deepEqual(hintless([bare(query, 'query', 'helps'), bare(configure, 'configure', 'helps')]), ['query', 'configure']);
   assert.deepEqual(hintless([bare(query, 'query', 'hint')]), [], 'a query step with helps.hints has hints even with no authored hint (the widget rule)');
   const hintsOff = (step) => Object.assign(structuredClone(step), { query: { ...step.query, helps: { hints: false } } });
   assert.deepEqual(hintless([hintsOff(query)]), ['query']);
@@ -475,8 +475,16 @@ test('a spot step may declare its helps and a hint; a misspelt helps key, or a h
   }
 });
 
-test('a configure step may leave out the target and the hint', () => {
-  assert.deepEqual(problems((p) => { delete p.steps[7].configure.target; delete p.steps[7].configure.hint; }), []);
+test('a configure step with an authored hint and no helps.hints fails validation', () => {
+  const [msg] = problems((p) => { delete p.steps[7].configure.helps; });
+  assert.match(msg, /step 8 \(configure "fx-config"\): hint: shown only when helps\.hints is on/);
+  assert.deepEqual(problems((p) => { p.steps[7].configure.helps = { hints: true, q: true }; }).length, 1);
+});
+
+test('a configure step may leave out the target, and its hint only with hints off', () => {
+  assert.deepEqual(problems((p) => { delete p.steps[7].configure.target; }), []);
+  assert.deepEqual(problems((p) => { delete p.steps[7].configure.hint; delete p.steps[7].configure.helps; }), []);
+  assert.match(problems((p) => { delete p.steps[7].configure.hint; }).join(), /hint: required when helps\.hints is on/);
 });
 
 test('no step type is reserved any more: configure is live', () => {

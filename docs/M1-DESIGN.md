@@ -505,7 +505,8 @@ A non-string ref item is the schema's `wrong-type`, not a second error.
 ### 4.9 Configure it (M2, #3, part 2)
 Core `lib/widgets/configure-it.mjs`, view `lib/widgets/configure-it-view.mjs`; step type `configure`, mechanic `configure`.
 ```
-ConfigureSpec = { id, schema: name, given: yaml, reference: yaml, target?: [pipeline name], uses?: {pipeline name: [component id]}, hint?: html, explain: html }
+ConfigureSpec = { id, schema: name, given: yaml, reference: yaml, target?: [pipeline name], uses?: {pipeline name: [component id]}, hint?: html, helps?: {hints: boolean}, explain: html }
+                  // hint is tier 1, shown only when helps.hints is on; validateConfigureHelps (next to validateConfigureSpec) checks both
 SCHEMAS → {collector: COLLECTOR_SCHEMA}           // data holds the name, code holds the schema
 validateConfigureSpec(spec) → string[]            // kebab id, known schema, given/reference/explain/hint non-empty text, target a non-empty list
                                                   // of unique names; uses a non-empty mapping of pipeline name to a non-empty list of unique ids; then referenceProblems (I7: the reference passes its own checker, given does
