@@ -199,7 +199,7 @@ test('tier 2 for a missing extension names the section, never the id', () => {
   const player = REF.replace(/service:\n {2}extensions: \[health_check\]\n/, 'service:\n');
   assert.notEqual(player, REF);
   assert.equal(runConfigure(s, state(), player).reason, 'extensions');
-  assert.equal(tier2(s, player), '<p>Your pipelines flow; the Collector is missing an extension the task asks for, enabled under service.extensions.</p>');
+  assert.equal(tier2(s, player), '<p>Your pipelines flow; the task asks for an extension that yours does not enable under service.extensions.</p>');
 });
 
 test('tier 2 for a forbidden component points at the stage it sits in, never the id', async () => {
