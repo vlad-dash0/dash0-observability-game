@@ -186,7 +186,7 @@
 /* The How to play card: between the header and the level, so a step never wipes it. It keeps
    to the step's width and scrolls inside itself, so the level stays visible at 320px. */
 .howto {
-  flex: 0 0 auto; max-height: 45vh; overflow-y: auto;
+  flex: 0 0 auto; max-height: 35vh; overflow-y: auto;
   width: 100%; max-width: var(--layout-narrow); margin: 0 auto;
   padding: var(--space-3) 20px 0;
 }
