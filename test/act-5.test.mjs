@@ -250,9 +250,9 @@ test('pipelines config: memory_limiter under a pipeline stage that is not proces
   assert.deepEqual(r.result.errors.map((e) => `${e.kind} ${e.path}`), ['unknown-ref service.pipelines.traces.exporters[1]']);
 });
 
-test('pipelines config: the extension part is not what is graded: dropping the health_check line passes, the wiring is what counts', () => {
+test('pipelines config: the extension is graded: dropping the health_check line is wrong (reason extensions, #241)', () => {
   const noExt = without(REF(), 'extensions:\n  health_check:\n', '  extensions: [health_check]\n');
-  assert.equal(run(noExt).outcome, 'right');
+  assert.deepEqual(verdictOf(run(noExt)), { outcome: 'wrong', reason: 'extensions', unmet: ['extensions'] });
   // But enabling it without defining it (the given's error) never passes.
   const enabledOnly = without(REF(), 'extensions:\n  health_check:\n');
   assert.deepEqual(verdictOf(run(enabledOnly)), { outcome: 'wrong', reason: 'invalid', unmet: undefined });

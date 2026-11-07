@@ -10,7 +10,7 @@
 //
 // The configure step grades the config through COLLECTOR_SCHEMA (docs/M1-DESIGN.md §4.8), which does
 // not model component settings, so the step grades the wiring (defined, the Collector would start,
-// and `uses` requires the traces and the metrics pipeline to list memory_limiter) and says so. The
+// `uses` requires the traces and the metrics pipeline to list memory_limiter, and `extensions` requires health_check enabled under service.extensions) and says so. The
 // given's own error is the extension (enabled in `service.extensions` but not defined), so the
 // level shows both directions of the same rule: listed but not defined stops the Collector,
 // defined but not listed does nothing. Where memory_limiter sits in each list is level 5.2.
@@ -101,6 +101,7 @@ const CONFIG = {
   given: GIVEN,
   reference: REFERENCE,
   uses: { traces: ['memory_limiter'], metrics: ['memory_limiter'] },
+  extensions: ['health_check'],
   helps: { hints: true },
   hint: 'A component works only when it is both defined in its own section and enabled by a list under <code>service</code>. Compare the two both ways: a name listed but not defined stops the Collector, and a component defined but listed nowhere does nothing. Fix by adding what is missing, not by deleting a name.',
   explain:

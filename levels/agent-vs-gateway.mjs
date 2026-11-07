@@ -13,9 +13,11 @@
 // together, and traceID is not valid for metrics. The exporter type is now load_balancing; loadbalancing is a deprecated alias.
 //
 // COLLECTOR_SCHEMA (docs/M1-DESIGN.md §4.8) does not model component settings, so the configure step grades the wiring
-// (`uses` requires load_balancing in the traces pipeline and otlp_grpc/gateway in the metrics one) and says so; `routing_key` is graded by the last Choice step.
-// Extending the schema to grade one key of one exporter was not worth it. `uses` can only require a component, not forbid
-// one, so a learner who also lists load_balancing in the metrics pipeline passes; the explain says metrics are not routed by trace ID.
+// (`uses` requires load_balancing in the traces pipeline and otlp_grpc/gateway in the metrics one, `forbids` keeps otlp_grpc/gateway out of the traces list and load_balancing out of the metrics one) and says so; `routing_key` is graded by the last Choice step.
+// Extending the schema to grade one key of one exporter was not worth it. Listing load_balancing in the metrics pipeline is
+// wrong twice over: metrics must keep otlp_grpc/gateway (`uses`) and `forbids` rejects load_balancing there; the explain says metrics are not routed by trace ID.
+// Accepted gap: pipelines are graded by name, so a second pipeline (say `traces/direct`) that sends traces to otlp_grpc/gateway
+// is not caught by `forbids`; only the `traces` list is read. Not worth modelling for this level.
 
 // Step 1: the patterns. `why` follows "Right." or "Not quite.".
 const PATTERN = [
@@ -110,6 +112,7 @@ const CONFIG = {
   given: GIVEN,
   reference: REFERENCE,
   uses: { traces: ['load_balancing'], metrics: ['otlp_grpc/gateway'] },
+  forbids: { traces: ['otlp_grpc/gateway'], metrics: ['load_balancing'] },
   helps: { hints: true },
   hint: 'Every span of one trace has to reach the same gateway replica; metrics have no such need. That is why the traces list names an exporter of its own: give that name a definition rather than pointing traces where metrics already go.',
   explain:

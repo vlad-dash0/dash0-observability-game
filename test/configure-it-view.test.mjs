@@ -373,3 +373,20 @@ test('Escape on the shown hint is handled and moves focus off it; the once-only 
   assert.equal(focus.last(), '#cf-input');
   assert.deepEqual(focus.unfocusable(), []);
 });
+
+// `extensions` and `forbids` (#241): fixed messages, one mistake each, no ids.
+test('a missing extension and a forbidden component each cost one mistake, with a message that names no id', () => {
+  const ext = REF.replace('service:\n', 'service:\n  extensions: [pprof]\n').replace('processors:\n', 'extensions:\n  pprof:\nprocessors:\n');
+  const a = setup(fixture({ reference: ext, extensions: ['pprof'], given: GIVEN }));
+  a.mount();
+  check(REF);
+  assert.equal(feedback(), 'The pipelines run, but the Collector is not enabling every extension the task asks for yet.');
+  assert.equal(a.counts.mistakes, 1);
+  assert.equal(feedback().includes('pprof'), false);
+  const two = REF.replace('exporters:\n', 'exporters:\n  otlp/bad:\n');
+  const b = setup(fixture({ reference: two, forbids: { traces: ['otlp/bad'] } }));
+  b.mount();
+  check(two.replace('[otlp/dash0]', '[otlp/dash0, otlp/bad]'));
+  assert.equal(feedback(), 'The traces pipeline runs, but it does not do what the task asks yet.');
+  assert.equal(b.counts.mistakes, 1);
+});

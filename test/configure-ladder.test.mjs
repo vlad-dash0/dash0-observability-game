@@ -112,3 +112,28 @@ test('agent-vs-gateway: sending metrics through load_balancing is wrong, the ref
   const r = runConfigure(spec, newConfigureState(), shortcut);
   assert.deepEqual([r.outcome, r.reason, r.unmet], ['wrong', 'uses', ['metrics']]);
 });
+
+test('agent-vs-gateway: metrics listing the gateway Service and load_balancing is wrong (reason forbids)', () => {
+  const spec = specOf('agent-vs-gateway');
+  assert.equal(runConfigure(spec, newConfigureState(), spec.reference).outcome, 'right');
+  const both = spec.reference.replace(/(metrics:[\s\S]*?exporters: )\[otlp_grpc\/gateway\]/, '$1[otlp_grpc/gateway, load_balancing]');
+  assert.notEqual(both, spec.reference, 'the mutation changed the metrics exporters');
+  const r = runConfigure(spec, newConfigureState(), both);
+  assert.deepEqual([r.outcome, r.reason, r.unmet], ['wrong', 'forbids', ['metrics']]);
+});
+
+test('pipelines: deleting the health_check extension is wrong (reason extensions)', () => {
+  const spec = specOf('pipelines');
+  assert.equal(runConfigure(spec, newConfigureState(), spec.reference).outcome, 'right');
+  const gone = spec.reference.replace('  extensions: [health_check]\n', '');
+  assert.notEqual(gone, spec.reference);
+  assert.equal(runConfigure(spec, newConfigureState(), gone).reason, 'extensions');
+});
+
+test('agent-vs-gateway: traces listing load_balancing and the gateway Service is wrong (reason forbids)', () => {
+  const spec = specOf('agent-vs-gateway');
+  const both = spec.reference.replace('exporters: [load_balancing]', 'exporters: [load_balancing, otlp_grpc/gateway]');
+  assert.notEqual(both, spec.reference);
+  const r = runConfigure(spec, newConfigureState(), both);
+  assert.deepEqual([r.outcome, r.reason, r.unmet], ['wrong', 'forbids', ['traces']]);
+});
