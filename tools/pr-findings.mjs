@@ -14,8 +14,12 @@
 // are ignored and listed. A thread the PR's author resolved stays open unless that author
 // is trusted too (GitHub lets a PR's author resolve any thread on it). See the trust note
 // in .github/pull_request_template.md for what else an outsider can and cannot do.
+// The latest review must be of the PR head (headRefOid) or of a commit from which every
+// other commit reachable from the head (by parent links) is a merge commit; otherwise
+// "no review of head <sha>" (#65). A merge's own content is not reviewed.
 // Usage: node tools/pr-findings.mjs <pr-number> [--repo owner/name]
-// Exit: 0 PASS, 1 open findings, 2 inconclusive (API error, no review, unparseable).
+// Exit: 0 PASS, 1 open findings or no review of the head, 2 inconclusive (API error, no
+// review, unparseable, a reviewed sha that is unknown or ambiguous).
 // Needs `npm ci` (linkedom, a devDependency); the gh call is injected so the parser and
 // the decision are pure.
 import { execFile } from 'node:child_process';
@@ -500,8 +504,14 @@ const lastWritten = (c) => (c.edited == null ? time(c.at) : Math.max(time(c.at),
  * see the trust note in .github/pull_request_template.md). Any error, or no review at all, is inconclusive: the open list may then be
  * incomplete, so it never reads as PASS. Minimized comments are skipped (the override for
  * a comment the parser must not read) and returned in `skipped` so the bypass is visible.
+ * With `head` (the PR head's full sha) and `commits` (the PR's commits, in any order, as
+ * { oid, parents: [oid] }), the latest review must be of the head, or of a commit such that
+ * every PR commit reachable from the head but not from it has two or more parents;
+ * otherwise `headMissing` is set and the exit is OPEN. Reachability follows parent links
+ * inside the PR's commit set (the base branch's commits drop out), never list position.
+ * A reviewed sha matching no commit or several is an error. fetchPr always supplies both.
  */
-export function evaluate({ comments, threads }) {
+export function evaluate({ comments, threads, head, commits }) {
   const errors = [];
   const reviews = [];
   const visible = [];
@@ -554,9 +564,34 @@ export function evaluate({ comments, threads }) {
     if (!t.isResolved) open.push({ id: 'thread', severity: '', finding: t.body, where: t.where, url: t.url, note: t.note });
   }
   if (!reviews.length) errors.push('no review found: no "## Review of <sha>" comment on this PR');
+  let headMissing = null;
+  if (head !== undefined && reviews.length) {
+    const sha = reviews.at(-1).sha;
+    const hits = commits.filter((c) => c.oid.startsWith(sha));
+    if (!hits.length) errors.push(`the latest review is of ${sha}, which matches no commit of this PR`);
+    else if (hits.length > 1) errors.push(`the latest review's sha ${sha} matches ${hits.length} commits of this PR, so it cannot be told apart`);
+    else {
+      const byOid = new Map(commits.map((c) => [c.oid, c]));
+      const reach = (from) => {
+        const seen = new Set();
+        for (const todo = [from]; todo.length;) {
+          const oid = todo.pop();
+          if (seen.has(oid) || !byOid.has(oid)) continue;
+          seen.add(oid);
+          todo.push(...byOid.get(oid).parents);
+        }
+        return seen;
+      };
+      const reviewed = reach(hits[0].oid);
+      const unreviewed = [...reach(head)].filter((oid) => !reviewed.has(oid) && byOid.get(oid).parents.length < 2);
+      if (unreviewed.length) {
+        headMissing = `no review of head ${head} (the latest review is of ${sha}, and ${unreviewed.length} commit(s) reachable from the head, not all merge commits, came after it)`;
+      }
+    }
+  }
   const findings = reviews.reduce((n, r) => n + r.findings.length, 0) + threads.length;
-  const exit = errors.length ? EXIT.INCONCLUSIVE : open.length ? EXIT.OPEN : EXIT.PASS;
-  return { exit, open, errors, skipped, dispositions, reviews: reviews.length, findings };
+  const exit = errors.length ? EXIT.INCONCLUSIVE : open.length || headMissing ? EXIT.OPEN : EXIT.PASS;
+  return { exit, open, errors, skipped, dispositions, reviews: reviews.length, findings, headMissing };
 }
 
 // --- gh layer -------------------------------------------------------------------------
@@ -572,6 +607,7 @@ export function defaultGh(args) {
 const NODES = {
   comments: 'createdAt lastEditedAt isMinimized url bodyHTML author { login } authorAssociation',
   reviews: 'submittedAt createdAt lastEditedAt isMinimized url bodyHTML author { login } authorAssociation',
+  commits: 'commit { oid parents(first: 100) { totalCount nodes { oid } } }',
   reviewThreads: 'isResolved resolvedBy { login } path line comments(first: 1) { nodes { body url author { login } authorAssociation } }',
 };
 
@@ -588,7 +624,7 @@ function trusted(node, url) {
 }
 // Who opened the PR: GitHub lets them resolve any thread on it, write access or not.
 const PR_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
-  repository(owner: $owner, name: $name) { pullRequest(number: $number) { author { login } authorAssociation } } }`;
+  repository(owner: $owner, name: $name) { pullRequest(number: $number) { author { login } authorAssociation headRefOid commits { totalCount } } } }`;
 const query = (key) => `query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
   repository(owner: $owner, name: $name) { pullRequest(number: $number) {
     ${key}(first: 100, after: $endCursor) { pageInfo { hasNextPage endCursor } nodes { ${NODES[key]} } }
@@ -622,8 +658,8 @@ async function connection(gh, repo, pr, key) {
  * A missing bodyHTML is passed on as is (not as ''), so the parser reports it.
  */
 export async function fetchPr({ repo, pr, gh = defaultGh }) {
-  const [issueComments, reviews, threads] = await Promise.all(
-    ['comments', 'reviews', 'reviewThreads'].map((key) => connection(gh, repo, pr, key)));
+  const [issueComments, reviews, threads, prCommits] = await Promise.all(
+    ['comments', 'reviews', 'reviewThreads', 'commits'].map((key) => connection(gh, repo, pr, key)));
   const [owner, name] = repo.split('/');
   let prNode;
   try {
@@ -633,6 +669,20 @@ export async function fetchPr({ repo, pr, gh = defaultGh }) {
   } catch (err) {
     throw new Error(`gh api graphql pullRequest: ${err.message}`);
   }
+  const head = prNode?.headRefOid;
+  if (!/^[0-9a-f]{40}$/.test(head ?? '')) throw new Error(`the PR: no usable head sha (${head})`);
+  const commitTotal = prNode?.commits?.totalCount;
+  if (!Number.isInteger(commitTotal)) throw new Error('the PR: no commit count');
+  // GitHub lists at most 250 commits of a PR: past that the head rule cannot be decided.
+  if (prCommits.length < commitTotal) throw new Error(`the PR has ${commitTotal} commits, more than the ${prCommits.length} GitHub lists: cannot check the head rule`);
+  const commits = prCommits.map((n) => {
+    const parents = n?.commit?.parents;
+    const oid = n?.commit?.oid ?? '';
+    if (!/^[0-9a-f]{40}$/.test(oid) || !Array.isArray(parents?.nodes) || parents.nodes.length !== parents.totalCount
+      || parents.nodes.some((p) => !/^[0-9a-f]{40}$/.test(p?.oid ?? ''))) throw new Error('the PR: an unreadable commit in its commit list');
+    return { oid, parents: parents.nodes.map((p) => p.oid) };
+  });
+  if (!commits.some((c) => c.oid === head)) throw new Error(`the PR: its commit list does not contain the head ${head}`);
   const prAuthor = prNode?.author?.login;
   const prAuthorTrusted = trusted(prNode, 'the PR');
   if (!prAuthor) throw new Error('the PR: no author login');
@@ -669,6 +719,8 @@ export async function fetchPr({ repo, pr, gh = defaultGh }) {
       body: t.comments?.nodes?.[0]?.body ?? '',
     })),
     ignored,
+    head,
+    commits,
   };
 }
 
@@ -701,10 +753,13 @@ export async function run({ repo, pr, gh = defaultGh, log = console.log }) {
     const stale = f.stale ? ` (dispositioned before the review was edited at ${f.stale})` : f.note ? ` (${f.note})` : '';
     log(`OPEN ${at}${f.severity ? ` [${f.severity}]` : ''}: ${oneLine(f.finding)}${stale} ${f.url}`);
   }
+  if (result.headMissing) log(`OPEN ${result.headMissing}`);
   for (const e of result.errors) log(`ERROR ${e}`);
   const summary = `${result.findings} finding(s) in ${result.reviews} review(s)`;
   if (result.exit === EXIT.INCONCLUSIVE) log(`INCONCLUSIVE: ${result.errors.length} problem(s); ${result.open.length} open of ${summary}`);
-  else if (result.exit === EXIT.OPEN) log(`OPEN: ${result.open.length} of ${summary} have no disposition`);
+  else if (result.exit === EXIT.OPEN) {
+    log(`OPEN: ${result.headMissing ? 'no review of head; ' : ''}${result.open.length} of ${summary} have no disposition`);
+  }
   else log(`PASS: ${summary}, all dispositioned`);
   return result.exit;
 }
