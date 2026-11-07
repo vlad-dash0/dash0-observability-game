@@ -288,7 +288,6 @@ const LEGACY = {
   'levels/the-pager.mjs': ['btn', 'choice', 'choices', 'feedback', 'info', 'lesson-intro', 'lesson-stage', 'q', 'show'],
   'levels/the-signals.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'levels/why-opentelemetry.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
-  'lib/widgets/configure-it-view.mjs': ['btn', 'configure-inactive', 'configure-input', 'configure-label', 'configure-more', 'configure-note', 'feedback', 'ghost', 'info', 'show', 'small'],
   'lib/widgets/trade-off-view.mjs': ['btn', 'feedback', 'show', 'tradeoff-keeps', 'tradeoff-option'],
 };
 
