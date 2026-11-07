@@ -191,3 +191,21 @@ test('tier 3: apply is the reference and runs as right; outlines nothing', () =>
   assert.equal(h.html, '<p>Filled in for you: a config that passes.</p>');
   assert.equal(runConfigure(spec(), newConfigureState(), h.apply).outcome, 'right');
 });
+
+// ---- extensions and forbids (#241) ---------------------------------------------------------
+
+test('tier 2 for a missing extension names the section, never the id', () => {
+  const s = spec();
+  const player = REF.replace(/service:\n {2}extensions: \[health_check\]\n/, 'service:\n');
+  assert.notEqual(player, REF);
+  assert.equal(runConfigure(s, state(), player).reason, 'extensions');
+  assert.equal(tier2(s, player), '<p>Your pipelines flow; the Collector is missing an extension the task asks for, enabled under service.extensions.</p>');
+});
+
+test('tier 2 for a forbidden component points at the stage it sits in, never the id', async () => {
+  const [s] = (await configureSpecs('agent-vs-gateway')).slice(-1);
+  const player = s.reference.replace('exporters: [load_balancing]', 'exporters: [load_balancing, otlp_grpc/gateway]');
+  assert.equal(runConfigure(s, state(), player).reason, 'forbids');
+  assert.equal(tier2(s, player),
+    '<p>In the answer, the traces pipeline lists 1 receiver, 2 processors and 1 exporter; yours lists 1 receiver, 2 processors and 2 exporters. Something yours lists under exporters does not belong in this pipeline.</p>');
+});

@@ -216,3 +216,68 @@ test('a failing uses config again is a free repeat; a pipeline named only in use
 test('a config with schema errors stays invalid, before uses is considered', () => {
   assert.equal(runConfigure(usesSpec(), newConfigureState(), USES_GIVEN).reason, 'invalid');
 });
+
+// `extensions` and `forbids` (#241): an extension that must be enabled, a component a pipeline must not list.
+const EXT_REF = `extensions:
+  health_check:
+receivers:
+  otlp:
+processors:
+  batch:
+exporters:
+  otlp/dash0:
+  otlp/other:
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/dash0]
+`;
+const EXT_GIVEN = EXT_REF.replace('[otlp/dash0]', '[otlp/dash0x]');
+const extSpec = (extra = {}) => spec({ given: EXT_GIVEN, reference: EXT_REF, extensions: ['health_check'], forbids: { traces: ['otlp/other'] }, ...extra });
+
+test('extensions and forbids: the reference is right, a valid spec has no problems', () => {
+  assert.deepEqual(validateConfigureSpec(extSpec()), []);
+  assert.equal(runConfigure(extSpec(), newConfigureState(), EXT_REF).outcome, 'right');
+});
+
+test('deleting the required extension from service.extensions is wrong (reason extensions), without the id', () => {
+  const r = runConfigure(extSpec(), newConfigureState(), EXT_REF.replace('  extensions: [health_check]\n', ''));
+  assert.deepEqual([r.outcome, r.reason, r.unmet], ['wrong', 'extensions', ['extensions']]);
+  const defined = runConfigure(extSpec(), newConfigureState(), EXT_REF.replace('extensions:\n  health_check:\n', '').replace('  extensions: [health_check]\n', ''));
+  assert.equal(defined.reason, 'extensions');
+});
+
+test('listing a forbidden component in the pipeline is wrong (reason forbids) with the pipeline name', () => {
+  const r = runConfigure(extSpec(), newConfigureState(), EXT_REF.replace('[otlp/dash0]', '[otlp/other, otlp/dash0]'));
+  assert.deepEqual([r.outcome, r.reason, r.unmet], ['wrong', 'forbids', ['traces']]);
+  assert.equal(runConfigure(extSpec(), newConfigureState(), EXT_REF.replace('[otlp/dash0]', '[otlp/dash0, otlp/other]')).reason, 'forbids');
+});
+
+test('a forbidden component in another pipeline is fine, and the extension needs the exact id', () => {
+  assert.equal(runConfigure(extSpec({ forbids: { metrics: ['otlp/other'] } }), newConfigureState(), EXT_REF).outcome, 'right');
+  const renamed = EXT_REF.replaceAll('health_check', 'health_check/x');
+  assert.equal(runConfigure(extSpec(), newConfigureState(), renamed).reason, 'extensions');
+});
+
+test('extensions and forbids are checked at load: their shape and the reference', () => {
+  const cases = [
+    [{ extensions: [] }, 'extensions must be a non-empty list of component ids'],
+    [{ extensions: 'health_check' }, 'extensions must be a non-empty list of component ids'],
+    [{ extensions: [3] }, 'extensions must be a non-empty list of component ids'],
+    [{ extensions: ['health_check', 'health_check'] }, 'extensions names "health_check" twice'],
+    [{ extensions: ['pprof'] }, 'extensions: the reference does not enable "pprof"'],
+    [{ forbids: [] }, 'forbids must be a mapping of pipeline names to non-empty lists of component ids'],
+    [{ forbids: {} }, 'forbids must be a mapping of pipeline names to non-empty lists of component ids'],
+    [{ forbids: { traces: [] } }, 'forbids "traces" must be a non-empty list of component ids'],
+    [{ forbids: { traces: ['a', 'a'] } }, 'forbids "traces" names "a" twice'],
+    [{ forbids: { traces: ['otlp/dash0'] } }, 'forbids "traces": the reference lists "otlp/dash0"'],
+    [{ forbids: { logs: ['otlp/other'] } }, 'forbids "logs": the reference has no pipeline with that name'],
+  ];
+  for (const [edit, want] of cases) {
+    const got = validateConfigureSpec(extSpec(edit));
+    assert.ok(got.includes(want), `${want}\n  got: ${JSON.stringify(got)}`);
+  }
+});
