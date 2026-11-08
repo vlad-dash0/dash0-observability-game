@@ -1,4 +1,4 @@
-// Act 8 "Operating at scale" and level 8.2 "Semantic convention versions" beyond the generated
+// Act 8 "Operating at scale" (8.3 has test/migrating-vendors.test.mjs) and level 8.2 "Semantic convention versions" beyond the generated
 // play-through (test/play.test.mjs, test/answers.test.mjs, test/levels-play.test.mjs): the act's
 // place in the registry, unlock and globe; level fields; the Spot it board of eight span attributes
 // and an independent reading of each key; the "what first" Choice; and the sources. Asserts
@@ -44,12 +44,12 @@ const spotRun = (ids) => {
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-8 follows act-7, holds only 8.2, no boss, and is not coming soon; nothing is coming soon', () => {
+test('act-8 follows act-7, holds 8.2 then 8.3, no boss, and is not coming soon; nothing is coming soon', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-8');
   assert.ok(act, 'act-8 is in the registry');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 8, name: 'Operating at scale', sub: 'As code', levelIds: [ID], bossId: null },
+    { no: 8, name: 'Operating at scale', sub: 'As code', levelIds: [ID, 'migrating-vendors'], bossId: null },
   );
   const ids = LIVE.acts.map((a) => a.id);
   assert.equal(ids.indexOf('act-8'), ids.indexOf('act-7') + 1, 'act-8 comes right after act-7');
@@ -80,7 +80,8 @@ test('act-8 opens when acts 0-7 are complete, or once entered', () => {
   assert.equal(isActUnlocked(index, progressOf([ID]), LIVE), true, 'entered');
   const act = LIVE.acts[index];
   assert.equal(isActComplete(act, emptyProgress()), false);
-  assert.equal(isActComplete(act, progressOf([ID])), true, 'its one level completes it (no boss)');
+  assert.equal(isActComplete(act, progressOf([ID])), false, '8.2 alone leaves 8.3 to play');
+  assert.equal(isActComplete(act, progressOf([ID, 'migrating-vendors'])), true, 'its two levels complete it (no boss)');
 });
 
 test('8.2 fields: scored with no par time, in act-8, lights storefront, awards no card; mechanics as derived', () => {
@@ -204,12 +205,12 @@ test('sources: the two opentelemetry.io pages, a Spec line, a cited Dash0 page b
 
 // ---- the globe -----------------------------------------------------------------------------
 
-test('globe: 8.2 lights Thailand, completing Southeast Asia', () => {
+test('globe: 8.2 lights Thailand, and Southeast Asia is complete only with 8.3 (test/migrating-vendors.test.mjs)', () => {
   assert.equal(LEVEL_COUNTRY[ID], 'THA');
   assert.equal(COUNTRY_NAMES.THA, 'Thailand');
   assert.equal(ACT_REGIONS['act-8'].region, 'Southeast Asia');
   const map = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES };
   const fresh = freshlyLit(emptyProgress(), progressOf([ID]), LIVE, map);
-  assert.deepEqual(fresh, { countryIds: ['THA'], regionIds: ['act-8'] });
-  assert.equal(litText(fresh, level, map), 'Thailand is now lit: Semantic convention versions. Southeast Asia is complete.');
+  assert.deepEqual(fresh, { countryIds: ['THA'], regionIds: [] });
+  assert.equal(litText(fresh, level, map), 'Thailand is now lit: Semantic convention versions.');
 });

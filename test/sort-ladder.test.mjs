@@ -26,6 +26,7 @@ const LADDER = {
   '4.1': false,
   '5.6': false,
   '7.4': false,
+  '8.3': false,
   '9.1': false,
 };
 

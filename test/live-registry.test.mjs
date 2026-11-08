@@ -62,6 +62,7 @@ const EXPECTED_ORDER = [
   'synthetic-checks',
   'everything-is-green',
   'semantic-convention-versions',
+  'migrating-vendors',
   'filter-or-sampler',
   'the-34-percent-error-rate',
   'connect-to-dash0',
@@ -146,7 +147,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
       no: 8,
       name: 'Operating at scale',
       sub: 'As code',
-      levelIds: ['semantic-convention-versions'],
+      levelIds: ['semantic-convention-versions', 'migrating-vendors'],
       bossId: null,
     },
     {
@@ -232,6 +233,7 @@ const HINTLESS = {
   'good-alerts': ['spot'],
   'synthetic-checks': ['sort'],
   'semantic-convention-versions': ['spot'],
+  'migrating-vendors': ['sort'],
 };
 
 test('which widgets have no hints on each live level is pinned, and the how-to-play help says so', () => {
