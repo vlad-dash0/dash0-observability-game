@@ -196,7 +196,7 @@
 /* An answered card stays legible (no fade); a toggle that cannot be picked yet fades, its only
    cue (palette rule 7). */
 .ui-option:disabled { cursor: default; }
-.ui-option--toggle:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
+.ui-option--toggle:disabled, .ui-option--choice:disabled:not([data-state]) { opacity: var(--opacity-disabled); cursor: not-allowed; }
 
 /* ---------- Feedback (feedback.mjs) ---------- */
 /* One live region, three tones: the icon and its alt text say the tone, the border echoes it. */

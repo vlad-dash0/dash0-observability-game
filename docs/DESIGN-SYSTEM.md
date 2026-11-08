@@ -94,8 +94,8 @@ feeds every template, and each template is only kit helpers.
 
 States are attributes, never extra classes: `aria-pressed` (selected), `data-state` (`correct`,
 `wrong`, `locked`, `opened`), `data-hinted`, `data-tone`, `disabled`, `hidden`. Hover, focus and
-disabled each have one rule in `kit.css`; besides it, a disabled toggle option fades (its only cue),
-while an answered choice card stays legible.
+disabled each have one rule in `kit.css`; besides it, a disabled toggle option, and a disabled choice option with no `data-state`, fades (its only cue;
+Sort it's category row), while an answered choice card (it has a `data-state`) stays legible.
 
 ## Layout
 
