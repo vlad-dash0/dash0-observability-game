@@ -117,6 +117,11 @@
         </div>
       </template>
     </section>
+    <section class="save-entry" aria-labelledby="save-entry-title" x-show="!debug" x-cloak>
+      <h2 id="save-entry-title" class="section-label">Your progress</h2>
+      <p class="save-entry-text">Move it to another browser with a short code.</p>
+      <button type="button" class="ui-btn ui-btn--ghost" id="save-open" @click="openSave()">Save code</button>
+    </section>
   </div>
 
   <!-- LEVEL OVERLAY. Levels render into ov-body / ov-actions (found by id) with
@@ -196,6 +201,16 @@
         </template>
       </ol>
       <button type="button" class="ui-btn ui-btn--primary" id="about-close" @click="closeAbout()">Close</button>
+    </div>
+  </div>
+
+  <!-- SAVE CODE: its body is kit markup that lib/save-dialog.mjs draws and wires, so it has no
+       Alpine attributes. Outside #hub, like About. -->
+  <div class="save-dialog" :class="saveOpen ? 'open' : ''" x-cloak
+       role="dialog" aria-modal="true" aria-labelledby="save-title">
+    <div class="save-card">
+      <h2 id="save-title" tabindex="-1">Save code</h2>
+      <div id="save-body" x-ignore></div>
     </div>
   </div>
 

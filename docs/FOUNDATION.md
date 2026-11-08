@@ -120,6 +120,15 @@ entry). `CURRENT_VERSION = 1`; `MIGRATIONS = {}` where `MIGRATIONS[n]` maps v n 
 - With `levelIds`/`cardIds`: drop ids not in the set (the in-memory view). Without: keep
   every well-formed id (what gets persisted).
 
+**Save codes (#18)**: `lib/save-code.mjs` turns a registry-view record into `oc1.<base64url JSON>.<FNV-1a hex>`
+(`encodeProgress`) and reads one back (`decodeProgress` → `{ok, progress, dropped}` or `{ok: false, reason}`,
+reason one of `empty`, `format`, `version`, `checksum`, `shape`; whole or nothing, never throws; ids the
+registry lacks are dropped and counted). The checksum catches typos and cut-off copies, not edits. `previewImport`
+lists what a merge would add or improve and which levels keep better local stars; the merge itself is `mergeProgress`,
+so the F4 rules hold (best stars, earliest `at`, card union, never a downgrade). The hub's "Save code" dialog
+(`lib/save-view.mjs` markup, `lib/save-dialog.mjs` wiring, `createGame.openSave`) shows the preview before Import
+and saves through `saveProgress`. `?mode=debug` hides the entry and refuses to open it: nothing is exported or imported.
+
 ### 2.6 ctx (`createLevelContext({level, ovBody, ovActions, now, shuffle, reduceMotion, onFinish, signal, reportError?, telemetry?})`)
 
 ```
@@ -243,6 +252,7 @@ builds run side by side, only the current build's registry is protected at the c
 | `scoreStars`, `MAX_STARS` | `lib/scoring.mjs` |
 | `createLevelContext` | `lib/level-context.mjs` |
 | `emptyProgress`, `sanitizeProgress`, `registryIds(registry)` → `{levelIds, cardIds}` (the `keep` ids), `migrate(raw, {current, migrations})` → migrated record, `raw` if at/past `current`, or `null` (corrupt), `mergeProgress(a, b, {keep}?)`, `recordCompletion(progress, levelId, {stars, cards, at}, registry)` → `{progress, firstCompletion, newBest, newCards}`, `starTotals` → `{earned, max}`, `cardTotals` → `{earned, max}` | `lib/progress.mjs` |
+| `encodeProgress`, `decodeProgress`, `previewImport`, `REFUSALS` (save codes, #18) | `lib/save-code.mjs` |
 | `isCompleted`, `isActComplete`, `isActUnlocked`, `levelState`, `lockReason` | `lib/unlock.mjs` |
 | `loadProgress(storageGetter, registry)` → `{status, progress}` (`TypeError` before any read without a registry), `saveProgress(storageGetter, progress, registry)` → `{saved, reason?, progress}` (`progress` is always the registry view; `TypeError` before any storage access without a registry) | `lib/storage.mjs` |
 | `resolveTheme`, `readTheme(getter)`, `writeTheme(getter, t)` | `lib/theme.mjs` |
