@@ -169,8 +169,8 @@ test('6.1 and 6.2 cards: front, back, spec URL and Dash0 angle are pinned; front
 
 const hs = () => stepOf('head-sampling', 'tradeoff', 'hs-plan');
 const option = (spec, knob, id) => spec.knobs.find((k) => k.id === knob).options.find((o) => o.id === id);
-const HS = { sampler: 'ratio-10pct' };
-const hsPlan = (id) => ({ sampler: id });
+const HS = { root: 'ratio-10pct', children: 'follow' };
+const hsPlan = (root, children = 'follow') => ({ root, children });
 const play = (spec, picks) => {
   let state = newTradeoffState(spec);
   for (const [knob, opt] of Object.entries(picks)) state = pickOption(spec, state, knob, opt).state;
@@ -195,17 +195,21 @@ test('head sampling: the table behind the copy, recomputed: 12 spans a trace, 4,
   assert.deepEqual(validateTradeoffSpec(spec), []);
   assert.equal(spec.unit, 'spans/s');
   assert.equal(spec.cap, 600);
-  assert.equal(option(spec, 'sampler', 'defaults').cost, 4800);
-  assert.equal(option(spec, 'sampler', 'ratio-1pct').cost, 48);
-  assert.equal(option(spec, 'sampler', 'ratio-10pct').cost, 480);
-  assert.equal(option(spec, 'sampler', 'children-always-on').cost, 480 + 2880);
-  assert.deepEqual(spec.knobs[0].options.map((o) => o.id), ['defaults', 'ratio-1pct', 'ratio-10pct', 'children-always-on'], 'no option about a child traceidratio: the level teaches always_on against ParentBased');
+  assert.equal(option(spec, 'root', 'defaults').cost, 4800);
+  assert.equal(option(spec, 'root', 'ratio-1pct').cost, 48);
+  assert.equal(option(spec, 'root', 'ratio-10pct').cost, 480);
+  assert.equal(option(spec, 'root', 'ratio-25pct').cost, 1200);
+  assert.equal(option(spec, 'root', 'ratio-50pct').cost, 2400);
+  assert.equal(option(spec, 'children', 'always-on').cost, 2880);
+  assert.equal(option(spec, 'children', 'follow').cost, 0);
+  assert.deepEqual(spec.knobs[0].options.map((o) => o.id), ['defaults', 'ratio-1pct', 'ratio-10pct', 'ratio-25pct', 'ratio-50pct']);
+  assert.deepEqual(spec.knobs[1].options.map((o) => o.id), ['always-on', 'follow'], 'no option about a child traceidratio: the level teaches always_on against ParentBased');
   const intro = plain(LIVE.levels['head-sampling'].play.steps[0].intro);
   for (const w of ['400 traces', '12 spans', '4,800 spans', '600 spans', 'storefront', 'checkout', 'payments']) assert.equal(intro.includes(w), true, w);
   assert.equal(/authored|not run|does not run|simulat/.test(intro + plain(spec.explain)), true, 'the copy says the arithmetic is worked out, not run by an engine');
 });
 
-test('head sampling: exactly one plan passes, the one-in-ten ParentBased setup on every service, at 480 of 600 spans/s', () => {
+test('head sampling: exactly one plan passes, one in ten at the root with the children following it, 480 of 600 spans/s', () => {
   const spec = hs();
   assert.deepEqual(spec.answer, HS);
   const plans = allPlans(spec).map((picks) => ({ picks, ...evaluatePlan(spec, picks) }));
@@ -217,10 +221,11 @@ test('head sampling: exactly one plan passes, the one-in-ten ParentBased setup o
 
 test('head sampling: every shortcut fails the real grader for its own reason', () => {
   const spec = hs();
-  const run = (id) => verdictOf(play(spec, hsPlan(id)));
-  assert.deepEqual(run('defaults'), { outcome: 'wrong', total: 4800, over: 4200, lost: [] }, 'sampling everything keeps every need and blows the budget');
-  assert.deepEqual(run('ratio-1pct'), { outcome: 'wrong', total: 48, over: 0, lost: ['enough-traces'] }, 'cheap and too few traces');
-  assert.deepEqual(run('children-always-on'), { outcome: 'wrong', total: 3360, over: 2760, lost: ['whole-traces'] }, 'children that ignore the parent: holes and over budget');
+  const run = (root, children) => verdictOf(play(spec, hsPlan(root, children)));
+  assert.deepEqual(run('defaults', 'follow'), { outcome: 'wrong', total: 4800, over: 4200, lost: [] }, 'sampling everything keeps every need and blows the budget');
+  assert.deepEqual(run('ratio-1pct', 'follow'), { outcome: 'wrong', total: 48, over: 0, lost: ['enough-traces'] }, 'cheap and too few traces');
+  assert.deepEqual(run('ratio-25pct', 'follow'), { outcome: 'wrong', total: 1200, over: 600, lost: [] }, 'more traces than the team needs, over the budget');
+  assert.deepEqual(run('ratio-10pct', 'always-on'), { outcome: 'wrong', total: 3360, over: 2760, lost: ['whole-traces'] }, 'children that ignore the parent: holes and over budget');
 });
 
 test('head sampling: a plan with nothing picked is incomplete and free, and a repeated wrong plan is a repeat', () => {
@@ -233,13 +238,13 @@ test('head sampling: a plan with nothing picked is incomplete and free, and a re
 
 test('head sampling: the nuance is graded: the wrong options say why a child that decides on its own breaks traces', () => {
   const spec = hs();
-  const alwaysOn = plain(spec.whyNot['sampler:children-always-on']);
+  const alwaysOn = plain(spec.whyNot['children:always-on']);
   for (const w of ['360 traces', '8 spans', '2,880', 'root', 'holes']) assert.equal(alwaysOn.includes(w), true, w);
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['sampler:children-always-on', 'sampler:defaults', 'sampler:ratio-1pct']);
-  const label = plain(option(spec, 'sampler', 'children-always-on').label);
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['children:always-on', 'root:defaults', 'root:ratio-1pct', 'root:ratio-25pct', 'root:ratio-50pct']);
+  const label = plain(option(spec, 'children', 'always-on').label);
   assert.equal(label.includes('always_on'), true);
-  assert.equal(label.includes('3,360'), true);
-  assert.equal(plain(option(spec, 'sampler', 'defaults').label).includes('parentbased_always_on'), true, 'the default sampler is named');
+  assert.equal(label.includes('2,880'), true);
+  assert.equal(plain(option(spec, 'root', 'defaults').label).includes('parentbased_always_on'), true, 'the default sampler is named');
 });
 
 test('head sampling: the closing Choice grades the nuance in words: a child that decides on its own, not the root\'s flag, breaks traces', () => {
@@ -262,7 +267,8 @@ test('head sampling: the closing Choice grades the nuance in words: a child that
 
 test('head sampling: the explain states the plan, the env vars, and what head sampling cannot do', () => {
   const t = plain(hs().explain);
-  for (const w of ['480 of 600', 'OTEL_TRACES_SAMPLER', 'OTEL_TRACES_SAMPLER_ARG', 'parentbased_traceidratio', 'sampled flag', 'cannot', 'errors', 'tail sampling']) {
+  assert.equal(/of 600/.test(t), false, 'the widget already says what the plan costs');
+  for (const w of ['40 of 400', 'OTEL_TRACES_SAMPLER', 'OTEL_TRACES_SAMPLER_ARG', 'parentbased_traceidratio', 'sampled flag', 'cannot', 'errors', 'tail sampling']) {
     assert.equal(t.includes(w), true, w);
   }
 });
@@ -270,7 +276,7 @@ test('head sampling: the explain states the plan, the env vars, and what head sa
 // ---- 6.2 Tail sampling: the trade-off -----------------------------------------------
 
 const ts = () => stepOf('tail-sampling', 'tradeoff', 'ts-budget');
-const TS = { policies: 'errors-slow-baseline', wait: 'wait-30s' };
+const TS = { wait: 'wait-25s', policies: 'errors-slow', baseline: 'baseline-5pct' };
 const MIB_PER_TRACE = 0.05;
 const KEPT_ERRORS = TRACES * 0.02;
 const KEPT_SLOW = TRACES * 0.03;
@@ -279,57 +285,58 @@ const KEPT = KEPT_ERRORS + KEPT_SLOW + KEPT_BASELINE;
 
 test('tail sampling: the table behind the copy, recomputed: 400 traces/s held for the wait at 0.05 MiB each, 39 of 400 kept', () => {
   assert.deepEqual([KEPT_ERRORS, KEPT_SLOW, KEPT_BASELINE, KEPT], [8, 12, 19, 39]);
-  assert.equal(TRACES * 10 * MIB_PER_TRACE, 200);
-  assert.equal(TRACES * 30 * MIB_PER_TRACE, 600);
-  assert.equal(TRACES * 120 * MIB_PER_TRACE, 2400);
-  assert.equal(TRACES * 30 < 50000, true, '12,000 traces held is under the default num_traces of 50,000');
+  const held = (seconds) => TRACES * seconds * MIB_PER_TRACE;
+  const sent = (traces) => traces * 10 * MIB_PER_TRACE; // a kept trace is held 10 s more, until it is sent
+  assert.deepEqual([5, 10, 15, 25, 30].map(held), [100, 200, 300, 500, 600]);
+  assert.equal(TRACES * 25 < 50000, true, '10,000 traces held is under the default num_traces of 50,000');
   const spec = ts();
   assert.deepEqual(validateTradeoffSpec(spec), []);
   assert.equal(spec.unit, 'MiB');
-  assert.equal(spec.cap, 1000);
-  assert.equal(option(spec, 'wait', 'wait-10s').cost, 200);
-  assert.equal(option(spec, 'wait', 'wait-30s').cost, 600);
-  assert.equal(option(spec, 'wait', 'wait-120s').cost, 2400);
-  for (const o of spec.knobs.find((k) => k.id === 'policies').options) assert.equal(o.cost, 0, `${o.id}: the policies do not change what is held while waiting`);
-  assert.equal(plain(option(spec, 'policies', 'errors-slow-baseline').label).includes('39 of 400'), true);
-  assert.equal(plain(option(spec, 'policies', 'errors-slow').label).includes('20 of 400'), true);
-  assert.equal(plain(option(spec, 'policies', 'probabilistic').label).includes('40 of 400'), true);
+  assert.equal(spec.cap, 550);
+  for (const [id, s] of [['wait-5s', 5], ['wait-10s', 10], ['wait-15s', 15], ['wait-25s', 25], ['wait-30s', 30]]) assert.equal(option(spec, 'wait', id).cost, held(s), id);
+  assert.equal(option(spec, 'policies', 'errors').cost, sent(8));
+  assert.equal(option(spec, 'policies', 'errors-slow').cost, sent(20));
+  assert.equal(option(spec, 'policies', 'everything').cost, sent(400));
+  assert.equal(option(spec, 'baseline', 'no-baseline').cost, 0);
+  assert.equal(option(spec, 'baseline', 'baseline-5pct').cost, sent(19));
+  assert.equal(option(spec, 'baseline', 'baseline-25pct').cost, sent(95));
+  assert.equal(plain(option(spec, 'policies', 'errors-slow').label).includes('20 traces/s kept'), true);
+  assert.equal(plain(option(spec, 'baseline', 'baseline-5pct').label).includes('19 traces/s kept'), true);
+  assert.equal(plain(option(spec, 'baseline', 'baseline-25pct').label).includes('95 traces/s kept'), true);
   const intro = plain(LIVE.levels['tail-sampling'].play.steps[0].intro);
-  for (const w of ['400 new traces', '20 seconds', '2%', '3%', '1,000 MiB', 'decision_wait', '30 seconds']) assert.equal(intro.includes(w), true, w);
+  for (const w of ['400 new traces', '20 seconds', '2%', '3%', '550 MiB', 'decision_wait', '30 seconds', '10 seconds more']) assert.equal(intro.includes(w), true, w);
 });
 
-test('tail sampling: exactly one plan passes: errors, slow and a baseline, with a 30 s wait, at 600 of 1,000 MiB', () => {
+test('tail sampling: exactly one plan passes: errors and slow, a 5% baseline and a 25 s wait, at 519.5 of 550 MiB', () => {
   const spec = ts();
   assert.deepEqual(spec.answer, TS);
   const plans = allPlans(spec).map((picks) => ({ picks, ...evaluatePlan(spec, picks) }));
   const passing = plans.filter((p) => p.over === 0 && p.lost.length === 0);
   assert.deepEqual(passing.map((p) => p.picks), [TS]);
-  assert.equal(passing[0].total, 600);
-  assert.deepEqual(verdictOf(play(spec, TS)), { outcome: 'right', total: 600, over: 0, lost: [] });
+  assert.equal(passing[0].total, 519.5);
+  assert.deepEqual(verdictOf(play(spec, TS)), { outcome: 'right', total: 519.5, over: 0, lost: [] });
 });
 
 test('tail sampling: every shortcut fails the real grader for its own reason', () => {
   const spec = ts();
-  const run = (policies, wait) => verdictOf(play(spec, { policies, wait }));
-  assert.deepEqual(run('errors-slow-baseline', 'wait-10s'), { outcome: 'wrong', total: 200, over: 0, lost: ['whole-traces'] }, 'cheap, and decides before the 20 s traces are whole');
-  assert.deepEqual(run('errors-slow-baseline', 'wait-120s'), { outcome: 'wrong', total: 2400, over: 1400, lost: [] }, 'a wait far longer than needed is the memory bill');
-  assert.deepEqual(run('probabilistic', 'wait-30s'), { outcome: 'wrong', total: 600, over: 0, lost: ['errors-kept', 'slow-kept'] }, 'a plain ratio is head sampling again: it drops the errors and the slow traces');
-  assert.deepEqual(run('errors-slow', 'wait-30s'), { outcome: 'wrong', total: 600, over: 0, lost: ['baseline-kept'] }, 'no healthy baseline to compare against');
-  assert.deepEqual(run('errors-slow', 'wait-10s'), { outcome: 'wrong', total: 200, over: 0, lost: ['baseline-kept', 'whole-traces'] });
-  assert.deepEqual(run('probabilistic', 'wait-120s'), { outcome: 'wrong', total: 2400, over: 1400, lost: ['errors-kept', 'slow-kept'] });
+  const run = (wait, policies, baseline) => verdictOf(play(spec, { wait, policies, baseline }));
+  assert.deepEqual(run('wait-30s', 'errors-slow', 'baseline-5pct'), { outcome: 'wrong', total: 619.5, over: 69.5, lost: [] }, 'the default wait keeps every need and is over the memory');
+  assert.deepEqual(run('wait-15s', 'errors-slow', 'baseline-5pct'), { outcome: 'wrong', total: 319.5, over: 0, lost: ['whole-traces'] }, 'cheap, and decides before the 20 s traces are whole');
+  assert.deepEqual(run('wait-25s', 'everything', 'no-baseline'), { outcome: 'wrong', total: 700, over: 150, lost: [] }, 'keeping every trace is no sampling and over the memory');
+  assert.deepEqual(run('wait-25s', 'errors', 'baseline-5pct'), { outcome: 'wrong', total: 513.5, over: 0, lost: ['slow-kept'] }, 'the slow traces are dropped');
+  assert.deepEqual(run('wait-25s', 'errors-slow', 'no-baseline'), { outcome: 'wrong', total: 510, over: 0, lost: ['baseline-kept'] }, 'no healthy baseline to compare against');
+  assert.deepEqual(run('wait-25s', 'errors-slow', 'baseline-25pct'), { outcome: 'wrong', total: 557.5, over: 7.5, lost: [] }, 'a bigger baseline than needed tips it over');
 });
 
-test('tail sampling: the trade-off teaches the cost: the wait holds traces in memory, policies do not, and late spans are named', () => {
+test('tail sampling: the trade-off teaches the cost: the wait holds traces in memory, the 20 s traces set how long, and late spans are named', () => {
   const spec = ts();
   const t = plain(spec.explain);
-  for (const w of ['600 of 1,000 MiB', '12,000 traces', 'num_traces', '50,000', 'decision_wait', 'whichever policies', 'late']) assert.equal(t.includes(w), true, w);
-  const long = plain(spec.whyNot['wait:wait-120s']);
-  for (const w of ['48,000', '2,400']) assert.equal(long.includes(w), true, w);
-  assert.equal(TRACES * 120 > 50000, false, '48,000 held traces fit the default num_traces of 50,000');
-  assert.equal(/num_traces|dropped/.test(long), false, 'no claim that traces are dropped for want of buffer: 48,000 is under 50,000');
-  const short = plain(spec.whyNot['wait:wait-10s']);
-  for (const w of ['20 seconds', 'late', 'different']) assert.equal(short.includes(w), true, w);
-  assert.equal(plain(spec.whyNot['policies:probabilistic']).includes('head sampling'), true);
+  for (const w of ['10,000 traces', 'num_traces', '50,000', 'decision_wait', '30-second default', 'late', '20 seconds']) assert.equal(t.includes(w), true, w);
+  assert.equal(/of 550 MiB|519/.test(t), false, 'the widget already says what the plan costs');
+  const dflt = plain(spec.whyNot['wait:wait-30s']);
+  for (const w of ['12,000', '600', '100 MiB']) assert.equal(dflt.includes(w), true, w);
+  for (const id of ['wait-5s', 'wait-10s', 'wait-15s']) for (const w of ['20 seconds', 'late']) assert.equal(plain(spec.whyNot[`wait:${id}`]).includes(w), true, `${id} ${w}`);
+  assert.equal(/head sampling|hint|cheapest/.test(plain(spec.hint)), false, 'the hint names the concept, not a heuristic');
 });
 
 // ---- 6.2 Tail sampling: the Spot it step --------------------------------------------
@@ -507,15 +514,15 @@ test('spot: the explain teaches the nuance with the recomputed figures: the span
   for (const w of ['39 of 400', '8 of 39', 'traces/metrics', 'no sampling processor', 'one span_metrics']) assert.equal(t.includes(w), true, w);
   assert.equal(t.includes('take span_metrics out of the exporters of traces/dash0, so traces/metrics is the only pipeline that feeds it'), true, 'the fix removes the connector from traces, or two pipelines feed one instance');
   // The figures come from the policies of the Trade-off answer, derived from that option, so the 39 of 400 holds.
-  const answerOption = ts().knobs.find((k) => k.id === 'policies').options.find((o) => o.id === ts().answer.policies);
-  const answerLabel = answerOption.label;
-  const wantTypes = [...answerLabel.matchAll(/<code>(\w+)<\/code>/g)].map((m) => m[1]);
-  assert.deepEqual(wantTypes, ['status_code', 'latency', 'probabilistic']);
-  const wantMs = Number(answerLabel.match(/above (\d+) seconds/)[1]) * 1000;
-  const wantPercent = Number(answerLabel.match(/at (\d+)% of the rest/)[1]);
-  assert.equal(wantMs, 2000);
-  assert.equal(wantPercent, 5);
-  assert.equal(answerLabel.includes('8 + 12 + 19 = 39 of 400'), true, 'the policies keep the 39 of 400 the explain uses');
+  const optionLabel = (knob) => ts().knobs.find((k) => k.id === knob).options.find((o) => o.id === ts().answer[knob]).label;
+  const policies = optionLabel('policies');
+  const baseline = optionLabel('baseline');
+  assert.deepEqual([...policies.matchAll(/<code>(\w+)<\/code>/g)].map((m) => m[1]), ['status_code', 'latency']);
+  assert.deepEqual([...baseline.matchAll(/<code>(\w+)<\/code>/g)].map((m) => m[1]), ['probabilistic']);
+  assert.equal(Number(policies.match(/above (\d+) seconds/)[1]) * 1000, 2000);
+  assert.equal(Number(baseline.match(/at (\d+)% of the rest/)[1]), 5);
+  assert.equal(policies.includes('20 traces/s kept'), true, '8 failed and 12 slow');
+  assert.equal(baseline.includes('19 traces/s kept'), true, '5% of the other 380: 8 + 12 + 19 = 39 of 400');
   assert.equal(KEPT_ERRORS + KEPT_SLOW + KEPT_BASELINE, 39);
   assert.equal(t.includes('the sampler kept every error and few of the rest'), true);
   assert.equal(t.includes('count sees the spans of all 400 traces a second'), true, 'the count pipeline is the contrast');

@@ -34,7 +34,7 @@ const SLOWEST = 20; // seconds the slowest checkouts take end to end
 const ERROR_RATE = 0.02;
 const SLOW_RATE = 0.03;
 const BASELINE = 0.05; // of the rest
-const CAP = 1000; // MiB
+const CAP = 550; // MiB
 const NUM_TRACES = 50000; // the processor's default
 
 const n = (x) => x.toLocaleString('en-US');
@@ -46,65 +46,80 @@ const SLOW = TRACES * SLOW_RATE;
 const REST = TRACES - ERRORS - SLOW;
 const BASE = REST * BASELINE;
 const KEPT = ERRORS + SLOW + BASE;
-const RATIO_ONLY = TRACES * 0.1;
+const SEND_SECONDS = 10; // in this table a trace the policies keep is held this much longer, until it is sent
+const sendMib = (traces) => Math.round(traces * SEND_SECONDS * MIB_PER_TRACE * 100) / 100;
+const BASE_25 = REST * 0.25;
 const ERROR_SHARE = Math.round((ERRORS / KEPT) * 100);
 
-// Step 1: the trade-off. Every wait costs the traces held for it; the policies cost nothing extra, because the processor
-// holds every trace until it decides, whichever policies are set.
+// Step 1: the trade-off. Three knobs add up in MiB. A wait costs the traces held while it runs; what the
+// policies keep costs the kept traces, held a little longer until they are sent (this table's rule). The wait is the
+// deciding knob: it must outlast the slowest trace (20 s) to decide on the whole of it, and every second of it is
+// memory, so the 30-second default is not free. No cost or Keeps heuristic finds the plan
+// (test/trade-off-balance.test.mjs probes them all).
 const BUDGET = {
   id: 'ts-budget',
   unit: 'MiB',
   cap: CAP,
   helps: { hints: true },
   hint:
-    'Each wait costs memory in proportion to the traces held while it runs. Ask which policies keep what the task needs, and which wait lets a whole trace arrive before the decision.',
+    'Memory is what the traces cost while the sampler waits to decide on them. Ask how long the slowest trace takes to finish, and what every second of waiting costs.',
   knobs: [
-    {
-      id: 'policies',
-      label: 'What the <code>tail_sampling</code> policies keep',
-      options: [
-        {
-          id: 'probabilistic',
-          label: `A <code>probabilistic</code> policy at 10%: ${n(RATIO_ONLY)} of ${n(TRACES)} traces/s, chosen at random`,
-          cost: 0,
-          keeps: ['baseline-kept'],
-        },
-        {
-          id: 'errors-slow',
-          label: `<code>status_code</code> ERROR and <code>latency</code> above 2 seconds: ${n(ERRORS + SLOW)} of ${n(TRACES)} traces/s (${n(ERRORS)} failed and ${n(SLOW)} slow)`,
-          cost: 0,
-          keeps: ['errors-kept', 'slow-kept'],
-        },
-        {
-          id: 'errors-slow-baseline',
-          label:
-            `<code>status_code</code> ERROR, <code>latency</code> above 2 seconds and a <code>probabilistic</code> policy at 5% of the rest: ` +
-            `${n(ERRORS)} + ${n(SLOW)} + ${n(BASE)} = ${n(KEPT)} of ${n(TRACES)} traces/s`,
-          cost: 0,
-          keeps: ['errors-kept', 'slow-kept', 'baseline-kept'],
-        },
-      ],
-    },
     {
       id: 'wait',
       label: 'How long <code>decision_wait</code> holds a trace before it decides',
       options: [
         {
-          id: 'wait-10s',
-          label: `10 seconds: ${n(TRACES)} traces/s × 10 s × ${MIB_PER_TRACE} MiB = ${n(mib(10))}`,
-          cost: mib(10),
-        },
-        {
           id: 'wait-30s',
-          label: `30 seconds, the default: ${n(TRACES)} × 30 × ${MIB_PER_TRACE} MiB = ${n(mib(30))}`,
+          label: `30 seconds, the default: ${n(TRACES)} traces/s × 30 s × ${MIB_PER_TRACE} MiB = ${n(mib(30))}`,
           cost: mib(30),
           keeps: ['whole-traces'],
         },
+        { id: 'wait-10s', label: `10 seconds: ${n(TRACES)} × 10 × ${MIB_PER_TRACE} MiB = ${n(mib(10))}`, cost: mib(10) },
+        { id: 'wait-25s', label: `25 seconds: ${n(TRACES)} × 25 × ${MIB_PER_TRACE} MiB = ${n(mib(25))}`, cost: mib(25), keeps: ['whole-traces'] },
+        { id: 'wait-5s', label: `5 seconds: ${n(TRACES)} × 5 × ${MIB_PER_TRACE} MiB = ${n(mib(5))}`, cost: mib(5) },
+        { id: 'wait-15s', label: `15 seconds: ${n(TRACES)} × 15 × ${MIB_PER_TRACE} MiB = ${n(mib(15))}`, cost: mib(15) },
+      ],
+    },
+    {
+      id: 'policies',
+      label: 'What the <code>tail_sampling</code> policies keep for sure',
+      options: [
         {
-          id: 'wait-120s',
-          label: `120 seconds: ${n(TRACES)} × 120 × ${MIB_PER_TRACE} MiB = ${n(mib(120))}`,
-          cost: mib(120),
-          keeps: ['whole-traces'],
+          id: 'errors-slow',
+          label: `<code>status_code</code> ERROR and <code>latency</code> above 2 seconds: ${n(ERRORS + SLOW)} traces/s kept, ${n(sendMib(ERRORS + SLOW))} MiB`,
+          cost: sendMib(ERRORS + SLOW),
+          keeps: ['errors-kept', 'slow-kept'],
+        },
+        {
+          id: 'errors',
+          label: `<code>status_code</code> ERROR: ${n(ERRORS)} traces/s kept, ${n(sendMib(ERRORS))} MiB`,
+          cost: sendMib(ERRORS),
+          keeps: ['errors-kept'],
+        },
+        {
+          id: 'everything',
+          label: `A <code>probabilistic</code> policy at 100%, so no trace is dropped: ${n(TRACES)} traces/s kept, ${n(sendMib(TRACES))} MiB`,
+          cost: sendMib(TRACES),
+          keeps: ['errors-kept', 'slow-kept', 'baseline-kept'],
+        },
+      ],
+    },
+    {
+      id: 'baseline',
+      label: 'The healthy traces, kept next to them',
+      options: [
+        {
+          id: 'baseline-25pct',
+          label: `A <code>probabilistic</code> policy at 25% of the rest: ${n(BASE_25)} traces/s kept, ${n(sendMib(BASE_25))} MiB`,
+          cost: sendMib(BASE_25),
+          keeps: ['baseline-kept'],
+        },
+        { id: 'no-baseline', label: 'No healthy traces: 0 MiB', cost: 0 },
+        {
+          id: 'baseline-5pct',
+          label: `A <code>probabilistic</code> policy at 5% of the rest: ${n(BASE)} traces/s kept, ${n(sendMib(BASE))} MiB`,
+          cost: sendMib(BASE),
+          keeps: ['baseline-kept'],
         },
       ],
     },
@@ -115,23 +130,24 @@ const BUDGET = {
     { id: 'baseline-kept', label: 'a sample of healthy traces to compare against' },
     { id: 'whole-traces', label: `a decision made on the whole trace, even one that takes ${SLOWEST} seconds` },
   ],
-  answer: { policies: 'errors-slow-baseline', wait: 'wait-30s' },
+  answer: { wait: 'wait-25s', policies: 'errors-slow', baseline: 'baseline-5pct' },
   whyNot: {
-    'policies:probabilistic':
-      'A random 10% is head sampling again, done later: it keeps 1 in 10 of the failed traces and 1 in 10 of the slow ones, and tail sampling exists to do better than that.',
-    'policies:errors-slow':
-      'It keeps what is wrong and nothing that is fine, so there is no healthy trace to compare a failing one with. A small probabilistic policy next to the other two adds one.',
-    'wait:wait-10s':
-      `A trace that takes ${SLOWEST} seconds is still running when the 10 seconds are up, so the processor decides on part of it, and the rest arrives late. ` +
-      'A late span can cause different sampling decisions for different parts of the same trace.',
-    'wait:wait-120s':
-      `It sees every trace whole, and holds ${n(held(120))} traces to do it, ${n(mib(120))} MiB: far more than the ${n(CAP)} MiB the replica has, for traces that were whole after ${SLOWEST} seconds anyway.`,
+    'wait:wait-5s': `A trace that takes ${SLOWEST} seconds is still running when the 5 seconds are up, so the processor decides on part of it. A late span can cause different sampling decisions for different parts of the same trace.`,
+    'wait:wait-10s': `A trace that takes ${SLOWEST} seconds is still running when the 10 seconds are up, so the processor decides on part of it, and the rest arrives late.`,
+    'wait:wait-15s': `The slowest traces take ${SLOWEST} seconds, so 15 seconds still decides on part of them and the rest arrives late. Cheap, and not whole.`,
+    'wait:wait-30s':
+      `It sees every trace whole, and so does a shorter wait: ${n(held(30))} traces held is ${n(mib(30))} MiB, ${n(mib(30) - mib(25))} MiB more than the ${SLOWEST}-second traces need. With the policies in this plan it is over the ${n(CAP)} MiB the replica has.`,
+    'policies:errors': 'It keeps what failed and drops the slow traces, so a slow checkout is gone before anyone can open it.',
+    'policies:everything':
+      `Every trace kept, ${n(sendMib(TRACES))} MiB of them held until they are sent, and nothing sampled at all. It keeps every need and does not fit: with a ${SLOWEST}-second wait the plan is over the ${n(CAP)} MiB.`,
+    'baseline:no-baseline': 'It keeps what is wrong and nothing that is fine, so there is no healthy trace to compare a failing one with.',
+    'baseline:baseline-25pct': `It keeps a healthy sample, ${n(BASE_25)} traces a second of it, and the extra ${n(sendMib(BASE_25) - sendMib(BASE))} MiB takes the plan past the ${n(CAP)} MiB. A 5% sample is enough to compare with.`,
   },
   explain:
-    `The plan costs ${n(mib(30))} of ${n(CAP)} MiB: ${n(TRACES)} new traces a second, each held for the 30-second <code>decision_wait</code>, is ${n(held(30))} traces at once, under the default <code>num_traces</code> of ${n(NUM_TRACES)}. ` +
-    `The policies cost nothing extra in this table, because the processor holds every trace until it decides, whichever policies you set. ` +
-    `Waiting is what costs: ${n(held(30))} traces held is the price of seeing the slowest traces (${SLOWEST} seconds) whole, and the decision is made on the whole trace, ` +
-    `which is how it can keep ${n(ERRORS)} failed and ${n(SLOW)} slow traces a second and ${n(BASE)} healthy ones, ${n(KEPT)} of ${n(TRACES)}, a saving of about ${pct(1 - KEPT / TRACES)} of the traces. ` +
+    `The wait is what costs: ${n(TRACES)} new traces a second, each held for the 25-second <code>decision_wait</code>, is ${n(held(25))} traces at once, under the default <code>num_traces</code> of ${n(NUM_TRACES)}, ` +
+    `and ${SLOWEST} seconds is the slowest trace, so a 25-second wait decides on the whole trace with room to spare. Every second beyond that is memory spent for nothing: the 30-second default would be ${n(mib(30) - mib(25))} MiB more. ` +
+    `The policies keep ${n(ERRORS)} failed and ${n(SLOW)} slow traces a second and ${n(BASE)} healthy ones, ${n(KEPT)} of ${n(TRACES)}, a saving of about ${pct(1 - KEPT / TRACES)} of the traces, ` +
+    `and a kept trace is held ${SEND_SECONDS} seconds more until it is sent. ` +
     'The price is a stateful component that all spans of a trace must reach, which is why 5.4 sent them there by trace ID. ' +
     'A span that arrives after the decision is late, and can get a different decision from the rest of its trace. ' +
     'These figures come from one authored table, not a measurement; the real per-trace size depends on your spans.',
@@ -204,8 +220,8 @@ export default {
         intro:
           `Head sampling kept 1 in 10 of the failures too, so the team moves to tail sampling in the gateway: the <code>tail_sampling</code> processor holds the spans of each trace until it can decide on the whole trace. ` +
           `One gateway replica gets ${n(TRACES)} new traces a second. The team wants every failed trace (${pct(ERROR_RATE)} of them) and every slow one (${pct(SLOW_RATE)}, above 2 seconds, the slowest take ${SLOWEST} seconds), ` +
-          `and a healthy baseline. The processor's <code>decision_wait</code> is 30 seconds by default. Each trace held costs ${MIB_PER_TRACE} MiB, and the replica has ${n(CAP)} MiB for it.`,
-        question: 'Pick the policies and the wait: keep what the team wants and stay within the memory.',
+          `and a healthy baseline. The processor's <code>decision_wait</code> is 30 seconds by default. Each trace held costs ${MIB_PER_TRACE} MiB, a trace the policies keep is held ${SEND_SECONDS} seconds more until it is sent, and the replica has ${n(CAP)} MiB for it.`,
+        question: 'Pick the wait and the policies: keep what the team wants and stay within the memory.',
         qid: 'ts-q-budget',
         tradeoff: BUDGET,
       },

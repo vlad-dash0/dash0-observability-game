@@ -602,45 +602,56 @@ test('cardinality: every budget cost is the product of the values of the attribu
   const spec = budget();
   const cost = (knob, option) => spec.knobs.find((k) => k.id === knob).options.find((o) => o.id === option).cost;
   const label = (knob, option) => plain(spec.knobs.find((k) => k.id === knob).options.find((o) => o.id === option).label);
-  assert.equal(cost('requests', 'none'), 1, 'a counter with no attributes is one series');
+  assert.equal(cost('requests', 'route'), 14);
   assert.equal(cost('requests', 'route-status'), 14 * 9);
+  assert.equal(cost('requests', 'route-status-tier'), 14 * 9 * 3);
   assert.equal(cost('requests', 'path-status'), 48211 * 9);
-  assert.equal(cost('served', 'none'), 1);
+  assert.equal(cost('requests', 'route-status-user'), 14 * 9 * 31402);
+  assert.equal(cost('served', 'none'), 1, 'a counter with no attributes is one series');
   assert.equal(cost('served', 'tier'), 3);
   assert.equal(cost('served', 'user'), 31402);
   assert.equal(cost('customer', 'span-attribute'), 0, 'a span attribute is not a metric series');
   assert.equal(label('requests', 'route-status').endsWith('14 × 9 = 126'), true, label('requests', 'route-status'));
+  assert.equal(label('requests', 'route-status-tier').endsWith('14 × 9 × 3 = 378'), true, label('requests', 'route-status-tier'));
   assert.equal(label('requests', 'path-status').endsWith('48,211 × 9 = 433,899'), true, label('requests', 'path-status'));
+  assert.equal(label('requests', 'route-status-user').endsWith('14 × 9 × 31,402 = 3,956,652'), true, label('requests', 'route-status-user'));
   assert.equal(label('served', 'user').endsWith(': 31,402'), true);
   assert.equal(433899, prod('path', 'status'), 'the arithmetic shown is the arithmetic');
-  assert.equal(spec.cap, 500);
+  assert.equal(3956652, prod('route', 'status', 'user'));
+  assert.equal(spec.cap, 300);
   assert.equal(spec.unit, 'series');
 });
 
-test('cardinality: the budget is a real trade-off with one right plan: 129 of 500 series, keeping all three needs', () => {
+test('cardinality: the budget is a real trade-off with one right plan: the tier on its own counter, 129 of 300 series', () => {
   const spec = budget();
   const plans = allPlans(spec).map((picks) => ({ picks, ...evaluatePlan(spec, picks) }));
   const passing = plans.filter((p) => p.over === 0 && p.lost.length === 0);
   assert.deepEqual(passing.map((p) => p.picks), [{ requests: 'route-status', served: 'tier', customer: 'span-attribute' }], 'exactly one plan passes');
   assert.equal(passing[0].total, 126 + 3 + 0);
   assert.equal(passing[0].total, 129);
-  const cheap = evaluatePlan(spec, { requests: 'none', served: 'none', customer: 'nothing' });
-  assert.deepEqual([cheap.total, cheap.over, cheap.lost.length], [2, 0, 3], 'the cheapest plan is far under the cap and drops all three needs');
+  // The tempting plan: one counter carries the tier too. Every attribute multiplies it, so it is over the cap with every need kept.
+  const one = evaluatePlan(spec, { requests: 'route-status-tier', served: 'none', customer: 'span-attribute' });
+  assert.deepEqual([one.total, one.over, one.lost.length], [379, 79, 0], 'the tier on the requests counter multiplies it: 378 + 1 series');
+  const cheap = evaluatePlan(spec, { requests: 'route', served: 'none', customer: 'nothing' });
+  assert.deepEqual([cheap.total, cheap.over, cheap.lost], [15, 0, ['errors-by-route', 'served-by-tier', 'one-customer']], 'the cheap plan drops three needs');
   const full = evaluatePlan(spec, { requests: 'path-status', served: 'tier', customer: 'span-attribute' });
-  assert.deepEqual([full.total, full.over, full.lost.length], [433899 + 3, 433899 + 3 - 500, 0], 'a raw URL keeps every need and is over the cap');
+  assert.deepEqual([full.total, full.over, full.lost.length], [433899 + 3, 433899 + 3 - 300, 0], 'a raw URL keeps every need and is over the cap');
   const user = evaluatePlan(spec, { requests: 'route-status', served: 'user', customer: 'span-attribute' });
   assert.deepEqual([user.total, user.over > 0, user.lost], [126 + 31402, true, ['served-by-tier']], 'a user id on the metric is over the cap and still has no tier');
   assert.equal(plans.some((p) => p.over === 0 && p.lost.length > 0), true);
   assert.equal(plans.some((p) => p.over > 0 && p.lost.length === 0), true);
 });
 
-test('cardinality: the budget explains itself with exact figures and says spans have a cost of their own', () => {
+test('cardinality: the budget explains itself without restating the cost, and says spans have a cost of their own', () => {
   const spec = budget();
   const t = plain(spec.explain);
-  for (const w of ['129 of 500 series', '126 for the route and status counter', '3 for the tier counter', 'route template', 'Spans have their own volume and cost']) assert.equal(t.includes(w), true, w);
+  for (const w of ['126 series for the route and status counter', '3 for the tier counter', '14 × 9 × 3 = 378', 'route template', 'Spans have their own volume and cost']) assert.equal(t.includes(w), true, w);
+  assert.equal(/of 300 series|costs 129/.test(t), false, 'the widget already says what the plan costs');
   assert.equal(plain(spec.whyNot['requests:path-status']).includes('433,899 series'), true);
+  assert.equal(plain(spec.whyNot['requests:route-status-tier']).includes('379 series, over the 300'), true);
   assert.equal(plain(spec.whyNot['served:user']).includes('31,402 users'), true);
   assert.equal(/span/.test(plain(spec.whyNot['served:user'])), true, 'the user id belongs on a span');
+  assert.equal(/multiplies/.test(plain(spec.hint)) && !/cheapest/.test(plain(spec.hint)), true, 'the hint names the concept, not a heuristic');
 });
 
 test('cardinality: the Dash0 tie-in is graded: fix the source, and a spam filter drops whole points but is not free', () => {
@@ -812,7 +823,7 @@ test('3.5 and 3.7 cite the pages their facts come from, and the sources that are
 test('cardinality: the budget intro says what a plan costs without calling the span attribute a metric', () => {
   const steps = LIVE.levels.cardinality.play.steps;
   const intro = plain(steps[2].intro);
-  assert.equal(intro.includes('A plan costs the sum of the series of its metrics; a span attribute is not a metric series, so it costs 0.'), true, intro);
+  assert.equal(intro.includes('A plan costs the sum of the series of its two counters; a span attribute is not a metric series, so it costs 0.'), true, intro);
   assert.equal(/three metrics/.test(intro + plain(steps[2].question)), false, 'only two of the three knobs are metrics');
   const knobs = budget().knobs;
   assert.deepEqual(knobs.map((k) => /<code>(?:http\.server\.requests|recommendations\.served)<\/code>/.test(k.label)), [true, true, false]);

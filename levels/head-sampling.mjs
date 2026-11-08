@@ -18,7 +18,7 @@
 //
 // Widget: Trade-off. It grades the option the player picks against authored costs and keeps; it does not simulate a
 // sampler. The "break" of a child that ignores its parent (a child set to always_on) is therefore authored arithmetic from
-// the one table below, shown in the copy, not something an engine runs. The costs are one knob of whole-system setups, not one
+// the one table below, shown in the copy, not something an engine runs. The root's cost is the whole kept trace, not one
 // knob per service, because a child's cost depends on the root's ratio and the widget adds the costs of the knobs.
 // Spans per second is the unit; the table is invented but fixed, and every number in the copy is computed from it.
 
@@ -37,68 +37,85 @@ const AT_TEN = TEN * WHOLE;
 const AT_ONE = ONE * WHOLE;
 const DROPPED = TRACES - TEN; // traces whose root was dropped
 const ORPHANS = DROPPED * CHILDREN; // their children's spans, exported by children that do not follow the root
-const ALWAYS_ON_CHILDREN = AT_TEN + ORPHANS;
 
 const SAMPLER = 'OTEL_TRACES_SAMPLER';
 const ARG = 'OTEL_TRACES_SAMPLER_ARG';
 
+const AT = (r) => TRACES * r; // traces a second kept at ratio r
+const SPANS_AT = (r) => AT(r) * WHOLE;
+const RATIO = (r) => `<code>${SAMPLER}=parentbased_traceidratio</code> and <code>${ARG}=${r}</code>`;
+const ratioOption = (id, r, keeps) => ({
+  id,
+  label: `${RATIO(r)} on <code>storefront</code>: ${n(AT(r))} traces/s × ${WHOLE} = ${n(SPANS_AT(r))}`,
+  cost: SPANS_AT(r),
+  keeps,
+});
+
+// Two knobs: the root's setting, and what the children do with the root's decision. The root's cost is the whole
+// kept trace (all 12 spans), because ParentBased children follow it. The children's second option costs the
+// spans it adds on top, at the 10% root of the team's target (the label says so).
+// No cost or Keeps heuristic finds the plan (test/trade-off-balance.test.mjs probes them all).
 const PLAN = {
   id: 'hs-plan',
   unit: 'spans/s',
   cap: CAP,
   helps: { hints: true },
   hint:
-    'The decision is made once, at the root. Ask what a child service does with a trace whose root was dropped, then add up the spans a second the backend would take.',
+    'The decision is made once, at the root. Ask what checkout and payments do with a trace whose root was dropped, and how many traces a second each ratio keeps.',
   knobs: [
     {
-      id: 'sampler',
-      label: 'The sampler setting of <code>storefront</code>, <code>checkout</code> and <code>payments</code>',
+      id: 'root',
+      label: 'The sampler setting of <code>storefront</code>, the root',
       options: [
         {
           id: 'defaults',
-          label: `Nothing set: the default, <code>${SAMPLER}=parentbased_always_on</code> everywhere. Every trace is sampled: ${n(TRACES)} × ${WHOLE} = ${n(FULL)}`,
+          label: `Nothing set: the default, <code>${SAMPLER}=parentbased_always_on</code>. Every trace is sampled: ${n(TRACES)} × ${WHOLE} = ${n(FULL)}`,
           cost: FULL,
-          keeps: ['enough-traces', 'whole-traces'],
+          keeps: ['any-traces', 'enough-traces', 'whole-traces'],
+        },
+        ratioOption('ratio-1pct', 0.01, ['any-traces']),
+        ratioOption('ratio-10pct', 0.1, ['any-traces', 'enough-traces']),
+        ratioOption('ratio-25pct', 0.25, ['any-traces', 'enough-traces']),
+        ratioOption('ratio-50pct', 0.5, ['any-traces', 'enough-traces']),
+      ],
+    },
+    {
+      id: 'children',
+      label: 'The sampler setting of <code>checkout</code> and <code>payments</code>',
+      options: [
+        {
+          id: 'always-on',
+          label: `<code>${SAMPLER}=always_on</code>: with a 10% root, ${n(DROPPED)} traces/s × ${CHILDREN} = ${n(ORPHANS)} more`,
+          cost: ORPHANS,
         },
         {
-          id: 'ratio-1pct',
-          label: `<code>${SAMPLER}=parentbased_traceidratio</code> and <code>${ARG}=0.01</code> everywhere: ${n(ONE)} traces/s × ${WHOLE} = ${n(AT_ONE)}`,
-          cost: AT_ONE,
+          id: 'follow',
+          label: `Nothing set: the default, <code>${SAMPLER}=parentbased_always_on</code>, follows the root's sampled flag`,
+          cost: 0,
           keeps: ['whole-traces'],
-        },
-        {
-          id: 'ratio-10pct',
-          label: `<code>${SAMPLER}=parentbased_traceidratio</code> and <code>${ARG}=0.1</code> everywhere: ${n(TEN)} traces/s × ${WHOLE} = ${n(AT_TEN)}`,
-          cost: AT_TEN,
-          keeps: ['enough-traces', 'whole-traces'],
-        },
-        {
-          id: 'children-always-on',
-          label:
-            `<code>parentbased_traceidratio</code> at <code>0.1</code> on storefront, and <code>${SAMPLER}=always_on</code> on checkout and payments: ` +
-            `${n(AT_TEN)} + ${n(DROPPED)} traces/s × ${CHILDREN} = ${n(ALWAYS_ON_CHILDREN)}`,
-          cost: ALWAYS_ON_CHILDREN,
-          keeps: ['enough-traces'],
         },
       ],
     },
   ],
   needs: [
+    { id: 'any-traces', label: 'some traces every second, never an empty list' },
     { id: 'enough-traces', label: `about ${n(TEN)} traces a second to look at` },
     { id: 'whole-traces', label: 'every trace that is kept has all of its spans' },
   ],
-  answer: { sampler: 'ratio-10pct' },
+  answer: { root: 'ratio-10pct', children: 'follow' },
   whyNot: {
-    'sampler:defaults':
+    'root:defaults':
       `It keeps everything, and that is the budget's whole point: ${n(FULL)} spans a second is ${n(FULL / CAP)} times the ${n(CAP)} the backend takes. Head sampling is how you stay under it.`,
-    'sampler:ratio-1pct':
+    'root:ratio-1pct':
       `Whole traces, and cheap: ${n(AT_ONE)} spans a second. But ${n(ONE)} traces a second is too few to learn from, and a rare failure is unlikely to be among them.`,
-    'sampler:children-always-on':
+    'root:ratio-25pct': `${n(AT(0.25))} traces a second is more than the team needs, and ${n(SPANS_AT(0.25))} spans a second is ${n(SPANS_AT(0.25) / CAP)} times the ${n(CAP)} the backend takes.`,
+    'root:ratio-50pct': `${n(AT(0.5))} traces a second, ${n(SPANS_AT(0.5))} spans a second: ${n(SPANS_AT(0.5) / CAP)} times the ${n(CAP)} the backend takes.`,
+    'children:always-on':
       `Storefront drops ${n(DROPPED)} of every ${n(TRACES)} traces a second at the root, and checkout and payments, set to <code>always_on</code>, ignore that and sample their spans anyway: ` +
       `${n(DROPPED)} traces/s × ${CHILDREN} spans = ${n(ORPHANS)} spans a second for traces whose root is gone. Those traces arrive with holes, and they cost ${n(ORPHANS)} spans a second of the budget.`,
   },
   explain:
-    `The plan costs ${n(AT_TEN)} of ${n(CAP)} spans/s: ${n(TEN)} of ${n(TRACES)} traces a second, ${WHOLE} spans each. ` +
+    `${n(TEN)} of ${n(TRACES)} traces a second, ${WHOLE} spans each. ` +
     `<code>${SAMPLER}=parentbased_traceidratio</code> with <code>${ARG}=0.1</code> is ParentBased with a TraceIdRatioBased root: the root decides from the trace ID, and every other span follows the parent's sampled flag, ` +
     'which travels in the <code>traceparent</code> header, so a trace is kept whole or not at all. The ratio is only used for a span with no parent; on a child it never runs. ' +
     'These figures are authored from one table, not run by an engine. What head sampling cannot do is look at the trace: it decides at the root, before any error or slow request has happened, ' +
@@ -144,7 +161,7 @@ export default {
           `A trace is ${WHOLE} spans (${SPANS.storefront} in storefront, ${SPANS.checkout} in checkout, ${SPANS.payments} in payments), so keeping everything is ${n(TRACES)} × ${WHOLE} = ${n(FULL)} spans a second, ` +
           `and the backend takes ${n(CAP)} spans a second. Head sampling decides when the root span starts, from the trace ID and a ratio, and passes the decision to the children in the sampled flag of the <code>traceparent</code> header. ` +
           'The arithmetic below is authored from this table, not run by a sampler.',
-        question: 'Pick the sampler setup that fits the budget and keeps every kept trace whole.',
+        question: 'Pick the sampler setting for each: keep what the team needs and stay within the budget.',
         qid: 'hs-q-plan',
         tradeoff: PLAN,
       },

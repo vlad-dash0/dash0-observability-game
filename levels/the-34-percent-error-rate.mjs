@@ -31,6 +31,8 @@ const UNIFORM_ERRORS = Math.round((ERRORS * KEEP_PCT) / 100); // failed traces a
 const DECOY_PCT = 18; // a dearer random policy that still fits the cap
 const DECOY = Math.round((REQUESTS * DECOY_PCT) / 100);
 const DECOY_ERRORS = Math.round((ERRORS * DECOY_PCT) / 100);
+const MORE_PCT = 20; // every error plus a larger share of the rest
+const STORED_MORE = ERRORS + Math.round((HEALTHY * MORE_PCT) / 100);
 const STORED_PCT = Math.round((ERRORS / STORED) * 100);
 const TRUE_PCT = Math.round((ERRORS / REQUESTS) * 100);
 
@@ -63,8 +65,8 @@ const VERDICT = [
   },
 ];
 
-// Step 2: the setup. Two knobs: four sampling policies (the answer last) and two places to compute the rate (the answer first).
-// Eight plans, one passes. Costs are spans a second sent to the backend. Every whyNot is a whole sentence that names its own option, so it holds
+// Step 2: the setup. Two knobs: five sampling policies and two places to compute the rate (the answer first).
+// Ten plans, one passes. Costs are spans a second sent to the backend. Every whyNot is a whole sentence that names its own option, so it holds
 // with either option of the other knob.
 const PLAN = {
   id: 'ser-plan',
@@ -76,16 +78,22 @@ const PLAN = {
       label: 'Sampling policy',
       options: [
         {
+          id: 'keep-all',
+          label: `Keep every trace: ${n(REQUESTS)} spans/s`,
+          cost: REQUESTS,
+          keeps: ['every-error', 'true-rate'],
+        },
+        {
           id: 'probabilistic-10pct',
           label: `A probabilistic policy at ${KEEP_PCT}% of all traces: about ${n(UNIFORM)} spans/s, chosen at random`,
           cost: UNIFORM,
           keeps: ['true-rate'],
         },
         {
-          id: 'keep-all',
-          label: `Keep every trace: ${n(REQUESTS)} spans/s`,
-          cost: REQUESTS,
-          keeps: ['every-error', 'true-rate'],
+          id: 'errors-10pct',
+          label: `Every error plus ${KEEP_PCT}% of the rest: ${n(STORED)} spans/s`,
+          cost: STORED,
+          keeps: ['every-error'],
         },
         {
           id: 'probabilistic-18pct',
@@ -94,9 +102,9 @@ const PLAN = {
           keeps: ['true-rate'],
         },
         {
-          id: 'errors-10pct',
-          label: `Every error plus ${KEEP_PCT}% of the rest: ${n(STORED)} spans/s`,
-          cost: STORED,
+          id: 'errors-20pct',
+          label: `Every error plus ${MORE_PCT}% of the rest: ${n(STORED_MORE)} spans/s`,
+          cost: STORED_MORE,
           keeps: ['every-error'],
         },
       ],
@@ -128,6 +136,7 @@ const PLAN = {
     'sampler:probabilistic-10pct': `This policy keeps an honest ratio, but only about ${UNIFORM_ERRORS} of the ${ERRORS} failed traces a second, so most failures can't be opened.`,
     'sampler:probabilistic-18pct': `This policy keeps an honest ratio, but only about ${DECOY_ERRORS} of the ${ERRORS} failed traces a second, so most failures can't be opened.`,
     'sampler:keep-all': `Keeping every trace sends ${n(REQUESTS)} spans/s, ${TIMES_OVER} times the cap of ${CAP}.`,
+    'sampler:errors-20pct': `This policy keeps every error and a larger share of the healthy traces: ${n(STORED_MORE)} spans/s, over the cap of ${CAP}.`,
     'rate:stored-spans': `The rate from the spans the backend keeps is a share of kept spans. With every error kept and ${KEEP_PCT}% of the rest, that reads ${WRONG_SUM}, not ${TRUE_PCT}%.`,
   },
   explain:
