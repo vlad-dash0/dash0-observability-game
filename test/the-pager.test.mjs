@@ -110,8 +110,8 @@ function start() {
 
 const text = (sel) => q(sel)?.textContent.replace(/\s+/g, ' ').trim() ?? null;
 const budget = () => text('#pager-budget');
-// The level's lesson wrapper (hand-written markup until #165); ctx.speech is the kit card inside it.
-const intro = () => text('.lesson-intro');
+// The kit lesson card ctx.speech renders.
+const intro = () => text('.ui-lesson');
 const escalateDisabled = () => q('#pager-escalate').disabled;
 /** The look keys whose reason is on screen, in screen order. */
 const said = () => qa('[data-said]').map((el) => el.dataset.said);
