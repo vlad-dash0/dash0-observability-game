@@ -27,7 +27,7 @@
 // (perses.dev) is not an allowed host, so no field beyond the Dash0 page's example is shown and no Perses rule is claimed.
 //
 // Invented for the game: the company, the file `dashboards/checkout-overview.yaml`, the namespaces `checkout`, `payments` and `tools`,
-// the panel names, the queries, the grid sizes and the Grid's width of 24 columns. Each line of the board is one added key, shown with its path from the top of the file (a key whose value is a mapping shows the mapping).
+// the panel names, the queries, the grid sizes and the layout's width of 24 columns. Each line of the board is one added key, shown with its path from the top of the file (a key whose value is a mapping shows the mapping).
 
 const SPOT = {
   id: 'dac-spot',
@@ -35,26 +35,26 @@ const SPOT = {
   helps: { hints: false },
   lines: [
     { id: 'header', text: '+ apiVersion: perses.dev/v1alpha1' },
+    { id: 'kind', text: '+ kind: PersesDashboard' },
     { id: 'metadata', text: '+ metadata: {name: checkout-overview, namespace: tools}' },
+    { id: 'display', text: '+ spec.display.name: Checkout overview' },
     { id: 'item-rate', text: '+ spec.layouts[0].spec.items[0]: {x: 0, "y": 0, width: 12, height: 6, content: {$ref: "#/spec/panels/request_rate"}}' },
     { id: 'item-errors', text: '+ spec.layouts[0].spec.items[1]: {x: 18, "y": 0, width: 12, height: 6, content: {$ref: "#/spec/panels/error_ratio"}}' },
     { id: 'item-corner', text: '+ spec.layouts[0].spec.items[2]: {x: 12, "y": 6, width: 12, height: 6, content: {$ref: "#/spec/panels/request_count"}}' },
     { id: 'item-latency', text: '+ spec.layouts[0].spec.items[3]: {x: 0, "y": 6, width: 12, height: 6, content: {$ref: "#/spec/panels/latency_p99"}}' },
     { id: 'panel-rate', text: '+ spec.panels.request_rate: {kind: Panel, spec: {display: {name: Request rate}, plugin: {kind: TimeSeriesChart}}}' },
-    { id: 'query-rate', text: '+ spec.panels.request_rate.spec.plugin.spec.queries[0].spec.plugin.spec.query: sum(rate(http_server_requests_total{service="checkout"}[5m]))' },
     { id: 'panel-errors', text: '+ spec.panels.error_ratio: {kind: Panel, spec: {display: {name: Error ratio}, plugin: {kind: TimeSeriesChart}}}' },
     { id: 'query-errors', text: '+ spec.panels.error_ratio.spec.plugin.spec.queries[0].spec.plugin.spec.query: sum(rate(http_server_requests_total{service="checkout", code=~"5.."}[5m])) / sum(rate(http_server_requests_total{service="checkout"}[5m]))' },
     { id: 'panel-count', text: '+ spec.panels.request_count: {kind: Panel, spec: {display: {name: Request count}, plugin: {kind: TimeSeriesChart}}}' },
-    { id: 'query-count', text: '+ spec.panels.request_count.spec.plugin.spec.queries[0].spec.plugin.spec.query: sum(increase(http_server_requests_total{service="checkout"}[5m]))' },
   ],
   faults: ['metadata', 'item-errors', 'item-latency'],
   whyNot: {
-    header: 'The same <code>apiVersion</code> as the example in Dash0\'s documentation of a dashboard the operator manages. Nothing here needs to change.',
+    header: 'The <code>apiVersion</code> of the example in Dash0\'s documentation of a dashboard the operator manages, which names the Perses API the resource belongs to. Nothing about this line is wrong.',
+    kind: 'A dashboard the operator manages is a <code>PersesDashboard</code>, the kind in Dash0\'s example. It says what resource the file is, and it matches.',
+    display: 'The name the dashboard shows in Dash0, set under <code>spec.display.name</code> as in Dash0\'s example. It is a title, and any title is fine.',
     'item-rate': 'Its <code>x: 0</code> is the left edge that <code>items[3]</code> shares, one band of the grid further down, and its width of 12 is every item\'s width. Read as cells it covers columns 0 to 12 of the 24, well inside the grid.',
     'item-corner': 'Read as cells it covers columns 12 to 24 of the grid\'s second band (<code>y</code> 6 to 12), which ends exactly at the edge, and it names <code>request_count</code>, a panel the file defines and no other item shows. Its <code>x: 12</code> is not shared with another item, but nothing about it is wrong.',
     'panel-errors': 'This panel is defined, and the item that names it points at the right key. What is wrong with that item is where it sits on the grid, not the panel it shows.',
-    'query-rate': 'A counter\'s <code>rate</code> over 5 minutes, summed: a request rate per second, the right shape for a counter on a time series chart.',
-    'query-count': 'A counter\'s <code>increase</code> over 5 minutes, summed: how many requests arrived in the window, a plain count the chart can draw.',
     'query-errors': 'The share of requests that fail: the rate of 5xx requests divided by the rate of all requests over the same 5 minutes, so it is a ratio between 0 and 1.',
   },
   explain:
@@ -111,7 +111,7 @@ export default {
           'Kettle &amp; Co keeps its dashboards in git and applies them with the Dash0 operator for Kubernetes: a <code>PersesDashboard</code> resource in a namespace that has a Dash0 monitoring resource becomes a dashboard in Dash0. ' +
           'The cluster has monitoring resources in <code>checkout</code> and <code>payments</code>, and none in <code>tools</code>. ' +
           'A pull request adds <code>dashboards/checkout-overview.yaml</code>, a new file in the Perses format Dash0 dashboards use. ' +
-          'Below is every line it adds, one key per line with its path from the top of the file. In this game\'s reading, a Grid is 24 columns wide. A layout item names its panel in <code>$ref</code>; reading the fields as cells, <code>x</code> and <code>width</code> give the columns it covers, from <code>x</code> to <code>x + width</code>, and <code>y</code> and <code>height</code> the rows.',
+          'Below is every line it adds, one key per line with its path from the top of the file. In this game\'s reading, a layout is 24 columns wide. A layout item names its panel in <code>$ref</code>; reading the fields as cells, <code>x</code> and <code>width</code> give the columns it covers, from <code>x</code> to <code>x + width</code>, and <code>y</code> and <code>height</code> the rows.',
         question: 'Which lines would you stop in review?',
         qid: 'dac-q-spot',
         spot: SPOT,

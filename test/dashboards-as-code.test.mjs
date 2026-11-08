@@ -93,9 +93,27 @@ test('step 1: a valid config board of twelve added lines, hints off, faults on t
   assert.deepEqual(spec.helps, { hints: false });
   assert.equal(Object.hasOwn(spec, 'hint'), false, 'no authored hint (hints off)');
   assert.deepEqual(spec.faults, ['metadata', 'item-errors', 'item-latency']);
-  assert.deepEqual(spec.lines.slice(0, 2).map((l) => l.id), ['header', 'metadata'], 'a header decoy sits right above the metadata fault');
-  assert.equal(layout(spec), '.F' + '.F.F' + '......', 'the two faulty items are not adjacent');
+  assert.deepEqual(spec.lines.slice(0, 4).map((l) => l.id), ['header', 'kind', 'metadata', 'display'], 'header and kind decoys above the metadata fault, a display name decoy below it');
+  assert.equal(layout(spec), '..F' + '..F.F' + '....', 'the faults are not adjacent and follow no every-other-line pattern');
   assert.equal(spec.lines.length, 12);
+  // Shape-only rules over line position or parity: the faults sit at 2, 5 and 7, so none of these picks them, in the top half or anywhere.
+  const at3 = spec.faults.map((f) => spec.lines.findIndex((l) => l.id === f)).sort((a, b) => a - b);
+  assert.deepEqual(at3, [2, 5, 7]);
+  const idx = spec.lines.map((l, i) => i);
+  const parity = {
+    odd: idx.filter((i) => i % 2 === 1),
+    even: idx.filter((i) => i % 2 === 0),
+    'first half': idx.filter((i) => i < 6),
+    'second half': idx.filter((i) => i >= 6),
+    'odd and first half': idx.filter((i) => i % 2 === 1 && i < 6),
+    'even and first half': idx.filter((i) => i % 2 === 0 && i < 6),
+    'odd and second half': idx.filter((i) => i % 2 === 1 && i >= 6),
+    'even and second half': idx.filter((i) => i % 2 === 0 && i >= 6),
+  };
+  for (const [name, picked] of Object.entries(parity)) {
+    assert.equal(spotRun(picked.map((i) => spec.lines[i].id)).state.solved, false, `${name} (${picked}) solved the board`);
+    for (const take of [3, picked.length]) assert.equal(spotRun(picked.slice(0, take).map((i) => spec.lines[i].id)).state.solved, false, `${name} first ${take}`);
+  }
   for (const l of spec.lines) assert.match(l.text, /^\+ /, `${l.id} is an added line`);
   assert.equal(spotRun(spec.faults).state.solved, true, 'the three faults solve it');
   assert.equal(spotRun(['metadata', 'item-errors']).state.solved, false, 'two of three do not');
@@ -110,6 +128,10 @@ test('step 1: every field on the board is one the Dash0 example shows, and the l
       assert.equal(DOCS_KEYS.has(key) || NAMED.has(key), true, `${l.id}: ${key} is a field of the Dash0 example or a name the game gives`);
     }
   }
+  const kindLine = readLine(spec.lines.find((l) => l.id === 'kind').text);
+  assert.deepEqual([kindLine.path, kindLine.value], ['kind', 'PersesDashboard'], 'the kind of the Dash0 example');
+  const disp = readLine(spec.lines.find((l) => l.id === 'display').text);
+  assert.deepEqual([disp.path, disp.value], ['spec.display.name', 'Checkout overview']);
   const head = readLine(spec.lines.find((l) => l.id === 'header').text);
   assert.deepEqual([head.path, head.value], ['apiVersion', 'perses.dev/v1alpha1'], 'the header of the Dash0 example, on its own line');
   const meta = readLine(spec.lines.find((l) => l.id === 'metadata').text);
@@ -225,7 +247,7 @@ test('step 1: no odd-one-out rule over the layout fields picks the faults, and o
 });
 
 test('step 1 whyNot: only on decoys, each a full sentence that names no fault line, the tempting ones covered', () => {
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['header', 'item-corner', 'item-rate', 'panel-errors', 'query-count', 'query-errors', 'query-rate']);
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['display', 'header', 'item-corner', 'item-rate', 'kind', 'panel-errors', 'query-errors']);
   for (const [id, t] of Object.entries(spec.whyNot)) {
     assert.match(plain(t), /\S[\s\S]*\.$/, `${id} ends a sentence`);
     for (const f of spec.faults) assert.equal(plain(t).includes(spec.lines.find((l) => l.id === f).text), false, `${id} does not quote ${f}`);
@@ -244,7 +266,7 @@ test('step 1 explain: the namespace, the width in cells, and the missing panel, 
   }
   assert.doesNotMatch(e, /next column|0 to 12|drawn over each other/, 'no overlap story left');
   const intro = plain(SPOT_STEP.intro);
-  for (const s of ['monitoring resources in checkout and payments, and none in tools', 'dashboards/checkout-overview.yaml', 'a new file', 'every line it adds', 'In this game\'s reading, a Grid is 24 columns wide', 'reading the fields as cells']) assert.equal(intro.includes(s), true, s);
+  for (const s of ['monitoring resources in checkout and payments, and none in tools', 'dashboards/checkout-overview.yaml', 'a new file', 'every line it adds', 'In this game\'s reading, a layout is 24 columns wide', 'reading the fields as cells']) assert.equal(intro.includes(s), true, s);
 });
 
 // ---- step 2: how a team with no cluster deploys ---------------------------------------------
