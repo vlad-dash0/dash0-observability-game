@@ -57,6 +57,7 @@ const EXPECTED_ORDER = [
   'what-costs-money',
   'errors-tripled',
   'good-alerts',
+  'slis-and-slos',
   'semantic-convention-versions',
   'filter-or-sampler',
   'the-34-percent-error-rate',
@@ -134,7 +135,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
       no: 7,
       name: 'Alerting and SLOs',
       sub: 'Wake me only when it matters',
-      levelIds: ['good-alerts'],
+      levelIds: ['good-alerts', 'slis-and-slos'],
       bossId: null,
     },
     {

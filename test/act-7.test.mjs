@@ -44,12 +44,12 @@ const spotRun = (ids) => {
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-7 follows act-6, holds only 7.1, no boss, and is not coming soon', () => {
+test('act-7 follows act-6, holds 7.1 and 7.2, no boss, and is not coming soon', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-7');
   assert.ok(act, 'act-7 is in the registry');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 7, name: 'Alerting and SLOs', sub: 'Wake me only when it matters', levelIds: [ID], bossId: null },
+    { no: 7, name: 'Alerting and SLOs', sub: 'Wake me only when it matters', levelIds: [ID, 'slis-and-slos'], bossId: null },
   );
   const ids = LIVE.acts.map((a) => a.id);
   assert.equal(ids.indexOf('act-7'), ids.indexOf('act-6') + 1, 'act-7 comes right after act-6');
@@ -75,7 +75,8 @@ test('act-7 opens when acts 0-6 are complete, or once entered', () => {
   assert.equal(isActUnlocked(index, progressOf([ID]), LIVE), true, 'entered');
   const act = LIVE.acts[index];
   assert.equal(isActComplete(act, emptyProgress()), false);
-  assert.equal(isActComplete(act, progressOf([ID])), true, 'its one level completes it (no boss)');
+  assert.equal(isActComplete(act, progressOf([ID])), false, '7.2 is still to play');
+  assert.equal(isActComplete(act, progressOf([ID, 'slis-and-slos'])), true, 'its two levels complete it (no boss)');
 });
 
 test('7.1 fields: scored with no par time, in act-7, lights checkout, awards no card; mechanics as derived', () => {
@@ -188,12 +189,12 @@ test('sources: the four prometheus.io pages, a Spec line, a cited Dash0 page for
 
 // ---- the globe -----------------------------------------------------------------------------
 
-test('globe: 7.1 lights Japan, completing East Asia', () => {
+test('globe: 7.1 lights Japan; East Asia is complete only with 7.2 (7.2.test.mjs)', () => {
   assert.equal(LEVEL_COUNTRY[ID], 'JPN');
   assert.equal(COUNTRY_NAMES.JPN, 'Japan');
   assert.equal(ACT_REGIONS['act-7'].region, 'East Asia');
   const map = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES };
   const fresh = freshlyLit(emptyProgress(), progressOf([ID]), LIVE, map);
-  assert.deepEqual(fresh, { countryIds: ['JPN'], regionIds: ['act-7'] });
-  assert.equal(litText(fresh, level, map), 'Japan is now lit: Good alerts. East Asia is complete.');
+  assert.deepEqual(fresh, { countryIds: ['JPN'], regionIds: [] });
+  assert.equal(litText(fresh, level, map), 'Japan is now lit: Good alerts.');
 });

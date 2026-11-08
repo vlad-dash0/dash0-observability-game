@@ -472,4 +472,16 @@ export const DECK = [
     specUrl: 'https://opentelemetry.io/docs/collector/configuration/#connectors',
     dash0Angle: null,
   },
+  {
+    id: 'rate-not-value',
+    front: 'A counter only grows. Alert on its rate, not its value, and build an SLI from rates: the value says nothing about now.',
+    back:
+      'A counter only goes up, or resets to zero when the process restarts. Compare its value with a threshold and the rule ' +
+      'fires for good once the total passes it, failing or not; divide two totals and you average the whole history since the ' +
+      'restart, which hides what is failing now. rate() calculates the per-second average rate of increase over the range ' +
+      'you give it, and adjusts for counter resets from target restarts. So alert on a rate or an increase() over a window, and ' +
+      'write an SLI as the rate of good events over the rate of valid events: sum(rate(good[5m])) / sum(rate(all[5m])).',
+    specUrl: 'https://prometheus.io/docs/prometheus/latest/querying/functions/#rate',
+    dash0Angle: null,
+  },
 ];
