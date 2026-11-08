@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { liveRegistry } from '../app.mjs';
+import { DECK } from '../cards/deck.mjs';
 import { COMING_SOON } from '../hub/coming-soon.mjs';
 import { ACT_REGIONS, COUNTRY_NAMES, LEVEL_COUNTRY } from '../hub/globe-map.mjs';
 import { freshlyLit, litText } from '../lib/globe-ignite.mjs';
@@ -44,12 +45,12 @@ const spotRun = (ids) => {
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-7 follows act-6, holds only 7.1, no boss, and is not coming soon', () => {
+test('act-7 follows act-6, holds 7.1 and 7.2, no boss, and is not coming soon', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-7');
   assert.ok(act, 'act-7 is in the registry');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 7, name: 'Alerting and SLOs', sub: 'Wake me only when it matters', levelIds: [ID], bossId: null },
+    { no: 7, name: 'Alerting and SLOs', sub: 'Wake me only when it matters', levelIds: [ID, 'slis-and-slos'], bossId: null },
   );
   const ids = LIVE.acts.map((a) => a.id);
   assert.equal(ids.indexOf('act-7'), ids.indexOf('act-6') + 1, 'act-7 comes right after act-6');
@@ -75,10 +76,11 @@ test('act-7 opens when acts 0-6 are complete, or once entered', () => {
   assert.equal(isActUnlocked(index, progressOf([ID]), LIVE), true, 'entered');
   const act = LIVE.acts[index];
   assert.equal(isActComplete(act, emptyProgress()), false);
-  assert.equal(isActComplete(act, progressOf([ID])), true, 'its one level completes it (no boss)');
+  assert.equal(isActComplete(act, progressOf([ID])), false, '7.2 is still to play');
+  assert.equal(isActComplete(act, progressOf([ID, 'slis-and-slos'])), true, 'its two levels complete it (no boss)');
 });
 
-test('7.1 fields: scored with no par time, in act-7, lights checkout, awards no card; mechanics as derived', () => {
+test('7.1 fields: scored with no par time, in act-7, lights checkout, awards the rate-not-value card; mechanics as derived', () => {
   assert.deepEqual(
     { no: level.no, name: level.name, sub: level.sub, icon: level.icon, rewardTitle: level.rewardTitle, kind: level.kind, actId: level.actId, parMs: level.scoring.parMs },
     { no: '7.1', name: 'Good alerts', sub: 'Page on what users feel', icon: '\u{1F514}', rewardTitle: 'Alert tuner', kind: 'level', actId: 'act-7', parMs: null },
@@ -86,10 +88,21 @@ test('7.1 fields: scored with no par time, in act-7, lights checkout, awards no 
   assert.deepEqual([...level.mechanics], ['spot'], 'derived from the steps: choice is not a mechanic');
   assert.deepEqual(level.play.steps.map((s) => ['spot', 'choice'].find((k) => s[k])), ['spot', 'choice']);
   assert.equal(level.play.prefix, 'ga');
-  assert.deepEqual([...level.cards], []);
+  assert.deepEqual([...level.cards], ['rate-not-value']);
   assert.deepEqual([...level.lights], ['checkout']);
   const titles = Object.values(LIVE.levels).map((l) => l.rewardTitle);
   assert.equal(titles.filter((t) => t === 'Alert tuner').length, 1, 'the reward title is unique');
+});
+
+test('card rate-not-value: pinned front, spec URL on prometheus.io, no Dash0 angle, front fits a card, an alerting lesson', () => {
+  const card = DECK.find((c) => c.id === 'rate-not-value');
+  assert.equal(card.front, 'A counter only grows. Alert on its rate or increase() over a window, not its value: the value says nothing about now.');
+  assert.equal(card.front.length <= 140, true, `front is ${card.front.length} characters`);
+  assert.equal(card.specUrl, 'https://prometheus.io/docs/prometheus/latest/querying/functions/#rate');
+  assert.equal(card.dash0Angle, null);
+  for (const w of ['resets to zero', 'per-second average rate of increase', 'increase()', 'sum(rate(errors[5m])) / sum(rate(all[5m])) > 0.02']) assert.equal(card.back.includes(w), true, w);
+  assert.equal(/\bSLI\b/.test(card.front + card.back), false, 'an SLI is 7.2, after this card');
+  assert.equal(card.back.includes('\u2014') || card.front.includes('\u2014'), false, 'no em dash');
 });
 
 // ---- step 1: Spot it ----------------------------------------------------------------------
@@ -188,12 +201,12 @@ test('sources: the four prometheus.io pages, a Spec line, a cited Dash0 page for
 
 // ---- the globe -----------------------------------------------------------------------------
 
-test('globe: 7.1 lights Japan, completing East Asia', () => {
+test('globe: 7.1 lights Japan; East Asia is complete only with 7.2 (test/slis-and-slos.test.mjs)', () => {
   assert.equal(LEVEL_COUNTRY[ID], 'JPN');
   assert.equal(COUNTRY_NAMES.JPN, 'Japan');
   assert.equal(ACT_REGIONS['act-7'].region, 'East Asia');
   const map = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES };
   const fresh = freshlyLit(emptyProgress(), progressOf([ID]), LIVE, map);
-  assert.deepEqual(fresh, { countryIds: ['JPN'], regionIds: ['act-7'] });
-  assert.equal(litText(fresh, level, map), 'Japan is now lit: Good alerts. East Asia is complete.');
+  assert.deepEqual(fresh, { countryIds: ['JPN'], regionIds: [] });
+  assert.equal(litText(fresh, level, map), 'Japan is now lit: Good alerts.');
 });
