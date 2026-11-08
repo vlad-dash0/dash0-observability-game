@@ -149,6 +149,10 @@ const ANSWERS = {
     'choice eig-page: outside-check',
   ],
   'semantic-convention-versions': ['spot scv-spot: http-target,net-host-port,http-status-code', 'choice scv-switch: move-queries'],
+  'migrating-vendors': [
+    'sort mv-sort: p95-chart=approximated ratio-alert=translated agent-panel=skipped anomaly-chart=manual memory-chart=translated p99-alert=approximated retired-alert=skipped failed-count=approximated paging-alert=manual unused-dashboard=skipped disk-alert=translated logs-panel=manual',
+    'choice mv-fix: boundary',
+  ],
   'filter-or-sampler': ['choice fos-verdict: wrong', 'sort fos-sort: errors-whole=tail healthz=filter slow-no-cache=both slow=tail debug-logs=filter many-spans=tail production-only=filter via-payments=tail errors-no-keepalive=both'],
   'the-34-percent-error-rate': ['choice ser-verdict: wrong', 'tradeoff ser-plan: sampler=errors-10pct rate=red-before'],
   'errors-tripled': [

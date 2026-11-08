@@ -52,6 +52,7 @@ import slisAndSlos from './slis-and-slos.mjs';
 import burnRateAlerts from './burn-rate-alerts.mjs';
 import syntheticChecks from './synthetic-checks.mjs';
 import semanticConventionVersions from './semantic-convention-versions.mjs';
+import migratingVendors from './migrating-vendors.mjs';
 import spanKinds from './span-kinds.mjs';
 import spansAndTraces from './spans-and-traces.mjs';
 import statusAndErrors from './status-and-errors.mjs';
@@ -150,7 +151,7 @@ export const ACTS = [
     badges: ['dash0'],
     teaser:
       'Dashboards as code, semantic convention upgrades, migrating vendors, browser telemetry and AI-assisted debugging.',
-    levels: [semanticConventionVersions],
+    levels: [semanticConventionVersions, migratingVendors],
     boss: null,
   },
   {

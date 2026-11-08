@@ -79,7 +79,7 @@ test('the live hub lists no soon act; acts 7 and 8 are playable, even a debug hu
   assert.equal(nos.every((n, i) => i === 0 || n > nos[i - 1]), true, `act numbers increase: ${nos}`);
   const act8 = game.acts.find((a) => a.id === 'act-8');
   assert.equal(act8.soon, false, 'act-8 is a playable act on the hub');
-  assert.deepEqual([...act8.ids], ['semantic-convention-versions']);
+  assert.deepEqual([...act8.ids], ['semantic-convention-versions', 'migrating-vendors']);
   assert.deepEqual([...game.acts.find((a) => a.id === 'act-7').ids], ['good-alerts', 'slis-and-slos', 'burn-rate-alerts', 'synthetic-checks', 'everything-is-green']);
   assert.equal(game.nudgeId, null);
   assert.equal(game.overlayOpen, false);
