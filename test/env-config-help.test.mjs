@@ -86,3 +86,12 @@ test('tier 2 points at the variable in use and at its line, and says a missing v
   assert.match(misspelt, /^<p><code>OTEL_RESOURCE_ATTRIBUTES<\/code> is not set in the file\./);
   for (const html of [fromList, misspelt]) assert.doesNotMatch(plain(html), /checkout|cart|1\.4\.2|production/);
 });
+
+test('tier 2 for a missing service name: absent says not set; present but blank says empty on its line; no value leaks', () => {
+  const absent = hintFor(GIVEN, 2).html;
+  assert.match(plain(absent), /^OTEL_SERVICE_NAME is not set, so the SDK falls back to a made-up one\./);
+  assert.doesNotMatch(plain(absent), /\bIn OTEL_SERVICE_NAME/);
+  const blank = hintFor(`${GIVEN}\nOTEL_SERVICE_NAME=`, 2).html;
+  assert.match(plain(blank), /^In OTEL_SERVICE_NAME \(line 3\): it is empty, so the SDK falls back to a made-up one\./);
+  for (const html of [absent, blank]) assert.doesNotMatch(plain(html), /checkout|1\.4\.2|production|unknown_service/);
+});

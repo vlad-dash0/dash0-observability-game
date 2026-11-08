@@ -175,7 +175,8 @@ export default {
         const result = checkConfig(text, TARGET, PROCESS);
         if (!result.ok) {
           // Only a new failing config costs a mistake; any config already checked (same after normalising) is free.
-          const norm = normalizeConfig(text);
+          // A .env parses the same without indentation or blank lines, so the key ignores both.
+          const norm = normalizeConfig(text).split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
           const same = tried.has(norm);
           tried.add(norm);
           const n = plural(result.issues.length, 'problem', 'problems');

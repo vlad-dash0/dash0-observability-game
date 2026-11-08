@@ -115,7 +115,7 @@ test('hint tier 2 names the first problem in the player text by its variable, wi
   click('#nys-hint');
   click('#nys-hint');
   assert.match(hintText(), /^Hint 2 of 3/);
-  assert.match(hintText(), /In OTEL_SERVICE_NAME: no service name is set/);
+  assert.match(hintText(), /OTEL_SERVICE_NAME is not set, so the SDK falls back to a made-up one/);
   assert.match(hintText(), /finished answer has 3 pairs, the service name included; yours has 2/);
 });
 
@@ -232,6 +232,21 @@ test('any config already checked is free: a trailing newline, trailing spaces, C
   click('#nys-check');
   assert.equal(tone(), 'neutral');
   assert.equal(q('#nys-wrong').textContent, '2', 'going back to A is free');
+});
+
+test('a repeat ignores indentation and blank lines: an indented first line and a blank line between lines are free', () => {
+  start();
+  toEditor();
+  const A = q('#nys-env').value;
+  click('#nys-check');
+  assert.equal(q('#nys-wrong').textContent, '1');
+  for (const same of [`  ${A}`, A.replace('\n', '\n\n')]) {
+    assert.notEqual(same, A);
+    q('#nys-env').value = same;
+    click('#nys-check');
+    assert.equal(tone(), 'neutral');
+    assert.equal(q('#nys-wrong').textContent, '1', JSON.stringify(same));
+  }
 });
 
 test('a blank Check is free and neutral, and says what to do', () => {
