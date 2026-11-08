@@ -140,8 +140,8 @@ Each level lists **concept** / **OTel nuance** / **Dash0 tie-in** / **mechanic**
 | --- | --- | --- | --- | --- |
 | 7.1 Good alerts | Symptoms not causes; `for` durations; flapping | Alerting on a cumulative counter's value instead of its rate | Dash0 check rules are Prometheus-compatible | Spot it |
 | 7.2 SLIs and SLOs | Good events / valid events; error budgets | Choosing the SLI from server spans vs load-balancer metrics | n/a | Query it |
-| 7.3 Burn-rate alerts | Multi-window, multi-burn-rate | Short window alone pages on blips; long window alone pages too late | Check rules + notification channels | Query it |
-| 7.4 Synthetic checks | Probing from outside | Synthetics catch DNS/TLS/CDN problems your spans never see | Dash0 synthetic checks | Configure it |
+| 7.3 Burn-rate alerts | Multi-window, multi-burn-rate | Short window alone pages on blips; long window alone starts slowly and keeps paging after the fix | Check rules + notification channels | Query it + Choice |
+| 7.4 Synthetic checks | Probing from outside | Synthetics catch DNS/TLS/CDN problems that stop requests reaching your service (your spans still record failed calls out of it) | Dash0 synthetic checks | Sort it + Choice |
 
 ### Act 8: Operating at scale ("As code")
 

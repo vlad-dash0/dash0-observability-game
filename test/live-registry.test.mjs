@@ -58,6 +58,8 @@ const EXPECTED_ORDER = [
   'errors-tripled',
   'good-alerts',
   'slis-and-slos',
+  'burn-rate-alerts',
+  'synthetic-checks',
   'semantic-convention-versions',
   'filter-or-sampler',
   'the-34-percent-error-rate',
@@ -135,7 +137,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
       no: 7,
       name: 'Alerting and SLOs',
       sub: 'Wake me only when it matters',
-      levelIds: ['good-alerts', 'slis-and-slos'],
+      levelIds: ['good-alerts', 'slis-and-slos', 'burn-rate-alerts', 'synthetic-checks'],
       bossId: null,
     },
     {
@@ -227,6 +229,7 @@ const HINTLESS = {
   'tail-sampling': ['spot'],
   'ottl-and-transforms': ['spot'],
   'good-alerts': ['spot'],
+  'synthetic-checks': ['sort'],
   'semantic-convention-versions': ['spot'],
 };
 

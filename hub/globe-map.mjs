@@ -2,10 +2,15 @@
 // country a level is. Pure data plus one lookup; hub/globe-data.mjs holds the generated dots.
 //
 // TO ADD A LEVEL: add its id to LEVEL_COUNTRY with a country from its act's region that is not
-// used yet and has at least MIN_DOTS dots (test/globe-data.test.mjs checks all of that).
+// used yet and has at least MIN_DOTS dots, bar the MIN_DOTS_EXCEPTIONS entries (test/globe-data.test.mjs checks all of that).
 
-// Every country in LEVEL_COUNTRY has at least this many land dots, so it is visible lit.
+// Every country in LEVEL_COUNTRY has at least this many land dots (bar MIN_DOTS_EXCEPTIONS), so it is visible lit.
 export const MIN_DOTS = 6;
+
+// The one narrow exception: South Korea has 5 dots on the 110m data (it is small), and the only other unused East Asia
+// country with 6 or more dots is North Korea (6), passed over for a demo-friendlier pick; Taiwan has 2. A code
+// listed here needs at least its own minimum instead of MIN_DOTS (test/globe-data.test.mjs pins this table).
+export const MIN_DOTS_EXCEPTIONS = Object.freeze({ KOR: 5 });
 
 // act id -> region name and the Natural Earth SUBREGION values it covers. Owner defaults
 // (2026-11-04): Southern Europe counts as Western Europe, Central America and the Caribbean
@@ -75,6 +80,8 @@ export const LEVEL_COUNTRY = Object.freeze({
   // act-7 East Asia
   'good-alerts': 'JPN',
   'slis-and-slos': 'CHN',
+  'burn-rate-alerts': 'MNG',
+  'synthetic-checks': 'KOR',
   // act-8 Southeast Asia
   'semantic-convention-versions': 'THA',
   // act-9 Oceania
@@ -93,7 +100,7 @@ export const COUNTRY_NAMES = Object.freeze({
   DZA: 'Algeria', COD: 'the Democratic Republic of the Congo', ZAF: 'South Africa',
   KAZ: 'Kazakhstan', SAU: 'Saudi Arabia', TUR: 'Turkey', UZB: 'Uzbekistan', TKM: 'Turkmenistan', IRQ: 'Iraq',
   IND: 'India', IRN: 'Iran', PAK: 'Pakistan',
-  JPN: 'Japan', CHN: 'China',
+  JPN: 'Japan', CHN: 'China', MNG: 'Mongolia', KOR: 'South Korea',
   THA: 'Thailand',
   AUS: 'Australia', NZL: 'New Zealand', PNG: 'Papua New Guinea',
 });

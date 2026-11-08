@@ -40,7 +40,7 @@ test('7.2 fields: second level of act-7, scored with no par time, query and choi
   assert.deepEqual([...level.cards], [], 'the rate-not-value card is awarded by 7.1');
   assert.equal(Object.values(LIVE.levels).filter((l) => l.rewardTitle === 'Budget keeper').length, 1, 'the reward title is unique');
   const act = LIVE.acts.find((a) => a.id === 'act-7');
-  assert.deepEqual([...act.levelIds], ['good-alerts', ID]);
+  assert.deepEqual([...act.levelIds], ['good-alerts', ID, 'burn-rate-alerts', 'synthetic-checks']);
 });
 
 // ---- step 1: the shape of an SLI -----------------------------------------------------------
@@ -203,11 +203,11 @@ test('sources: Spec lines on prometheus.io and opentelemetry.io only, facts and 
 
 // ---- the globe -----------------------------------------------------------------------------
 
-test('globe: 7.2 lights China and completes East Asia', () => {
+test('globe: 7.2 lights China; East Asia is complete only with 7.4 (test/synthetic-checks.test.mjs)', () => {
   assert.equal(LEVEL_COUNTRY[ID], 'CHN');
   assert.equal(COUNTRY_NAMES.CHN, 'China');
   const map = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES };
   const fresh = freshlyLit(progressOf(['good-alerts']), progressOf(['good-alerts', ID]), LIVE, map);
-  assert.deepEqual(fresh, { countryIds: ['CHN'], regionIds: ['act-7'] });
-  assert.equal(litText(fresh, level, map), 'China is now lit: SLIs and SLOs. East Asia is complete.');
+  assert.deepEqual(fresh, { countryIds: ['CHN'], regionIds: [] });
+  assert.equal(litText(fresh, level, map), 'China is now lit: SLIs and SLOs.');
 });

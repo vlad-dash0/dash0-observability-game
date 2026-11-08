@@ -484,4 +484,32 @@ export const DECK = [
     specUrl: 'https://prometheus.io/docs/prometheus/latest/querying/functions/#rate',
     dash0Angle: null,
   },
+  {
+    id: 'multi-window-burn',
+    front: 'Page on a burn rate over two windows: the long one says it is worth a page, the short one says it is still happening.',
+    back:
+      'Burn rate is the error ratio divided by what the SLO allows. A short window alone pages on a blip: a 30-second total outage reads ' +
+      '100 on the last 5 minutes, yet it spent only 1.2% of a 30-day budget. A long window alone starts slowly and keeps paging after the fix: ' +
+      'a 10-minute outage still reads 167 on the last hour six minutes after the rollback. Pairing them does not speed up the start; it removes the blips ' +
+      'and clears the page soon after recovery. Require both above the line, for example 14.4, which is 2% of a 30-day budget spent in an hour. ' +
+      'The 30-day window and these figures are the game\'s example; Dash0 SLOs use 28 days.',
+    specUrl: 'https://www.dash0.com/docs/dash0/monitoring/alerting/slos',
+    dash0Angle:
+      'A Dash0 SLO exposes ready-made fast burn and slow burn signals (a fast burn spends the budget quickly, a slow burn slowly), each paired with a shorter window that confirms the problem is still happening, ' +
+      'so a check rule on them needs no hand-built two-window query.',
+  },
+  {
+    id: 'synthetics-see-the-edge',
+    front: 'Failures in front of your service (DNS, TLS, CDN, load balancer) leave no server span of yours; a probe from outside sees them.',
+    back:
+      'A server span covers the handling of a request that arrived at your service. A failed DNS lookup, a failed TLS handshake, or an answer from ' +
+      'a CDN or a load balancer in front of it can happen before the request reaches your code, so your service records no server span and its ' +
+      'error ratio can stay at 0%. A proxy or ingress you instrument records its own span, and a failed call out of your service is recorded ' +
+      'by its client span, DNS error included. A synthetic check sends its own request from outside at regular intervals and fails when the lookup, ' +
+      'the handshake or the response is wrong. Keep the spans for why a request that arrived went wrong.',
+    specUrl: 'https://opentelemetry.io/docs/specs/semconv/http/http-spans/',
+    dash0Angle:
+      'A Dash0 synthetic check runs from public or private locations, shows DNS resolution, TCP connection and the SSL/TLS handshake ' +
+      'for each run, and sends a notification through your channels when an assertion fails.',
+  },
 ];
