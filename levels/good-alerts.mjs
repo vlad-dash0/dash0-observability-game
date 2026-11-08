@@ -81,7 +81,7 @@ export default {
   sub: 'Page on what users feel',
   icon: '\u{1F514}',
   rewardTitle: 'Alert tuner',
-  cards: [],
+  cards: ['rate-not-value'],
   lights: ['checkout'],
   scoring: { parMs: null },
   play: {

@@ -1,12 +1,11 @@
 // Level 7.2 "SLIs and SLOs" beyond the generated play-through (test/play.test.mjs, test/answers.test.mjs):
-// level fields, the card and the globe; the Query it step (the reference result read independently from the
+// level fields (the card is 7.1's, test/act-7.test.mjs) and the globe; the Query it step (the reference result read independently from the
 // dataset's samples, not trivially 0 or 1, and the obvious wrong queries failing through the real grader);
 // the three Choices; and the sources. Asserts strings, numbers and booleans only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { liveRegistry } from '../app.mjs';
-import { DECK } from '../cards/deck.mjs';
 import { ACT_REGIONS, COUNTRY_NAMES, LEVEL_COUNTRY } from '../hub/globe-map.mjs';
 import { freshlyLit, litText } from '../lib/globe-ignite.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
@@ -38,20 +37,10 @@ test('7.2 fields: second level of act-7, scored with no par time, query and choi
   assert.deepEqual([...level.mechanics], ['query'], 'derived from the steps: choice is not a mechanic');
   assert.deepEqual(level.play.steps.map((s) => ['choice', 'query'].find((k) => s[k])), ['choice', 'query', 'choice', 'choice']);
   assert.deepEqual([...level.lights], ['checkout', 'api-gateway']);
-  assert.deepEqual([...level.cards], ['rate-not-value']);
+  assert.deepEqual([...level.cards], [], 'the rate-not-value card is awarded by 7.1');
   assert.equal(Object.values(LIVE.levels).filter((l) => l.rewardTitle === 'Budget keeper').length, 1, 'the reward title is unique');
   const act = LIVE.acts.find((a) => a.id === 'act-7');
   assert.deepEqual([...act.levelIds], ['good-alerts', ID]);
-});
-
-test('card rate-not-value: pinned front, spec URL on prometheus.io, no Dash0 angle, front fits a card', () => {
-  const card = DECK.find((c) => c.id === 'rate-not-value');
-  assert.equal(card.front, 'A counter only grows. Alert on its rate, not its value, and build an SLI from rates: the value says nothing about now.');
-  assert.equal(card.front.length <= 140, true, `front is ${card.front.length} characters`);
-  assert.equal(card.specUrl, 'https://prometheus.io/docs/prometheus/latest/querying/functions/#rate');
-  assert.equal(card.dash0Angle, null);
-  for (const w of ['resets to zero', 'per-second average rate of increase', 'sum(rate(good[5m])) / sum(rate(all[5m]))', 'increase()']) assert.equal(card.back.includes(w), true, w);
-  assert.equal(card.back.includes('\u2014') || card.front.includes('\u2014'), false, 'no em dash');
 });
 
 // ---- step 1: the shape of an SLI -----------------------------------------------------------
@@ -120,7 +109,7 @@ test('step 2 graded for real: each obvious wrong query fails, and the verdict te
     'no rate': [`sum(${CALLS}{${SRV}, status_code!="STATUS_CODE_ERROR"}) / sum(${CALLS}{${SRV}})`, 'wrong-values'],
     'inverted ratio': [ratio(SRV, `${SRV}, status_code!="STATUS_CODE_ERROR"`), 'wrong-values'],
     'error ratio, not the good one': [ratio(`${SRV}, status_code="STATUS_CODE_ERROR"`, SRV), 'wrong-values'],
-    'wrong status value': [ratio(`${SRV}, status_code="STATUS_CODE_OK"`, SRV), 'empty'],
+    'STATUS_CODE_OK (this dataset has no OK series)': [ratio(`${SRV}, status_code="STATUS_CODE_OK"`, SRV), 'empty'],
     'good over errors, not over all': [ratio(`${SRV}, status_code!="STATUS_CODE_ERROR"`, `${SRV}, status_code="STATUS_CODE_ERROR"`), 'wrong-values'],
     'good events only, no division': [`sum(rate(${CALLS}{${SRV}, status_code!="STATUS_CODE_ERROR"}[5m]))`, 'wrong-values'],
     'client spans counted too': [ratio('service_name="checkout", status_code!="STATUS_CODE_ERROR"', 'service_name="checkout"'), 'wrong-values'],
@@ -153,7 +142,11 @@ test('step 3: the 0.1% budget of 1,000,000 valid requests is 1,000, the illustra
   const choices = BUDGET_STEP.choice.choices;
   assert.deepEqual(choices.map((c) => c.key), ['thousand', 'hundred', 'ten-thousand', 'all-but']);
   assert.deepEqual(choices.filter((c) => c.right).map((c) => c.key), ['thousand']);
-  assert.match(plain(choices[0].label), /^1,000 failed requests/);
+  assert.deepEqual(choices.map((c) => plain(c.label)), ['1,000 failed requests (0.1%)', '100 failed requests (0.01%)', '10,000 failed requests (1%)', '999,000 failed requests (99.9%)'], 'all four labels are a number and a percentage');
+  for (const c of choices) assert.equal(/leaves over/.test(plain(c.label)), false, 'only the intro and the explanations say "leaves over"');
+  assert.match(plain(BUDGET_STEP.intro), /91\.7%/, 'the gap between checkout now and the SLO is acknowledged');
+  assert.match(plain(BUDGET_STEP.intro), /budget is spent/);
+  assert.equal(choices.filter((c) => Math.round(1_000_000 * Number(plain(c.label).match(/\(([\d.]+)%\)/)[1]) / 100) === Number(plain(c.label).match(/^([\d,]+)/)[1].replace(/,/g, ''))).length, 4, 'each number is its percentage of 1,000,000');
   assert.equal(Math.round(1_000_000 * (1 - 0.999)), 1000, 'the budget is 1,000');
   assert.match(plain(BUDGET_STEP.intro), /illustrative/);
   assert.match(plain(BUDGET_STEP.intro), /99\.9%/);
@@ -171,7 +164,20 @@ test('step 4: the load balancer is the right source; server spans are the tempti
   assert.match(plain(choices[0].why), /never reached checkout/);
   assert.match(plain(choices[2].why), /twice/);
   assert.match(plain(EDGE_STEP.intro), /502/);
-  assert.equal(plain(EDGE_STEP.intro).includes('99.95%'), true, 'the server-span SLI looks healthy through the outage');
+  const intro = plain(EDGE_STEP.intro);
+  assert.match(intro, /load balancer[^.]*\(the edge of your system\)/, 'the edge is defined on first use');
+  assert.equal(intro.includes('99.95%') && intro.includes('99.81%'), true, 'both figures are stated');
+  // The arithmetic: a 1-hour outage in a 30-day window, steady traffic, 99.95% of served requests good.
+  const window = 30 * 24, outage = 1, slo = 0.999;
+  assert.equal(intro.includes(`1 hour of ${window}`), true);
+  const turnedAway = outage / window;
+  assert.equal(turnedAway.toFixed(4), '0.0014', 'about 0.14% of the requests got a 502');
+  const server = 0.9995;
+  const edge = 1 - turnedAway - (1 - server) * (1 - turnedAway);
+  assert.equal(edge.toFixed(4), '0.9981', 'the load balancer SLI is about 99.81%');
+  assert.deepEqual([server >= slo, edge >= slo], [true, false], 'the server spans meet the SLO and the edge misses it');
+  assert.match(intro, /30 days/);
+  assert.doesNotMatch(intro, /week/);
 });
 
 // ---- sources -------------------------------------------------------------------------------
@@ -184,10 +190,14 @@ test('sources: Spec lines on prometheus.io and opentelemetry.io only, facts and 
     'https://opentelemetry.io/docs/specs/semconv/http/http-spans/',
     'https://opentelemetry.io/docs/collector/components/connector/',
   ]);
-  for (const url of SRC.match(/https:\/\/[^\s,)]+/g)) assert.equal(['prometheus.io', 'opentelemetry.io'].includes(new URL(url).host), true, url);
+  for (const url of SRC.match(/https:\/\/[^\s,)]+/g)) assert.equal(['prometheus.io', 'opentelemetry.io', 'github.com'].includes(new URL(url).host), true, url);
+  assert.equal(/^\/\/ Docs \(GitHub, spanmetrics connector README at v0\.164\.0.*connector\/spanmetricsconnector\/README\.md$/m.test(SRC), true, 'the spanmetrics README is cited on a Docs line');
   assert.match(SRC, /Facts used/);
+  assert.doesNotMatch(SRC, /read on the pages above/);
   assert.match(SRC, /Invented/);
   assert.doesNotMatch(plain(JSON.stringify(level.play)), /Dash0/, '7.2 has no Dash0 tie-in (OUTLINE: n/a)');
+  assert.doesNotMatch(plain(JSON.stringify(level.play)), /\bevents?\b/, 'player-facing copy says requests');
+  assert.match(plain(level.play.finish), /^You can turn "it works" into a ratio of good requests to valid requests, and compute it from rates, not from a counter's total\. You can read the error budget off an SLO\. You know /);
   assert.equal(SRC.includes('\u2014'), false, 'no em dash');
 });
 

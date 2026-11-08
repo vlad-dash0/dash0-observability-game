@@ -1,20 +1,23 @@
 // Level 7.2: SLIs and SLOs. Act 7 "Alerting and SLOs". Kettle & Co's checkout team wants a number for "checkout works". The player
-// picks the shape of an SLI (good events over valid events, Choice), writes it as a PromQL ratio of rates over the checkout server
+// picks the shape of an SLI (good requests over valid requests, Choice), writes it as a PromQL ratio of rates over the checkout server
 // spans (Query it), reads an error budget off an SLO target (Choice), and then meets the nuance: server spans never see a request the
 // load balancer turned away, so the user-facing SLI is measured at the edge (Choice with a tempting wrong option). Hints are on for
 // the Query it step only, as in 3.7.
 // Spec: https://prometheus.io/docs/prometheus/latest/querying/functions/#rate , https://prometheus.io/docs/concepts/metric_types/#counter
 // Spec: https://opentelemetry.io/docs/specs/semconv/http/http-spans/ , https://opentelemetry.io/docs/collector/components/connector/
+// Docs (GitHub, spanmetrics connector README at v0.164.0, as levels/red-and-use.mjs cites it): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.164.0/connector/spanmetricsconnector/README.md
 //
-// Facts used (each read on the pages above, 2026-11-07): rate() calculates the per-second average rate of increase of the series in
+// Facts used (each read on the page named in its parentheses, 2026-11-07): rate() calculates the per-second average rate of increase of the series in
 // the range vector, and counter resets from target restarts are adjusted for (the functions page); a counter only goes up, or resets
 // to zero on a restart (the metric types page); an HTTP server span is set to the error status for a 5xx and otherwise left unset
-// (the HTTP spans page, as already used by 3.7); the spanmetrics connector counts spans into a calls metric by service.name,
-// span.name, span.kind and status.code (the connector page, as in 3.7).
+// (the HTTP spans page, as already used by 3.7); the spanmetrics connector counts spans into a calls metric, which a Prometheus
+// backend sees as traces_span_metrics_calls_total, by service.name, span.name, span.kind and status.code, with the status codes
+// STATUS_CODE_UNSET, STATUS_CODE_OK and STATUS_CODE_ERROR and the span kinds such as SPAN_KIND_SERVER (the spanmetrics README, as
+// in 3.7; the connector page only lists the connectors).
 //
 // Invented for the game, not claimed from any source: the company, the numbers, the 99.9% target, the 30-day window (labelled
 // illustrative in the copy because the data is one hour) and the load balancer story. The definitions of SLI, SLO and error budget
-// are in the game's own words: an SLI is a ratio of good events to valid events, an SLO is the target for it, the budget is what the
+// are in the game's own words: an SLI is a ratio of good requests to valid requests, an SLO is the target for it, the budget is what the
 // target leaves over. No edge counter exists in the data, so the edge-vs-server step is a Choice, not a query. No Dash0 claim.
 
 const SLI = [
@@ -22,7 +25,7 @@ const SLI = [
     key: 'good-over-valid',
     label: 'Good requests over valid requests, as a share of the traffic',
     right: true,
-    why: 'A ratio of good events to valid events is a number between 0 and 1 that means the same on a quiet night and on a sale day, and an SLO target can be set against it: 99.9% good. What counts as good and as valid is your decision, and it is written down once.',
+    why: 'A ratio of good requests to valid requests is a number between 0 and 1 that means the same on a quiet night and on a sale day, and an SLO target can be set against it: 99.9% good. What counts as good and as valid is your decision, and it is written down once.',
   },
   {
     key: 'error-count',
@@ -39,23 +42,23 @@ const SLI = [
 const BUDGET = [
   {
     key: 'thousand',
-    label: '1,000 failed requests: the 0.1% the target leaves over',
+    label: '1,000 failed requests (0.1%)',
     right: true,
     why: 'The error budget is what the SLO leaves over: 100% minus 99.9% is 0.1%, and 0.1% of 1,000,000 valid requests is 1,000. Spend them on deploys and mistakes; once they are gone, the target is missed.',
   },
   {
     key: 'hundred',
-    label: '100 failed requests: 0.01% of the traffic, a tenth of a tenth',
+    label: '100 failed requests (0.01%)',
     why: 'That is 0.01% of the requests. The target is 99.9% good, so the failures allowed are the other 0.1%, and 0.1% of 1,000,000 is 1,000.',
   },
   {
     key: 'ten-thousand',
-    label: '10,000 failed requests: 1% of the traffic is still fine',
+    label: '10,000 failed requests (1%)',
     why: 'That is a 99% target. At 99.9%, the failures allowed are 0.1% of the valid requests, which is 1,000 of 1,000,000, a tenth of what this answer allows.',
   },
   {
     key: 'all-but',
-    label: '999,000 failed requests: only 1,000 good ones are required',
+    label: '999,000 failed requests (99.9%)',
     why: 'Inverted. The target is the share that must be good, 99.9%, so 999,000 of the 1,000,000 must succeed. The failures allowed are the 1,000 left over.',
   },
 ];
@@ -70,12 +73,12 @@ const EDGE = [
     key: 'load-balancer',
     label: 'The load balancer\'s request counts: good responses over all responses it sent',
     right: true,
-    why: 'The load balancer sees every request users send, including the ones that never reached a healthy pod, so its good-over-valid ratio is the one closest to what users got. It has fewer labels than a span, so use the server spans to find out where and why, and the edge for the SLI.',
+    why: 'The load balancer sees every request that reaches your infrastructure, including the ones that never reached a healthy pod, so its good-over-valid ratio is the one closest to what users got. It has fewer labels than a span, so use the server spans to find out where and why, and the load balancer for the SLI.',
   },
   {
     key: 'both-summed',
     label: 'Both, added together: server-span requests plus load-balancer requests',
-    why: 'Every request that reached checkout is counted twice, once at the edge and once as a span, and the sum is not a share of anything. An SLI uses one source for its good events and its valid events.',
+    why: 'Every request that reached checkout is counted twice, once at the load balancer and once as a span, and the sum is not a share of anything. An SLI uses one source for its good requests and its valid requests.',
   },
 ];
 
@@ -86,7 +89,7 @@ export default {
   sub: 'A number for "it works"',
   icon: '\u{1F3AF}',
   rewardTitle: 'Budget keeper',
-  cards: ['rate-not-value'],
+  cards: [],
   lights: ['checkout', 'api-gateway'],
   scoring: { parMs: null },
   play: {
@@ -127,21 +130,24 @@ export default {
       {
         intro:
           'The team sets an SLO of <b>99.9%</b> good requests over a window of 30 days. The window is illustrative: the data you queried is one hour. ' +
-          'Say checkout serves 1,000,000 valid requests in the window. Whatever the target leaves over is the <b>error budget</b>.',
+          'Say checkout serves 1,000,000 valid requests in the window. Whatever the target leaves over is the <b>error budget</b>. ' +
+          'Checkout measured 91.7% in the last step, far below 99.9%: right now its budget is spent, and that gap is what an SLO is for.',
         question: 'How many of those requests may fail before the SLO is missed?',
         qid: 'sl-q-budget',
         choice: { id: 'sl-budget', choices: BUDGET },
       },
       {
         intro:
-          'Last week a deploy left checkout with no ready pod for four minutes. The load balancer in front of it answered 502 to every ' +
-          'request in that time. Checkout\'s server-span SLI for the week reads 99.95%, and customers wrote in.',
+          'Back to the 99.9% SLO over 30 days, with steady traffic. A deploy left checkout with no ready pod for one hour, and the load balancer ' +
+          'in front of it (the edge of your system) answered 502 to every request in that hour: 1 hour of 720, so 0.14% of the month\'s requests. ' +
+          'Checkout\'s server-span SLI for the 30 days reads 99.95%, which meets the target. Counted at the load balancer, which adds those 502s ' +
+          'to the failures, it reads about 99.81%, which misses it. Customers wrote in.',
         question: 'Which source should the SLI come from?',
         qid: 'sl-q-edge',
         choice: { id: 'sl-edge', choices: EDGE },
       },
     ],
     finish:
-      'You can turn "it works" into a ratio of good events to valid events, compute it from rates, not from a counter\'s total, read the error budget off an SLO, and you know a server-span SLI misses the requests that never reached the server.',
+      'You can turn "it works" into a ratio of good requests to valid requests, and compute it from rates, not from a counter\'s total. You can read the error budget off an SLO. You know a server-span SLI misses the requests that never reached the server.',
   },
 };
