@@ -140,11 +140,14 @@ export default {
         labelledBy: 'pager-alert',
         itemsHtml: list.map((x) => option({ attr, value: x.key, labelHtml: e(x.label) })).join(''),
       });
-    /** Append one row to the plain (not live) list, and announce only that row in the kit feedback region (neutral: information only). */
+    /** The newest row is announced in the kit feedback region (neutral: information only); the row it replaces moves into the plain (not live) list, so each row is on screen once. */
     const addRow = (list, region, key, attr, label, body) => {
-      list.rowsHtml = `${list.rowsHtml ?? ''}<p data-${attr}="${key}"><strong>${label}</strong> ${body}</p>`;
-      list.innerHTML = prose(list.rowsHtml);
-      setFeedback(region, 'neutral', `<strong>${label}</strong> ${body}`);
+      if (region.newestHtml) {
+        list.rowsHtml = `${list.rowsHtml ?? ''}${region.newestHtml}`;
+        list.innerHTML = prose(list.rowsHtml);
+      }
+      region.newestHtml = `<p data-${attr}="${key}"><strong>${label}</strong> ${body}</p>`;
+      setFeedback(region, 'neutral', region.newestHtml);
     };
     const askAnswers = () => {
       ctx.renderStep(
