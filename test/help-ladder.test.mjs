@@ -19,7 +19,7 @@ const sideHtml = (id, { hints, title }) =>
   sideColumn({ id, titleHtml: title, counts: [{ key: 'wrong', label: '' }], hints, ruleHtml: RULE });
 
 test('help-ladder keeps the behaviour; the markup lives in the kit (lib/ui/side.mjs)', () => {
-  assert.deepEqual(Object.keys(ladder).sort(), ['HINT_TIERS', 'LADDER', 'PENALTY', 'RULE', 'boardStars', 'hintCost', 'ladderText', 'mountSide', 'ruleText', 'starsLabel', 'validateHelps']);
+  assert.deepEqual(Object.keys(ladder).sort(), ['HINT_TIERS', 'LADDER', 'PENALTY', 'RULE', 'boardStars', 'hintCost', 'ladderText', 'mountHintLadder', 'mountSide', 'ruleText', 'starsLabel', 'validateHelps']);
 });
 
 test('LADDER is generated from scoreStars', () => {
