@@ -589,14 +589,25 @@ const choice = (key) => pick.find((c) => c.key === key);
 
 test('8.5: step 2 asks why the failed-requests query found nothing: one right cause, three wrong ones that are all about the name, each with a why', () => {
   assert.deepEqual(pick.filter((c) => c.right).map((c) => c.key), ['old-name']);
-  assert.deepEqual(pick.filter((c) => !c.right).map((c) => c.key), ['invented-name', 'new-name-wrong', 'case-mismatch']);
+  assert.deepEqual(pick.filter((c) => !c.right).map((c) => c.key), ['invented-name', 'newer-name', 'metric-label']);
   assert.equal(plain(LEVEL.play.steps[1].question), "Why did the agent's failed-requests query return nothing?");
   const right = plain(choice('old-name').why);
   for (const w of [STABLE, LEGACY, 'level 8.2', 'Agent0 reads telemetry in the OpenTelemetry semantic conventions it was produced in', 'getAttributeKeys', 'Dash0 MCP Server', 'Use the names the spans carry', `${fmt(failed)} failed from ${WINDOW}`]) assert.equal(right.includes(w), true, w);
   const inv = plain(choice('invented-name').why);
   for (const w of [LEGACY, STABLE, 'level 8.2']) assert.equal(inv.includes(w), true, `the invented-name decoy is refuted by the migration pair: ${w}`);
-  assert.equal(plain(choice('new-name-wrong').why).includes(`${fmt(failed)} failed from ${WINDOW}`), true);
-  assert.equal(/lower case/.test(plain(choice('case-mismatch').why)), true);
+  const mirror = plain(choice('newer-name').why);
+  for (const w of [LEGACY, STABLE, 'older name', 'level 8.2'.replace('level ', ''), `${fmt(failed)} failed from ${WINDOW}`]) assert.equal(mirror.includes(w), true, `the mirror decoy is refuted by the pair: ${w}`);
+  const metric = plain(choice('metric-label').why);
+  for (const w of ['span attribute names', 'HTTP conventions', 'migration']) assert.equal(metric.includes(w), true, w);
+});
+
+test('8.5: no step 2 decoy is ruled out by the step text alone: none mentions case, and the right label and a mirror decoy claim opposite directions of the rename', () => {
+  for (const c of pick) assert.equal(/\b(case|upper|lower|spell\w*)\b/i.test(c.label), false, `${c.key}: nothing about case`);
+  assert.equal(/\b(before|older)\b/.test(choice('old-name').label), true);
+  assert.equal(/\bnewer\b/.test(choice('newer-name').label), true, 'the mirror decoy claims the opposite direction');
+  for (const c of pick.filter((x) => !x.right)) assert.equal(/\b(before|older|earlier)\b/.test(c.label), false, `${c.key}: only the right label states the rename direction`);
+  assert.equal(plain(LEVEL.play.steps[1].code).includes(`the ${WINDOW} column of the step 1 versions query`), true);
+  assert.equal(plain(view('failed-requests').label), `Agent: failed requests, ${WINDOW}`);
 });
 
 test('8.5: step 2 shows the two queries side by side over one explicit window and one service, with the TABLE figures, and names neither attribute in the prose', () => {

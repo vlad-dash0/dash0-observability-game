@@ -142,7 +142,7 @@ const SCENARIO = {
     { id: 'alert-rule', label: 'Agent: the rule that paged', costMin: 2, kind: 'neutral', html: RULE_VIEW },
     { id: 'node-status', label: 'Agent: node status', costMin: 3, kind: 'neutral', html: NODES_VIEW },
     { id: 'service-list', label: 'Agent: services sending data, last 10 minutes', costMin: 2, kind: 'neutral', html: SERVICES_VIEW },
-    { id: 'failed-requests', label: `Agent: failed requests since ${TABLE.failuresFrom}`, costMin: 1, kind: 'neutral', html: LEGACY_VIEW },
+    { id: 'failed-requests', label: `Agent: failed requests, ${TABLE.failuresFrom} to ${TABLE.queryAt}`, costMin: 1, kind: 'neutral', html: LEGACY_VIEW },
     { id: 'recent-changes', label: 'Agent: changes in the last hour', costMin: 4, kind: 'herring', html: CHANGES_VIEW },
     { id: 'card-charges', label: 'Agent: card charge times, last hour', costMin: 3, kind: 'herring', html: CHARGES_VIEW },
   ],
@@ -196,18 +196,18 @@ const WHY_EMPTY = [
   },
   {
     key: 'invented-name',
-    label: 'The agent invented an attribute name that OpenTelemetry never had for the status code',
-    why: 'http.status_code was a real OpenTelemetry name: it is the name the HTTP conventions used before http.response.status_code replaced it (the migration pair of level 8.2). The agent did not invent it, but checkout no longer sends it.',
+    label: 'The agent made up an attribute name for the status code that OpenTelemetry does not list',
+    why: 'http.status_code was a real OpenTelemetry name: it is the name the HTTP conventions used before http.response.status_code replaced it (the migration pair of level 8.2). The agent did not make it up, but checkout no longer sends it.',
   },
   {
-    key: 'new-name-wrong',
-    label: 'Checkout spans carry the older attribute name and the versions query used one they lack',
-    why: `The versions query filtered on http.response.status_code and counted ${fmt(failedAfter)} failed from ${WINDOW}, so checkout's spans carry that name. The older name is the one that matches nothing.`,
+    key: 'newer-name',
+    label: "The query used a newer name for the status code than checkout's instrumentation sends yet",
+    why: `The direction is the other way round: http.status_code is the older name, and the 8.2 migration renamed it to http.response.status_code. Checkout's spans already carry the newer one, as the ${fmt(failedAfter)} failed from ${WINDOW} show. The empty query used the older name.`,
   },
   {
-    key: 'case-mismatch',
-    label: 'The name was spelled in the wrong case and Dash0 matches attribute names exactly',
-    why: 'Both names are written in lower case, as the conventions write them. The two queries differ in the words of the name, http.status_code against http.response.status_code, not in its case.',
+    key: 'metric-label',
+    label: 'The status code is a metric label while spans store it under a different key',
+    why: 'Both names are span attribute names in the HTTP conventions (the migration page renames one to the other), so spans do carry the status code as an attribute. The two queries differ by the name the migration renamed, not by metric against span.',
   },
 ];
 
@@ -236,7 +236,7 @@ export default {
           `Failed-requests query, ${WINDOW}:\n` +
           '  spans where service.name = checkout and http.status_code = 500\n' +
           '  result: 0 spans\n\n' +
-          `Versions query, ${WINDOW}:\n` +
+          `Versions query, the ${WINDOW} column of the step 1 versions query:\n` +
           '  spans where service.name = checkout and http.response.status_code = 500\n' +
           `  result: ${fmt(failedAfter)} failed`,
         question: "Why did the agent's failed-requests query return nothing?",
