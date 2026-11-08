@@ -4,7 +4,7 @@
 // same-looking call of another visitor's trace. In production the shop, the checkout API and the OTLP endpoint are three origins, and
 // two requests fail on CORS (Choice): the browser's export to the OTLP endpoint, and the checkout call that now carries `traceparent`.
 // Hints are off on the Build it step (the default ladder: hints in early acts only). Nothing is sent or parsed.
-// Spec: https://www.w3.org/TR/trace-context/#traceparent-header , https://opentelemetry.io/docs/languages/js/exporters/
+// Spec: https://www.w3.org/TR/trace-context/#traceparent-header , https://opentelemetry.io/docs/languages/js/exporters/ , https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS
 // Dash0 docs: https://www.dash0.com/docs/dash0/monitoring/websites/website-monitoring , https://www.dash0.com/docs/dash0/monitoring/websites/correlate-sessions-backend-traces , https://www.dash0.com/docs/dash0/monitoring/websites/proxying-the-ingestion-endpoint , https://www.dash0.com/docs/dash0/monitoring/websites/understand-web-vitals
 // Docs (GitHub README, not an allowed Spec host; the Collector's CORS settings): https://github.com/open-telemetry/opentelemetry-collector/blob/main/receiver/otlpreceiver/README.md#cors-cross-origin-resource-sharing
 //
@@ -22,12 +22,19 @@
 // preflight (OPTIONS) requests and return Access-Control-Allow-* headers. Dash0 website monitoring: the Websites Explorer combines user
 // behaviour, Core Web Vitals and session details; Web Vitals are LCP, INP and CLS, reported at the 75th percentile (p75).
 //
-// Stated as reasoning, with no source on an allowed host (the CORS mechanics are documented on MDN, which is not one): that an
-// export request made by the page carries the page's origin; that before a cross-origin request with a header outside the default
-// safelist the browser sends a preflight request, the reply lists the headers the server allows, and the browser does not send the
-// real request when the header it wants to send is not in that list; and that `traceparent` is such a header. The board shows the
-// replies as data (what each reply lists), so the choice reads from them. The names of the Web SDK's own cross-origin setting are
-// not used.
+// MDN, Cross-Origin Resource Sharing (CORS) (read 2026-11-08): a page can only request resources from its own origin unless the
+// response from the other origin includes the right CORS headers; a cross-origin request carries an `Origin` header naming the
+// page's origin, and the server opts in with `Access-Control-Allow-Origin`; for requests that can have side effects the browser
+// "preflights" with an HTTP `OPTIONS` request, whose `Access-Control-Request-Headers` lists the headers the real request will carry,
+// and the reply's `Access-Control-Allow-Headers` confirms which are permitted; the only request headers a script may set without
+// that are the CORS-safelisted ones: `Accept`, `Accept-Language`, `Content-Language`, `Content-Type` (with extra rules) and `Range`.
+// `traceparent` is not in that list, which is how the level knows it needs to be allowed.
+//
+// Stated as reasoning, with no source (MDN does not say it in these words): that the browser does not send the real request when a
+// header it wants to send is missing from the preflight reply's allowed list; that the export request, made by the page, is a
+// cross-origin request with the page's origin (MDN states this for requests in general, not for the OTLP exporter); and that the
+// preflight applies to `traceparent` specifically as the Web SDK adds it. The board shows the replies as data (what each reply
+// lists), so the choice reads from them. The names of the Web SDK's own cross-origin setting are not used.
 //
 // Invented for the game: the company, the three origins (shop.kettle.example, api.kettle.example, otlp.kettle.example), every span ID,
 // trace ID, name and time on the Build it board, the other visitor's trace, and the two failing requests of the Choice.
