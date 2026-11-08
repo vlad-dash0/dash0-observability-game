@@ -290,6 +290,9 @@ test('focus: a refusal lands on the message, a changing preview on Import, a no-
     click({ type: '#save-code-in', text: encodeProgress(rec({ p: { stars: 1, at: T2 } }), REG) });
     click('#save-check');
     assert.deepEqual(f.ids, ['save-back']);
+    f.ids.length = 0;
+    click('#save-back');
+    assert.deepEqual(f.ids, ['save-code-in'], 'Back keeps focus in the dialog, on the pasted code');
   } finally {
     f.restore();
   }
