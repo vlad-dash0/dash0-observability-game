@@ -146,7 +146,7 @@ test('a payload that is not valid UTF-8 is a shape refusal; decode never throws'
 
 test('every refusal reason has player text, plain, with no em dash', () => {
   assert.deepEqual(Object.keys(REFUSALS).sort(), ['checksum', 'empty', 'format', 'shape', 'version']);
-  for (const t of Object.values(REFUSALS)) assert.ok(t.length > 10 && !t.includes('—'));
+  for (const t of Object.values(REFUSALS)) assert.ok(t.length > 10 && !t.includes('\u2014'));
 });
 
 test('import preview with unequal fixtures: added, improved, kept, new cards, in both directions', () => {
@@ -187,6 +187,33 @@ test('importing your own code again is not a change; into empty progress everyth
   assert.deepEqual(fresh.added.map((a) => a.id), ['a', 'b', 'd']);
   assert.deepEqual(norm(fresh.merged), LOCAL);
   assert.equal(previewImport(LOCAL, emptyProgress(), REG).changed, false);
+});
+
+test('equal stars on a level are in none of added, improved or kept; your own code keeps nothing', () => {
+  const local = rec({ a: { stars: 3, at: T1 }, b: { stars: 2, at: T1 } });
+  const p = previewImport(local, rec({ a: { stars: 3, at: T2 }, b: { stars: 4, at: T2 } }), REG);
+  assert.deepEqual(p.added, []);
+  assert.deepEqual(p.improved, [{ id: 'b', from: 2, to: 4 }]);
+  assert.deepEqual(p.kept, []);
+  assert.deepEqual(previewImport(LOCAL, LOCAL, REG).kept, []);
+});
+
+test('a time before 1970 is encoded as no time and the code still reads; a time after year 9999 is refused', () => {
+  const old = rec({ a: { stars: 2, at: '1969-06-01T00:00:00.000Z' } });
+  const got = decodeProgress(encodeProgress(old, REG), REG);
+  assert.equal(got.ok, true);
+  assert.deepEqual(norm(got.progress.levels), { a: { stars: 2, at: null } });
+  const far = (ms) => forge({ l: [['a', 1, ms.toString(36)]], c: [] });
+  assert.equal(refused(far(253402300799999)).ok, true, 'the last millisecond of 9999 is fine');
+  assert.deepEqual(refused(far(253402300800000)), { ok: false, reason: 'shape' });
+  assert.deepEqual(refused(forge({ l: [['a', 1, 'zzzzzzzzzz']], c: [] })), { ok: false, reason: 'shape' });
+});
+
+test('a well-shaped code over the length limit is refused as format', () => {
+  const long = `oc1.${'A'.repeat(24001)}.${'0'.repeat(8)}`;
+  assert.deepEqual(refused(long), { ok: false, reason: 'format' });
+  const edge = `oc1.${'A'.repeat(23000)}.${'0'.repeat(8)}`;
+  assert.equal(refused(edge).reason, 'checksum', 'under the limit it is read on to the checksum');
 });
 
 test('a 0-star completion imported over nothing counts as added', () => {

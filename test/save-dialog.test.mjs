@@ -49,6 +49,15 @@ function setup({ local, debug, throwOn, clipboard } = {}) {
   return { game, store, focused };
 }
 const msg = () => q('#save-msg');
+// Records which element ids get .focus() (linkedom has no focus of its own).
+function trackFocus() {
+  const proto = Object.getPrototypeOf(q('#save-body'));
+  const had = Object.hasOwn(proto, 'focus');
+  const prev = proto.focus;
+  const ids = [];
+  proto.focus = function focus() { ids.push(this.id); };
+  return { ids, restore() { if (had) proto.focus = prev; else delete proto.focus; } };
+}
 const msgText = () => msg().querySelector('[data-feedback-text]').textContent;
 const saved = (store) => store.sets.filter(([k]) => k === STORAGE_KEY);
 const stored = (store) => JSON.parse(store.data.get(STORAGE_KEY));
@@ -164,8 +173,9 @@ test('a good code shows what changes before anything is saved; Back returns with
   game.openSave();
   click({ type: '#save-code-in', text: CODE });
   click('#save-check');
-  const cells = qa('#save-body td').map((td) => td.textContent);
+  const cells = qa('#save-body dt, #save-body dd').map((td) => td.textContent);
   assert.deepEqual(cells, ['0.3: Level r', 'New, 3 stars', '0.2: Level q', '1 star to 4 stars']);
+  assert.equal(qa('#save-body table').length, 0, 'a label/value list, not a table');
   assert.match(q('#save-body').textContent, /Your better stars stay on 1 level\./);
   assert.ok(q('#save-apply'));
   assert.equal(saved(store).length, 0, 'nothing is written by the preview');
@@ -187,7 +197,7 @@ test('Import merges: better of each side, saved, shown on the hub, and says what
   assert.equal(saved(store).length, 1);
   for (const [id, stars] of Object.entries(want)) assert.equal(stored(store).levels[id].stars, stars, `stored ${id}`);
   assert.deepEqual(game.stars, { earned: 14, max: 20 });
-  assert.equal(msgText(), 'Imported: 1 added, 1 improved.');
+  assert.equal(msgText(), 'Imported: 1 level added, 1 level improved.');
   assert.equal(msg().getAttribute('data-tone'), 'success');
   assert.equal(q('#save-apply') === null, true);
   click('#save-close');
@@ -261,4 +271,50 @@ test('the dialog markup is kit helpers only: no style attribute, no handler attr
   check();
   click('#save-apply');
   check();
+});
+
+test('focus: a refusal lands on the message, a changing preview on Import, a no-change preview on Back', () => {
+  const { game } = setup({ local: LOCAL });
+  game.openSave();
+  const f = trackFocus();
+  try {
+    click({ type: '#save-code-in', text: 'oc1.x.y' });
+    click('#save-check');
+    assert.deepEqual(f.ids, ['save-msg']);
+    f.ids.length = 0;
+    click({ type: '#save-code-in', text: CODE });
+    click('#save-check');
+    assert.deepEqual(f.ids, ['save-apply']);
+    f.ids.length = 0;
+    click('#save-back');
+    click({ type: '#save-code-in', text: encodeProgress(rec({ p: { stars: 1, at: T2 } }), REG) });
+    click('#save-check');
+    assert.deepEqual(f.ids, ['save-back']);
+  } finally {
+    f.restore();
+  }
+});
+
+test('a newer-version record in storage: the import is kept for this visit, nothing is written, and the dialog says so', () => {
+  const { game, store } = setup({ local: { v: 2, levels: {}, cards: [] } });
+  assert.equal(game.notice, 'future');
+  game.notice = null;
+  game.openSave();
+  click({ type: '#save-code-in', text: CODE });
+  click('#save-check');
+  click('#save-apply');
+  assert.equal(msgText(), 'Your progress was saved by a newer version of the game, so nothing was saved. Reload the page to get it.');
+  assert.equal(game.notice, 'future');
+  assert.equal(saved(store).length, 0);
+  assert.equal(game.progress.levels.q.stars, 4);
+});
+
+test('imported levels and cards are counted with matching singular and plural', () => {
+  const { game } = setup();
+  game.openSave();
+  const code = encodeProgress(rec({ p: { stars: 1, at: T1 }, q: { stars: 1, at: T1 }, r: { stars: 1, at: T1 } }, []), REG);
+  click({ type: '#save-code-in', text: code });
+  click('#save-check');
+  click('#save-apply');
+  assert.equal(msgText(), 'Imported: 3 levels added.');
 });

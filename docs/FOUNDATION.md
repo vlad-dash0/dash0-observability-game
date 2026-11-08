@@ -123,7 +123,7 @@ entry). `CURRENT_VERSION = 1`; `MIGRATIONS = {}` where `MIGRATIONS[n]` maps v n 
 **Save codes (#18)**: `lib/save-code.mjs` turns a registry-view record into `oc1.<base64url JSON>.<FNV-1a hex>`
 (`encodeProgress`) and reads one back (`decodeProgress` → `{ok, progress, dropped}` or `{ok: false, reason}`,
 reason one of `empty`, `format`, `version`, `checksum`, `shape`; whole or nothing, never throws; ids the
-registry lacks are dropped and counted). The checksum catches typos and cut-off copies, not edits. `previewImport`
+registry lacks are dropped and counted; a completion time after year 9999 is refused as `shape`, and one before 1970 is written as no time). The checksum catches typos and cut-off copies, not edits. `previewImport`
 lists what a merge would add or improve and which levels keep better local stars; the merge itself is `mergeProgress`,
 so the F4 rules hold (best stars, earliest `at`, card union, never a downgrade). The hub's "Save code" dialog
 (`lib/save-view.mjs` markup, `lib/save-dialog.mjs` wiring, `createGame.openSave`) shows the preview before Import
