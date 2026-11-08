@@ -8,7 +8,7 @@ only they emit `ui-` classes, only `styles/kit.css` styles them, and colours com
 Status: P1b moved the step frame (`lib/play.mjs`), `ctx.speech`, Choice, the help ladder, Build it
 and the `index.html` buttons onto the kit; P2 (#143) moved the incident board (and added `fold`);
 P3a (#156) moved Sort it (kit markup, side column and hint ladder);
-P3b (#160) moved Spot it (kit, hint ladder); #159 moved Query it and Configure it (kit split, side column, hint ladder); the other widgets and the hand-written levels move in
+P3b (#160) moved Spot it (kit, hint ladder); #159 moved Query it and Configure it (kit split, side column, hint ladder) and E1 level 1.2 (Env config step on the kit, wide with the side column and the ladder; #165 moved the whole level frame, so `naming-your-service` has no LEGACY entry); the other widgets and the hand-written levels move in
 later phases (until then `base.css` keeps their wrappers narrow); the last phase deletes the
 retired CSS.
 
