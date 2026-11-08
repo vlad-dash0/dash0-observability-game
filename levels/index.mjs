@@ -19,6 +19,7 @@
 //
 // Act: { id, no, name, sub, levels: [level, ...], boss: level | null }.
 import agentVsGateway from './agent-vs-gateway.mjs';
+import aiAssistedDebugging from './ai-assisted-debugging.mjs';
 import autoVsManual from './auto-vs-manual.mjs';
 import baggage from './baggage.mjs';
 import cardinality from './cardinality.mjs';
@@ -153,7 +154,7 @@ export const ACTS = [
     badges: ['dash0'],
     teaser:
       'Dashboards as code, semantic convention upgrades, migrating vendors, browser telemetry and AI-assisted debugging.',
-    levels: [dashboardsAsCode, semanticConventionVersions, migratingVendors, frontendRum],
+    levels: [dashboardsAsCode, semanticConventionVersions, migratingVendors, frontendRum, aiAssistedDebugging],
     boss: null,
   },
   {

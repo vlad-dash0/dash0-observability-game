@@ -39,7 +39,7 @@ test('8.3 fields: third level of act-8 after 8.2, scored with no par time, a sor
   assert.deepEqual([...level.cards], []);
   assert.equal(Object.values(LIVE.levels).filter((l) => l.rewardTitle === 'Migration lead').length, 1, 'the reward title is unique');
   const act = LIVE.acts.find((a) => a.id === 'act-8');
-  assert.deepEqual([...act.levelIds], ['dashboards-as-code', 'semantic-convention-versions', ID, 'frontend-rum']);
+  assert.deepEqual([...act.levelIds], ['dashboards-as-code', 'semantic-convention-versions', ID, 'frontend-rum', 'ai-assisted-debugging']);
   assert.equal(LIVE.order[LIVE.order.indexOf('semantic-convention-versions') + 1], ID, '8.3 plays right after 8.2');
 });
 

@@ -49,7 +49,7 @@ test('act-8 follows act-7, holds its levels in order, no boss, and is not coming
   assert.ok(act, 'act-8 is in the registry');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 8, name: 'Operating at scale', sub: 'As code', levelIds: ['dashboards-as-code', ID, 'migrating-vendors', 'frontend-rum'], bossId: null },
+    { no: 8, name: 'Operating at scale', sub: 'As code', levelIds: ['dashboards-as-code', ID, 'migrating-vendors', 'frontend-rum', 'ai-assisted-debugging'], bossId: null },
   );
   const ids = LIVE.acts.map((a) => a.id);
   assert.equal(ids.indexOf('act-8'), ids.indexOf('act-7') + 1, 'act-8 comes right after act-7');
@@ -83,7 +83,7 @@ test('act-8 opens when acts 0-7 are complete, or once entered', () => {
   assert.equal(isActComplete(act, emptyProgress()), false);
   assert.equal(isActComplete(act, progressOf([ID])), false, '8.2 alone leaves the others to play');
   assert.equal(isActComplete(act, progressOf([ID, 'migrating-vendors', 'dashboards-as-code'])), false, 'a level left to play leaves the act open');
-  assert.equal(isActComplete(act, progressOf(['dashboards-as-code', ID, 'migrating-vendors', 'frontend-rum'])), true, 'all the levels of the act complete it (no boss)');
+  assert.equal(isActComplete(act, progressOf(['dashboards-as-code', ID, 'migrating-vendors', 'frontend-rum', 'ai-assisted-debugging'])), true, 'all the levels of the act complete it (no boss)');
 });
 
 test('8.2 fields: scored with no par time, in act-8, lights storefront, awards no card; mechanics as derived', () => {
