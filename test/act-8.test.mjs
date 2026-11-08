@@ -54,7 +54,7 @@ test('act-8 follows act-7, holds only 8.2, no boss, and is not coming soon; noth
   const ids = LIVE.acts.map((a) => a.id);
   assert.equal(ids.indexOf('act-8'), ids.indexOf('act-7') + 1, 'act-8 comes right after act-7');
   assert.deepEqual([...COMING_SOON], [], 'no act is coming soon');
-  assert.equal(LIVE.order[LIVE.order.indexOf('synthetic-checks') + 1], ID, '8.2 plays right after 7.4');
+  assert.equal(LIVE.order[LIVE.order.indexOf('everything-is-green') + 1], ID, '8.2 plays right after the act-7 boss');
 });
 
 test('act-8 keeps its teaser verbatim now it is live', () => {
@@ -70,7 +70,7 @@ test('act-8 opens when acts 0-7 are complete, or once entered', () => {
   assert.equal(levelState(ID, progressOf(before), LIVE), 'open');
   assert.equal(lockReason(ID, progressOf(before), LIVE), null);
 
-  const withoutAlerts = before.filter((id) => id !== 'synthetic-checks');
+  const withoutAlerts = before.filter((id) => id !== 'everything-is-green');
   assert.equal(isActUnlocked(index, progressOf(withoutAlerts), LIVE), false, 'act-7 counts');
   assert.equal(levelState(ID, progressOf(withoutAlerts), LIVE), 'locked');
   assert.deepEqual(lockReason(ID, progressOf(withoutAlerts), LIVE), { kind: 'act', actId: 'act-7' });

@@ -47,6 +47,7 @@ import promqlBasics from './promql-basics.mjs';
 import resources from './resources.mjs';
 import redAndUse from './red-and-use.mjs';
 import silence from './silence.mjs';
+import everythingIsGreen from './everything-is-green.mjs';
 import slisAndSlos from './slis-and-slos.mjs';
 import burnRateAlerts from './burn-rate-alerts.mjs';
 import syntheticChecks from './synthetic-checks.mjs';
@@ -139,7 +140,7 @@ export const ACTS = [
     badges: ['dash0'],
     teaser: 'Good alerts, SLOs and error budgets, burn-rate alerts and synthetic checks.',
     levels: [goodAlerts, slisAndSlos, burnRateAlerts, syntheticChecks],
-    boss: null,
+    boss: everythingIsGreen,
   },
   {
     id: 'act-8',
