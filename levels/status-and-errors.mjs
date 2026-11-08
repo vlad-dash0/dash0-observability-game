@@ -3,6 +3,7 @@
 // (a 4xx is Error only on the CLIENT span, a 5xx is Error on either span), then says what Ok followed by Error leaves.
 // Spec: docs/M1-DESIGN.md §6 Act 2.
 // Spec: https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status , https://opentelemetry.io/docs/specs/otel/trace/api/#set-status
+import { actions, finishButton, nextButton, question, step } from '../lib/ui/index.mjs';
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
 import { newSortState } from '../lib/widgets/sort-it.mjs';
@@ -89,22 +90,21 @@ export default {
   lights: ['catalog'],
   scoring: { parMs: null },
   run(ctx) {
-    const actions = ctx.ovActions;
+    const bar = ctx.ovActions;
 
     const stepSort = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: true,
+          bodyHtml: `${ctx.speech(
           'Every span\'s status starts as Unset. Instrumentation sets Error when an operation ' +
             'fails, following the semantic conventions, and for HTTP the rule depends on the ' +
             'span\'s kind. Check five spans from this morning.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="status-q-sort">Pick a span, then say whether its status is right.</h3>
-          ${renderSort(SORT, newSortState(SORT), { escapeHtml: ctx.escapeHtml, labelledBy: 'status-q-sort' })}
-        </div>`,
-        '<button class="btn" id="status-next" disabled>Next</button>',
+        )}${question({ id: 'status-q-sort', html: 'Pick a span, then say whether its status is right.' })}${renderSort(SORT, newSortState(SORT), { escapeHtml: ctx.escapeHtml, labelledBy: 'status-q-sort' })}`,
+        }),
+        actions({ wide: true, buttonsHtml: nextButton('status-next') }),
       );
-      const next = actions.querySelector('#status-next');
+      const next = bar.querySelector('#status-next');
       mountSort(ctx, SORT, {
         onComplete: () => {
           next.disabled = false;
@@ -116,18 +116,17 @@ export default {
 
     const stepOkThenError = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: false,
+          bodyHtml: `${ctx.speech(
           'In checkout, a handler validates the cart and calls ' +
             '<code>span.setStatus({ code: SpanStatusCode.OK })</code>. Later in the same span, ' +
             'a helper calls <code>span.setStatus({ code: SpanStatusCode.ERROR })</code>.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="status-q-final">What status does the span end with?</h3>
-          ${choiceHtml(ctx, OK_THEN_ERROR, { id: 'status', labelledBy: 'status-q-final' })}
-        </div>`,
-        '<button class="btn" id="status-finish" data-finish disabled>Finish</button>',
+        )}${question({ id: 'status-q-final', html: 'What status does the span end with?' })}${choiceHtml(ctx, OK_THEN_ERROR, { id: 'status', labelledBy: 'status-q-final' })}`,
+        }),
+        actions({ wide: false, buttonsHtml: finishButton('status-finish') }),
       );
-      const finish = actions.querySelector('#status-finish');
+      const finish = bar.querySelector('#status-finish');
       mountChoice(ctx, OK_THEN_ERROR, {
         id: 'status',
         onRight: () => {
