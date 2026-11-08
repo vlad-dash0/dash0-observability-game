@@ -1,7 +1,7 @@
 // Level 9.3: Connect the game to Dash0. The player works out the two things a sender needs, the
 // endpoint of an organization (the one a browser can use) and an auth token that may only ingest, enters
 // them in a connect form, and sends one test span. The game connects to the player's own Dash0
-// (live, not open until INGRESS_HOSTS is filled) or to a simulated one (practice, scored the same:
+// (live, to the INGRESS_HOSTS of lib/dash0/ingress.mjs) or to a simulated one (practice, scored the same:
 // a wrong permission, a bad form and a rejected token each cost one mistake, once per distinct cause).
 // The token is typed into a secret field, handed to ctx.telemetry.connect and cleared from the
 // DOM in the same click; it is never kept, shown or logged by this file (docs/DASH0-LAB.md).

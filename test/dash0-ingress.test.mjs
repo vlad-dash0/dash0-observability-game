@@ -1,5 +1,5 @@
 // Dash0 ingress validators (lib/dash0/ingress.mjs). Spec: docs/DASH0-LAB.md. Hosts are
-// injected: the module ships INGRESS_HOSTS empty until the live phase.
+// injected: INGRESS_HOSTS is the four regional hosts (live phase, #195 P6).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -94,10 +94,16 @@ test('cspOrigin renders the CSP origin, with the port only when it is not 443', 
   assert.equal(cspOrigin(HOST, 443), parseEndpoint(`https://${HOST}:443`, opts).base);
 });
 
-test('the shipped allowlist is empty and frozen, so no live host validates yet; practice hosts never resolve', () => {
-  assert.deepEqual(INGRESS_HOSTS, []);
+const LIVE_HOSTS = [
+  'ingress.eu-west-1.aws.dash0.com',
+  'ingress.us-west-2.aws.dash0.com',
+  'ingress.us-east-1.aws.dash0.com',
+  'ingress.europe-west4.gcp.dash0.com',
+];
+
+test('the shipped allowlist is the four regional hosts, frozen; practice hosts are never in it', () => {
+  assert.deepEqual([...INGRESS_HOSTS], LIVE_HOSTS);
   assert.ok(Object.isFrozen(INGRESS_HOSTS));
-  assert.deepEqual(parseEndpoint(`https://${HOST}`), { ok: false, reason: 'unknown-host' });
   for (const h of PRACTICE_HOSTS) {
     assert.match(h, /\.invalid$/, 'practice hosts are RFC 2606 reserved');
     assert.ok(!INGRESS_HOSTS.includes(h));
@@ -157,4 +163,21 @@ test('checkDataset: empty is the default dataset (null), a slug passes, anything
   for (const bad of ['has space', 'a/b', '-lead', 'x'.repeat(64), 'é']) {
     assert.deepEqual(checkDataset(bad), { ok: false, reason: 'format' }, bad);
   }
+});
+
+test('every shipped ingress host validates for a live export, and lookalikes are refused', () => {
+  for (const h of LIVE_HOSTS) {
+    assert.deepEqual(parseEndpoint(`https://${h}`), {
+      ok: true,
+      base: `https://${h}`,
+      tracesUrl: `https://${h}/v1/traces`,
+      host: h,
+    });
+  }
+  const h = LIVE_HOSTS[0];
+  assert.deepEqual(parseEndpoint(`https://${h}.evil.example`), { ok: false, reason: 'unknown-host' });
+  assert.deepEqual(parseEndpoint(`https://evil.example/${h}`), { ok: false, reason: 'unknown-host' });
+  assert.deepEqual(parseEndpoint(`http://${h}`), { ok: false, reason: 'not-https' });
+  assert.deepEqual(parseEndpoint(`https://${h}:4318`), { ok: false, reason: 'unexpected-port' });
+  assert.deepEqual(parseEndpoint(`https://${h}.evil.example:4318`), { ok: false, reason: 'unknown-host' });
 });

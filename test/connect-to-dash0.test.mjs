@@ -120,7 +120,7 @@ async function connectLive(h, { endpoint = ENDPOINT, token = SECRET, dataset = '
 }
 
 test('the first screen offers practice, labels it, and disables live while it is not open', () => {
-  const h = open(practiceTelemetry().tele); // no hosts: liveAvailable() is false
+  const h = open(practiceTelemetry({ hosts: [] }).tele); // no allowed host: liveAvailable() is false
   assert.ok(h.text().includes(PRACTICE_BANNER));
   assert.equal(q('#ctd-live').disabled, true);
   assert.match(h.text(), /Your own Dash0 is not open yet/);
@@ -704,7 +704,7 @@ test('the endpoint table is a labelled scroll region', () => {
 });
 
 test('a disabled live button points at the paragraph that says why', () => {
-  open(practiceTelemetry().tele);
+  open(practiceTelemetry({ hosts: [] }).tele);
   const why = q('#ctd-live').getAttribute('aria-describedby');
   assert.equal(why, 'ctd-live-why');
   assert.match(q(`#${why}`).textContent, /not open yet/);
