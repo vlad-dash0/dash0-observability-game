@@ -20,8 +20,8 @@
 // YAML or JSON file. "Edit as JSON" applies changes immediately when saved and is described as convenient for quick edits and
 // prototyping. Export Dashboards: the Source tab downloads a dashboard as Perses YAML, for sharing, version control or migration.
 //
-// Perses docs (read 2026-11-08). API, Dashboard (perses.dev/perses/docs/api/dashboard/): a dashboard spec has `display`, and optional
-// `datasources`, `variables`, `panels` and `layouts`; `panels` is a map whose key is the reference of the panel; `layouts` is a list
+// Perses docs (v0.55, read 2026-11-08; the URLs redirect to perses.dev/docs/perses/latest/). API, Dashboard (perses.dev/perses/docs/api/dashboard/): a dashboard spec has the keys `display`,
+// `datasources`, `variables`, `panels` and `layouts`, all marked Optional; `panels` is a map whose key is the reference of the panel; `layouts` is a list
 // and "in Perses the definition of a panel is uncorrelated from the definition of where to position it"; a layout of `kind: Grid` has
 // `spec.items`, each with `x`, `y`, `width`, `height` (integers) and `content` holding a `$ref` to a panel, as in the page's example
 // `"#/spec/panels/statRAM"`. Concepts, Dashboard (perses.dev/perses/docs/concepts/dashboard/): a dashboard's visual elements are a

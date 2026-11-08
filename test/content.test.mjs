@@ -70,7 +70,7 @@ test('the scanners have teeth: Spec line URLs and hosts', () => {
   assert.deepEqual(specUrls('// Spec: docs/FOUNDATION.md §5'), []);
   assert.equal(SPEC_HOSTS.includes(hostOf('https://opentelemetry.io.evil.example/')), false);
   for (const ok of ['https://perses.dev/perses/docs/api/dashboard/', 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS']) assert.equal(SPEC_HOSTS.includes(hostOf(ok)), true, ok);
-  for (const bad of ['https://perses.dev.evil.example/', 'https://evil.example/developer.mozilla.org/', 'https://mozilla.org/']) assert.equal(SPEC_HOSTS.includes(hostOf(bad)), false, bad);
+  for (const bad of ['https://perses.dev.evil.example/', 'https://www.perses.dev/perses/docs/', 'https://perses.dev@evil.example/perses/docs/', 'https://evil.example/developer.mozilla.org/', 'https://mozilla.org/']) assert.equal(SPEC_HOSTS.includes(hostOf(bad)), false, bad);
 });
 
 // A penalty is not always a star (at 3+ penalties it may cost none), so player copy says
