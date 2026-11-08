@@ -160,7 +160,7 @@ const tradeoff = {
       slip('over the cap', over, /^Not quite\. Over the cap by/),
       slip('drops a need', lost, /^Not quite\. It is within the cap but drops/),
       // A hint changes no pick, so solve() still overwrites every knob.
-      ...(s.helps?.hints ? [{ name: 'hint', clicks: [`#${s.id}-hint`], says: /\S/, at: `#${s.id}-hint-text` }] : []),
+      ...(s.helps?.hints ? [{ name: 'hint', clicks: [`#${s.id}-hint`], says: /^Hint 1 of 3/, at: `#${s.id}-hint-text` }] : []),
     ];
   },
   first: () => 'input',

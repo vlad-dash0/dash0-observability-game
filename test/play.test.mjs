@@ -414,6 +414,8 @@ test('validatePlay names each problem as the design says', () => {
     [(p) => { p.steps[5].tradeoff.cap = 100; }, 'step 6 (tradeoff "fx-budget"): trade-off: every plan that keeps every need fits the cap, so the cap never bites'],
     [(p) => { p.steps[5].tradeoff.answer.attrs = 'user'; }, 'step 6 (tradeoff "fx-budget"): answer: the reference plan is over the cap by 5'],
     [(p) => { delete p.steps[5].question; }, 'step 6 (tradeoff "fx-budget"): needs a question'],
+    [(p) => { p.steps[5].tradeoff.helps = { hints: 1 }; }, 'step 6 (tradeoff "fx-budget"): helps: "hints" is not true or false'],
+    [(p) => { delete p.steps[5].tradeoff.helps; p.steps[5].tradeoff.hint = 'x'; }, 'step 6 (tradeoff "fx-budget"): hint: shown only when helps.hints is on'],
   ];
   for (const [edit, want] of cases) {
     const got = problems(edit);

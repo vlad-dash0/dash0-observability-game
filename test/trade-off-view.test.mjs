@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { makeDom, q, qa, click } from './helpers/dom.mjs';
 import { recordFocus } from './helpers/focus.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
-import { newTradeoffState } from '../lib/widgets/trade-off.mjs';
+import { newTradeoffState, validateTradeoffSpec } from '../lib/widgets/trade-off.mjs';
 import { capText, mountTradeoff, renderTradeoff, tradeoffView } from '../lib/widgets/trade-off-view.mjs';
 import { TRADEOFF_RULE, hintFor, validateTradeoffHelps } from '../lib/widgets/trade-off-help.mjs';
 import { spec as base } from './fixtures/trade-off-spec.mjs';
@@ -379,10 +379,10 @@ test('three hint tiers: the rule, two outlined options of one knob, then the ans
   assert.deepEqual(hintedCards(), ['attrs:tier', 'attrs:user']);
   assert.equal(hintText().startsWith('Hint 2 of 3'), true);
   assert.deepEqual(picked(), ['sampling:tail']);
-  const tier2 = hintText();
-  pick('attrs', 'user'); // picking an outlined card keeps the outlines and the paid text
-  assert.deepEqual(hintedCards(), ['attrs:tier', 'attrs:user']);
-  assert.equal(hintText(), tier2);
+  pick('attrs', 'user'); // the pointer was about the old picks: a pick drops the outline and the text, free
+  assert.deepEqual(hintedCards(), []);
+  assert.equal(hintText(), '');
+  assert.deepEqual(counts, { mistakes: 0, hints: 2, done: 0 });
   assert.equal(text('#bill-wrong'), '0');
 
   click('#bill-hint'); // tier 3: picked for you
@@ -474,4 +474,50 @@ test('validateTradeoffHelps: helps keys are hints only and boolean; a hint line 
   assert.match(validateTradeoffHelps({ ...fixture(), helps: { tips: true } })[0], /"tips" is not one of hints/);
   assert.deepEqual(validateTradeoffHelps(withHints({ hint: ' ' })), ['hint: not non-empty text']);
   assert.deepEqual(validateTradeoffHelps({ ...fixture(), hint: 'x' }), ['hint: shown only when helps.hints is on']);
+});
+
+test('hintFor tier 2: the decoy is never the current pick, so the pair does not give the answer away; none left, nothing outlined', () => {
+  const s = fixture();
+  // attrs is wrong with 'user' picked: the decoy can only be 'none', never 'user', whatever the draw.
+  for (const shuffle of [(a) => [...a], (a) => [...a].reverse()]) {
+    const h = hintFor(s, { sampling: 'tail', attrs: 'user' }, 2, { shuffle });
+    assert.deepEqual(h.hinted, [{ knob: 'attrs', option: 'none' }, { knob: 'attrs', option: 'tier' }]);
+  }
+  // Over every plan and both draws, the current pick on the outlined knob is never in the pair.
+  for (const sampling of ['head', 'tail', 'all', undefined]) {
+    for (const attrs of ['none', 'tier', 'user', undefined]) {
+      for (const shuffle of [(a) => [...a], (a) => [...a].reverse()]) {
+        const picks = { sampling, attrs };
+        const h = hintFor(s, picks, 2, { shuffle });
+        for (const x of h.hinted) assert.notEqual(x.option, picks[x.knob], JSON.stringify(picks));
+      }
+    }
+  }
+  // Every reachable wrong state of a two-option knob has no decoy left: the outline would be the answer.
+  const two = fixture();
+  two.knobs[1].options = two.knobs[1].options.filter((o) => o.id !== 'none');
+  const h = hintFor(two, { sampling: 'tail', attrs: 'user' }, 2);
+  assert.deepEqual([h.hinted, h.html.includes('Look again at: User attribute')], [[], true]);
+  assert.equal(h.html.includes('outlined'), false);
+  // With nothing picked on that knob the decoy is any non-answer option.
+  assert.equal(hintFor(two, { sampling: 'tail' }, 2).hinted.length, 2);
+});
+
+test('hintFor tier 2: an unfinished plan is not "already passing", even when one option keeps every need', () => {
+  const s = fixture();
+  s.knobs[0].options[1].keeps = ['errors', 'per-user']; // tail alone keeps everything and fits the cap
+  assert.equal(hintFor(s, { sampling: 'tail' }, 2).html.includes('Press Check'), false);
+  assert.deepEqual(hintFor(s, { sampling: 'tail' }, 2).hinted.map((x) => x.knob), ['attrs', 'attrs']);
+});
+
+test('validateTradeoffHelps: hints need a single passing plan, since tier 2 reads the answer as the plan; off, any spec', () => {
+  const s = fixture();
+  s.knobs[1].options.push({ id: 'tier2', label: 'user.tier too', cost: 3, keeps: ['per-user'] });
+  assert.deepEqual(validateTradeoffHelps(s), []);
+  assert.deepEqual(validateTradeoffHelps({ ...s, helps: { hints: true } }), ['helps: hints need a single passing plan, but 2 plans pass']);
+});
+
+test('a spec id that starts with a digit is invalid (it is an element id and a radio name)', () => {
+  assert.match(validateTradeoffSpec({ ...fixture(), id: '9-plan' }).join(';'), /spec id "9-plan" is not kebab-case/);
+  assert.deepEqual(validateTradeoffSpec(fixture()), []);
 });
