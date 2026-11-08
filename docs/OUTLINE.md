@@ -44,7 +44,7 @@ incident in the game you've been playing, viewed in Dash0.
 
 ## 3. Level types (mechanics)
 
-1. **Sort it**: drag items into buckets (is this a metric, log, span or event? a
+1. **Sort it**: sort items into categories (is this a metric, log, span or event? a
    resource attribute or a span attribute?).
 2. **Build it**: assemble a span tree from loose spans; set parent IDs, kinds and
    status; the waterfall renders live.

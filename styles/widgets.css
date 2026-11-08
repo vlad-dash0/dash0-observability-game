@@ -147,16 +147,17 @@
   .wf-tick-label[data-tick="1"], .wf-tick-label[data-tick="3"], .wf-tick-label[data-tick="4"] { display: none; }
 }
 
-/* Sort it (lib/widgets/sort-it-view.mjs, #156): the bucket drop panels in a grid that shrinks
-   to one column at 320px, and the placed items under a bucket's button. Labels may hold long
-   <code> names, so they wrap anywhere. Only existing text/surface pairs (tokens). */
-.sort-buckets { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: var(--space-3); }
-.sort-instr { color: var(--color-text-muted); font-size: 13.5px; margin: 0; }
-.sort-buckets [data-drop] { min-width: 0; }
-.sort-buckets [data-bucket] { inline-size: 100%; overflow-wrap: anywhere; }
+/* Sort it (lib/widgets/sort-it-view.mjs, #156, #261): no boxes. The category choices are kit options;
+   the placed items sit in plain groups (a heading with a tally, then the list) in a grid that shrinks
+   to one column. */
+.sort-instr { color: var(--color-text-muted); font-size: 13.5px; margin: 0 0 var(--space-2); }
+.sort-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
+.sort-group { min-width: 0; }
+.sort-group-title { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.sort-tally { color: var(--color-text-muted); font-weight: 400; }
 .sort-placed { list-style: none; display: flex; flex-direction: column; gap: 4px; margin: var(--space-2) 0 0; padding: 0; }
 .sort-placed li { color: var(--color-text-muted); font-size: 13.5px; font-weight: 600; padding: 0 4px; max-width: 100%; overflow-wrap: anywhere; }
-.sort-placed li::before { content: "\2713 "; content: "\2713 " / ""; color: var(--color-success); }
+.sort-placed li::before { content: "\2713"; content: "\2713" / ""; margin-inline-end: var(--space-2); color: var(--color-success); }
 
 /* Spot it (lib/widgets/spot-it-view.mjs, #160): the instruction line, and the line text inside a
    kit option, where the global code chip (background, border) would double the card. Tokens only. */
