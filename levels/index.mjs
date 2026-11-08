@@ -25,6 +25,7 @@ import cardinality from './cardinality.mjs';
 import checkoutIsSlow from './checkout-is-slow.mjs';
 import collectingLogs from './collecting-logs.mjs';
 import connectToDash0 from './connect-to-dash0.mjs';
+import dashboardsAsCode from './dashboards-as-code.mjs';
 import contextPropagation from './context-propagation.mjs';
 import correlation from './correlation.mjs';
 import detectorsAndKubernetes from './detectors-and-kubernetes.mjs';
@@ -32,6 +33,7 @@ import distributions from './distributions.mjs';
 import errorsTripled from './errors-tripled.mjs';
 import eventsAndLinks from './events-and-links.mjs';
 import exemplars from './exemplars.mjs';
+import frontendRum from './frontend-rum.mjs';
 import goodAlerts from './good-alerts.mjs';
 import headSampling from './head-sampling.mjs';
 import histograms from './histograms.mjs';
@@ -151,7 +153,7 @@ export const ACTS = [
     badges: ['dash0'],
     teaser:
       'Dashboards as code, semantic convention upgrades, migrating vendors, browser telemetry and AI-assisted debugging.',
-    levels: [semanticConventionVersions, migratingVendors],
+    levels: [dashboardsAsCode, semanticConventionVersions, migratingVendors, frontendRum],
     boss: null,
   },
   {

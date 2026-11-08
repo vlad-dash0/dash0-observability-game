@@ -148,6 +148,8 @@ const ANSWERS = {
     'incident everything-is-green: span-numbers,who-calls,outside-request > expired-certificate',
     'choice eig-page: outside-check',
   ],
+  'dashboards-as-code': ['spot dac-spot: metadata,item-errors,item-latency', 'choice dac-deploy: terraform'],
+  'frontend-rum': ['build frum-tree: 4d5e6f708192a3b4.parent=3c4d5e6f708192a3', 'choice frum-cors: page-origin-api-header'],
   'semantic-convention-versions': ['spot scv-spot: http-target,net-host-port,http-status-code', 'choice scv-switch: move-queries'],
   'migrating-vendors': [
     'sort mv-sort: p95-chart=approximated ratio-alert=translated agent-panel=skipped anomaly-chart=manual memory-chart=translated p99-alert=approximated retired-alert=skipped failed-count=approximated paging-alert=manual unused-dashboard=skipped disk-alert=translated logs-panel=manual',
