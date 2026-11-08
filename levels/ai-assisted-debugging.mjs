@@ -5,11 +5,11 @@
 // call; the request rate never moved, so it is not a surge). Four views are neutral; two are red herrings (the release list and the
 // card charge times, which point at the release and at the payment provider). The nuance is a neutral view, not a herring: the agent's
 // first question used a legacy attribute name (`http.status_code`, the old name 8.2 teaches) and got 0 spans, which tempts "nothing is
-// failing" (the `false-alarm` cause); the player compares its query with the one in the versions view, which names the stable name
-// (`http.response.status_code`) and finds the failures. Looking at it costs no penalty; the closing Choice grades the nuance.
+// failing". Looking at it costs no penalty. Step 2 puts it beside the versions query (same window and service, the stable name
+// `http.response.status_code`, 984 failed) and asks WHY it found nothing: the closing Choice grades the nuance.
 // Agents need good semantic conventions as much as people do. Scored. A plain-data Scenario for the incident engine, played through
 // one declarative `incident` step (lib/widgets/incident.mjs, docs/M1-DESIGN.md §4.3, docs/DECLARATIVE-LEVELS.md §2), then one
-// closing Choice on the naming nuance, which the incident step grades only in part.
+// closing Choice on why the first query found nothing, which the incident step does not grade.
 // The scenario is designed for this game (issue #138).
 // Spec: https://opentelemetry.io/docs/specs/semconv/non-normative/http-migration/
 // Dash0 docs: https://www.dash0.com/docs/dash0/ai/mcp , https://www.dash0.com/docs/dash0/ai/agent0/overview , https://www.dash0.com/docs/dash0/ai/agent0/overview/use-agent0/query-telemetry-via-mcp
@@ -103,10 +103,10 @@ const SERVICES_VIEW =
   'Every one of them sent data in the last minute.</p>';
 
 const LEGACY_VIEW =
-  '<p>The agent was asked how many checkout requests failed in the last 30 minutes.</p>' +
+  `<p>The agent was asked how many checkout requests failed since ${TABLE.failuresFrom}.</p>` +
   '<pre><code>spans where service.name = checkout and http.status_code = 500\n' +
   'result: 0 spans</code></pre>' +
-  '<p>The agent\'s answer: no failed checkout requests in the last 30 minutes.</p>';
+  `<p>The agent's answer: no failed checkout requests since ${TABLE.failuresFrom}.</p>`;
 
 const CHANGES_VIEW =
   '<p>The agent was asked what changed in the last hour.</p>' +
@@ -142,7 +142,7 @@ const SCENARIO = {
     { id: 'alert-rule', label: 'Agent: the rule that paged', costMin: 2, kind: 'neutral', html: RULE_VIEW },
     { id: 'node-status', label: 'Agent: node status', costMin: 3, kind: 'neutral', html: NODES_VIEW },
     { id: 'service-list', label: 'Agent: services sending data, last 10 minutes', costMin: 2, kind: 'neutral', html: SERVICES_VIEW },
-    { id: 'failed-requests', label: 'Agent: failed requests, last 30 minutes', costMin: 1, kind: 'neutral', html: LEGACY_VIEW },
+    { id: 'failed-requests', label: `Agent: failed requests since ${TABLE.failuresFrom}`, costMin: 1, kind: 'neutral', html: LEGACY_VIEW },
     { id: 'recent-changes', label: 'Agent: changes in the last hour', costMin: 4, kind: 'herring', html: CHANGES_VIEW },
     { id: 'card-charges', label: 'Agent: card charge times, last hour', costMin: 3, kind: 'herring', html: CHARGES_VIEW },
   ],
@@ -170,14 +170,6 @@ const SCENARIO = {
       why: 'Checkout reserves stock before it takes payment, and the failing trace ends at the stock reservation: no span in it calls the payment provider, so a slow charge cannot be what fails these orders.',
     },
     {
-      id: 'false-alarm',
-      label: 'Checkout is not failing: the agent found no failed requests, so the page is a false alarm',
-      right: false,
-      why:
-        'The empty answer came from a query for http.status_code, the name before the HTTP conventions went stable. ' +
-        `Checkout sends http.response.status_code now (its opt-in is http, the switch of level 8.2), so the old name matches nothing even while orders fail. The queries that use the stable name find ${fmt(failedAfter)} failed requests since ${TABLE.failuresFrom}, ${pctAfter}% of the ${fmt(requestsAfter)}.`,
-    },
-    {
       id: 'order-surge',
       label: 'A surge of orders at the shop overloaded checkout, so some of its requests fail under the load',
       right: false,
@@ -186,33 +178,34 @@ const SCENARIO = {
   ],
   answerAfterViews: 3,
   hint:
-    '<p>Look at which attribute each query filtered on. Compare the query that found no failures with the queries that did find failures: was each one asking for the same thing?</p>',
+    '<p>A cause has to explain two things: where the failing requests stop, and why both versions fail alike. Which of the views you have not opened could show each?</p>',
 };
 
-// Step 2: what to change so an empty answer cannot hide an outage again. `why` follows "Right." or "Not quite.".
-const FIX = [
+// Step 2: why the agent's first query found nothing. Both queries share the window (since 10:12) and the service, so only the
+// attribute name differs on screen. `why` follows "Right." or "Not quite.".
+const WHY_EMPTY = [
   {
-    key: 'stable-names',
-    label: 'Use the attribute names the spans carry, so that each query and agent prompt reaches the data',
+    key: 'old-name',
+    label: 'The query named an attribute that checkout no longer sends',
     right: true,
     why:
-      'Checkout sends http.response.status_code since its opt-in went to http (level 8.2), and the old http.status_code is no longer on its spans, so any query, alert or prompt that still names it matches nothing, whoever or whatever runs it. ' +
-      'In Dash0, Agent0 reads telemetry in the OpenTelemetry semantic conventions it was produced in, and getAttributeKeys, one of the tools of the Dash0 MCP Server, lists the attribute keys present, so check the keys present before you ask for a name.',
+      `The first query asks for http.status_code, the name before the HTTP conventions went stable. Checkout sends http.response.status_code now (its opt-in is http, level 8.2), so the old name matches nothing even while orders fail: the versions query, on the same spans, counted ${fmt(failedAfter)} failed since ${TABLE.failuresFrom}. ` +
+      'Use the names the spans carry. In Dash0, Agent0 reads telemetry in the OpenTelemetry semantic conventions it was produced in, and getAttributeKeys, one of the tools of the Dash0 MCP Server, lists the attribute keys present, so check the keys present before you ask for a name.',
   },
   {
-    key: 'keep-dup',
-    label: 'Set the opt-in back to http/dup, so the old names keep matching and no query has to change',
-    why: 'http/dup sends both names, which is how 8.2 moves queries before the switch to http. As an end state it doubles every attribute that changed and keeps the old names alive. The telemetry is not at fault; the question is.',
+    key: 'late-data',
+    label: 'The failing spans reached Dash0 too late for the first query',
+    why: `The versions query counted ${fmt(failedAfter)} failed requests since ${TABLE.failuresFrom} in the same data, so those spans had arrived. Late data would be missing from both queries, and only one of them came back empty.`,
   },
   {
-    key: 'no-filter',
-    label: 'Ask the agent to count every checkout span with no filter, so that no attribute name can miss',
-    why: 'Counting every span answers another question than counting the failed ones. To find the failures the agent has to filter on the status again, and that is the attribute whose name it just got wrong.',
+    key: 'sampled-out',
+    label: 'The failing spans were sampled out before they were stored',
+    why: `Spans that were never stored could not be counted by any query, and the versions query counted ${fmt(failedAfter)} failed ones since ${TABLE.failuresFrom}. They were stored.`,
   },
   {
-    key: 'retry-later',
-    label: 'Ask the same question over a wider time range, in case the data for the last half hour was late',
-    why: `The data was not late, and a wider range does not help. Checkout's spans carry http.response.status_code, so a query for http.status_code matches none of them at ${TABLE.queryAt} or at any other minute: the same question gives the same empty answer.`,
+    key: 'wrong-service',
+    label: 'The service.name filter pointed at the wrong service',
+    why: 'Both queries filter on service.name = checkout, and the versions query found failed requests with that filter.',
   },
 ];
 
@@ -236,14 +229,21 @@ export default {
       },
       {
         intro:
-          `The incident is explained. The agent's first answer was "no failed requests" while ${fmt(failedAfter)} had failed. In the review, someone asks what to change.`,
-        question: 'What should the team change so an empty answer cannot hide an outage again?',
-        qid: 'aad-q-fix',
-        choice: { id: 'aad-fix', choices: FIX },
+          `The incident is explained. The agent's first answer was "no failed requests", and later it counted ${fmt(failedAfter)} failed since ${TABLE.failuresFrom}. Here are the two queries, for the same window and the same service.`,
+        code:
+          `First query, since ${TABLE.failuresFrom}:\n` +
+          '  spans where service.name = checkout and http.status_code = 500\n' +
+          '  result: 0 spans\n\n' +
+          `Versions query, since ${TABLE.failuresFrom}:\n` +
+          '  spans where service.name = checkout and http.response.status_code = 500\n' +
+          `  result: ${fmt(failedAfter)} failed`,
+        question: "Why did the agent's first query return nothing?",
+        qid: 'aad-q-why',
+        choice: { id: 'aad-why', choices: WHY_EMPTY },
       },
     ],
     finish:
-      'You read an empty answer as a question about a name, not as proof of health. A query on an old attribute name matches nothing. ' +
-      'In Dash0, the MCP Server lets an assistant query your telemetry with read-only tools, Agent0 reads it in the semantic conventions it was produced in, and getAttributeKeys lists the attribute keys present: check the keys present before you ask for a name.',
+      'You read an empty answer as a question about a name, not as proof of health. A query on an old attribute name matches nothing, so use the names the spans carry. ' +
+      'In Dash0, the MCP Server lets an assistant query your telemetry with read-only tools, Agent0 reads it in the semantic conventions it was produced in, and you check the keys present with getAttributeKeys on the Dash0 MCP Server before you ask for a name.',
   },
 };

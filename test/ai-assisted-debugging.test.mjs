@@ -1,6 +1,6 @@
 // Level 8.5 "AI-assisted debugging" beyond the generated play-through (test/play.test.mjs, test/answers.test.mjs, test/levels-play.test.mjs):
 // the scenario pinned (views, kinds, costs, budget, answerAfterViews), the engine's validator and budget arithmetic on it, the one table
-// every figure comes from (TABLE), the legacy-name query (a neutral view, the false-alarm trap) against the 8.2 pair, tile labels with no tell, the simulated agent said plainly, an all-subsets probe
+// every figure comes from (TABLE), the legacy-name query (a neutral view, set beside the versions query in step 2) against the 8.2 pair, tile labels with no tell, the simulated agent said plainly, an all-subsets probe
 // through the real incident engine (the three clues are each needed; unlocking boards leave exactly one defensible cause), the hint tiers
 // on every board, the reference path within budget (I7), one penalty per run, and a focus walk that ends on Finish. The scenario is
 // designed for this game (#138); the structure mirrors test/everything-is-green.test.mjs. The happy and sloppy runs are generated from
@@ -58,7 +58,7 @@ test('8.5: scenario pin: id, budget, answerAfterViews, views with kinds and cost
   );
   assert.deepEqual(
     S.hypotheses.map((h) => `${h.id}|${h.right}`),
-    ['inventory-failing|true', 'bad-release|false', 'payment-timeouts|false', 'false-alarm|false', 'order-surge|false'],
+    ['inventory-failing|true', 'bad-release|false', 'payment-timeouts|false', 'order-surge|false'],
   );
 });
 
@@ -97,7 +97,7 @@ test('8.5: a scored non-boss level of act-8, last, lighting existing nodes, no c
   assert.equal(act.bossId, null, 'a level with an incident step, not a boss');
   assert.deepEqual([...act.levelIds], ['dashboards-as-code', 'semantic-convention-versions', 'migrating-vendors', 'frontend-rum', ID]);
   assert.equal(LIVE.order[LIVE.order.indexOf('frontend-rum') + 1], ID, '8.5 plays right after 8.4');
-  assert.equal(S.hypotheses.length, 5);
+  assert.equal(S.hypotheses.length, 4);
 });
 
 test('8.5: lights checkout and inventory (existing nodes), pinned by what completing it lights', () => {
@@ -221,21 +221,15 @@ test('the legacy-name query is a neutral view, so no star is lost for looking: i
   const uses = (id) => plain(view(id).html);
   assert.equal(uses('failures-by-version').includes(`${STABLE} = 500`), true, 'a clue asks by the stable name');
   for (const v of S.views.filter((x) => x.id !== 'failed-requests')) assert.equal(uses(v.id).includes(LEGACY), false, `${v.id} does not use the legacy name`);
-  assert.equal(S.hypotheses.find((h) => h.id === 'false-alarm').why.includes(LEGACY), true);
+  assert.equal(S.hypotheses.some((h) => h.id === 'false-alarm'), false, 'no step 1 cause is a trap nobody can fall into');
 });
 
-test('8.5: the legacy view costs no mistake; the false-alarm cause is the trap, and a player who opened it and the clues still has one defensible cause', () => {
+test('8.5: the legacy view costs no mistake; a player who opened it and the clues still has one defensible cause', () => {
   const st = [...CLUES, 'failed-requests'].reduce((acc, id) => openView(S, acc, id).state, newIncident(S));
   assert.equal(openView(S, newIncident(S), 'failed-requests').herring, false);
   assert.equal(openView(S, newIncident(S), 'failed-requests').exhaustedNow, false);
   assert.equal(canAnswer(S, st), true);
   assert.deepEqual(defensibleOn([...CLUES, 'failed-requests']), [RIGHT]);
-  assert.equal(defensibleOn(['failed-requests']).includes('false-alarm'), true, 'the legacy view alone leaves the false alarm standing');
-});
-
-test('the empty result is read as a naming problem by the why of the false-alarm cause, which cites the stable name and 8.2', () => {
-  const why = plain(S.hypotheses.find((h) => h.id === 'false-alarm').why);
-  for (const w of [LEGACY, STABLE, 'level 8.2', 'matches nothing even while orders fail', `${fmt(failed)} failed requests since ${TABLE.failuresFrom}`, `9.1% of the ${fmt(requests)}`]) assert.equal(why.includes(w), true, w);
 });
 
 // ---- the agent is simulated ------------------------------------------------------------
@@ -284,7 +278,6 @@ const REFUTED_BY = {
   'bad-release': { 'failures-by-version': 'Both versions fail at the same rate' },
   'payment-timeouts': { 'failing-trace': 'No span in the trace calls the payment provider' },
   'order-surge': { 'request-rate': 'The rate did not change' },
-  'false-alarm': { 'failures-by-version': 'per 1,000 requests', 'failing-trace': 'SERVER 500', 'alert-rule': 'The ratio since 10:12 is 9.1%' },
 };
 const idsOf = S.views.map((v) => v.id);
 const defensibleOn = (set) => S.hypotheses.filter((h) => h.right || !Object.keys(REFUTED_BY[h.id]).some((v) => set.includes(v))).map((h) => h.id);
@@ -345,9 +338,10 @@ test('with the threshold lowered to two clues, every board lacking a clue would 
 
 // ---- the hint tiers on every board -------------------------------------------------------
 
-test('tier 1 points at the idea behind the clues: which attribute each query filtered on, compared across queries', () => {
+test('tier 1 points at the idea of step 1: a cause has to explain where the failing requests stop and why both versions fail alike, not the attribute comparison', () => {
   const t = plain(S.hint);
-  assert.equal(t.includes('which attribute each query filtered on') && t.includes('Compare'), true);
+  assert.equal(t.includes('where the failing requests stop') && t.includes('why both versions fail alike'), true);
+  assert.equal(/attribute|status_code|name/i.test(t), false, 'step 1 tier 1 leaves the naming to step 2');
 });
 
 test('no hint tier names the cause on any of the 512 boards: tier 1 is the authored hint, tier 2 names only clue views, tier 3 is the paid one', () => {
@@ -410,7 +404,7 @@ const feedback = () => region(ID, 'feedback');
 /** After the right hypothesis: Next, the closing Choice answered right, then Finish. */
 const finish = () => {
   click('#aad-next');
-  click('[data-pick="stable-names"]');
+  click('[data-pick="old-name"]');
   click('[data-finish]');
 };
 
@@ -420,7 +414,7 @@ test('8.5: the first screen shows the alert, a full budget, nine views, locked h
   assert.equal(budget(), '20 min left. 0 of 20 min spent');
   assert.equal(board(ID).cells.total, 20);
   assert.equal(qa('[data-view]').length, 9);
-  assert.equal(locked(), 'true,true,true,true,true');
+  assert.equal(locked(), 'true,true,true,true');
   assert.equal(q('#aad-next').disabled, true);
   assert.equal(qa('[data-finish]').length, 0, 'Finish is on the closing step');
 });
@@ -428,12 +422,12 @@ test('8.5: the first screen shows the alert, a full budget, nine views, locked h
 test('8.5: it takes all three clue views to unlock the answers (answerAfterViews 3): two are not enough, and neutrals and herrings never count', () => {
   start();
   for (const id of [...NEUTRALS, ...HERRINGS]) open(id);
-  assert.equal(locked(), 'true,true,true,true,true');
+  assert.equal(locked(), 'true,true,true,true');
   open('failures-by-version');
   open('request-rate');
-  assert.equal(locked(), 'true,true,true,true,true');
+  assert.equal(locked(), 'true,true,true,true');
   open('failing-trace');
-  assert.equal(locked(), 'false,false,false,false,false');
+  assert.equal(locked(), 'false,false,false,false');
 });
 
 test('8.5: the reference path (the three clues, then inventory-failing) solves with 45% of the budget (9 min) left and no penalty', () => {
@@ -483,7 +477,7 @@ test('8.5: shortcut impossible: four neutrals leave every hypothesis locked with
   const { finished, slips } = start();
   for (const id of NEUTRALS) open(id);
   assert.equal(budget(), '12 min left. 8 of 20 min spent');
-  assert.equal(locked(), 'true,true,true,true,true');
+  assert.equal(locked(), 'true,true,true,true');
   assert.equal(q('#aad-next').disabled, true);
   assert.equal(finished.length, 0);
   assert.equal(slips.mistakes, 0);
@@ -526,7 +520,7 @@ test('8.5: the second herring is a second mistake; a wrong answer on top is a th
   open('recent-changes');
   for (const id of CLUES) open(id);
   assert.equal(slips.mistakes, 2);
-  guess('false-alarm');
+  guess('order-surge');
   assert.equal(slips.mistakes, 3);
   guess(RIGHT);
   finish();
@@ -534,7 +528,7 @@ test('8.5: the second herring is a second mistake; a wrong answer on top is a th
   assert.equal(finished[0].stars, 2);
 });
 
-for (const id of ['bad-release', 'payment-timeouts', 'false-alarm', 'order-surge']) {
+for (const id of ['bad-release', 'payment-timeouts', 'order-surge']) {
   test(`8.5: guessing ${id} costs one mistake, once, and is then ruled out (picking it again is free)`, () => {
     const { slips, finished } = start();
     for (const v of CLUES) open(v);
@@ -591,31 +585,44 @@ test('8.5: opening a view again costs neither time nor a mistake, so repeat open
 const pick = LEVEL.play.steps[1].choice.choices;
 const choice = (key) => pick.find((c) => c.key === key);
 
-test('8.5: the closing step has one right change, the stable names, and three wrong ones that each say why', () => {
-  assert.deepEqual(pick.filter((c) => c.right).map((c) => c.key), ['stable-names']);
-  assert.deepEqual(pick.filter((c) => !c.right).map((c) => c.key), ['keep-dup', 'no-filter', 'retry-later']);
-  assert.equal(plain(LEVEL.play.steps[1].question), 'What should the team change so an empty answer cannot hide an outage again?');
-  const right = plain(choice('stable-names').why);
-  for (const w of [STABLE, LEGACY, 'level 8.2', 'Agent0 reads telemetry in the OpenTelemetry semantic conventions it was produced in', 'getAttributeKeys']) assert.equal(right.includes(w), true, w);
-  assert.equal(plain(choice('keep-dup').why).includes('8.2') && plain(choice('keep-dup').why).includes('end state'), true);
-  assert.equal(plain(choice('no-filter').why).includes('filter on the status again'), true);
-  assert.equal(plain(choice('retry-later').why).includes(`at ${TABLE.queryAt}`) && plain(choice('retry-later').why).includes('same empty answer'), true);
-  const intro = plain(LEVEL.play.steps[1].intro);
-  assert.equal(intro.includes(`${fmt(failed)} had failed`), true);
-  assert.equal(intro.includes('http.') || /status_code/.test(intro), false, 'the intro names neither attribute');
+test('8.5: step 2 asks why the first query found nothing: one right cause, three that the two queries on screen refute, each with a why', () => {
+  assert.deepEqual(pick.filter((c) => c.right).map((c) => c.key), ['old-name']);
+  assert.deepEqual(pick.filter((c) => !c.right).map((c) => c.key), ['late-data', 'sampled-out', 'wrong-service']);
+  assert.equal(plain(LEVEL.play.steps[1].question), "Why did the agent's first query return nothing?");
+  const right = plain(choice('old-name').why);
+  for (const w of [STABLE, LEGACY, 'level 8.2', 'Agent0 reads telemetry in the OpenTelemetry semantic conventions it was produced in', 'getAttributeKeys', 'Dash0 MCP Server', 'Use the names the spans carry', `${fmt(failed)} failed since ${TABLE.failuresFrom}`]) assert.equal(right.includes(w), true, w);
+  for (const k of ['late-data', 'sampled-out']) assert.equal(plain(choice(k).why).includes(`${fmt(failed)} failed`) && plain(choice(k).why).includes(`since ${TABLE.failuresFrom}`), true, k);
+  assert.equal(plain(choice('wrong-service').why).includes('service.name = checkout'), true);
+  for (const c of pick.filter((x) => !x.right)) assert.equal(plain(c.why).includes(LEGACY) || /attribute name|opt-in/.test(c.why), false, `${c.key}: a decoy's why does not give away the mechanism`);
 });
 
-test('8.5: the closing labels are balanced: the right one is neither the longest nor the shortest, within 15 characters of the others, with no shape or echo tell', () => {
+test('8.5: step 2 shows the two queries side by side over one window and one service, with the TABLE figures, and names neither attribute in the prose', () => {
+  const step = LEVEL.play.steps[1];
+  const code = step.code;
+  const first = code.indexOf(`${LEGACY} = 500`);
+  const second = code.indexOf(`${STABLE} = 500`);
+  assert.equal(first > -1 && second > first, true, 'the first query, then the versions query');
+  assert.equal(code.split(`since ${TABLE.failuresFrom}`).length - 1, 2, 'both queries use the one window');
+  assert.equal(code.split('service.name = checkout').length - 1, 2, 'both queries use the one service');
+  assert.equal(code.includes('result: 0 spans') && code.includes(`result: ${fmt(failed)} failed`), true);
+  assert.equal(failed, 984);
+  const intro = plain(step.intro);
+  assert.equal(intro.includes(`${fmt(failed)} failed since ${TABLE.failuresFrom}`), true);
+  assert.equal(intro.includes('http.') || /status_code/.test(intro), false, 'the intro names neither attribute');
+  assert.equal(plain(view('failed-requests').html).includes(`since ${TABLE.failuresFrom}`), true, 'the legacy view uses the same window');
+  assert.equal(/getAttributeKeys/.test(plain(LEVEL.play.finish)) && /Dash0 MCP Server/.test(plain(LEVEL.play.finish)), true);
+});
+
+test('8.5: step 2 labels are balanced: the right one is neither the longest nor the shortest, within 15 characters of the others, only it names the mechanism, no verify tail, no echo of a view tile', () => {
   const lens = pick.map((c) => plain(c.label).length);
-  const right = plain(choice('stable-names').label);
+  const right = plain(choice('old-name').label);
   assert.equal(right.length < Math.max(...lens) && right.length > Math.min(...lens), true, lens.join());
   assert.equal(Math.max(...lens) - Math.min(...lens) <= 15, true, lens.join());
-  assert.equal(pick.some((c) => /stable/i.test(c.label)), false, 'no label says stable');
-  assert.equal(pick.some((c) => /for good/.test(c.label)), false, 'no decoy rules itself out');
-  assert.equal(pick.filter((c) => /^(Ask|Use) /.test(c.label) && /question|names|filter/.test(c.label)).length >= 3, true, 'the right one is not the only one that changes the question');
-  assert.equal(pick.every((c) => /, (so|in case) /.test(c.label)), true, 'one shape for all four: an action, then a reason after a comma');
-  for (const c of pick) assert.equal(/\b(verify|check that|make sure)\b/i.test(c.label), false, `${c.key}: no verify tail`);
-  for (const v of S.views) assert.equal(/stable attribute names|agent prompt/i.test(v.label), false, 'no view tile echoes the right label');
+  assert.equal(pick.filter((c) => /attribute|no longer|opt-in|stable|legacy|\bold\b/i.test(c.label)).map((c) => c.key).join(), 'old-name', 'only the right label names the mechanism');
+  assert.equal(pick.every((c) => /^The /.test(c.label) && !/,/.test(c.label)), true, 'one shape: a plain statement of a cause');
+  for (const c of pick) assert.equal(/\b(verify|check|make sure|confirm)\b/i.test(c.label), false, `${c.key}: no verify tail`);
+  for (const c of pick) assert.equal(c.label.includes(LEGACY) || c.label.includes(STABLE), false, `${c.key}: no label repeats the intro's query text`);
+  for (const v of S.views) assert.equal(/attribute|no longer sends/i.test(v.label), false, 'no view tile echoes the right label');
 });
 
 test('8.5: a wrong answer on the closing step costs one mistake, once, and leaves 4 stars', () => {
@@ -623,10 +630,10 @@ test('8.5: a wrong answer on the closing step costs one mistake, once, and leave
   for (const id of CLUES) open(id);
   guess(RIGHT);
   click('#aad-next');
-  click('[data-pick="keep-dup"]');
+  click('[data-pick="late-data"]');
   assert.equal(slips.mistakes, 1);
   assert.equal(q('[data-finish]').disabled, true, 'Finish waits for the right change');
-  click('[data-pick="stable-names"]');
+  click('[data-pick="old-name"]');
   click('[data-finish]');
   assert.equal(slips.mistakes, 1);
   assert.equal(finished[0].stars, 4);
@@ -643,7 +650,7 @@ test('8.5: focus walk: first view, an opened heading, the win card, then Finish'
   assert.equal(focus.last(), `#${ID}-win-title`);
   assert.equal(q('#aad-next').disabled, false);
   click('#aad-next');
-  click('[data-pick="stable-names"]');
+  click('[data-pick="old-name"]');
   assert.equal(focus.last(), '#aad-finish');
   assert.equal(q('[data-finish]').id, 'aad-finish');
   assert.deepEqual(focus.unfocusable(), []);

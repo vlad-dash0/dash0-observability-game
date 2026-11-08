@@ -152,7 +152,7 @@ const ANSWERS = {
   'frontend-rum': ['build frum-tree: 4d5e6f708192a3b4.parent=3c4d5e6f708192a3', 'choice frum-cors: page-origin-api-header'],
   'ai-assisted-debugging': [
     'incident ai-assisted-debugging: failures-by-version,failing-trace,request-rate > inventory-failing',
-    'choice aad-fix: stable-names',
+    'choice aad-why: old-name',
   ],
   'semantic-convention-versions': ['spot scv-spot: http-target,net-host-port,http-status-code', 'choice scv-switch: move-queries'],
   'migrating-vendors': [
