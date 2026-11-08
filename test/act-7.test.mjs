@@ -45,12 +45,12 @@ const spotRun = (ids) => {
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-7 follows act-6, holds 7.1 to 7.4, no boss, and is not coming soon', () => {
+test('act-7 follows act-6, holds 7.1 to 7.4 then its boss, and is not coming soon', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-7');
   assert.ok(act, 'act-7 is in the registry');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 7, name: 'Alerting and SLOs', sub: 'Wake me only when it matters', levelIds: [ID, 'slis-and-slos', 'burn-rate-alerts', 'synthetic-checks'], bossId: null },
+    { no: 7, name: 'Alerting and SLOs', sub: 'Wake me only when it matters', levelIds: [ID, 'slis-and-slos', 'burn-rate-alerts', 'synthetic-checks'], bossId: 'everything-is-green' },
   );
   const ids = LIVE.acts.map((a) => a.id);
   assert.equal(ids.indexOf('act-7'), ids.indexOf('act-6') + 1, 'act-7 comes right after act-6');
@@ -78,7 +78,8 @@ test('act-7 opens when acts 0-6 are complete, or once entered', () => {
   assert.equal(isActComplete(act, emptyProgress()), false);
   assert.equal(isActComplete(act, progressOf([ID])), false, '7.2 to 7.4 are still to play');
   assert.equal(isActComplete(act, progressOf([ID, 'slis-and-slos', 'burn-rate-alerts'])), false, '7.4 is still to play');
-  assert.equal(isActComplete(act, progressOf([ID, 'slis-and-slos', 'burn-rate-alerts', 'synthetic-checks'])), true, 'its four levels complete it (no boss)');
+  assert.equal(isActComplete(act, progressOf([ID, 'slis-and-slos', 'burn-rate-alerts', 'synthetic-checks'])), false, 'the boss is still to play');
+  assert.equal(isActComplete(act, progressOf([ID, 'slis-and-slos', 'burn-rate-alerts', 'synthetic-checks', 'everything-is-green'])), true, 'its four levels and its boss complete it');
 });
 
 test('7.1 fields: scored with no par time, in act-7, lights checkout, awards the rate-not-value card; mechanics as derived', () => {

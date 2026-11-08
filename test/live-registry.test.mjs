@@ -60,6 +60,7 @@ const EXPECTED_ORDER = [
   'slis-and-slos',
   'burn-rate-alerts',
   'synthetic-checks',
+  'everything-is-green',
   'semantic-convention-versions',
   'filter-or-sampler',
   'the-34-percent-error-rate',
@@ -138,7 +139,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
       name: 'Alerting and SLOs',
       sub: 'Wake me only when it matters',
       levelIds: ['good-alerts', 'slis-and-slos', 'burn-rate-alerts', 'synthetic-checks'],
-      bossId: null,
+      bossId: 'everything-is-green',
     },
     {
       id: 'act-8',

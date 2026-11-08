@@ -203,12 +203,15 @@ test('sources: Spec lines on opentelemetry.io, Dash0 docs lines on www.dash0.com
 
 // ---- the globe -----------------------------------------------------------------------------
 
-test('globe: 7.4 lights South Korea and completes East Asia', () => {
+test('globe: 7.4 lights South Korea; East Asia is complete once the boss is done too', () => {
   assert.equal(LEVEL_COUNTRY[ID], 'KOR');
   assert.equal(COUNTRY_NAMES.KOR, 'South Korea');
   const map = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES };
   const before = ['good-alerts', 'slis-and-slos', 'burn-rate-alerts'];
   const fresh = freshlyLit(progressOf(before), progressOf([...before, ID]), LIVE, map);
-  assert.deepEqual(fresh, { countryIds: ['KOR'], regionIds: ['act-7'] });
-  assert.equal(litText(fresh, level, map), 'South Korea is now lit: Synthetic checks. East Asia is complete.');
+  assert.deepEqual(fresh, { countryIds: ['KOR'], regionIds: [] }, 'the Act 7 boss is still to play');
+  assert.equal(litText(fresh, level, map), 'South Korea is now lit: Synthetic checks.');
+  const done = [...before, ID];
+  const boss = freshlyLit(progressOf(done), progressOf([...done, 'everything-is-green']), LIVE, map);
+  assert.deepEqual(boss, { countryIds: [], regionIds: ['act-7'] }, 'the boss has no country of its own and completes the region');
 });
