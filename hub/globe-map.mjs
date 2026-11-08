@@ -7,6 +7,11 @@
 // Every country in LEVEL_COUNTRY has at least this many land dots, so it is visible lit.
 export const MIN_DOTS = 6;
 
+// The one narrow exception: South Korea has 5 dots on the 110m data (it is small), and East Asia has no other
+// unused country with 6 or more (North Korea has 6 and was passed over for a demo-friendlier pick). A code
+// listed here needs at least its own minimum instead of MIN_DOTS (test/globe-data.test.mjs pins this table).
+export const MIN_DOTS_EXCEPTIONS = Object.freeze({ KOR: 5 });
+
 // act id -> region name and the Natural Earth SUBREGION values it covers. Owner defaults
 // (2026-11-04): Southern Europe counts as Western Europe, Central America and the Caribbean
 // as North America, Eastern Europe rides with Northern Europe (Russia excepted, below).
@@ -76,7 +81,7 @@ export const LEVEL_COUNTRY = Object.freeze({
   'good-alerts': 'JPN',
   'slis-and-slos': 'CHN',
   'burn-rate-alerts': 'MNG',
-  'synthetic-checks': 'PRK',
+  'synthetic-checks': 'KOR',
   // act-8 Southeast Asia
   'semantic-convention-versions': 'THA',
   // act-9 Oceania
@@ -95,7 +100,7 @@ export const COUNTRY_NAMES = Object.freeze({
   DZA: 'Algeria', COD: 'the Democratic Republic of the Congo', ZAF: 'South Africa',
   KAZ: 'Kazakhstan', SAU: 'Saudi Arabia', TUR: 'Turkey', UZB: 'Uzbekistan', TKM: 'Turkmenistan', IRQ: 'Iraq',
   IND: 'India', IRN: 'Iran', PAK: 'Pakistan',
-  JPN: 'Japan', CHN: 'China', MNG: 'Mongolia', PRK: 'North Korea',
+  JPN: 'Japan', CHN: 'China', MNG: 'Mongolia', KOR: 'South Korea',
   THA: 'Thailand',
   AUS: 'Australia', NZL: 'New Zealand', PNG: 'Papua New Guinea',
 });

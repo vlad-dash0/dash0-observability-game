@@ -141,7 +141,7 @@ const ANSWERS = {
     'choice br-rule: both',
   ],
   'synthetic-checks': [
-    'sort sc-sort: handler-throws=spans tls-expired=probe slow-query=spans dns-stale=probe inventory-loop=spans cdn-stale=probe payment-timeout=spans lb-no-targets=probe bad-deploy=spans',
+    'sort sc-sort: handler-throws=spans tls-expired=probe payment-dns=spans slow-query=spans dns-dropout=probe inventory-loop=spans dns-stale=probe payment-tls=spans cdn-stale=probe bad-deploy=spans lb-no-targets=probe',
     'choice sc-alert: probe',
   ],
   'semantic-convention-versions': ['spot scv-spot: http-target,net-host-port,http-status-code', 'choice scv-switch: move-queries'],

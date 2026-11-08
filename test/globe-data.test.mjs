@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { DOTS, COUNTRIES, LATTICE_POINTS } from '../hub/globe-data.mjs';
-import { ACT_REGIONS, LEVEL_COUNTRY, MIN_DOTS, COUNTRY_ACT, actOfCountry } from '../hub/globe-map.mjs';
+import { ACT_REGIONS, LEVEL_COUNTRY, MIN_DOTS, MIN_DOTS_EXCEPTIONS, COUNTRY_ACT, actOfCountry } from '../hub/globe-map.mjs';
 import { liveRegistry } from '../app.mjs';
 import { globeState } from '../lib/globe.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
@@ -52,8 +52,16 @@ test("each level's country is in its act's region", () => {
 test(`every mapped country has at least ${MIN_DOTS} dots (K)`, () => {
   assert.equal(MIN_DOTS, 6);
   for (const iso of Object.values(LEVEL_COUNTRY)) {
-    assert.ok(dotsOf(iso).length >= MIN_DOTS, `${iso} has ${dotsOf(iso).length} dots, needs ${MIN_DOTS}`);
+    const need = MIN_DOTS_EXCEPTIONS[iso] ?? MIN_DOTS;
+    assert.ok(dotsOf(iso).length >= need, `${iso} has ${dotsOf(iso).length} dots, needs ${need}`);
   }
+});
+
+test('the dot-count exception is exactly South Korea at 5, used by a level, and is a real shortfall', () => {
+  assert.deepEqual({ ...MIN_DOTS_EXCEPTIONS }, { KOR: 5 });
+  assert.equal(Object.values(LEVEL_COUNTRY).includes('KOR'), true);
+  assert.equal(dotsOf('KOR').length, 5, 'KOR has the 5 dots the exception allows (a change means the exception is stale)');
+  assert.equal(dotsOf('KOR').length < MIN_DOTS, true, 'without the exception it would fail');
 });
 
 test('region lookup: Russia goes to act-5, Antarctica to nothing, unknown subregion to nothing', () => {
@@ -154,7 +162,7 @@ test('the committed module names the pinned source and hash', () => {
 // outline (overseas parts dropped) plus half a degree. Overseas parts that stay on purpose (Alaska, Hawaii, Svalbard) are
 // inside their box.
 const HOME = {
-  FRA: [40, 52, -6, 11], DEU: [46, 56, 5, 16], ESP: [35, 45, -10, 4], NOR: [57, 82, 4, 32], SWE: [54, 70, 10, 25], FIN: [59, 71, 20, 33], USA: [18, 72, -173, -66], CAN: [41, 84, -142, -52], MEX: [14, 34, -118, -86], GRL: [59, 85, -74, -11], CUB: [19, 24, -86, -73], GTM: [13, 19, -93, -87], HND: [12, 17, -90, -82], BRA: [-35, 6, -75, -34], ARG: [-56, -21, -74, -53], PER: [-19, 1, -82, -68], COL: [-5, 13, -80, -66], BOL: [-24, -9, -71, -56], VEN: [0, 13, -74, -59], CHL: [-57, -17, -77, -66], DZA: [18, 38, -10, 13], COD: [-14, 6, 11, 32], ZAF: [-36, -21, 15, 34], KAZ: [40, 56, 45, 88], SAU: [15, 33, 34, 57], TUR: [35, 43, 25, 46], UZB: [36, 47, 55, 74], TKM: [34, 44, 52, 68], IRQ: [28, 38, 38, 50], IND: [7, 36, 67, 98], IRN: [24, 41, 43, 64], PAK: [23, 38, 60, 79], JPN: [30, 46, 128, 146], CHN: [18, 54, 73, 135], MNG: [41, 52, 87, 121], PRK: [37, 43, 124, 131], AUS: [-44, -10, 112, 154], NZL: [-48, -34, 166, 179], THA: [5, 21, 97, 106], PNG: [-12.5, 0, 140.5, 158],
+  FRA: [40, 52, -6, 11], DEU: [46, 56, 5, 16], ESP: [35, 45, -10, 4], NOR: [57, 82, 4, 32], SWE: [54, 70, 10, 25], FIN: [59, 71, 20, 33], USA: [18, 72, -173, -66], CAN: [41, 84, -142, -52], MEX: [14, 34, -118, -86], GRL: [59, 85, -74, -11], CUB: [19, 24, -86, -73], GTM: [13, 19, -93, -87], HND: [12, 17, -90, -82], BRA: [-35, 6, -75, -34], ARG: [-56, -21, -74, -53], PER: [-19, 1, -82, -68], COL: [-5, 13, -80, -66], BOL: [-24, -9, -71, -56], VEN: [0, 13, -74, -59], CHL: [-57, -17, -77, -66], DZA: [18, 38, -10, 13], COD: [-14, 6, 11, 32], ZAF: [-36, -21, 15, 34], KAZ: [40, 56, 45, 88], SAU: [15, 33, 34, 57], TUR: [35, 43, 25, 46], UZB: [36, 47, 55, 74], TKM: [34, 44, 52, 68], IRQ: [28, 38, 38, 50], IND: [7, 36, 67, 98], IRN: [24, 41, 43, 64], PAK: [23, 38, 60, 79], JPN: [30, 46, 128, 146], CHN: [18, 54, 73, 135], MNG: [41, 52, 87, 121], KOR: [33, 39, 125, 130], AUS: [-44, -10, 112, 154], NZL: [-48, -34, 166, 179], THA: [5, 21, 97, 106], PNG: [-12.5, 0, 140.5, 158],
 };
 
 test('every mapped country has a home box, and all its dots lie inside it', () => {

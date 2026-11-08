@@ -49,8 +49,10 @@ test('card multi-window-burn: pinned front, fits a card, Dash0 SLO page as sourc
   assert.equal(card.front, 'Page on a burn rate over two windows: the long one says it is worth a page, the short one says it is still happening.');
   assert.equal(card.front.length <= 140, true, `front is ${card.front.length} characters`);
   assert.equal(card.specUrl, 'https://www.dash0.com/docs/dash0/monitoring/alerting/slos');
-  for (const w of ['reads 100 on 5 minutes', 'reads 167 on the hour', '14.4', '2% of a 30-day budget']) assert.equal(card.back.includes(w), true, w);
+  for (const w of ['reads 100 on the last 5 minutes', 'reads 167 on the last hour', '14.4', '1.2% of a 30-day budget', '2% of a 30-day budget spent in an hour', 'Pairing them does not speed up the start', 'Dash0 SLOs use 28 days']) assert.equal(card.back.includes(w), true, w);
   assert.match(card.dash0Angle, /fast burn and slow burn/);
+  assert.match(card.dash0Angle, /confirms the problem is still happening/, 'the confirmation window is explained, not named');
+  assert.doesNotMatch(card.dash0Angle, /confirmation window/);
   assert.equal((card.front + card.back + card.dash0Angle).includes('\u2014'), false);
 });
 
@@ -132,10 +134,16 @@ test('step 1 graded for real: each obvious wrong query fails, and the verdict te
 
 test('step 1 copy: the numbers in the explain are the data, the window is labelled illustrative', () => {
   const e = plain(query.explain);
-  for (const w of ['about 35', 'about 11', '83.3', '0.035', '20 minutes', '40 minutes', 'rate()']) assert.equal(e.includes(w), true, w);
+  for (const w of ['about 35', 'about 11', '83.3', 'error ratio, 0.035', '20 minutes', '40 minutes', 'rate()', 'not a typo', 'the last 5 minutes read 83.3 too', '[30d]', 'only one hour exists']) assert.equal(e.includes(w), true, w);
   // before the deploy: 2 failures of 180 requests per scrape; the last 5 minutes: 15 of 180.
   assert.equal(Math.abs(value(burn('5m')) - (15 / 180) / 0.001) < 1e-6, true);
   assert.equal(Math.abs((2 / 180) / 0.001 - 11.11) < 0.01, true, 'before the deploy about 11 times');
+  // 83.3 twice: the last 5 minutes and the whole 20 minutes since the deploy (the counters restarted there) both read it.
+  assert.equal(Math.abs(value(burn('20m')) - 250 / 3) < 1e-6, true, 'the 20 minutes since the deploy read 83.3 too');
+  assert.equal(Math.abs((40 / 60) * (2 / 180 / 0.001) + (20 / 60) * (15 / 180 / 0.001) - value(query.reference)) < 0.5, true, 'two thirds of 11 plus one third of 83 is the hour');
+  // A window longer than the data reads the same hour: the explain says so.
+  for (const w of ['[2h]', '[30d]']) assert.equal(Math.abs(value(burn(w.slice(1, -1))) - value(query.reference)) < 0.01, true, `${w} reads the same hour`);
+  assert.doesNotMatch(plain(JSON.stringify(level.play)), /failed share/, 'one term: error ratio');
   const intro = plain(QUERY_STEP.intro);
   assert.match(intro, /illustrative/);
   assert.match(intro, /99\.9%/);
@@ -179,13 +187,13 @@ test('step 2: the readings of incidents A and B in the copy are the arithmetic',
   assert.match(intro, /no blip followed by a long failure/);
 });
 
-test('step 2: the facts in the answers are the arithmetic (1.2% of the budget, 59 minutes after the fix, 43 minutes to cross)', () => {
+test('step 2: the facts in the answers are the arithmetic (1.2% of the budget, 59 minutes after the fix, 43 minutes to cross, 13.44 against 14.4)', () => {
   const choices = RULE_STEP.choice.choices;
   const why = (k) => plain(choices.find((c) => c.key === k).why);
   const budgetSeconds = allow * 30 * 24 * 3600;
   assert.equal(Math.round(budgetSeconds), 2592);
   assert.equal((30 / Math.round(budgetSeconds) * 100).toFixed(1), '1.2');
-  assert.equal(why('short-only').includes('1.2% of the budget (30 seconds of the 2,592'), true);
+  assert.equal(why('short-only').includes('only 1.2% of the budget (a 99.9% target allows 2,592 seconds of failure in 30 days, and the hiccup used 30)'), true);
   // The 1-hour reading stays above the line until fewer than 14.4 x 0.001 x 3600 s of failures are left in the hour.
   const keepSeconds = LINE * allow * 3600;
   assert.equal(keepSeconds.toFixed(2), '51.84');
@@ -198,7 +206,10 @@ test('step 2: the facts in the answers are the arithmetic (1.2% of the budget, 5
   assert.equal(((LINE / 20) * 60).toFixed(1), '43.2');
   assert.equal(why('long-only').includes('a burn rate of 20) it needs 43 minutes'), true);
   assert.equal(Number((0.02 * 28 * 24).toFixed(6)), 13.44);
-  assert.equal(why('both').includes('13.44 for 2% of the budget in an hour, on its 28-day window'), true);
+  assert.equal(why('both').includes('which is a burn rate of 13.44 there and 14.4 on the 30 days used here'), true, 'the two thresholds are said once, with the reason');
+  assert.equal(why('both').includes('confirmation window'), false);
+  assert.equal(why('both').includes('a shorter window that confirms the problem is still happening'), true);
+  assert.equal(why('either').includes('exactly as the 5-minute rule does'), true);
 });
 
 test('step 2: both windows is the one right answer, labels carry no reasoning, the tempting wrong ones are named by their numbers', () => {

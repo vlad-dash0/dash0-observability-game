@@ -1,5 +1,5 @@
 // Level 7.4: Synthetic checks. Act 7 "Alerting and SLOs". Kettle & Co's checkout is fully instrumented, and customers still tell the team
-// about outages first. The player sorts nine failures into "your server spans see it" and "only a probe from outside sees it" (Sort it),
+// about outages first. The player sorts eleven failures into "your spans record the failure" and "your spans record nothing, a probe sees it" (Sort it),
 // then chooses the alert that would have paged for an expired TLS certificate, where the spans read healthy (Choice). No synthetic run is
 // simulated. Hints are off on the sort (the default ladder: hints in early acts only).
 // Spec: https://opentelemetry.io/docs/specs/otel/trace/api/#spankind , https://opentelemetry.io/docs/specs/semconv/http/http-spans/
@@ -13,18 +13,19 @@
 // TLS error; notification channels deliver alerts from check rules and synthetic checks (the synthetic monitoring page, the run details
 // page, the notification channels page).
 //
-// Stated as reasoning, with no source: a request that fails before it reaches instrumented code (a failed DNS lookup, a failed TLS
-// handshake, an answer from a CDN cache or from the load balancer) never becomes a server span in your service, because a server span is
-// made by the code that handles the request. The copy says "never reaches" and does not cite a page for it.
+// Stated as reasoning, with no source: a request that fails before it reaches instrumented code of your service (a failed DNS lookup of
+// your hostname, a failed TLS handshake with your certificate, an answer from a CDN cache or from the load balancer) does not become a
+// server span of your service, because a server span is made by the code that handles the request. The copy scopes it to your
+// service's spans: an instrumented proxy or ingress has spans of its own, and a failed call out of your service is a client span.
 //
-// Invented for the game: the company, the nine failures, and every number in step 2 (3,000 requests against a usual 12,000, 0 errors, 180 ms).
+// Invented for the game: the company, the eleven failures, and every number in step 2 (3,000 requests against a usual 4,000 at that hour, 0 errors, 180 ms, a 10-second health check).
 
 const SORT = {
   id: 'sc-sort',
   helps: { hints: false },
   buckets: [
-    { id: 'spans', label: 'Your server spans see it' },
-    { id: 'probe', label: 'Only a probe from outside sees it' },
+    { id: 'spans', label: 'Your spans record the failure' },
+    { id: 'probe', label: 'Your spans record nothing; a probe sees it' },
   ],
   items: [
     {
@@ -35,9 +36,15 @@ const SORT = {
     },
     {
       id: 'tls-expired',
-      label: 'The TLS certificate on the public hostname has expired',
+      label: 'The TLS certificate on checkout\'s public hostname has expired',
       bucket: 'probe',
-      why: 'Clients refuse the connection during the handshake, before any HTTP request is sent. No request reaches checkout, so there is no server span. A probe does the handshake itself and fails.',
+      why: 'Clients refuse the connection during the handshake, before any HTTP request is sent. No request reaches checkout, so checkout has no server span for it. A probe does the handshake itself and fails.',
+    },
+    {
+      id: 'payment-dns',
+      label: 'Checkout\'s call to the payment provider fails its DNS lookup',
+      bucket: 'spans',
+      why: 'This failure is on the way out of your service. Checkout\'s client span for the call records the error, a DNS error, which is the example the HTTP spans page gives, so your spans do record it.',
     },
     {
       id: 'slow-query',
@@ -46,10 +53,10 @@ const SORT = {
       why: 'The request got in, so the server span is long and the database client span under it shows where the time went.',
     },
     {
-      id: 'dns-stale',
-      label: 'A DNS record still points the hostname at a retired address',
+      id: 'dns-dropout',
+      label: 'Checkout\'s public hostname drops out of DNS',
       bucket: 'probe',
-      why: 'Clients resolve the name to an address that no longer serves checkout, and their requests go nowhere. Nothing arrives to be traced. A probe resolves the name like a visitor does and fails the same way.',
+      why: 'Visitors\' lookups of the name return no address, so their requests are never sent and nothing arrives at checkout to be traced. A probe looks the name up like a visitor does and fails.',
     },
     {
       id: 'inventory-loop',
@@ -58,28 +65,34 @@ const SORT = {
       why: 'The requests arrive and run, slowly, and the trace shows 30 client spans under one server span.',
     },
     {
+      id: 'dns-stale',
+      label: 'A DNS record still points the hostname at a retired address',
+      bucket: 'probe',
+      why: 'Clients resolve the name to an address that no longer serves checkout, and their requests go nowhere. Nothing arrives to be traced. A probe resolves the name like a visitor does and fails the same way.',
+    },
+    {
+      id: 'payment-tls',
+      label: 'The payment provider\'s TLS certificate has expired, so checkout\'s calls to it fail',
+      bucket: 'spans',
+      why: 'The handshake fails on the way out of your service, and checkout\'s client span for the call records the error. A TLS failure is invisible to your spans only when it stops requests from reaching you.',
+    },
+    {
       id: 'cdn-stale',
       label: 'The CDN serves a broken page from its cache',
       bucket: 'probe',
-      why: 'The CDN answers visitors itself, so the request never travels to your service, and your spans see a quiet, healthy origin. A probe fetches the page from outside and can check what it got.',
-    },
-    {
-      id: 'payment-timeout',
-      label: 'The payment provider times out on a call',
-      bucket: 'spans',
-      why: 'The request reached checkout, which then called out and waited. The client span for the call and the server span above it both record the failure.',
-    },
-    {
-      id: 'lb-no-targets',
-      label: 'The load balancer has no healthy target left',
-      bucket: 'probe',
-      why: 'The load balancer answers with an error of its own and forwards nothing to checkout, so no server span exists for those requests. A probe sees the error response.',
+      why: 'The CDN answers visitors itself, so the request never travels to your service, and the spans of your service see a quiet, healthy origin. A probe fetches the page from outside and can check what it got.',
     },
     {
       id: 'bad-deploy',
       label: 'A bad deploy makes every request to /pay return 500',
       bucket: 'spans',
       why: 'The requests reach the new code, which fails them, so each one becomes a server span with an error status.',
+    },
+    {
+      id: 'lb-no-targets',
+      label: 'The load balancer has no healthy target left',
+      bucket: 'probe',
+      why: 'The load balancer answers with an error of its own and forwards nothing to checkout, so checkout has no server span for those requests. A probe sees the error response.',
     },
   ],
 };
@@ -101,8 +114,20 @@ const ALERT = [
     why: 'The requests that do arrive still take 180 ms at p99, exactly as usual. A span describes a request that got in, and latency says nothing about the ones that did not.',
   },
   {
+    key: 'rate',
+    label: 'Request rate of checkout\'s server spans below half of usual',
+    why:
+      'It pages on silence, but here it stays quiet: 3,000 requests is three quarters of the 4,000 usual at that hour, above the half line, because the internal tools kept calling. ' +
+      'Even when it does fire, a drop in spans cannot tell an expired certificate from a quiet night or a broken client; the probe names the TLS error.',
+  },
+  {
+    key: 'health-check',
+    label: 'A load balancer health check to the pods every 10 seconds',
+    why: 'The check goes from the load balancer to each pod inside the network, so it never meets the certificate on the public hostname, and every pod answers healthy. It measures whether pods respond, not whether visitors can connect.',
+  },
+  {
     key: 'probe',
-    label: 'A probe requesting the public hostname every minute',
+    label: 'A request to the public hostname every minute, must pass',
     right: true,
     why:
       'The probe makes its own request from outside the way a visitor does: the DNS lookup, then the TLS handshake, and with an expired certificate the handshake fails, whatever the spans say. ' +
@@ -129,21 +154,21 @@ export default {
         intro:
           'Every request that reaches Kettle &amp; Co\'s checkout becomes a server span, and still the team hears about some outages from customers first. ' +
           'A <b>probe</b> is a request the team sends itself, at regular intervals, from outside, the way a visitor would; a <b>synthetic check</b> is a probe with a pass or fail on what comes back.',
-        question: 'For each failure, say who sees it: your server spans, or only a probe from outside.',
+        question: 'For each failure, say whether your own spans record it, or record nothing and only a probe from outside sees it.',
         qid: 'sc-q-sort',
         sort: SORT,
       },
       {
         intro:
           'Last night the TLS certificate on checkout\'s public hostname expired and browsers refused to connect. Checkout\'s server spans for the last 5 minutes: ' +
-          '3,000 requests (usually 12,000), all from internal tools that do not check certificates, 0 errors, p99 latency 180 ms (usually 180 ms). Nothing paged.',
+          '3,000 requests (usually 4,000 at that hour), all from internal tools that do not check certificates, so they still connect, 0 errors, p99 latency 180 ms (usually 180 ms). Nothing paged.',
         question: 'Which alert would have paged the on-call engineer?',
         qid: 'sc-q-alert',
         choice: { id: 'sc-alert', choices: ALERT },
       },
     ],
     finish:
-      'You can tell what server spans see from what only a probe sees: a request that never reaches your service leaves no span. ' +
+      'You can tell what your spans record from what only a probe sees: a request that never reaches your service leaves no server span of its own, while a failed call out of your service shows in its client span. ' +
       'Spans tell you why a request that arrived went wrong, and a probe from outside tells you whether requests can arrive at all.',
   },
 };
