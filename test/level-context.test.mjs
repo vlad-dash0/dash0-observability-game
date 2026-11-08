@@ -340,3 +340,14 @@ test('#17 P3 board stars equal level stars after one guide ask and one hint', ()
   assert.equal(board, ctx.finish().stars);
   assert.equal(board, 3);
 });
+
+test('#17 P3 an ask after finish is no charge and tells nobody', () => {
+  const { ctx, calls } = setup();
+  let heard = 0;
+  ctx.onGuideHint(() => { heard += 1; });
+  const result = ctx.finish();
+  ctx.askedGuide();
+  assert.equal(heard, 0);
+  assert.equal(result.stars, 5);
+  assert.equal(calls.length, 1);
+});

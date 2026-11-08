@@ -213,14 +213,17 @@ test('#17 P3 mountSide counts a guide ask in the hints shown, the stars and the 
   ctx.hint = () => {};
   withGuide(ctx);
   const side2 = mountSide(ctx, q('#box'), 's1', {});
-  side2.score({ wrong: 0, wrongLabel: 'wrong drops', hints: 0, done: false });
+  side2.score({ wrong: 2, wrongLabel: 'wrong drops', hints: 0, done: false });
   side2.hintUi({ label: 'Hint 1 of 3', disabled: false, tierHtml: '' });
-  assert.equal(q('#s1-hint-cost').textContent, 'costs 1 star');
+  assert.equal(q('#s1-hint-cost').textContent, 'costs 1 star', 'two penalties: 3 stars, one more gives 2');
   ctx.askedGuide();
   assert.equal(q('#s1-hints').textContent, '1', 'the card shows the ask at once');
-  assert.equal(q('#s1-stars').getAttribute('aria-label'), '4 of 5 stars still possible');
-  assert.equal(q('#s1-hint-cost').textContent, 'costs 1 star');
+  assert.equal(q('#s1-stars').getAttribute('aria-label'), '2 of 5 stars still possible');
+  assert.equal(q('#s1-hint-cost').textContent, 'costs no star now', 'three penalties: 2 stars, a fourth still gives 2');
   assert.equal(side2.hintsShown(2), 3);
+  side2.score({ wrong: 2, wrongLabel: 'wrong drops', hints: 0, done: false });
+  side2.hintUi({ label: 'Hint 1 of 3', disabled: false, tierHtml: '' });
+  assert.equal(q('#s1-hint-cost').textContent, 'costs no star now', 'the ask survives a later score() and hintUi()');
   const n = side2.score({ wrong: 1, wrongLabel: 'wrong drops', hints: 1, done: false });
   assert.equal(n, 2, 'one wrong, one hint and one ask: three penalties');
   assert.equal(q('#s1-hints').textContent, '2', 'the ask survives a later score()');
@@ -237,4 +240,21 @@ test('#17 P3 mountHintLadder (Query it, Configure it) states the asks in its suc
   ctx.askedGuide();
   lad.succeed();
   assert.equal(q('#s4-win-stars').textContent, '4 of 5 stars: 0 failed Checks, 1 hint.');
+});
+
+test('#17 P3 a solved board ignores later asks, and an earlier step\'s board never reacts to the next step\'s asks', () => {
+  const dom = makeDom();
+  recordFocus(dom.window);
+  dom.body.innerHTML = `<div id="b1">${sideHtml('one', { hints: true, title: 'A' })}</div><div id="b2">${sideHtml('two', { hints: true, title: 'B' })}</div>`;
+  const ctx = withGuide({ ovBody: dom.body, escapeHtml, mistake() {}, hint() {} });
+  const first = mountSide(ctx, q('#b1'), 'one', {});
+  first.score({ wrong: 0, wrongLabel: 'wrong', hints: 0, done: false });
+  first.succeed({ line: 'done' });
+  first.score({ wrong: 0, wrongLabel: 'wrong', hints: 0, done: true });
+  const second = mountSide(ctx, q('#b2'), 'two', {});
+  second.score({ wrong: 0, wrongLabel: 'wrong', hints: 0, done: false });
+  ctx.askedGuide();
+  assert.equal(q('#one-hints').textContent, '0', 'the solved board did not repaint');
+  assert.equal(first.hintsShown(0), 0, 'and did not count the ask');
+  assert.equal(q('#two-hints').textContent, '1', 'the live board did');
 });
