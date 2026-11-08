@@ -238,7 +238,7 @@ test('stepContext carries no answer: no line trips withholds, for every live all
   for (const { level, type, spec, step } of ALLOWED) {
     const lines = contextOf(level, type, spec, step);
     assert.ok(Array.isArray(lines) && lines.length > 0 && lines.every((l) => typeof l === 'string' && l.trim() !== ''), `${level.id} ${type.idOf(spec)}`);
-    const tokens = answerTokens(type, spec);
+    const tokens = answerTokens(type, spec, step);
     if (!LISTS_OPTIONS.has(type.key)) {
       // A configure line is quoted with a leading bar (and may be a YAML list item), which a reply may not start a line with; the text is what counts.
       for (const line of lines) assert.equal(withholds(line.replace(/^\|\s*(?:-\s+)?/, ''), tokens), false, `${level.id} ${type.idOf(spec)}: ${line}`);
@@ -310,11 +310,11 @@ test('stepContext does not depend on authoring order: choices, hypotheses, views
 test('answerTokens per widget', () => {
   const tok = (name) => answerTokens(fx(name).type, FIXTURES[name].spec);
   assert.deepEqual(tok('choice'), { singles: ['add trace id to every log line'], pairs: [] });
-  assert.deepEqual(tok('incident'), { singles: ['the payment provider times out', 'provider', 'times'], pairs: [] }, 'the words only the right hypothesis has');
-  assert.deepEqual(tok('spot'), { singles: ['sampler always on', 'always'], pairs: [] });
+  assert.deepEqual(tok('incident'), { singles: ['the payment provider times out', 'payment provider', 'provider times'], pairs: [] }, 'the pairs of words only the right hypothesis has');
+  assert.deepEqual(tok('spot'), { singles: ['sampler always on', 'sampler always'], pairs: [] });
   assert.deepEqual(tok('sort'), {
     singles: [],
-    pairs: [['requests per second', 'metric'], ['request path of one checkout', 'trace']],
+    pairs: [['requests per second', 'metric'], ['request path of 1 checkout', 'trace']],
   });
   assert.deepEqual(tok('build'), {
     singles: [],
@@ -332,13 +332,21 @@ test('answerTokens per widget', () => {
   });
   assert.deepEqual(tok('tradeoff'), {
     singles: ['keep traces 30 days', 'sample errors only'],
-    pairs: [['trace retention', 'keep traces 30 days'], ['retention', 'keep traces 30 days'], ['trace sampling', 'sample errors only'], ['sampling', 'sample errors only']],
+    pairs: [
+      ['trace retention', 'keep traces 30 days'],
+      ['trace retention', '30 days'],
+      ['retention', 'keep traces 30 days'],
+      ['retention', '30 days'],
+      ['trace sampling', 'sample errors only'],
+      ['sampling', 'sample errors only'],
+    ],
   });
   assert.deepEqual(tok('query'), {
     singles: [
       'sum rate http server request duration seconds count route pay 5m',
       'rate http server request duration seconds count route pay 5m',
       'http server request duration seconds count route pay 5m',
+      'sum rate http server request duration seconds count 5m',
     ],
     pairs: [],
   });
@@ -515,7 +523,7 @@ function paraphraseOf(type, spec) {
     const seen = new Set(others.flatMap(words));
     // A hint may use the game's everyday nouns freely, so a paraphrase built on one of them is not a leak.
     const everyday = /^(?:attributes|collector|services?|requests?|signals?|pipelines?|traces?|metrics?|errors?|processor|exporter|receiver)$/;
-    return words(label).filter((w) => !seen.has(w) && !everyday.test(w) && (/^\d+$/.test(w) ? w.length >= 3 : w.length >= 7)).sort((x, y) => y.length - x.length)[0];
+    return words(label).filter((w) => !seen.has(w) && !everyday.test(w) && (/^\d+$/.test(w) ? w.length >= 3 : w.length >= 10)).sort((x, y) => y.length - x.length)[0];
   };
   switch (type.key) {
     case 'choice': {
@@ -629,6 +637,162 @@ const REVIEW_REPLIES = [
   ['res-sort', '- service.name = checkout\n- Resource attribute'],
   ['temp-convert', 'Use the deltato​cumulative processor.'],
 ];
+
+/** The replies the second review (of 681f580) found passing, each on the live step it was found on. */
+const REVIEW2_REPLIES = [
+  ['res-sort', 'service.name is a resource attribute.'],
+  ['res-sort', 'service.name goes on the resource, url.path on the span.'],
+  ['res-sort', 'Take service.name = checkout. It is a resource attribute.'],
+  // Not here on purpose: br-rule "Page when both the 5m and the 1h burn rate exceed 14.4." Its right label differs from the wrong ones
+  // only by "both" and the order of small words, so catching it would withhold hints like "Look at both windows"; accepted.
+  ['sl-budget', 'The budget is 1000 failed requests.'],
+  ['instr-async', 'Use an asynchronous UpDownCounter with a callback.'],
+  ['pql-unit', 'You want the _seconds_bucket series of the duration histogram.'],
+  ['wcm-signal', 'For traces, tail-sample them in the collector pipeline.'],
+  ['temp-convert', 'Convert delta to cumulative in the Collector before export.'],
+  ['hist-avg', 'rate(http_server_request_duration_seconds_sum[5m]) / rate(http_server_request_duration_seconds_count[5m])'],
+  ['hist-avg', 'rate(http_server_request_duration_seconds_sum{route="/pay"}[5m]) / rate(http_server_request_duration_seconds_count{route="/pay"}[5m])'],
+  ['hs-plan', 'Look at checkout first. Leave it on the default.'],
+  ['cor-build', 'Take the Order accepted record. It goes with POST /checkout.'],
+  ['cdn-combos', 'Six hundred and thirty.'],
+  ['eto-ratio', 'Forty errors over three hundred twenty-eight kept requests is 12.2 percent.'],
+];
+
+/** The step of the live registry with this widget id, among the steps the guide may speak on. */
+const allowedStep = (stepId) => {
+  const found = ALLOWED.filter(({ type, spec }) => type.idOf(spec) === stepId);
+  assert.equal(found.length, 1, `${stepId} is one live allowed step`);
+  return found[0];
+};
+
+test('every reply the second review found passing is withheld on its live step', () => {
+  for (const [stepId, reply] of REVIEW2_REPLIES) {
+    const { type, spec, step } = allowedStep(stepId);
+    assert.equal(withholds(reply, answerTokens(type, spec, step)), true, `${stepId}: ${reply}`);
+    assert.equal(withholds(reply, answerTokens(type, spec)), true, `${stepId} without the step text: ${reply}`);
+  }
+});
+
+/** Realistic mentor hints on real steps: none gives the answer, so none may be withheld (the second review's finding 2). */
+const MENTOR_HINTS = [
+  ['the-bill', 'Compare how many series each counter had before and after the bill jumped.'],
+  ['the-3am-errors', 'Look at what changed in the deploy history right before the first error, and which views show it.'],
+  ['sl-attrs', 'Ask which attributes you can filter and group on later, and what is just a message for a human.'],
+  ['ser-verdict', 'Before you call the claim right or wrong, ask what the 34% is a share of.'],
+  ['everything-is-green', 'If users could not connect at all, which of your dashboards would notice?'],
+  ['temp-convert', 'Think about whether the work happens in a receiver, a processor or an exporter.'],
+  ['dist-unknown', 'Check which components are compiled into the distribution you are running.'],
+  ['instr-async', 'Ask whether you call it when something happens, or whether the SDK can read it when it exports.'],
+  ['pql-unit', 'Remember that a histogram is stored as several series, and ask which one holds the buckets.'],
+  ['hist-kind', 'Compare how each kind of histogram chooses where its bucket boundaries go.'],
+  ['hist-buckets', 'A percentile is read from the buckets, so ask what the bucket edges allow you to say.'],
+  ['cdn-combos', 'Each series is one combination of attribute values, so think about how the counts combine.'],
+  ['sl-budget', 'Work out how many requests the SLO covers over the window, then take the share that may fail.'],
+  ['br-rule', 'Think about how fast the budget burns and over which windows you want to be sure.'],
+  ['eto-ratio', 'Work out what both the errors and the requests did, not just the errors.'],
+  ['pql-rate', 'Pick the metric first, then decide which labels you filter on and which you group by.'],
+  ['hist-avg', 'An average is a total divided by a count, so ask which series gives each.'],
+  ['ru-rate', 'Start with the counter, take its rate over the window, then aggregate.'],
+  ['pql-increase', 'Think about the window you are asked about and which function works on a counter over it.'],
+  ['temp-spot', 'Ask of each series whether it is a running total or a change since the last report.'],
+  ['cdn-spot', 'Think about which attributes could take a value that nobody will ever see again.'],
+  ['exm-spot', 'Look for the points that link back to a single request.'],
+  ['res-sort', 'Think about whether the value describes the process or one particular request.'],
+  ['res-sort', 'Ask where you would look to find it later.'],
+  ['cor-build', 'Look at which records are written while a request is being handled and which are not.'],
+  ['cor-build', 'Check what each record says about when it was written.'],
+  ['hs-plan', 'Add up what each setting costs for each service before you pick.'],
+  ['ts-budget', 'Work out the memory that waiting costs, then see which wait fits.'],
+  ['wcm-gb', 'Think about what each need requires and what the cheapest setting is that still keeps it.'],
+  ['cdn-budget', 'Multiply the values of the attributes you keep and compare with the budget.'],
+  ['wcm-signal', 'Compare what each signal costs against what the team needs from it.'],
+  ['det-config', 'Check what the pipeline lists and whether every listed component is defined.'],
+  ['col-config', 'Read the pipeline for the logs and see which receiver it is missing.'],
+  ['pipe-config', 'Compare the traces pipeline with the metrics pipeline.'],
+  ['otlp-config', 'Look at where each pipeline sends its data and whether the exporter is defined.'],
+  ['agw-config', 'Look at what the agent does with a trace before it leaves.'],
+  ['ottl-config', 'Check whether the processor is only defined or also used in each pipeline.'],
+];
+
+test('realistic mentor hints are not withheld, with and without the step text (finding 2)', () => {
+  const kinds = new Set();
+  for (const [stepId, hint] of MENTOR_HINTS) {
+    const { type, spec, step } = allowedStep(stepId);
+    kinds.add(type.key);
+    assert.equal(withholds(hint, answerTokens(type, spec, step)), false, `${stepId}: ${hint}`);
+  }
+  assert.equal(kinds.size, 8, 'every widget type has realistic hints');
+  assert.ok(MENTOR_HINTS.length >= 24);
+});
+
+test('skeletons: separated numbers stay whole, number words are digits, a compound matches as separate words (findings 3, 5, 8)', () => {
+  assert.equal(withholds('A budget of 1,000.', { singles: ['1000'], pairs: [] }), true);
+  assert.equal(withholds('Above 14.4 now.', { singles: ['144'], pairs: [] }), true);
+  assert.equal(withholds('Six hundred and thirty.', { singles: ['630'], pairs: [] }), true);
+  assert.equal(withholds('Forty errors of three hundred twenty-eight.', { singles: ['40 error', '328'], pairs: [] }), true);
+  assert.equal(withholds('Two and three are five.', { singles: ['23'], pairs: [] }), false, '"and" joins number words only after hundred or thousand');
+  assert.equal(withholds('Convert delta to cumulative first.', { singles: ['deltatocumulative'], pairs: [] }), true);
+  assert.equal(withholds('Convert delta to cumulative first.', { singles: ['tocum'], pairs: [] }), false, 'a short single is not looked for with its spaces removed');
+});
+
+test('answerTokens: a query is also withheld without its matchers, unless the given query or the lesson has that form (finding 6)', () => {
+  const spec = { ...FIXTURES.query.spec, given: undefined };
+  const tokens = answerTokens(STEP_TYPES.query, spec);
+  assert.equal(withholds('sum(rate(http_server_request_duration_seconds_count[5m]))', tokens), true);
+  assert.equal(withholds('rate(http_server_request_duration_seconds_count[5m])', tokens), true);
+  const told = answerTokens(STEP_TYPES.query, spec, { question: 'Start from rate(http_server_request_duration_seconds_count[5m]).' });
+  assert.equal(withholds('rate(http_server_request_duration_seconds_count[5m])', told), false, 'the lesson already says it');
+  assert.equal(withholds('sum(rate(http_server_request_duration_seconds_count[5m]))', told), true);
+});
+
+test('answerTokens: words only the right option has block only in twos, a number or compound alone, a bigram of shared words (findings 2, 4)', () => {
+  const choice = (right) => ({ id: 'fx-words', choices: [{ key: 'a', label: right, why: 'x', right: true }, { key: 'b', label: 'Use an eager gauge with a timer', why: 'x' }, { key: 'c', label: 'Use a counter with a callback', why: 'x' }] });
+  const tokens = answerTokens(STEP_TYPES.choice, choice('Use an lazy gauge with a callback'));
+  assert.equal(withholds('Use an lazy gauge with a callback.', tokens), true);
+  assert.equal(withholds('Pick an lazy gauge.', tokens), true, 'a bigram of the right label that no rival has');
+  assert.equal(withholds('Is the thing lazy? Think about it.', tokens), false, 'one distinctive word alone is a hint');
+  const compound = answerTokens(STEP_TYPES.choice, choice('Use the deltatocumulative processor'));
+  assert.equal(withholds('Try deltatocumulative.', compound), true, 'a long compound alone');
+  const stepText = answerTokens(STEP_TYPES.choice, choice('Use an lazy gauge with a callback'), { question: 'Is it lazy or eager?' });
+  assert.equal(withholds('Pick an lazy gauge.', stepText), true, 'the bigram still names the answer');
+  assert.equal(withholds('Think about the lazy part.', stepText), false);
+});
+
+test('answerTokens: a sort item is stated by its key, a bucket by the word only it has, stop words included (finding 1)', () => {
+  const spec = {
+    id: 'fx-sort-words',
+    buckets: [{ id: 'm', label: 'Metric series' }, { id: 't', label: 'Trace spans' }],
+    items: [
+      { id: 'a', label: 'orders.count = 5', bucket: 'm', why: 'x' },
+      { id: 'b', label: 'order.id = 7', bucket: 't', why: 'x' },
+    ],
+  };
+  const tokens = answerTokens(STEP_TYPES.sort, spec);
+  assert.equal(withholds('orders.count goes in a metric.', tokens), true, 'item key and a bucket word that is a stop word');
+  assert.equal(withholds('order.id is in the spans.', tokens), true);
+  assert.equal(withholds('orders.count = 5 is a trace.', tokens), false, 'the other bucket');
+  assert.equal(withholds('Think about metric versus trace.', tokens), false, 'no item in it');
+});
+
+test('answerTokens: a configure fixture with a short value stays filterable, and "Set level to 10." is withheld (finding 9)', () => {
+  const spec = structuredClone(FIXTURES.configure.spec);
+  spec.given = spec.given.replace('processors:\n  batch:', 'processors:\n  batch:\n    send_batch_size: 8192');
+  spec.reference = spec.reference.replace('processors:\n  k8sattributes:', 'processors:\n  k8sattributes:\n    level: 10').replace('    passthrough: false\n', '');
+  const tokens = answerTokens(STEP_TYPES.configure, spec);
+  assert.notEqual(tokens, null, 'a two-character value does not make the step unavailable');
+  assert.deepEqual(tokens.pairs, [['level', '10']]);
+  assert.equal(withholds('Set level to 10.', tokens), true);
+  assert.equal(withholds('Set level to 11.', tokens), false);
+});
+
+test('withholds: a pair split by a pronoun at a sentence start is still a pair (finding 7)', () => {
+  const tok = { singles: [], pairs: [['service name', 'resource']] };
+  assert.equal(withholds('Take service.name. It is a resource.', tok), true);
+  assert.equal(withholds('Take service.name. They are resource things.', tok), true);
+  assert.equal(withholds('Take service.name. This one is a resource.', tok), true);
+  assert.equal(withholds('Take service.name. A resource is different.', tok), false, 'no pronoun, a real split');
+  assert.equal(withholds('Requests per second matter here. A metric is a different thing.', TOK), false);
+});
 
 test('every reply the review found passing is withheld on its live step', () => {
   for (const [stepId, reply] of REVIEW_REPLIES) {
