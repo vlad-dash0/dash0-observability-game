@@ -67,10 +67,10 @@ test('globe: 8.1 lights Indonesia, and Southeast Asia stays open', () => {
 
 const DOCS_KEYS = new Set([
   // Every key of the Dash0 "Manage Dashboards as Code" example that the board uses, transcribed from that page.
-  'apiVersion', 'kind', 'metadata', 'name', 'namespace', 'spec', 'display', 'datasources', 'default', 'plugin', 'layouts', 'items',
+  'apiVersion', 'kind', 'metadata', 'name', 'namespace', 'spec', 'display', 'plugin', 'layouts', 'items',
   'x', 'y', 'width', 'height', 'content', '$ref', 'panels', 'queries', 'query',
 ]);
-const NAMED = new Set(['checkout-overview', 'request_rate', 'error_ratio', 'latency_p99']); // the game's own names under `panels` and in metadata
+const NAMED = new Set(['checkout-overview', 'request_rate', 'error_ratio', 'latency_p99', 'request_count']); // the game's own names under `panels` and in metadata
 
 /** A board line read as YAML: `{path, value}`; a bare flow mapping has an empty path. Queries stay text. */
 function readLine(text) {
@@ -93,7 +93,7 @@ test('step 1: a valid config board of twelve added lines, hints off, faults on t
   assert.deepEqual(spec.helps, { hints: false });
   assert.equal(Object.hasOwn(spec, 'hint'), false, 'no authored hint (hints off)');
   assert.deepEqual(spec.faults, ['metadata', 'item-errors', 'item-latency']);
-  assert.equal(layout(spec), '.F..' + '.FF.' + '....');
+  assert.equal(layout(spec), '.F.' + '.FF.' + '.....');
   assert.equal(spec.lines.length, 12);
   for (const l of spec.lines) assert.match(l.text, /^\+ /, `${l.id} is an added line`);
   assert.equal(spotRun(spec.faults).state.solved, true, 'the three faults solve it');
@@ -111,8 +111,6 @@ test('step 1: every field on the board is one the Dash0 example shows, and the l
   }
   const header = readLine(spec.lines.find((l) => l.id === 'header').text).value;
   assert.deepEqual(header, { apiVersion: 'perses.dev/v1alpha1', kind: 'PersesDashboard' }, 'as in the Dash0 example');
-  const ds = readLine(spec.lines.find((l) => l.id === 'datasource').text).value;
-  assert.deepEqual(ds, { name: 'default', plugin: { kind: 'PrometheusDataSource' } });
   for (const id of ['panel-rate', 'panel-errors']) {
     const v = readLine(spec.lines.find((l) => l.id === id).text).value;
     assert.deepEqual([v.kind, v.spec.plugin.kind], ['Panel', 'TimeSeriesChart']);
@@ -133,7 +131,7 @@ test('step 1 oracle: an independent reading of the diff flags exactly the faults
       items.push({ id: l.id, ...value });
       refs.push({ id: l.id, panel: value.content.$ref.replace('#/spec/panels/', '') });
     }
-    const panel = /^spec\.panels\.(\w+)$/.exec(path);
+    const panel = /^spec\.panels\.(\w+)(\.|$)/.exec(path);
     if (panel) defined.add(panel[1]);
   }
   // Reading the fields as cells on a 24-column grid, an item does not fit when x + width is more than 24.
@@ -148,7 +146,7 @@ test('step 1 oracle: an independent reading of the diff flags exactly the faults
   assert.deepEqual([first.x + first.width, third.y, fourth.x, fourth.x + fourth.width, fourth.y], [12, 6, 12, 24, 6]);
   assert.equal(items.filter((it) => it.x + it.width > GRID).length, 1, 'one item runs past the grid, so the fault is one line');
   assert.equal(items.length, 4);
-  assert.deepEqual([...defined].sort(), ['error_ratio', 'request_rate']);
+  assert.deepEqual([...defined].sort(), ['error_ratio', 'request_count', 'request_rate']);
 });
 
 test('step 1: the two non-fault layout items and the two panels are honest decoys, so no keyword or position picks the faults', () => {
@@ -164,8 +162,8 @@ test('step 1: the two non-fault layout items and the two panels are honest decoy
     'lines with fewest = signs': (l) => -(l.text.match(/=/g) ?? []).length,
     'lines with a path': (l) => (l.text.match(/\./g) ?? []).length,
     'lines about a panel': (l) => (/panel/i.test(l.text) ? 1 : 0),
-    'lines with names the game made up': (l) => (/tools|latency_p99|error_ratio|request_rate/.test(l.text) ? 1 : 0),
-    'lines with a v1alpha1 or default look': (l) => (/alpha|default/.test(l.text) ? 1 : 0),
+    'lines with names the game made up': (l) => (/tools|latency_p99|error_ratio|request_rate|request_count/.test(l.text) ? 1 : 0),
+    'lines with a v1alpha1 look': (l) => (/alpha/.test(l.text) ? 1 : 0),
     'metadata and the lines with a 6': (l) => (l.id === 'metadata' || /\b6\b/.test(l.text) ? 1 : 0),
   };
   for (const [name, score] of Object.entries(rules)) {
@@ -186,8 +184,16 @@ test('step 1: no odd-one-out rule over the layout fields picks the faults, and o
   const items = spec.lines.filter((l) => /\.items\[\d\]$/.test(readLine(l.text).path)).map((l) => ({ id: l.id, ...readLine(l.text).value }));
   assert.deepEqual(items.map((it) => it.id), ['item-rate', 'item-errors', 'item-latency', 'item-corner']);
   const refs = items.map((it) => it.content.$ref.replace('#/spec/panels/', ''));
-  const defined = items.filter((it, i) => ['request_rate', 'error_ratio'].includes(refs[i]));
-  assert.equal(defined.length, 3, 'three of the four items name a defined panel');
+  const definedPanels = ['request_rate', 'error_ratio', 'request_count'];
+  assert.equal(refs.filter((r) => definedPanels.includes(r)).length, 3, 'three of the four items name a defined panel');
+  // Every rule over $ref fails: unique ref, duplicated ref, odd one out. The three defined refs are each used once, so no ref repeats.
+  const count = (r) => refs.filter((x) => x === r).length;
+  const byRef = (pred) => items.filter((it, i) => pred(count(refs[i]))).map((it) => it.id);
+  assert.deepEqual(byRef((n) => n === 1), ['item-rate', 'item-errors', 'item-latency', 'item-corner'], 'every $ref is unique');
+  assert.deepEqual(byRef((n) => n > 1), [], 'no $ref is duplicated');
+  for (const [name, picked] of [['unique ref', byRef((n) => n === 1)], ['duplicated ref', byRef((n) => n > 1)], ['odd ref', byRef((n) => n === 1)]]) {
+    assert.equal(spotRun(['metadata', ...picked]).state.solved, false, `${name} (${picked}) does not solve it`);
+  }
   // "Pick the item whose field differs from the rest", one field at a time: the odd ones are never the faulty pair.
   const faultItems = ['item-errors', 'item-latency'];
   const oddOnes = (field) => items.filter((it) => items.filter((o) => o[field] === it[field]).length === 1).map((it) => it.id);
@@ -210,7 +216,7 @@ test('step 1: no odd-one-out rule over the layout fields picks the faults, and o
 });
 
 test('step 1 whyNot: only on decoys, each a full sentence that names no fault line, the tempting ones covered', () => {
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['datasource', 'header', 'item-corner', 'item-rate', 'panel-errors', 'query-errors', 'query-rate']);
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['header', 'item-corner', 'item-rate', 'panel-errors', 'query-count', 'query-errors', 'query-rate']);
   for (const [id, t] of Object.entries(spec.whyNot)) {
     assert.match(plain(t), /\S[\s\S]*\.$/, `${id} ends a sentence`);
     for (const f of spec.faults) assert.equal(plain(t).includes(spec.lines.find((l) => l.id === f).text), false, `${id} does not quote ${f}`);
@@ -225,12 +231,12 @@ test('step 1 whyNot: only on decoys, each a full sentence that names no fault li
 
 test('step 1 explain: the namespace, the width in cells, and the missing panel, each with its numbers; it grades lines, not a parsed file', () => {
   const e = plain(spec.explain);
-  for (const s of ['namespace: tools', 'checkout', 'payments', 'Reading the fields as cells', 'x: 18', '12 wide', 'column 30 on a grid of 24', 'x: 12', 'latency_p99', 'request_rate', 'error_ratio', 'grades the lines you select, not a parsed file', 'Perses schema']) {
+  for (const s of ['namespace: tools', 'checkout', 'payments', 'Reading the fields as cells', 'x: 18', '12 wide', 'column 30 on a grid of 24', 'x: 12', 'latency_p99', 'request_rate', 'error_ratio', 'request_count', 'defines three panels', 'grades the lines you select, not a parsed file', 'Perses schema']) {
     assert.equal(e.includes(s), true, s);
   }
   assert.doesNotMatch(e, /next column|0 to 12|drawn over each other/, 'no overlap story left');
   const intro = plain(SPOT_STEP.intro);
-  for (const s of ['monitoring resources in checkout and payments, and none in tools', 'dashboards/checkout-overview.yaml', 'a new file', 'every line it adds', 'A Grid is 24 columns wide', 'reading the fields as cells']) assert.equal(intro.includes(s), true, s);
+  for (const s of ['monitoring resources in checkout and payments, and none in tools', 'dashboards/checkout-overview.yaml', 'a new file', 'every line it adds', 'In this game\'s reading, a Grid is 24 columns wide', 'reading the fields as cells']) assert.equal(intro.includes(s), true, s);
 });
 
 // ---- step 2: how a team with no cluster deploys ---------------------------------------------

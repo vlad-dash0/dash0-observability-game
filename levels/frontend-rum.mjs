@@ -50,7 +50,7 @@ const span = (traceId, spanId, service, name, kind, startMs, endMs, parentId) =>
 
 // Checkout's server span arrived as a root. The browser span its traceparent names is the fetch call (PAY), not the click that began
 // it (CLICK), not the earlier fetch of the cart (CART), not the same-looking call of the other visitor's trace (PAY2), and not the
-// twin in its own trace (PAY_B, the second call of a double-click on Pay, which also encloses the server span): the board labels the
+// twin in its own trace (PAY_B, the second call the Pay handler sent, which also encloses the server span): the board labels the
 // twins by their span id, and only the parent id in the header tells which one the server span answers.
 const TREE = {
   id: 'frum-tree',
@@ -115,8 +115,8 @@ export default {
         intro:
           'A browser can produce spans too, so a trace can start at the click. In Kettle &amp; Co\'s shop, the instrumentation records a span for the click on Pay and one for each fetch call the click makes. ' +
           `In the lab, the shop and the checkout service share an origin, and the SDK adds <code>traceparent: 00-${T1}-${PAY}-01</code> to the call. ` +
-          'The visitor double-clicked Pay, so two identical calls left the browser in this trace; the board tells them apart by the end of their span id. ' +
-          'Another visitor clicked Pay at the same moment, in trace <code>9d8c7b6a</code>. Checkout\'s server span for the first call arrived as a root.',
+          'The Pay handler sent the call twice (a retry bug the team is chasing), so two identical calls left the browser in this trace; the board tells them apart by the end of their span id. ' +
+          'Another visitor clicked Pay at the same moment, in trace <code>9d8c7b6a</code>. Checkout\'s server span for one of the two calls arrived as a root.',
         question: 'Give checkout\'s server span its parent.',
         qid: 'frum-q-tree',
         build: TREE,

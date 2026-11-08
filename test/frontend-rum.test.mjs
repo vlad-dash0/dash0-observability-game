@@ -98,7 +98,9 @@ test('step 1: the traceparent in the intro is a valid W3C value and names the fe
   assert.equal(tree.answer[server.spanId].parentId, parentId, 'the answer is the span the header names');
   assert.equal(server.startMs >= named.startMs && server.endMs <= named.endMs, true, 'the call encloses the server span');
   assert.match(plain(BUILD_STEP.intro), /Another visitor clicked Pay at the same moment, in trace 9d8c7b6a/);
-  assert.match(plain(BUILD_STEP.intro), /double-clicked Pay, so two identical calls left the browser in this trace; the board tells them apart by the end of their span id/);
+  assert.match(plain(BUILD_STEP.intro), /server span for one of the two calls arrived as a root/);
+  assert.doesNotMatch(plain(BUILD_STEP.intro), /first call/, 'no word of the intro picks a twin');
+  assert.match(plain(BUILD_STEP.intro), /Pay handler sent the call twice \(a retry bug the team is chasing\), so two identical calls left the browser in this trace; the board tells them apart by the end of their span id/);
   assert.match(plain(BUILD_STEP.intro), /share an origin/);
 });
 
@@ -119,7 +121,7 @@ test('step 1: only the span the header names passes; each tempting parent fails 
   const server2 = byName('checkout', 'POST /checkout', '9d8c7b6a');
   const twin = byName('shop-web', 'POST /checkout', 'a3f1c9e2', 1);
   assert.deepEqual(gradeWith(pay.spanId), [], 'the fetch call the header names');
-  assert.deepEqual(gradeWith(twin.spanId), ['wrong-parent'], 'the double-click twin in the same trace, which also encloses the server span');
+  assert.deepEqual(gradeWith(twin.spanId), ['wrong-parent'], 'the twin in the same trace, which also encloses the server span');
   assert.deepEqual(gradeWith(undefined), ['wrong-parent'], 'left as a root');
   assert.deepEqual(gradeWith(click.spanId), ['wrong-parent'], 'the click that started the call');
   assert.deepEqual(gradeWith(cart.spanId), ['wrong-parent'], 'the earlier fetch of the cart');
