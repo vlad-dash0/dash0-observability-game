@@ -89,6 +89,7 @@
   padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border);
 }
 .ui-panel-sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); padding: var(--space-4); min-width: 0; }
+.ui-panel-sec { overflow-wrap: anywhere; } /* long unbroken text (a reason, an id) wraps instead of being clipped by the panel */
 .ui-panel-sec + .ui-panel-sec { border-top: 1px solid var(--color-border); }
 /* A region a widget redraws in place (the incident board's tiles, evidence log, causes). The column
    is minmax(0, 1fr): an implicit auto column grows to min-content and the panel clips it at 320px. */

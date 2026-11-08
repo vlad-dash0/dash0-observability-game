@@ -6,8 +6,9 @@ import assert from 'node:assert/strict';
 import { makeDom, q, qa, click } from './helpers/dom.mjs';
 import { recordFocus } from './helpers/focus.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
-import { newConfigureState } from '../lib/widgets/configure-it.mjs';
-import { RULE, mountConfigure, renderConfigure } from '../lib/widgets/configure-it-view.mjs';
+import { checkConfig } from '../lib/configure/check.mjs';
+import { newConfigureState, SCHEMAS } from '../lib/widgets/configure-it.mjs';
+import { RULE, mountConfigure, pipelinesHtml, renderConfigure } from '../lib/widgets/configure-it-view.mjs';
 import { CONFIGURE_RULE } from '../lib/widgets/configure-it-help.mjs';
 
 const REF = `receivers:
@@ -537,4 +538,13 @@ test('when tier 3 cannot finish (the checker fails) the ladder is spent: the lab
   assert.equal(q('#cf-hint').textContent.trim(), 'No more hints');
   assert.equal(q('#cf-hint').disabled, true);
   assert.equal(q('#cf-hint-cost').hasAttribute('hidden'), true);
+});
+
+test('a Collector that would not start for a reason outside every pipeline says so in the Pipelines panel', () => {
+  const NOTE = 'The problem is outside the pipelines: see the list above.';
+  const html = (text) => pipelinesHtml(checkConfig(text, SCHEMAS.collector), SCHEMAS.collector, escapeHtml);
+  const outside = REF + '  extensions: [health_check]\n';
+  assert.equal(html(outside).includes(NOTE), true, 'service.extensions names an undefined extension');
+  assert.equal(html(REF).includes(NOTE), false, 'a flowing config has nothing to point at');
+  assert.equal(html(REF.replace('[otlp/dash0]', '[nope]')).includes(NOTE), false, 'the problem is inside the pipeline');
 });
