@@ -136,6 +136,14 @@ const ANSWERS = {
     'choice sl-budget: thousand',
     'choice sl-edge: load-balancer',
   ],
+  'burn-rate-alerts': [
+    'query br-burn: checkout-http@3600 sum(rate(http_server_requests_total{service="checkout", status="500"}[1h])) / sum(rate(http_server_requests_total{service="checkout"}[1h])) / 0.001',
+    'choice br-rule: both',
+  ],
+  'synthetic-checks': [
+    'sort sc-sort: handler-throws=spans tls-expired=probe slow-query=spans dns-stale=probe inventory-loop=spans cdn-stale=probe payment-timeout=spans lb-no-targets=probe bad-deploy=spans',
+    'choice sc-alert: probe',
+  ],
   'semantic-convention-versions': ['spot scv-spot: http-target,net-host-port,http-status-code', 'choice scv-switch: move-queries'],
   'filter-or-sampler': ['choice fos-verdict: wrong', 'sort fos-sort: errors-whole=tail healthz=filter slow-no-cache=both slow=tail debug-logs=filter many-spans=tail production-only=filter via-payments=tail errors-no-keepalive=both'],
   'the-34-percent-error-rate': ['choice ser-verdict: wrong', 'tradeoff ser-plan: sampler=errors-10pct rate=red-before'],

@@ -159,7 +159,7 @@ test('adding acts 7 and 8 changes no state outside act-9, and locks act-9 again 
     ['head-sampling'],
   ];
   const k = fixtures.indexOf(acts0to6);
-  assert.deepEqual(without.order, LIVE.order.filter((id) => id !== 'good-alerts' && id !== 'slis-and-slos' && id !== 'semantic-convention-versions'));
+  assert.deepEqual(without.order, LIVE.order.filter((id) => id !== 'good-alerts' && id !== 'slis-and-slos' && id !== 'burn-rate-alerts' && id !== 'synthetic-checks' && id !== 'semantic-convention-versions'));
   const changed = [];
   fixtures.forEach((ids, i) => {
     const p = progressOf(ids);

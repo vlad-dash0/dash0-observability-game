@@ -80,7 +80,7 @@ test('the live hub lists no soon act; acts 7 and 8 are playable, even a debug hu
   const act8 = game.acts.find((a) => a.id === 'act-8');
   assert.equal(act8.soon, false, 'act-8 is a playable act on the hub');
   assert.deepEqual([...act8.ids], ['semantic-convention-versions']);
-  assert.deepEqual([...game.acts.find((a) => a.id === 'act-7').ids], ['good-alerts', 'slis-and-slos']);
+  assert.deepEqual([...game.acts.find((a) => a.id === 'act-7').ids], ['good-alerts', 'slis-and-slos', 'burn-rate-alerts', 'synthetic-checks']);
   assert.equal(game.nudgeId, null);
   assert.equal(game.overlayOpen, false);
   assert.equal(store.data.has(STORAGE_KEY), false);

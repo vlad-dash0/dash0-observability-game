@@ -75,6 +75,8 @@ export const LEVEL_COUNTRY = Object.freeze({
   // act-7 East Asia
   'good-alerts': 'JPN',
   'slis-and-slos': 'CHN',
+  'burn-rate-alerts': 'MNG',
+  'synthetic-checks': 'PRK',
   // act-8 Southeast Asia
   'semantic-convention-versions': 'THA',
   // act-9 Oceania
@@ -93,7 +95,7 @@ export const COUNTRY_NAMES = Object.freeze({
   DZA: 'Algeria', COD: 'the Democratic Republic of the Congo', ZAF: 'South Africa',
   KAZ: 'Kazakhstan', SAU: 'Saudi Arabia', TUR: 'Turkey', UZB: 'Uzbekistan', TKM: 'Turkmenistan', IRQ: 'Iraq',
   IND: 'India', IRN: 'Iran', PAK: 'Pakistan',
-  JPN: 'Japan', CHN: 'China',
+  JPN: 'Japan', CHN: 'China', MNG: 'Mongolia', PRK: 'North Korea',
   THA: 'Thailand',
   AUS: 'Australia', NZL: 'New Zealand', PNG: 'Papua New Guinea',
 });
