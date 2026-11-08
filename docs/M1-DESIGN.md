@@ -102,14 +102,17 @@ a wide step: a kit split with the board and the side column (score card with a w
 count, success card with its swirl, and the hint tools when the step's helps turn hints on; a chips
 row `Helps: Instant feedback on, Hints on|off` above the board). Items are toggle options (`data-item` +
 `aria-pressed`, no answer attribute) in a named group (`role="group" aria-label="Items to sort"`,
-`aria-describedby="ID-instr"`); buckets are drop panels (`[data-drop]` holding the `data-bucket`
-button and the `[data-bucket-list]` of placed items); a kit stats line reads "Sorted N of M";
-`#ID-feedback` is the kit feedback region; the plain-text instruction ("Drag each item into the
-right bucket, or pick an item and then a bucket.") is `<p class="sort-instr" id="ID-instr">`.
+`aria-describedby="ID-instr"`); there are no bucket boxes (#261): the categories are a row of kit
+choice options (`data-bucket`, disabled until an item is selected and for a category already tried
+for it, outlined when hinted) under a plain "Then choose its category." line, and below that one plain
+group per category (`[data-drop]`: a heading "Label, a middle dot, N" with the tally, and the
+`[data-bucket-list]` of placed items); a kit stats line reads "Sorted N of M";
+`#ID-feedback` is the kit feedback region; the plain-text instruction ("Pick an item, then its
+category, or drag an item onto a category.") is `<p class="sort-instr" id="ID-instr">`.
 `labelledBy`, a plain-token heading id, makes the widget a labelled group.
 `mountSort(ctx, spec, {onComplete, swirl?})`: the pool order is shuffled once per mount through
-`ctx.shuffle`; tap-to-place (item then bucket; keyboard-native); drag is an enhancement calling
-the same path. Only `'wrong'` costs a mistake (`ctx.mistake()` and the score card's count in one
+`ctx.shuffle`; tap-to-place (item then category button; keyboard-native); drag is an enhancement calling
+the same path, dropping an item on a category's group. Only `'wrong'` costs a mistake (`ctx.mistake()` and the score card's count in one
 branch); nothing counts after the last item. Feedback (D7): `Right. <label> goes in <bucket>.
 <why>` (success) / `Not quite. <label> is not <bucket>. <whyNot?>` (error; doesn't reveal the
 answer) / `You already tried <bucket> for <label>.` (a repeat; free, neutral) / `Pick an item

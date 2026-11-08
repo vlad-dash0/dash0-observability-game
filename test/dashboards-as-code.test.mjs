@@ -305,7 +305,7 @@ test('step 2: each wrong option fails for a reason the scenario shows', () => {
 
 // ---- sources and claims ---------------------------------------------------------------------
 
-test('sources: Dash0 docs on the Spec line, Facts used, Invented and reasoning sections, no Perses host, allowed hosts only', () => {
+test('sources: Dash0 docs on the Spec line, Facts used, Invented and reasoning sections, Perses pages cited, allowed hosts only', () => {
   const spec1 = SRC.split('\n').find((l) => /^\/\/ Spec: /.test(l));
   for (const url of [
     'https://www.dash0.com/docs/dash0/dashboards/manage-dashboards-as-code',
@@ -315,8 +315,9 @@ test('sources: Dash0 docs on the Spec line, Facts used, Invented and reasoning s
   assert.match(SRC, /Facts used/);
   assert.match(SRC, /Stated as reasoning/);
   assert.match(SRC, /Invented for the game/);
-  assert.match(SRC, /perses\.dev\) is not an allowed host, so no field beyond the Dash0 page's example is shown/);
-  const hosts = ['www.dash0.com'];
+  for (const url of ['https://perses.dev/perses/docs/api/dashboard/', 'https://perses.dev/perses/docs/concepts/dashboard/']) assert.equal(spec1.includes(url), true, url);
+  assert.match(SRC, /the width of 24 columns is the game's own/);
+  const hosts = ['www.dash0.com', 'perses.dev'];
   for (const url of SRC.match(/https:\/\/[^\s,)]+/g)) assert.equal(hosts.includes(new URL(url).host), true, url);
   assert.equal(SRC.includes(String.fromCharCode(0x2014)), false, 'no em dash');
 });
