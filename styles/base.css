@@ -1,4 +1,4 @@
-/* Reset, typography and the shared level components (F2, #10), adapted from R's
+/* Reset, typography, focus and reduced motion (F2, #10), adapted from R's
    styles.css. Colours come only from styles/tokens.css: no hex here (test/theme.test.mjs). */
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }

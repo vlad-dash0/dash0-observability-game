@@ -135,7 +135,7 @@ token with a contrast check.
 | T5 | design-system | No `:has(` and no `!important` (reduced motion, `[x-cloak]`); no glows. |
 | T6 | design-system | Only `lib/ui` emits `ui-` classes (`index.html` is the static exception). |
 | T7 | design-system | Retired classes: no file emits them (`LEGACY` is empty) and no stylesheet defines them. |
-| T15 | design-system | Every class in `base.css`, `hub.css`, `widgets.css` has an emitter, or a documented `DYNAMIC_ALLOW` entry. |
+| T15 | design-system | Every class in `base.css`, `hub.css`, `widgets.css` has an emitter, or a `DYNAMIC_ALLOW` entry tied to the companion class its rule must sit with. |
 | T8, T9 | levels-play, static | Every class a level renders (each step, the page after each click) and `index.html` writes has a CSS rule. |
 | T12 | play, design-system | The step frame is the kit's, wide by `STEP_TYPES[*].wide`; one `level` container. |
 | T10 | ui | Exact markup, escaping, TypeErrors, CSP-safe output, every class defined in `kit.css`. |

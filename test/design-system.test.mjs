@@ -291,29 +291,53 @@ test('T7 LEGACY is empty and the retired CSS is gone: nothing on the pre-kit UI 
 });
 
 // Every class a non-kit stylesheet styles is written by some app module or index.html. A rule
-// nothing emits is dead; delete it. Classes built from a ${...} part are invisible to the scanner,
-// so they are listed here with the code that builds them.
+// nothing emits is dead; delete it. A class the scanner cannot see (built from a ${...} part, a
+// variable or an Alpine :class) is listed here against the companion classes its rule must sit
+// with, so `.level-card.dim` stays red while `.globe-probe.dim` passes. Literal emitters need no entry.
 const DYNAMIC_ALLOW = {
-  // c1-c6: app.mjs `confetti c${(i % 6) + 1}`. show, open, soon: Alpine :class literals in index.html.
-  // done, locked, nudge: app.mjs levelClasses(), the level state plus ' nudge'. body, dim, lit, pulse, rim,
-  // sky: lib/globe-render.mjs `globe-probe ${role}` over COLOR_ROLES. None is visible to the scanner.
-  'hub.css': ['body', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'dim', 'done', 'lit', 'locked', 'nudge', 'open', 'pulse', 'rim', 'show', 'sky', 'soon'],
+  'hub.css': {
+    // app.mjs `confetti c${(i % 6) + 1}`
+    c1: ['confetti'], c2: ['confetti'], c3: ['confetti'], c4: ['confetti'], c5: ['confetti'], c6: ['confetti'],
+    // app.mjs levelClasses(): the level state plus ' nudge'
+    done: ['level-card'], locked: ['level-card'], nudge: ['level-card'],
+    // lib/globe-render.mjs `globe-probe ${role}` over COLOR_ROLES (lit and pulse are literal in index.html)
+    body: ['globe-probe'], dim: ['globe-probe'], rim: ['globe-probe'], sky: ['globe-probe'],
+    // index.html Alpine :class (overlayOpen, rewardOpen, notice, aboutOpen)
+    open: ['about'], show: ['notice', 'overlay', 'reward'],
+  },
 };
 
-test('T15 every class in base.css, hub.css and widgets.css has an emitter (or a documented dynamic one)', () => {
+test('T15 every class in base.css, hub.css and widgets.css has an emitter, or a documented dynamic one beside its companion class', () => {
   const emitted = new Set();
   for (const f of ['index.html', ...walk('lib', ['.mjs']), ...APP_MODULES]) for (const c of emittedClasses(read(f))) emitted.add(c);
   assert.ok(emitted.has('confetti') && emitted.has('wf-row') && emitted.has('globe-stage'), 'the scan reads app.mjs, widgets and index.html');
   const seen = new Set();
   for (const f of NOT_TOKENS.filter((n) => n !== 'kit.css')) {
     for (const r of sheetRules(f)) {
-      for (const c of classesInSelector(r.selector)) {
-        if ((DYNAMIC_ALLOW[f] ?? []).includes(c)) { seen.add(`${f} ${c}`); continue; }
-        assert.ok(emitted.has(c), `styles/${f} "${r.selector}" styles .${c}, which nothing emits; delete the rule`);
+      for (const sel of splitTop(r.selector)) {
+        const here = classesInSelector(sel);
+        for (const c of here) {
+          const companions = DYNAMIC_ALLOW[f]?.[c];
+          if (companions) {
+            assert.ok(companions.some((k) => here.includes(k)), `styles/${f} "${sel}" styles .${c} without ${companions.map((k) => `.${k}`).join(' or ')}; ${c} is only set on those`);
+            seen.add(`${f} ${c}`);
+          } else assert.ok(emitted.has(c), `styles/${f} "${sel}" styles .${c}, which nothing emits; delete the rule`);
+        }
       }
     }
   }
-  for (const [f, list] of Object.entries(DYNAMIC_ALLOW)) for (const c of list) assert.ok(seen.has(`${f} ${c}`), `stale DYNAMIC_ALLOW entry ${f} .${c}`);
+  for (const [f, map] of Object.entries(DYNAMIC_ALLOW)) {
+    for (const c of Object.keys(map)) {
+      assert.ok(seen.has(`${f} ${c}`), `stale DYNAMIC_ALLOW entry ${f} .${c}`);
+      assert.ok(!emitted.has(c), `DYNAMIC_ALLOW .${c} is written literally somewhere; the scanner sees it, so drop the entry`);
+    }
+  }
+});
+
+test('every :disabled rule that sets opacity uses the disabled-opacity token, not a literal', () => {
+  const dis = SHEETS.flatMap(sheetRules).filter((r) => /:disabled/.test(r.selector) && decls(r.body).some(([p]) => p === 'opacity'));
+  assert.ok(dis.length >= 2, 'kit.css fades its disabled controls');
+  for (const r of dis) assert.equal(decls(r.body).find(([p]) => p === 'opacity')[1], 'var(--opacity-disabled)', r.selector);
 });
 
 test('T7 retired classes: only LEGACY files emit them, and LEGACY has no stale entry', () => {
