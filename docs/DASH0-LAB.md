@@ -11,7 +11,7 @@ Every Dash0 fact not yet confirmed is marked `VERIFY (#195)` in code and listed 
 - Each phase is one PR against main, never stacked.
 
 ## Hosts and CSP
-`INGRESS_HOSTS` in `lib/dash0/ingress.mjs` is the single authority: the validator's allowlist and, enforced by `test/static.test.mjs`, the `vercel.json` `connect-src` origins minus `'self'`. It ships the four regional hosts below, so `connect-src` is `'self'` plus those four `https://` origins and live mode is open wherever `fetch` exists. `PRACTICE_HOSTS` (a reserved `.invalid` host) belongs to the simulated ingress and is never a CSP origin.
+`INGRESS_HOSTS` in `lib/dash0/ingress.mjs` is the single authority: the validator's allowlist and, enforced by `test/static.test.mjs`, the `vercel.json` `connect-src` origins minus `'self'`. It ships the four regional hosts (inferred, see Sources for the P6 facts), so `connect-src` is `'self'` plus those four `https://` origins and live mode is open wherever `fetch` exists. `PRACTICE_HOSTS` (a reserved `.invalid` host) belongs to the simulated ingress and is never a CSP origin.
 
 ## Endpoint check: `parseEndpoint(raw, {hosts, ports, allowLocal})`
 Returns `{ok:true, base, tracesUrl, host}` or `{ok:false, reason}`. Reasons, in check order: `empty`, `grpc-port` (scheme-less `host:4317`, or port 4317), `no-scheme` (scheme-less input: a host with a dot, or any host with a port other than 4317, optionally with a path; a word with no dot and no port stays `malformed`), `malformed`, `not-https`, `credentials`, `query`, `fragment`, `unknown-host` (exact match, lookalikes fail), `unexpected-port` (the effective port, `443` when none is written, must be in `ports`; `cspOrigin(host, port)` renders a non-443 port as `https://host:port`), `signal-path` (already ends in `/v1/traces`, case-insensitive, repeated slashes collapsed; the field is the base and the game appends the path), `unexpected-path` (any other path). A trailing slash is normalised and never yields `//v1`. `allowLocal` (debug mode only) also accepts `http://localhost:<port>`.
@@ -85,15 +85,29 @@ A hand-written level (`widgets: []`, `mechanics: ['spot']`, scored, no par, no h
 - Send-once, per page: the accepted send is recorded against the host that took it (`SENT`, a WeakMap on the cached incident). Reconnecting to a different Dash0 offers the send screen again, naming the first host. A separate `ATTEMPTED` WeakSet records that a send was ever started; a send screen opened after an earlier attempt (for example the level was closed with the request out) drops "has not been sent yet" and shows the duplicate note. After any failed outcome (401, 403 and every other) `#its-send` is disabled; the way on is the retry, where one is offered, or practice.
 - A level with no telemetry session (this boss and 9.3) shows a plain note, "Use Back to return to the map.", and no button.
 
-## Verified facts (P6, 2026-11-08)
-Public sources and a token-free CORS probe; no account was used.
+## Sources for the P6 facts (2026-11-08)
+Public sources and a token-free CORS probe; no account and no token were used. Three kinds of evidence, kept apart.
+
+Documented (a public page says it):
 | Fact | Source |
 |---|---|
-| Hosts: `ingress.eu-west-1.aws.dash0.com` and `ingress.us-west-2.aws.dash0.com` are documented. `ingress.us-east-1.aws.dash0.com` and `ingress.europe-west4.gcp.dash0.com` are pattern-inferred (they follow the pattern for the two other documented regions) and answered the preflight. Port 443, path `/v1/traces`. | https://www.dash0.com/docs/dash0/get-started (regions); the Dash0 CLI README and the Fluent Bit Dash0 output page agree |
-| Tokens: form `auth_...`, `Authorization: Bearer`, scope "Ingesting" (only sends telemetry), dataset-limited, created in Settings, Auth Tokens. Whether a wrong-scope token gets 401 or 403 is not documented. | https://www.dash0.com/docs/dash0/miscellaneous/glossary/auth-tokens |
-| `Dash0-Dataset` header exists as spelled; omitted means the token's default dataset. | https://www.dash0.com/docs/dash0/miscellaneous/glossary/datasets |
-| OTLP JSON over `fetch` is what Dash0's own browser SDK sends (`Content-Type: application/json`, `Authorization: Bearer`, `Dash0-Dataset`). | the `dash0hq/dash0-sdk-web` transport code (reasoning only, not a game citation) |
-| CORS: a preflight from `Origin: https://example.vercel.app` asking for `authorization,content-type,dash0-dataset` returns 204 with `access-control-allow-origin: *`, those three headers and `allow-methods: POST`. An unauthenticated `POST /v1/traces` returns 401 `{"code":16,"message":"no authorization header found"}` with `access-control-allow-origin: *`, so the browser can read the failure. Same on all four hosts. 403 and 2xx response headers are untested (no token). | curl, 2026-11-08 |
+| The four storage regions: eu-west-1, europe-west4, us-east-1, us-west-2. No `ingress.` host, port or path is on this page. | https://www.dash0.com/docs/dash0/get-started |
+| The host form `ingress.<region>.<cloud>.dash0.com` (`ingress.eu-west-1.aws` and `ingress.us-west-2.aws`). | the dash0-cli README (https://github.com/dash0hq/dash0-cli) |
+| Host `ingress.eu-west-1.aws.dash0.com`, port 443, `/v1/traces`, `Authorization Bearer` with the auth token. | the Fluent Bit Dash0 output page (https://docs.fluentbit.io/manual/pipeline/outputs/dash0) |
+| The `/v1/traces` signal path of OTLP/HTTP. | https://opentelemetry.io/docs/specs/otlp/ |
+| Tokens: form `auth_...`, scope "Ingesting" (only sends telemetry), dataset-limited, created in Settings, Auth Tokens. When a request names no dataset, Dash0 writes to the token's default ingestion dataset. Whether a wrong-scope token gets 401 or 403 is not documented. | https://www.dash0.com/docs/dash0/miscellaneous/glossary/auth-tokens |
+| The `Dash0-Dataset` header exists as spelled; omitting it writes to the token's default ingestion dataset. | https://www.dash0.com/docs/dash0/miscellaneous/glossary/datasets |
+
+Probed (a curl on 2026-11-08, no token):
+| Fact | Evidence |
+|---|---|
+| CORS: a preflight from `Origin: https://example.vercel.app` asking for `authorization,content-type,dash0-dataset` returns 204 with `access-control-allow-origin: *`, those three headers and `allow-methods: POST`. An unauthenticated `POST /v1/traces` returns 401 `{"code":16,"message":"no authorization header found"}` with `access-control-allow-origin: *`, so the browser can read the failure. Same on all four hosts. The probe shows each host exists and answers CORS; it does not show that it is an organization's ingress. 403 and 2xx response headers are untested (no token). | curl, 2026-11-08 |
+
+Reasoned (inferred, not verified against a real token):
+| Fact | Reasoning |
+|---|---|
+| All four hosts. `ingress.eu-west-1.aws` and `ingress.us-west-2.aws` appear in the dash0-cli README, eu-west-1 in the Fluent Bit page. `ingress.us-east-1.aws.dash0.com` and `ingress.europe-west4.gcp.dash0.com` apply the same form to documented regions. | documented regions plus the documented host form |
+| OTLP JSON over `fetch` with `Content-Type: application/json`, `Authorization: Bearer` and `Dash0-Dataset` is accepted. | the `dash0hq/dash0-sdk-web` transport code sends this (reasoning only, not a game citation); never sent with a real token |
 
 Result: the browser can talk to the ingress directly, so the relay (P6-alt) is not needed. The connect level's copy already matched these facts and is unchanged.
 
@@ -111,8 +125,8 @@ Result: the browser can talk to the ingress directly, so the relay (P6-alt) is n
 - The boss, live: send the incident, then follow the on-screen steps in a real Dash0: filter the Trace Explorer by `session.id` (is the key offered for a span attribute?), open the trace, find the span in error and its events (the span events in the Span Sidebar), and check that all four answers can be read there and match. Check whether a re-send lists each span of the trace twice with the same ids (the copy says to read one copy), and that the Time Picker's default range finds a fresh incident.
 
 ## Owner inputs (VERIFY)
-1. Answered 2026-11-08 for the preflight and the 401 (see Verified facts): CORS is open, no relay. Still untested: 403 and 2xx response headers.
+1. Answered 2026-11-08 for the preflight and the 401 (see Sources for the P6 facts): CORS is open, no relay. Still untested: 403 and 2xx response headers.
 2. Scope names (ingest-only, dataset-limited), where tokens are created (the `auth_` prefix and `Dash0-Dataset` header are confirmed in the Dash0 docs), whether 401/403 mean what the game teaches.
-3. Region and ingress host list, OTLP/HTTP port (443 or 4318), JSON body acceptance, the dataset identifier rules (the game's regex is its own check).
+3. Partly answered 2026-11-08: the hosts (inferred from the documented regions and host form) and port 443 (Fluent Bit example) are reasoned and untested with a token. Still open: JSON body acceptance and the dataset identifier rules (the game's regex is its own check).
 4. Trace explorer view name, how to filter by `session.id`, deep-link format. The boss copy cites the Dash0 docs for the Trace Explorer, its Filter and Time Picker, the Trace View waterfall and the Span Sidebar (tracing/about-tracing, view, span-sidebar, span-events, glossary/filtering). Still VERIFY (#195): that a sender-set `session.id` span attribute is offered as a filter key (`session.id` itself: https://opentelemetry.io/docs/specs/semconv/registry/attributes/session/). The span events in the Span Sidebar are confirmed by tracing/span-events and tracing/view.
 5. A test org with an ingest-only token for the live QA run (never committed).

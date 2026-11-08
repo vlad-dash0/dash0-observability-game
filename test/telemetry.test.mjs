@@ -395,7 +395,7 @@ test('live mode is unavailable without hosts or without fetch', () => {
   assert.equal(make({ hosts: [] }).telemetry.liveAvailable(), false);
   assert.equal(make({ fetch: null }).telemetry.liveAvailable(), false);
   const { telemetry } = make({ hosts: [] });
-  assert.equal(telemetry.connect(live()).ok, false, 'no live host can be configured while the list is empty');
+  assert.equal(telemetry.connect(live()).ok, false, 'no host allowed (the no-fetch fallback): live cannot be configured');
 });
 
 test('with the shipped INGRESS_HOSTS, live sends the test span to each host and a lookalike never reaches fetch', async () => {

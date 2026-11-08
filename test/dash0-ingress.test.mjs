@@ -177,6 +177,10 @@ test('every shipped ingress host validates for a live export, and lookalikes are
   const h = LIVE_HOSTS[0];
   assert.deepEqual(parseEndpoint(`https://${h}.evil.example`), { ok: false, reason: 'unknown-host' });
   assert.deepEqual(parseEndpoint(`https://evil.example/${h}`), { ok: false, reason: 'unknown-host' });
+  // Exact matching, not a suffix match: a prefix lookalike and a trailing dot are other hosts.
+  assert.deepEqual(parseEndpoint(`https://x${h}`), { ok: false, reason: 'unknown-host' });
+  assert.deepEqual(parseEndpoint(`https://sub.${h}`), { ok: false, reason: 'unknown-host' });
+  assert.deepEqual(parseEndpoint(`https://${h}.`), { ok: false, reason: 'unknown-host' });
   assert.deepEqual(parseEndpoint(`http://${h}`), { ok: false, reason: 'not-https' });
   assert.deepEqual(parseEndpoint(`https://${h}:4318`), { ok: false, reason: 'unexpected-port' });
   assert.deepEqual(parseEndpoint(`https://${h}.evil.example:4318`), { ok: false, reason: 'unknown-host' });
