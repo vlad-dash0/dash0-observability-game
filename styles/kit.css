@@ -267,7 +267,7 @@
 
 /* ---------- Form fields (field.mjs) ---------- */
 .ui-field { display: grid; gap: 6px; }
-.ui-field-label { font-size: var(--text-md); font-weight: var(--weight-semibold); }
+.ui-field-label { min-width: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); overflow-wrap: anywhere; /* a long key or code name wraps at 320px */ }
 .ui-input {
   display: block; inline-size: 100%; font: inherit; font-size: var(--text-base); color: var(--color-text);
   background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px 10px;
