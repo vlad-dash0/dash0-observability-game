@@ -2,9 +2,11 @@
 // the queries: each view shows the query the agent ran and what came back. The agent is simulated, an authored view per query: no
 // model is called and no real MCP server is reached, and the copy says so. Three clues hold the chain (the failures are spread over
 // both versions of checkout, so it is not the release; a failing trace ends at a 503 from the inventory service, before any payment
-// call; the request rate never moved, so it is not a surge). Three views are neutral; two are red herrings. The nuance is the first
-// herring: the agent's first question used a legacy attribute name (`http.status_code`, the old name 8.2 teaches) and got
-// 0 spans, which tempts "nothing is failing"; the clues query the stable name (`http.response.status_code`) and find the failures.
+// call; the request rate never moved, so it is not a surge). Four views are neutral; two are red herrings (the release list and the
+// card charge times, which point at the release and at the payment provider). The nuance is a neutral view, not a herring: the agent's
+// first question used a legacy attribute name (`http.status_code`, the old name 8.2 teaches) and got 0 spans, which tempts "nothing is
+// failing" (the `false-alarm` cause); the player compares its query with the one in the versions view, which names the stable name
+// (`http.response.status_code`) and finds the failures. Looking at it costs no penalty; the closing Choice grades the nuance.
 // Agents need good semantic conventions as much as people do. Scored. A plain-data Scenario for the incident engine, played through
 // one declarative `incident` step (lib/widgets/incident.mjs, docs/M1-DESIGN.md §4.3, docs/DECLARATIVE-LEVELS.md §2), then one
 // closing Choice on the naming nuance, which the incident step grades only in part.
@@ -34,6 +36,12 @@ export const TABLE = {
   failuresFrom: '10:12',
   ruleFiredAt: '10:27', // 15 minutes above 5% after the failures start
   queryAt: '10:36', // the agent's queries run until here
+  // Card charges, 95th percentile in ms (the card charge times view, a herring: failing orders never reach a charge).
+  charges: [
+    { at: '09:50', p95Ms: 410 },
+    { at: '10:12', p95Ms: 430 },
+    { at: '10:30', p95Ms: 520 },
+  ],
   beforeMin: 32, // 09:40 to 10:12
   afterMin: 24, // 10:12 to 10:36
   // One row per version: requests and failed requests before and after 10:12, 225 requests a minute each.
@@ -63,7 +71,7 @@ const [OLD, NEW] = TABLE.versions;
 const row = (cells) => `<tr><th scope="row">${cells[0]}</th>${cells.slice(1).map((c) => `<td>${c}</td>`).join('')}</tr>`;
 
 const VERSIONS_VIEW =
-  `<p>The agent was asked how the failed checkout requests are spread over the versions. Version ${NEW.v} went live on 3 of the 6 pods at ${TABLE.releaseAt}.</p>` +
+  `<p>The agent was asked how the failed checkout requests of the last hour are spread over the versions. Version ${NEW.v} went live on 3 of the 6 pods at ${TABLE.releaseAt}.</p>` +
   '<pre><code>spans where service.name = checkout and http.response.status_code = 500\n' +
   `group by service.version, ${TABLE.releaseAt} to ${TABLE.failuresFrom} and ${TABLE.failuresFrom} to ${TABLE.queryAt}</code></pre>` +
   '<table><caption>Failed requests per 1,000 requests</caption>' +
@@ -78,7 +86,7 @@ const TRACE_VIEW =
   '<p>No span in the trace calls the payment provider.</p>';
 
 const RATE_VIEW =
-  '<p>The agent was asked how many requests a minute checkout took, and whether that changed.</p>' +
+  '<p>The agent was asked how many requests a minute checkout took in the last hour, and whether that changed.</p>' +
   '<table><caption>Requests a minute to POST /checkout</caption>' +
   '<thead><tr><th scope="col">Time</th><th scope="col">Requests a minute</th></tr></thead>' +
   `<tbody>${TABLE.rate.map((x) => row([x.at, fmt(x.perMin)])).join('')}</tbody></table>` +
@@ -86,7 +94,7 @@ const RATE_VIEW =
 
 const RULE_VIEW =
   `<p>The agent read the rule that paged you: checkout error ratio above ${TABLE.errorRatioRulePct}% for 15 minutes. ` +
-  `It has been firing since ${TABLE.ruleFiredAt}. The ratio over the last 15 minutes is ${pctAfter}%.</p>`;
+  `It has been firing since ${TABLE.ruleFiredAt}. The ratio since ${TABLE.failuresFrom} is ${pctAfter}%.</p>`;
 
 const NODES_VIEW = `<p>${TABLE.nodes} of ${TABLE.nodes} nodes in the checkout pool are Ready.</p>`;
 
@@ -110,6 +118,13 @@ const CHANGES_VIEW =
   '</tbody></table>' +
   `<p>The agent lists recommendations 5.2.0 as the change closest to ${TABLE.failuresFrom}. It does not say whether checkout calls that service.</p>`;
 
+const CHARGES_VIEW =
+  '<p>The agent was asked how long card charges took in the last hour.</p>' +
+  '<table><caption>Card charge time, 95th percentile</caption>' +
+  '<thead><tr><th scope="col">Time</th><th scope="col">Milliseconds</th></tr></thead>' +
+  `<tbody>${TABLE.charges.map((x) => row([x.at, fmt(x.p95Ms)])).join('')}</tbody></table>` +
+  `<p>The slowest charges got slower after ${TABLE.failuresFrom}. The agent does not say whether the failing orders reached a charge.</p>`;
+
 const SCENARIO = {
   id: 'ai-assisted-debugging',
   alert: {
@@ -121,14 +136,15 @@ const SCENARIO = {
   },
   budget: { startPct: 100, burnPctPerMin: 5 },
   views: [
-    { id: 'failures-by-version', label: 'Agent: failures by version', costMin: 4, kind: 'clue', html: VERSIONS_VIEW },
+    { id: 'failures-by-version', label: 'Agent: failures by version, last hour', costMin: 4, kind: 'clue', html: VERSIONS_VIEW },
     { id: 'failing-trace', label: 'Agent: one failing trace', costMin: 4, kind: 'clue', html: TRACE_VIEW },
-    { id: 'request-rate', label: 'Agent: requests a minute', costMin: 3, kind: 'clue', html: RATE_VIEW },
+    { id: 'request-rate', label: 'Agent: requests a minute, last hour', costMin: 3, kind: 'clue', html: RATE_VIEW },
     { id: 'alert-rule', label: 'Agent: the rule that paged', costMin: 2, kind: 'neutral', html: RULE_VIEW },
     { id: 'node-status', label: 'Agent: node status', costMin: 3, kind: 'neutral', html: NODES_VIEW },
-    { id: 'service-list', label: 'Agent: services sending data', costMin: 3, kind: 'neutral', html: SERVICES_VIEW },
-    { id: 'failed-requests', label: 'Agent: failed requests, last 30 minutes', costMin: 3, kind: 'herring', html: LEGACY_VIEW },
+    { id: 'service-list', label: 'Agent: services sending data, last 10 minutes', costMin: 2, kind: 'neutral', html: SERVICES_VIEW },
+    { id: 'failed-requests', label: 'Agent: failed requests, last 30 minutes', costMin: 1, kind: 'neutral', html: LEGACY_VIEW },
     { id: 'recent-changes', label: 'Agent: changes in the last hour', costMin: 4, kind: 'herring', html: CHANGES_VIEW },
+    { id: 'card-charges', label: 'Agent: card charge times, last hour', costMin: 3, kind: 'herring', html: CHARGES_VIEW },
   ],
   hypotheses: [
     {
@@ -170,22 +186,22 @@ const SCENARIO = {
   ],
   answerAfterViews: 3,
   hint:
-    '<p>An empty answer says what the question found, not what happened. Read the question before you read the answer, and ask whether the thing it asks for could exist.</p>',
+    '<p>Look at which attribute each query filtered on. Compare the query that found no failures with the queries that did find failures: was each one asking for the same thing?</p>',
 };
 
 // Step 2: what to change so an empty answer cannot hide an outage again. `why` follows "Right." or "Not quite.".
 const FIX = [
   {
     key: 'stable-names',
-    label: 'Use the stable attribute names the spans carry, so each query and agent prompt reaches the data',
+    label: 'Use the attribute names the spans carry, so that each query and agent prompt reaches the data',
     right: true,
     why:
       'Checkout sends http.response.status_code since its opt-in went to http (level 8.2), and the old http.status_code is no longer on its spans, so any query, alert or prompt that still names it matches nothing, whoever or whatever runs it. ' +
-      'In Dash0, Agent0 reads telemetry in the OpenTelemetry semantic conventions it was produced in, and the MCP server lists the attribute keys present (getAttributeKeys), so the names to ask for are the ones the telemetry carries.',
+      'In Dash0, Agent0 reads telemetry in the OpenTelemetry semantic conventions it was produced in, and getAttributeKeys, one of the tools of the Dash0 MCP Server, lists the attribute keys present, so check the keys present before you ask for a name.',
   },
   {
     key: 'keep-dup',
-    label: 'Set the opt-in back to http/dup for good, so the old names keep matching and no query has to change',
+    label: 'Set the opt-in back to http/dup, so the old names keep matching and no query has to change',
     why: 'http/dup sends both names, which is how 8.2 moves queries before the switch to http. As an end state it doubles every attribute that changed and keeps the old names alive. The telemetry is not at fault; the question is.',
   },
   {
@@ -195,8 +211,8 @@ const FIX = [
   },
   {
     key: 'retry-later',
-    label: 'Run the same query again in a few minutes, in case the data for the last half hour was late',
-    why: `The data was not late. Checkout's spans carry http.response.status_code, so a query for http.status_code matches none of them at ${TABLE.queryAt} or at any later minute: the same question gives the same empty answer.`,
+    label: 'Ask the same question over a wider time range, in case the data for the last half hour was late',
+    why: `The data was not late, and a wider range does not help. Checkout's spans carry http.response.status_code, so a query for http.status_code matches none of them at ${TABLE.queryAt} or at any other minute: the same question gives the same empty answer.`,
   },
 ];
 
@@ -220,14 +236,14 @@ export default {
       },
       {
         intro:
-          `The incident is explained. The agent's first answer was "no failed requests" while ${fmt(failedAfter)} had failed, because it asked for http.status_code and checkout now sends http.response.status_code. In the review, someone asks what to change.`,
+          `The incident is explained. The agent's first answer was "no failed requests" while ${fmt(failedAfter)} had failed. In the review, someone asks what to change.`,
         question: 'What should the team change so an empty answer cannot hide an outage again?',
         qid: 'aad-q-fix',
         choice: { id: 'aad-fix', choices: FIX },
       },
     ],
     finish:
-      'You read an empty answer as a question about a name, not as proof of health. An agent filters on the names you give it, as a person does, so a query on an old attribute name matches nothing. ' +
-      'In Dash0, the MCP server lets an assistant query your telemetry with read-only tools, and Agent0 reads it in the semantic conventions it was produced in: use the names the telemetry carries.',
+      'You read an empty answer as a question about a name, not as proof of health. A query on an old attribute name matches nothing. ' +
+      'In Dash0, the MCP Server lets an assistant query your telemetry with read-only tools, Agent0 reads it in the semantic conventions it was produced in, and getAttributeKeys lists the attribute keys present: check the keys present before you ask for a name.',
   },
 };

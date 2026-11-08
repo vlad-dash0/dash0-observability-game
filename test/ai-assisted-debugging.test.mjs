@@ -1,6 +1,6 @@
 // Level 8.5 "AI-assisted debugging" beyond the generated play-through (test/play.test.mjs, test/answers.test.mjs, test/levels-play.test.mjs):
 // the scenario pinned (views, kinds, costs, budget, answerAfterViews), the engine's validator and budget arithmetic on it, the one table
-// every figure comes from (TABLE), the legacy-name herring against the 8.2 pair, the simulated agent said plainly, an all-subsets probe
+// every figure comes from (TABLE), the legacy-name query (a neutral view, the false-alarm trap) against the 8.2 pair, tile labels with no tell, the simulated agent said plainly, an all-subsets probe
 // through the real incident engine (the three clues are each needed; unlocking boards leave exactly one defensible cause), the hint tiers
 // on every board, the reference path within budget (I7), one penalty per run, and a focus walk that ends on Finish. The scenario is
 // designed for this game (#138); the structure mirrors test/everything-is-green.test.mjs. The happy and sloppy runs are generated from
@@ -33,8 +33,8 @@ const view = (id) => S.views.find((v) => v.id === id);
 const plain = (html) => html.replace(/<[^>]+>/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim();
 const cost = (kind) => S.views.filter((v) => v.kind === kind).reduce((n, v) => n + v.costMin, 0);
 const CLUES = ['failures-by-version', 'failing-trace', 'request-rate'];
-const NEUTRALS = ['alert-rule', 'node-status', 'service-list'];
-const HERRINGS = ['failed-requests', 'recent-changes'];
+const NEUTRALS = ['alert-rule', 'node-status', 'service-list', 'failed-requests'];
+const HERRINGS = ['recent-changes', 'card-charges'];
 const RIGHT = 'inventory-failing';
 const LEGACY = 'http.status_code';
 const STABLE = 'http.response.status_code';
@@ -52,8 +52,8 @@ test('8.5: scenario pin: id, budget, answerAfterViews, views with kinds and cost
     S.views.map((v) => `${v.id}|${v.kind}|${v.costMin}`),
     [
       'failures-by-version|clue|4', 'failing-trace|clue|4', 'request-rate|clue|3',
-      'alert-rule|neutral|2', 'node-status|neutral|3', 'service-list|neutral|3',
-      'failed-requests|herring|3', 'recent-changes|herring|4',
+      'alert-rule|neutral|2', 'node-status|neutral|3', 'service-list|neutral|2', 'failed-requests|neutral|1',
+      'recent-changes|herring|4', 'card-charges|herring|3',
     ],
   );
   assert.deepEqual(
@@ -62,15 +62,27 @@ test('8.5: scenario pin: id, budget, answerAfterViews, views with kinds and cost
   );
 });
 
+test('8.5: tile labels carry no tell: no herring is among the two longest or two shortest, a clue and a neutral also name a window, herrings are not the only ones with "last"', () => {
+  const byLen = [...S.views].sort((a, b) => a.label.length - b.label.length).map((v) => v.id);
+  for (const h of HERRINGS) {
+    assert.equal(byLen.slice(-2).includes(h) || byLen.slice(0, 2).includes(h), false, `${h} is not an extreme label`);
+  }
+  const withLast = S.views.filter((v) => /\blast\b/.test(v.label));
+  assert.equal(withLast.some((v) => v.kind === 'clue') && withLast.some((v) => v.kind === 'neutral'), true, 'a clue and a neutral name a window');
+  assert.equal(withLast.filter((v) => v.kind !== 'herring').length > HERRINGS.length, true, 'more non-herrings than herrings say "last"');
+  assert.equal(HERRINGS.every((h) => /\blast\b/.test(view(h).label)) && withLast.length > HERRINGS.length, true);
+});
+
 test('8.5: valid; 20 minutes; clues plus neutrals cost 19 min and leave 5% (1 min), so only a herring can exhaust the budget', () => {
   assert.deepEqual(validateScenario(S), []);
   assert.equal(S.budget.startPct / S.budget.burnPctPerMin, 20);
   assert.equal(cost('clue'), 11);
   assert.equal(cost('neutral'), 8);
+  assert.equal(cost('herring'), 7);
   assert.equal(S.budget.startPct - (cost('clue') + cost('neutral')) * S.budget.burnPctPerMin, 5);
   for (const h of S.views.filter((v) => v.kind === 'herring')) assert.equal(h.costMin > 1, true, `${h.id} alone spends more than the 1 min that is left`);
   assert.equal(S.views.every((v) => v.costMin <= 4), true, 'no view is a long wait');
-  assert.equal(S.views.filter((v) => v.kind === 'neutral').length >= 2 && S.views.filter((v) => v.kind === 'herring').length >= 2, true);
+  assert.equal(S.views.filter((v) => v.kind === 'neutral').length >= 2 && S.views.filter((v) => v.kind === 'herring').length === 2, true, 'two herrings');
   assert.equal(S.hypotheses.filter((h) => h.right).length, 1);
 });
 
@@ -107,7 +119,7 @@ test('8.5: star totals count it (the derived scored-level max), and a 3-star run
 
 test('globe: 8.5 lights the Philippines and, last of the act, completes Southeast Asia', () => {
   assert.equal(LEVEL_COUNTRY[ID], 'PHL');
-  assert.equal(COUNTRY_NAMES.PHL, 'Philippines');
+  assert.equal(COUNTRY_NAMES.PHL, 'the Philippines');
   assert.equal(ACT_REGIONS['act-8'].region, 'Southeast Asia');
   const map = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES };
   const progressOf = (ids) => {
@@ -118,7 +130,7 @@ test('globe: 8.5 lights the Philippines and, last of the act, completes Southeas
   const others = ['dashboards-as-code', 'semantic-convention-versions', 'migrating-vendors', 'frontend-rum'];
   const fresh = freshlyLit(progressOf(others), progressOf([...others, ID]), LIVE, map);
   assert.deepEqual(fresh, { countryIds: ['PHL'], regionIds: ['act-8'] });
-  assert.equal(litText(fresh, LEVEL, map), 'Philippines is now lit: AI-assisted debugging. Southeast Asia is complete.');
+  assert.equal(litText(fresh, LEVEL, map), 'The Philippines is now lit: AI-assisted debugging. Southeast Asia is complete.');
   assert.deepEqual(freshlyLit(emptyProgress(), progressOf([ID]), LIVE, map), { countryIds: ['PHL'], regionIds: [] }, 'alone it leaves the region open');
 });
 
@@ -175,7 +187,10 @@ test('the views state exactly the table\'s figures', () => {
   const rate = plain(view('request-rate').html);
   for (const x of TABLE.rate) assert.equal(rate.includes(`${x.at} ${fmt(x.perMin)}`), true, x.at);
   const rule = plain(view('alert-rule').html);
-  assert.equal(rule.includes(`above ${TABLE.errorRatioRulePct}% for 15 minutes`) && rule.includes(`since ${TABLE.ruleFiredAt}`) && rule.includes('is 9.1%'), true);
+  assert.equal(rule.includes(`above ${TABLE.errorRatioRulePct}% for 15 minutes`) && rule.includes(`since ${TABLE.ruleFiredAt}`) && rule.includes(`The ratio since ${TABLE.failuresFrom} is ${((failed / requests) * 100).toFixed(1)}%`), true, 'the ratio is over the stated window');
+  const charges = plain(view('card-charges').html);
+  for (const x of TABLE.charges) assert.equal(charges.includes(`${x.at} ${x.p95Ms}`), true, x.at);
+  assert.deepEqual(TABLE.charges, [{ at: '09:50', p95Ms: 410 }, { at: '10:12', p95Ms: 430 }, { at: '10:30', p95Ms: 520 }]);
   assert.equal(plain(view('node-status').html), `${TABLE.nodes} of ${TABLE.nodes} nodes in the checkout pool are Ready.`);
   assert.equal(plain(view('service-list').html).includes(`${TABLE.services} services`), true);
   const trace = plain(view('failing-trace').html);
@@ -193,18 +208,29 @@ test('the time line holds: release 09:40, failures 10:12, rule 10:27 = the page,
 
 // ---- the herring, and the 8.2 pair -----------------------------------------------------
 
-test('the herring queries the legacy name of the 8.2 pair and returns nothing; the clues query the stable name', () => {
+test('the legacy-name query is a neutral view, so no star is lost for looking: it queries the legacy name of the 8.2 pair and returns nothing; the clues query the stable name', () => {
+  assert.equal(view('failed-requests').kind, 'neutral');
+  assert.equal(HERRINGS.includes('failed-requests'), false);
   const spot = semconv.play.steps[0].spot;
   assert.equal(spot.lines.some((l) => l.text === `${LEGACY}=500`), true, '8.2 shows the old name');
   assert.equal(spot.faults.includes('http-status-code'), true, '8.2 has the old name as a fault');
   assert.equal(spot.explain.includes(`<code>${LEGACY}</code> (now <code>${STABLE}</code>)`), true, 'the pair is the one 8.2 states');
   const legacy = plain(view('failed-requests').html);
   assert.equal(legacy.includes(`${LEGACY} = 500`) && legacy.includes('result: 0 spans') && legacy.includes('no failed checkout requests'), true);
-  assert.equal(legacy.includes(STABLE), false, 'the herring never shows the stable name');
+  assert.equal(legacy.includes(STABLE), false, 'the legacy view never shows the stable name; the player compares it with the versions view');
   const uses = (id) => plain(view(id).html);
   assert.equal(uses('failures-by-version').includes(`${STABLE} = 500`), true, 'a clue asks by the stable name');
   for (const v of S.views.filter((x) => x.id !== 'failed-requests')) assert.equal(uses(v.id).includes(LEGACY), false, `${v.id} does not use the legacy name`);
   assert.equal(S.hypotheses.find((h) => h.id === 'false-alarm').why.includes(LEGACY), true);
+});
+
+test('8.5: the legacy view costs no mistake; the false-alarm cause is the trap, and a player who opened it and the clues still has one defensible cause', () => {
+  const st = [...CLUES, 'failed-requests'].reduce((acc, id) => openView(S, acc, id).state, newIncident(S));
+  assert.equal(openView(S, newIncident(S), 'failed-requests').herring, false);
+  assert.equal(openView(S, newIncident(S), 'failed-requests').exhaustedNow, false);
+  assert.equal(canAnswer(S, st), true);
+  assert.deepEqual(defensibleOn([...CLUES, 'failed-requests']), [RIGHT]);
+  assert.equal(defensibleOn(['failed-requests']).includes('false-alarm'), true, 'the legacy view alone leaves the false alarm standing');
 });
 
 test('the empty result is read as a naming problem by the why of the false-alarm cause, which cites the stable name and 8.2', () => {
@@ -244,7 +270,10 @@ test('sources: one Spec line on opentelemetry.io, Dash0 docs lines on www.dash0.
 test('the Dash0 tie-in is only what the docs say: the MCP server lets an assistant query with read-only tools, Agent0 reads the semantic conventions it was produced in', () => {
   const claims = plain([LEVEL.play.finish, ...LEVEL.play.steps[1].choice.choices.map((c) => c.why)].join(' '));
   assert.equal(claims.includes('Agent0 reads telemetry in the OpenTelemetry semantic conventions it was produced in'), true);
-  assert.equal(claims.includes('the MCP server lets an assistant query your telemetry with read-only tools'), true);
+  assert.equal(claims.includes('the MCP Server lets an assistant query your telemetry with read-only tools'), true);
+  assert.equal(claims.includes('one of the tools of the Dash0 MCP Server'), true);
+  assert.equal(/MCP server/.test(claims), false, 'the product is spelled as its page title, MCP Server');
+  assert.equal(/as a person does|names to ask for/.test(claims), false, 'no unsourced claim about how an agent asks');
   assert.equal(claims.includes('getAttributeKeys'), true);
 });
 
@@ -255,7 +284,7 @@ const REFUTED_BY = {
   'bad-release': { 'failures-by-version': 'Both versions fail at the same rate' },
   'payment-timeouts': { 'failing-trace': 'No span in the trace calls the payment provider' },
   'order-surge': { 'request-rate': 'The rate did not change' },
-  'false-alarm': { 'failures-by-version': 'per 1,000 requests', 'failing-trace': 'SERVER 500', 'alert-rule': 'The ratio over the last 15 minutes is 9.1%' },
+  'false-alarm': { 'failures-by-version': 'per 1,000 requests', 'failing-trace': 'SERVER 500', 'alert-rule': 'The ratio since 10:12 is 9.1%' },
 };
 const idsOf = S.views.map((v) => v.id);
 const defensibleOn = (set) => S.hypotheses.filter((h) => h.right || !Object.keys(REFUTED_BY[h.id]).some((v) => set.includes(v))).map((h) => h.id);
@@ -275,12 +304,14 @@ test('no neutral or herring view refutes the three causes the clues each settle,
   for (const h of only) assert.equal(Object.keys(REFUTED_BY[h]).length, 1, `${h} is ruled out by one view`);
   for (const v of [...NEUTRALS, ...HERRINGS]) {
     const t = plain(view(v).html);
-    assert.equal(/both versions|same rate|payment (provider|call)|requests a minute|rate did not/i.test(t), false, `${v} does not speak to the version, the payment call or the rate`);
+    assert.equal(/both versions|same rate|requests a minute|rate did not/i.test(t), false, `${v} does not speak to the version or the rate`);
+    if (v !== 'card-charges') assert.equal(/payment (provider|call)/i.test(t), false, `${v} does not speak to the payment call`);
   }
+  assert.equal(/did not say|does not say whether the failing orders reached a charge/i.test(plain(view('card-charges').html)), true, 'the charge herring leaves the trace to refute it');
   assert.deepEqual(CLUES.map((c) => only.filter((h) => REFUTED_BY[h][c]).length), [1, 1, 1], 'each clue rules out exactly one of them');
 });
 
-test('all 256 boards of the eight views: the boards that unlock hold all three clues and leave exactly the right cause; each clue alone is needed to settle one cause', () => {
+test('all 512 boards of the nine views: the boards that unlock hold all three clues and leave exactly the right cause; each clue alone is needed to settle one cause', () => {
   let unlocking = 0;
   let missing = 0;
   for (const set of subsets()) {
@@ -297,7 +328,7 @@ test('all 256 boards of the eight views: the boards that unlock hold all three c
       assert.equal(defensible.length >= 2 && defensible.includes(RIGHT), true, `a board without ${c} keeps two defensible causes: ${set.join()}`);
     }
   }
-  assert.equal(unlocking, 32, 'the three clues with any of the five neutrals and herrings');
+  assert.equal(unlocking, 64, 'the three clues with any of the six other views');
   assert.equal(missing > 0, true);
 });
 
@@ -309,12 +340,17 @@ test('with the threshold lowered to two clues, every board lacking a clue would 
     boards += 1;
     assert.equal(defensibleOn(set).length >= 2, true, set.join());
   }
-  assert.equal(boards, 3 * 32, 'three pairs of clues with any of the five other views');
+  assert.equal(boards, 3 * 64, 'three pairs of clues with any of the six other views');
 });
 
 // ---- the hint tiers on every board -------------------------------------------------------
 
-test('no hint tier names the cause on any of the 256 boards: tier 1 is the authored hint, tier 2 names only clue views, tier 3 is the paid one', () => {
+test('tier 1 points at the idea behind the clues: which attribute each query filtered on, compared across queries', () => {
+  const t = plain(S.hint);
+  assert.equal(t.includes('which attribute each query filtered on') && t.includes('Compare'), true);
+});
+
+test('no hint tier names the cause on any of the 512 boards: tier 1 is the authored hint, tier 2 names only clue views, tier 3 is the paid one', () => {
   const rightLabel = plain(S.hypotheses.find((h) => h.id === RIGHT).label);
   const causeWords = ['inventory', 'stock', 'reservation', '503'];
   for (const set of subsets()) {
@@ -322,6 +358,7 @@ test('no hint tier names the cause on any of the 256 boards: tier 1 is the autho
     for (const id of set) st = openView(S, st, id).state;
     const t1 = hintFor(S, st, 1);
     assert.equal(t1.html, S.hint);
+    assert.equal(/failed-requests|http\.status_code|0 spans|empty|changes|charge|release|payment/i.test(plain(t1.html)), false, 'tier 1 points at no view');
     assert.deepEqual([t1.views, t1.hypothesis], [[], null]);
     const t2 = hintFor(S, st, 2);
     assert.equal(t2.hypothesis, null);
@@ -377,12 +414,12 @@ const finish = () => {
   click('[data-finish]');
 };
 
-test('8.5: the first screen shows the alert, a full budget, eight views, locked hypotheses and a disabled Next', () => {
+test('8.5: the first screen shows the alert, a full budget, nine views, locked hypotheses and a disabled Next', () => {
   start();
   assert.equal(alertTitle(ID), 'Checkout failing at the last step');
   assert.equal(budget(), '20 min left. 0 of 20 min spent');
   assert.equal(board(ID).cells.total, 20);
-  assert.equal(qa('[data-view]').length, 8);
+  assert.equal(qa('[data-view]').length, 9);
   assert.equal(locked(), 'true,true,true,true,true');
   assert.equal(q('#aad-next').disabled, true);
   assert.equal(qa('[data-finish]').length, 0, 'Finish is on the closing step');
@@ -413,7 +450,7 @@ test('8.5: the reference path (the three clues, then inventory-failing) solves w
   assert.equal(mistakes, 0);
 });
 
-test('8.5: shortcut: opening every view in order exhausts at the first herring and costs three mistakes (two herrings, one exhaustion); the answer is still open', () => {
+test('8.5: shortcut: opening every view in order exhausts at the first herring and costs three mistakes (two herrings, one exhaustion); the legacy query is free; the answer is still open', () => {
   let st = newIncident(S);
   let mistakes = 0;
   const exhaustedOn = [];
@@ -423,7 +460,7 @@ test('8.5: shortcut: opening every view in order exhausts at the first herring a
     mistakes += Number(r.herring) + Number(r.exhaustedNow);
     if (r.exhaustedNow) exhaustedOn.push(v.id);
   }
-  assert.deepEqual(exhaustedOn, ['failed-requests']);
+  assert.deepEqual(exhaustedOn, ['recent-changes']);
   assert.equal(budgetLeft(S, st), 0);
   assert.equal(mistakes, 3);
   assert.equal(answer(S, st, RIGHT).outcome, 'right', 'the incident is still solvable at 0');
@@ -442,7 +479,7 @@ test('8.5: shortcut: clues and neutrals in any order are never penalised and nev
   }
 });
 
-test('8.5: shortcut impossible: three neutrals leave every hypothesis locked with 12 of 20 min left', () => {
+test('8.5: shortcut impossible: four neutrals leave every hypothesis locked with 12 of 20 min left', () => {
   const { finished, slips } = start();
   for (const id of NEUTRALS) open(id);
   assert.equal(budget(), '12 min left. 8 of 20 min spent');
@@ -471,10 +508,10 @@ test('8.5: the shortest path is the three clues; it solves with 9 of 20 min left
 
 test('8.5: a herring costs one mistake on its first open only, and the run still finishes with 4 stars', () => {
   const { slips, finished } = start();
-  open('failed-requests');
+  open('recent-changes');
   assert.equal(slips.mistakes, 1);
   assert.deepEqual([status().tone, status().text.includes('was misleading')], ['error', true]);
-  open('failed-requests');
+  open('recent-changes');
   assert.equal(slips.mistakes, 1, 'a repeat open is free');
   for (const id of CLUES) open(id);
   guess(RIGHT);
@@ -485,7 +522,7 @@ test('8.5: a herring costs one mistake on its first open only, and the run still
 
 test('8.5: the second herring is a second mistake; a wrong answer on top is a third and leaves 2 stars', () => {
   const { slips, finished } = start();
-  open('failed-requests');
+  open('card-charges');
   open('recent-changes');
   for (const id of CLUES) open(id);
   assert.equal(slips.mistakes, 2);
@@ -519,7 +556,7 @@ test('8.5: every clue and neutral leaves 1 min and no mistake; a herring then sp
   for (const id of [...CLUES, ...NEUTRALS]) open(id);
   assert.equal(slips.mistakes, 0, '19 min in: 1 left, nothing spent yet');
   assert.equal(budget(), '1 min left. 19 of 20 min spent');
-  open('failed-requests');
+  open('recent-changes');
   assert.equal(slips.mistakes, 2);
   assert.equal(board(ID).left, 'Budget spent.');
   assert.deepEqual([status().tone, status().text.includes('was misleading, and the error budget is spent')], ['error', true]);
@@ -527,6 +564,18 @@ test('8.5: every clue and neutral leaves 1 min and no mistake; a herring then sp
   guess(RIGHT);
   finish();
   assert.equal(finished[0].stars, 3, 'two penalties leave 3 stars');
+});
+
+test('8.5: the legacy-name query is free: it costs 1 min, no mistake and no "misleading" note, and the run keeps 5 stars', () => {
+  const { slips, finished } = start();
+  open('failed-requests');
+  assert.equal(slips.mistakes, 0);
+  assert.equal(status().text.includes('misleading'), false);
+  for (const id of CLUES) open(id);
+  guess(RIGHT);
+  finish();
+  assert.equal(slips.mistakes, 0);
+  assert.equal(finished[0].stars, 5);
 });
 
 test('8.5: opening a view again costs neither time nor a mistake, so repeat opens cannot exhaust the budget', () => {
@@ -552,7 +601,8 @@ test('8.5: the closing step has one right change, the stable names, and three wr
   assert.equal(plain(choice('no-filter').why).includes('filter on the status again'), true);
   assert.equal(plain(choice('retry-later').why).includes(`at ${TABLE.queryAt}`) && plain(choice('retry-later').why).includes('same empty answer'), true);
   const intro = plain(LEVEL.play.steps[1].intro);
-  assert.equal(intro.includes(`${fmt(failed)} had failed`) && intro.includes(LEGACY) && intro.includes(STABLE), true);
+  assert.equal(intro.includes(`${fmt(failed)} had failed`), true);
+  assert.equal(intro.includes('http.') || /status_code/.test(intro), false, 'the intro names neither attribute');
 });
 
 test('8.5: the closing labels are balanced: the right one is neither the longest nor the shortest, within 15 characters of the others, with no shape or echo tell', () => {
@@ -560,6 +610,9 @@ test('8.5: the closing labels are balanced: the right one is neither the longest
   const right = plain(choice('stable-names').label);
   assert.equal(right.length < Math.max(...lens) && right.length > Math.min(...lens), true, lens.join());
   assert.equal(Math.max(...lens) - Math.min(...lens) <= 15, true, lens.join());
+  assert.equal(pick.some((c) => /stable/i.test(c.label)), false, 'no label says stable');
+  assert.equal(pick.some((c) => /for good/.test(c.label)), false, 'no decoy rules itself out');
+  assert.equal(pick.filter((c) => /^(Ask|Use) /.test(c.label) && /question|names|filter/.test(c.label)).length >= 3, true, 'the right one is not the only one that changes the question');
   assert.equal(pick.every((c) => /, (so|in case) /.test(c.label)), true, 'one shape for all four: an action, then a reason after a comma');
   for (const c of pick) assert.equal(/\b(verify|check that|make sure)\b/i.test(c.label), false, `${c.key}: no verify tail`);
   for (const v of S.views) assert.equal(/stable attribute names|agent prompt/i.test(v.label), false, 'no view tile echoes the right label');

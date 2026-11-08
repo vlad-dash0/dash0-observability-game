@@ -105,7 +105,7 @@ export const COUNTRY_NAMES = Object.freeze({
   KAZ: 'Kazakhstan', SAU: 'Saudi Arabia', TUR: 'Turkey', UZB: 'Uzbekistan', TKM: 'Turkmenistan', IRQ: 'Iraq',
   IND: 'India', IRN: 'Iran', PAK: 'Pakistan',
   JPN: 'Japan', CHN: 'China', MNG: 'Mongolia', KOR: 'South Korea',
-  THA: 'Thailand', VNM: 'Vietnam', IDN: 'Indonesia', MYS: 'Malaysia', PHL: 'Philippines',
+  THA: 'Thailand', VNM: 'Vietnam', IDN: 'Indonesia', MYS: 'Malaysia', PHL: 'the Philippines',
   AUS: 'Australia', NZL: 'New Zealand', PNG: 'Papua New Guinea',
 });
 
