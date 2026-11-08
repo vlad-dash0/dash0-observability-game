@@ -201,7 +201,7 @@ export default {
       {
         intro:
           'The second vendor charges per <b>GB</b> sent. The budget is ' +
-          `${GB.cap} GB sent a day. The costs are invented, and each option shows the GB it adds.`,
+          `${GB.cap} GB sent a day. Sending every span would be 120 GB a day, and every request and response body in every log line 80. The costs are invented, and each option shows the GB it adds.`,
         question: 'Pick a setting for each of the two: keep every need and stay within the budget.',
         qid: 'wcm-q-gb',
         tradeoff: GB,

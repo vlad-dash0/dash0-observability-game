@@ -48,8 +48,10 @@ const ratioLine = (r) => `<code>${SAMPLER}=traceidratio</code> and <code>${ARG}=
 // The root keeps 1 in 10 (storefront, fixed); two knobs set what checkout and payments do with the root's decision.
 // The cards show costs and not what an option keeps until a Check: the player has to know that ParentBased, the
 // default, follows the sampled flag, and what always_on and a plain ratio do instead. No blind rule finds the plan
-// (test/trade-off-balance.test.mjs probes them). Checkout and payments are two knobs, each of whose settings keeps
-// what only that service can: the whole-trace needs are one for each service.
+// (test/trade-off-balance.test.mjs probes them). Checkout and payments are two knobs; only checkout has a
+// need (its spans in every kept trace), because every payments option would keep a payments need: payments is
+// decided by the cap, where a plain ratio or always_on is over it. A checkout ratio below the root's keeps only
+// part of the root's traces (a higher ratio samples every trace a lower one does), so it keeps no need.
 const PLAN = {
   id: 'hs-plan',
   unit: 'spans/s',
@@ -67,6 +69,11 @@ const PLAN = {
           label: `<code>${SAMPLER}=always_on</code>, so every trace is sampled: ${n(TRACES)} × ${SPANS.checkout} = ${n(forAll('checkout'))}`,
           cost: forAll('checkout'),
           keeps: ['checkout-whole'],
+        },
+        {
+          id: 'ratio-5pct',
+          label: `${ratioLine(0.05)}: ${n(TRACES * 0.05)} traces/s × ${SPANS.checkout} = ${n(forRatio('checkout', 0.05))}`,
+          cost: forRatio('checkout', 0.05),
         },
         {
           id: 'ratio',
@@ -91,26 +98,22 @@ const PLAN = {
           id: 'follow',
           label: `The default, <code>${SAMPLER}=parentbased_always_on</code>: ${n(TEN)} traces/s × ${SPANS.payments} = ${n(forTen('payments'))}`,
           cost: forTen('payments'),
-          keeps: ['payments-whole'],
         },
         {
           id: 'ratio',
           label: `${ratioLine(0.5)}: ${n(TRACES * 0.5)} traces/s × ${SPANS.payments} = ${n(forRatio('payments', 0.5))}`,
           cost: forRatio('payments', 0.5),
-          keeps: ['payments-whole'],
         },
         {
           id: 'always-on',
           label: `<code>${SAMPLER}=always_on</code>, so every trace is sampled: ${n(TRACES)} × ${SPANS.payments} = ${n(forAll('payments'))}`,
           cost: forAll('payments'),
-          keeps: ['payments-whole'],
         },
       ],
     },
   ],
   needs: [
     { id: 'checkout-whole', label: 'every kept trace has its checkout spans' },
-    { id: 'payments-whole', label: 'every kept trace has its payments spans' },
   ],
   answer: { checkout: 'follow', payments: 'follow' },
   whyNot: {
@@ -120,6 +123,9 @@ const PLAN = {
     'checkout:ratio':
       `A plain <code>traceidratio</code> must ignore the parent's sampled flag, and a higher ratio samples every trace a lower one does, so checkout keeps the root's ${n(TEN)} traces a second and ${n(orphanTraces(0.25))} more whose root was dropped: ` +
       `${n(forRatio('checkout', 0.25))} spans, ${n(orphanTraces(0.25) * SPANS.checkout)} of them with no root above them.`,
+    'checkout:ratio-5pct':
+      `A plain <code>traceidratio</code> must ignore the parent's sampled flag, and a lower ratio samples only some of the traces a higher one does, so checkout at ${n(TRACES * 0.05)} traces a second keeps only half of the root's ${n(TEN)}: ` +
+      `${n(forRatio('checkout', 0.05))} spans, and the other half of the root's traces have no checkout spans.`,
     'checkout:always-off': 'It records nothing, so checkout has no spans in the traces the root kept, and every one of them has a hole where checkout should be.',
     'payments:ratio':
       `A plain <code>traceidratio</code> must ignore the parent's sampled flag, and a higher ratio samples every trace a lower one does, so payments keeps the root's ${n(TEN)} traces a second and ${n(orphanTraces(0.5))} more whose root was dropped: ` +

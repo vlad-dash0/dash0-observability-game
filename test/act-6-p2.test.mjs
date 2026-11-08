@@ -159,6 +159,7 @@ test('6.3: the same lever flips between the two models (bodies cost under per GB
 test('6.3 per GB: the meter is GB sent, and retention is the separate multiplier', () => {
   assert.equal(plain(steps[1].intro).includes('per GB sent'), true);
   assert.equal(plain(steps[1].intro).includes('60 GB sent a day'), true);
+  assert.equal(plain(steps[1].intro).includes('every span would be 120 GB a day'), true, 'the baseline of the percentages is on screen');
   assert.equal(/\bstored\b/.test(plain(steps[1].intro)), false, 'the step does not call the meter stored');
   assert.equal(plain(gb().explain).includes('what you store is the daily volume times the days you keep it'), true);
 });

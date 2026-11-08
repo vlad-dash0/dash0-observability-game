@@ -200,11 +200,12 @@ test('head sampling: the table behind the copy, recomputed: 12 spans a trace, 4,
   assert.equal(option(spec, 'checkout', 'follow').cost, 200);
   assert.equal(option(spec, 'checkout', 'always-on').cost, 2000);
   assert.equal(option(spec, 'checkout', 'ratio').cost, 500);
+  assert.equal(option(spec, 'checkout', 'ratio-5pct').cost, 100);
   assert.equal(option(spec, 'checkout', 'always-off').cost, 0);
   assert.equal(option(spec, 'payments', 'follow').cost, 120);
   assert.equal(option(spec, 'payments', 'always-on').cost, 1200);
   assert.equal(option(spec, 'payments', 'ratio').cost, 600);
-  assert.deepEqual(spec.knobs.map((k) => k.options.map((o) => o.id)), [['always-on', 'ratio', 'follow', 'always-off'], ['follow', 'ratio', 'always-on']]);
+  assert.deepEqual(spec.knobs.map((k) => k.options.map((o) => o.id)), [['always-on', 'ratio-5pct', 'ratio', 'follow', 'always-off'], ['follow', 'ratio', 'always-on']]);
   const intro = plain(LIVE.levels['head-sampling'].play.steps[0].intro);
   for (const w of ['400 traces', '12 spans', '4,800 spans', '760 spans', 'storefront', 'checkout', 'payments', '160 spans', '600 of the 760']) assert.equal(intro.includes(w), true, w);
   assert.equal(/authored|not run|does not run|simulat/.test(intro + plain(spec.explain)), true, 'the copy says the arithmetic is worked out, not run by an engine');
@@ -227,6 +228,7 @@ test('head sampling: every shortcut fails the real grader for its own reason', (
   assert.deepEqual(run('follow', 'always-on'), { outcome: 'wrong', total: 1400, over: 800, lost: [] });
   assert.deepEqual(run('follow', 'ratio'), { outcome: 'wrong', total: 800, over: 200, lost: [] }, 'a plain ratio keeps the root\'s traces and more whose root was dropped: over budget');
   assert.deepEqual(run('ratio', 'follow'), { outcome: 'wrong', total: 620, over: 20, lost: [] }, 'the nearest miss: over by 20 spans a second');
+  assert.deepEqual(run('ratio-5pct', 'follow'), { outcome: 'wrong', total: 220, over: 0, lost: ['checkout-whole'] }, 'a child ratio below the root\'s keeps only some of the root\'s traces');
   assert.deepEqual(run('always-off', 'follow'), { outcome: 'wrong', total: 120, over: 0, lost: ['checkout-whole'] }, 'cheap, and checkout is missing from every kept trace');
   assert.deepEqual(run('always-off', 'ratio'), { outcome: 'wrong', total: 600, over: 0, lost: ['checkout-whole'] }, 'the dearest plan that fits still drops checkout');
 });
@@ -247,9 +249,10 @@ test('head sampling: the nuance is graded: the wrong options say why a child tha
   for (const w of ['1,080', '1,200', 'root']) assert.equal(payments.includes(w), true, w);
   const ratio = plain(spec.whyNot['checkout:ratio']);
   for (const w of ["ignore the parent's sampled flag", 'a higher ratio samples every trace a lower one does', '60 more whose root was dropped', '300 of them with no root above them']) assert.equal(ratio.includes(w), true, w);
+  assert.equal(plain(spec.whyNot['checkout:ratio-5pct']).includes('a lower ratio samples only some of the traces a higher one does'), true);
   assert.equal(plain(spec.whyNot['payments:ratio']).includes('160 more whose root was dropped'), true);
   assert.equal(plain(spec.whyNot['payments:ratio']).includes('480 of them'), true);
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['checkout:always-off', 'checkout:always-on', 'checkout:ratio', 'payments:always-on', 'payments:ratio']);
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['checkout:always-off', 'checkout:always-on', 'checkout:ratio', 'checkout:ratio-5pct', 'payments:always-on', 'payments:ratio']);
   assert.equal(plain(option(spec, 'checkout', 'always-on').label).includes('always_on'), true);
   assert.equal(plain(option(spec, 'checkout', 'follow').label).includes('parentbased_always_on'), true, 'the default sampler is named');
 });
