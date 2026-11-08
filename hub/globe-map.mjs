@@ -7,10 +7,12 @@
 // Every country in LEVEL_COUNTRY has at least this many land dots (bar MIN_DOTS_EXCEPTIONS), so it is visible lit.
 export const MIN_DOTS = 6;
 
-// The one narrow exception: South Korea has 5 dots on the 110m data (it is small), and the only other unused East Asia
-// country with 6 or more dots is North Korea (6), passed over for a demo-friendlier pick; Taiwan has 2. A code
-// listed here needs at least its own minimum instead of MIN_DOTS (test/globe-data.test.mjs pins this table).
-export const MIN_DOTS_EXCEPTIONS = Object.freeze({ KOR: 5 });
+// The narrow exceptions, each a country below MIN_DOTS that a level uses. South Korea has 5 dots on the 110m data (it is small),
+// and the only other unused East Asia country with 6 or more dots is North Korea (6), passed over for a demo-friendlier pick; Taiwan
+// has 2. The Solomon Islands have 2: Oceania's only other unused countries with land dots (New Caledonia has 2 as well, none else),
+// and the owner chose to count a 2-dot country as visible for Act 9 (#240). A code listed here needs at least its own minimum
+// instead of MIN_DOTS (test/globe-data.test.mjs checks each entry is used by a level, equals the country's dot count and is below MIN_DOTS).
+export const MIN_DOTS_EXCEPTIONS = Object.freeze({ KOR: 5, SLB: 2 });
 
 // act id -> region name and the Natural Earth SUBREGION values it covers. Owner defaults
 // (2026-11-04): Southern Europe counts as Western Europe, Central America and the Caribbean
@@ -92,6 +94,7 @@ export const LEVEL_COUNTRY = Object.freeze({
   'filter-or-sampler': 'NZL',
   'the-34-percent-error-rate': 'AUS',
   'connect-to-dash0': 'PNG',
+  'the-trace-that-starts-in-the-middle': 'SLB',
 });
 
 // ADM0_A3 code -> display name, for every country in LEVEL_COUNTRY (the ignite announcement,
@@ -106,7 +109,7 @@ export const COUNTRY_NAMES = Object.freeze({
   IND: 'India', IRN: 'Iran', PAK: 'Pakistan',
   JPN: 'Japan', CHN: 'China', MNG: 'Mongolia', KOR: 'South Korea',
   THA: 'Thailand', VNM: 'Vietnam', IDN: 'Indonesia', MYS: 'Malaysia', PHL: 'the Philippines',
-  AUS: 'Australia', NZL: 'New Zealand', PNG: 'Papua New Guinea',
+  AUS: 'Australia', NZL: 'New Zealand', PNG: 'Papua New Guinea', SLB: 'the Solomon Islands',
 });
 
 /** The act id whose region a country (ADM0_A3 code, Natural Earth SUBREGION) is in, else null. */
