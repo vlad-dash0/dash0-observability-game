@@ -10,8 +10,8 @@
 // Facts used (each read on the pages above, 2026-11-07). Manage Dashboards as Code: Dash0 dashboards use the Perses dashboard format;
 // they can be versioned and managed as infrastructure as code, which enables version control, automated deployment pipelines and code
 // review for dashboard changes. With the Dash0 Operator for Kubernetes a dashboard is a Perses `PersesDashboard` custom resource
-// (`apiVersion: perses.dev/v1alpha1`, `metadata.name` and `metadata.namespace`, and under `spec`: `display.name`, `datasources`
-// with `plugin.kind: PrometheusDataSource`, `layouts` of `kind: Grid` whose `spec.items` have `x`, `y`, `width`, `height` and
+// (`apiVersion: perses.dev/v1alpha1`, `metadata.name` and `metadata.namespace`, and under `spec`: `display.name`,
+// `layouts` of `kind: Grid` whose `spec.items` have `x`, `y`, `width`, `height` and
 // `content.$ref: "#/spec/panels/<name>"`, and `panels` of `kind: Panel` with a `TimeSeriesChart` plugin whose
 // `PrometheusTimeSeriesQuery` holds a `query`); the operator watches for Perses dashboard resources in namespaces with a Dash0
 // monitoring resource deployed, and creates, updates or removes the Dash0 dashboard when the resource is created, modified or deleted.
@@ -34,23 +34,22 @@ const SPOT = {
   target: 'config',
   helps: { hints: false },
   lines: [
-    { id: 'header', text: '+ {apiVersion: perses.dev/v1alpha1, kind: PersesDashboard}' },
-    { id: 'metadata', text: '+ metadata: {name: checkout-overview, namespace: tools}' },
+    { id: 'metadata', text: '+ {apiVersion: perses.dev/v1alpha1, kind: PersesDashboard, metadata: {name: checkout-overview, namespace: tools}}' },
     { id: 'grid', text: '+ spec.layouts[0].kind: Grid' },
     { id: 'item-rate', text: '+ spec.layouts[0].spec.items[0]: {x: 0, "y": 0, width: 12, height: 6, content: {$ref: "#/spec/panels/request_rate"}}' },
     { id: 'item-errors', text: '+ spec.layouts[0].spec.items[1]: {x: 18, "y": 0, width: 12, height: 6, content: {$ref: "#/spec/panels/error_ratio"}}' },
-    { id: 'item-latency', text: '+ spec.layouts[0].spec.items[2]: {x: 0, "y": 6, width: 12, height: 6, content: {$ref: "#/spec/panels/latency_p99"}}' },
-    { id: 'item-corner', text: '+ spec.layouts[0].spec.items[3]: {x: 12, "y": 6, width: 12, height: 6, content: {$ref: "#/spec/panels/request_count"}}' },
+    { id: 'item-corner', text: '+ spec.layouts[0].spec.items[2]: {x: 12, "y": 6, width: 12, height: 6, content: {$ref: "#/spec/panels/request_count"}}' },
+    { id: 'item-latency', text: '+ spec.layouts[0].spec.items[3]: {x: 0, "y": 6, width: 12, height: 6, content: {$ref: "#/spec/panels/latency_p99"}}' },
     { id: 'panel-rate', text: '+ spec.panels.request_rate: {kind: Panel, spec: {display: {name: Request rate}, plugin: {kind: TimeSeriesChart}}}' },
     { id: 'query-rate', text: '+ spec.panels.request_rate.spec.plugin.spec.queries[0].spec.plugin.spec.query: sum(rate(http_server_requests_total{service="checkout"}[5m]))' },
     { id: 'panel-errors', text: '+ spec.panels.error_ratio: {kind: Panel, spec: {display: {name: Error ratio}, plugin: {kind: TimeSeriesChart}}}' },
     { id: 'query-errors', text: '+ spec.panels.error_ratio.spec.plugin.spec.queries[0].spec.plugin.spec.query: sum(rate(http_server_requests_total{service="checkout", code=~"5.."}[5m])) / sum(rate(http_server_requests_total{service="checkout"}[5m]))' },
+    { id: 'panel-count', text: '+ spec.panels.request_count: {kind: Panel, spec: {display: {name: Request count}, plugin: {kind: TimeSeriesChart}}}' },
     { id: 'query-count', text: '+ spec.panels.request_count.spec.plugin.spec.queries[0].spec.plugin.spec.query: sum(increase(http_server_requests_total{service="checkout"}[5m]))' },
   ],
   faults: ['metadata', 'item-errors', 'item-latency'],
   whyNot: {
-    header: 'The same <code>apiVersion</code> and <code>kind</code> as the example in Dash0\'s documentation of a dashboard the operator manages. Nothing here needs to change.',
-    'item-rate': 'Its <code>x: 0</code> is the left edge that <code>items[2]</code> shares, one band of the grid further down, and its width of 12 is every item\'s width. Read as cells it covers columns 0 to 12 of the 24, well inside the grid.',
+    'item-rate': 'Its <code>x: 0</code> is the left edge that <code>items[3]</code> shares, one band of the grid further down, and its width of 12 is every item\'s width. Read as cells it covers columns 0 to 12 of the 24, well inside the grid.',
     'item-corner': 'Read as cells it covers columns 12 to 24 of the grid\'s second band (<code>y</code> 6 to 12), which ends exactly at the edge, and it names <code>request_count</code>, a panel the file defines and no other item shows. Its <code>x: 12</code> is not shared with another item, but nothing about it is wrong.',
     'panel-errors': 'This panel is defined, and the item that names it points at the right key. What is wrong with that item is where it sits on the grid, not the panel it shows.',
     'query-rate': 'A counter\'s <code>rate</code> over 5 minutes, summed: a request rate per second, the right shape for a counter on a time series chart.',
@@ -59,8 +58,8 @@ const SPOT = {
   },
   explain:
     'Three lines to stop. <code>namespace: tools</code>: the operator watches for Perses dashboard resources in namespaces that have a Dash0 monitoring resource, and only <code>checkout</code> and <code>payments</code> do, so a resource applied to <code>tools</code> would never reach Dash0. ' +
-    'Reading the fields as cells (Dash0\'s example shows only their names), the second item starts at <code>x: 18</code> and is 12 wide, so it would run to column 30 on a grid of 24: it does not fit. At <code>x: 12</code> it would end at the edge, as the fourth item does one band down. ' +
-    'The third item names <code>latency_p99</code>, and the file defines three panels, <code>request_rate</code>, <code>error_ratio</code> and <code>request_count</code>, so that item points at nothing: the panel was left out of the pull request. ' +
+    'Reading the fields as cells (Dash0\'s example shows only their names), the second item starts at <code>x: 18</code> and is 12 wide, so it would run to column 30 on a grid of 24: it does not fit. At <code>x: 12</code> it would end at the edge, as the third item does one band down. ' +
+    'The fourth item names <code>latency_p99</code>, and the file defines three panels, <code>request_rate</code>, <code>error_ratio</code> and <code>request_count</code>, so that item points at nothing: the panel was left out of the pull request. ' +
     'A reviewer can read all three in the diff before anything is live, which is the point of keeping dashboards in git. ' +
     'This step grades the lines you select, not a parsed file: nothing here checks the YAML against the Perses schema.',
 };

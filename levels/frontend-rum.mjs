@@ -50,19 +50,19 @@ const span = (traceId, spanId, service, name, kind, startMs, endMs, parentId) =>
 
 // Checkout's server span arrived as a root. The browser span its traceparent names is the fetch call (PAY), not the click that began
 // it (CLICK), not the earlier fetch of the cart (CART), not the same-looking call of the other visitor's trace (PAY2), and not the
-// twin in its own trace (PAY_B, the second call the Pay handler sent, which also encloses the server span): the board labels the
+// twin in its own trace (PAY_B, the second call the Pay handler sent, which also encloses the server span, starts earlier, ends later and is listed first: the header's call is the later, tighter one): the board labels the
 // twins by their span id, and only the parent id in the header tells which one the server span answers.
 const TREE = {
   id: 'frum-tree',
   spans: [
     span(T1, CLICK, 'shop-web', 'click Pay', 'INTERNAL', 0, 1250, null),
     span(T1, CART, 'shop-web', 'GET /cart', 'CLIENT', 20, 160, CLICK),
-    span(T1, PAY, 'shop-web', 'POST /checkout', 'CLIENT', 200, 1200, CLICK),
-    span(T1, PAY_B, 'shop-web', 'POST /checkout', 'CLIENT', 210, 1190, CLICK),
+    span(T1, PAY_B, 'shop-web', 'POST /checkout', 'CLIENT', 200, 1200, CLICK),
+    span(T1, PAY, 'shop-web', 'POST /checkout', 'CLIENT', 210, 1190, CLICK),
     span(T1, SERVER, 'checkout', 'POST /checkout', 'SERVER', 230, 1160, null),
     span(T1, DB, 'checkout', 'INSERT orders', 'CLIENT', 300, 1100, SERVER),
     span(T2, CLICK2, 'shop-web', 'click Pay', 'INTERNAL', 150, 1300, null),
-    span(T2, PAY2, 'shop-web', 'POST /checkout', 'CLIENT', 210, 1180, CLICK2),
+    span(T2, PAY2, 'shop-web', 'POST /checkout', 'CLIENT', 215, 1180, CLICK2),
     span(T2, SERVER2, 'checkout', 'POST /checkout', 'SERVER', 240, 1170, PAY2),
   ],
   edit: ['parent'],

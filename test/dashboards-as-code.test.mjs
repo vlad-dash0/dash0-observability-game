@@ -93,7 +93,7 @@ test('step 1: a valid config board of twelve added lines, hints off, faults on t
   assert.deepEqual(spec.helps, { hints: false });
   assert.equal(Object.hasOwn(spec, 'hint'), false, 'no authored hint (hints off)');
   assert.deepEqual(spec.faults, ['metadata', 'item-errors', 'item-latency']);
-  assert.equal(layout(spec), '.F.' + '.FF.' + '.....');
+  assert.equal(layout(spec), 'F.' + '.F.F' + '......', 'the two faulty items are not adjacent');
   assert.equal(spec.lines.length, 12);
   for (const l of spec.lines) assert.match(l.text, /^\+ /, `${l.id} is an added line`);
   assert.equal(spotRun(spec.faults).state.solved, true, 'the three faults solve it');
@@ -109,9 +109,9 @@ test('step 1: every field on the board is one the Dash0 example shows, and the l
       assert.equal(DOCS_KEYS.has(key) || NAMED.has(key), true, `${l.id}: ${key} is a field of the Dash0 example or a name the game gives`);
     }
   }
-  const header = readLine(spec.lines.find((l) => l.id === 'header').text).value;
-  assert.deepEqual(header, { apiVersion: 'perses.dev/v1alpha1', kind: 'PersesDashboard' }, 'as in the Dash0 example');
-  for (const id of ['panel-rate', 'panel-errors']) {
+  const head = readLine(spec.lines.find((l) => l.id === 'metadata').text).value;
+  assert.deepEqual([head.apiVersion, head.kind, head.metadata.name], ['perses.dev/v1alpha1', 'PersesDashboard', 'checkout-overview'], 'the header of the Dash0 example, folded into the metadata line');
+  for (const id of ['panel-rate', 'panel-errors', 'panel-count']) {
     const v = readLine(spec.lines.find((l) => l.id === id).text).value;
     assert.deepEqual([v.kind, v.spec.plugin.kind], ['Panel', 'TimeSeriesChart']);
   }
@@ -125,13 +125,13 @@ test('step 1 oracle: an independent reading of the diff flags exactly the faults
   const refs = [];
   for (const l of spec.lines) {
     const { path, value } = readLine(l.text);
-    if (path === 'metadata' && !WATCHED.includes(value.namespace)) found.push(l.id);
+    if (path === '' && !WATCHED.includes(value.metadata.namespace)) found.push(l.id);
     const item = /^spec\.layouts\[0\]\.spec\.items\[(\d)\]$/.exec(path);
     if (item) {
       items.push({ id: l.id, ...value });
       refs.push({ id: l.id, panel: value.content.$ref.replace('#/spec/panels/', '') });
     }
-    const panel = /^spec\.panels\.(\w+)(\.|$)/.exec(path);
+    const panel = /^spec\.panels\.(\w+)$/.exec(path);
     if (panel) defined.add(panel[1]);
   }
   // Reading the fields as cells on a 24-column grid, an item does not fit when x + width is more than 24.
@@ -140,10 +140,10 @@ test('step 1 oracle: an independent reading of the diff flags exactly the faults
   found.push(...crossing);
   found.push(...refs.filter((r) => !defined.has(r.panel)).map((r) => r.id));
   assert.deepEqual([...new Set(found)].sort(), [...spec.faults].sort());
-  // The numbers the explanation quotes: the second item starts at 18 and is 12 wide, so it ends at column 30 of 24; the fourth ends at 24.
+  // The numbers the explanation quotes: the second item starts at 18 and is 12 wide, so it ends at column 30 of 24; the third (x: 12, one band down) ends at 24.
   const [first, second, third, fourth] = items;
   assert.deepEqual([second.x, second.width, second.x + second.width], [18, 12, 30]);
-  assert.deepEqual([first.x + first.width, third.y, fourth.x, fourth.x + fourth.width, fourth.y], [12, 6, 12, 24, 6]);
+  assert.deepEqual([first.x + first.width, fourth.y, third.x, third.x + third.width, third.y], [12, 6, 12, 24, 6]);
   assert.equal(items.filter((it) => it.x + it.width > GRID).length, 1, 'one item runs past the grid, so the fault is one line');
   assert.equal(items.length, 4);
   assert.deepEqual([...defined].sort(), ['error_ratio', 'request_count', 'request_rate']);
@@ -182,14 +182,14 @@ test('step 1: the two non-fault layout items and the two panels are honest decoy
 
 test('step 1: no odd-one-out rule over the layout fields picks the faults, and over all 4,095 selections only the reference passes', () => {
   const items = spec.lines.filter((l) => /\.items\[\d\]$/.test(readLine(l.text).path)).map((l) => ({ id: l.id, ...readLine(l.text).value }));
-  assert.deepEqual(items.map((it) => it.id), ['item-rate', 'item-errors', 'item-latency', 'item-corner']);
+  assert.deepEqual(items.map((it) => it.id), ['item-rate', 'item-errors', 'item-corner', 'item-latency']);
   const refs = items.map((it) => it.content.$ref.replace('#/spec/panels/', ''));
   const definedPanels = ['request_rate', 'error_ratio', 'request_count'];
   assert.equal(refs.filter((r) => definedPanels.includes(r)).length, 3, 'three of the four items name a defined panel');
   // Every rule over $ref fails: unique ref, duplicated ref, odd one out. The three defined refs are each used once, so no ref repeats.
   const count = (r) => refs.filter((x) => x === r).length;
   const byRef = (pred) => items.filter((it, i) => pred(count(refs[i]))).map((it) => it.id);
-  assert.deepEqual(byRef((n) => n === 1), ['item-rate', 'item-errors', 'item-latency', 'item-corner'], 'every $ref is unique');
+  assert.deepEqual(byRef((n) => n === 1), ['item-rate', 'item-errors', 'item-corner', 'item-latency'], 'every $ref is unique');
   assert.deepEqual(byRef((n) => n > 1), [], 'no $ref is duplicated');
   for (const [name, picked] of [['unique ref', byRef((n) => n === 1)], ['duplicated ref', byRef((n) => n > 1)], ['odd ref', byRef((n) => n === 1)]]) {
     assert.equal(spotRun(['metadata', ...picked]).state.solved, false, `${name} (${picked}) does not solve it`);
@@ -204,6 +204,11 @@ test('step 1: no odd-one-out rule over the layout fields picks the faults, and o
     assert.equal(spotRun(picked).state.solved, false, `the odd one out on ${f} (${picked}) does not solve it`);
     assert.equal(faultItems.every((id) => oddOnes(f).includes(id)), false, `${f} does not single out both faulty items`);
   }
+  // "The middle two items" and "adjacent items" are not the faulty pair: they are not next to each other in the list.
+  const at = (id) => items.findIndex((it) => it.id === id);
+  assert.equal(Math.abs(at('item-errors') - at('item-latency')), 2, 'the faulty items are two apart');
+  assert.equal(spotRun(['metadata', ...items.slice(1, 3).map((it) => it.id)]).state.solved, false, 'the middle two items do not solve it');
+  for (let i = 0; i + 1 < items.length; i += 1) assert.equal(spotRun(['metadata', items[i].id, items[i + 1].id]).state.solved, false, `adjacent items ${i} and ${i + 1} do not solve it`);
   // Every non-empty selection of the twelve lines through the real checkSpot: exactly the reference solves it.
   const ids = spec.lines.map((l) => l.id);
   const passing = [];
@@ -216,12 +221,11 @@ test('step 1: no odd-one-out rule over the layout fields picks the faults, and o
 });
 
 test('step 1 whyNot: only on decoys, each a full sentence that names no fault line, the tempting ones covered', () => {
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['header', 'item-corner', 'item-rate', 'panel-errors', 'query-count', 'query-errors', 'query-rate']);
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['item-corner', 'item-rate', 'panel-errors', 'query-count', 'query-errors', 'query-rate']);
   for (const [id, t] of Object.entries(spec.whyNot)) {
     assert.match(plain(t), /\S[\s\S]*\.$/, `${id} ends a sentence`);
     for (const f of spec.faults) assert.equal(plain(t).includes(spec.lines.find((l) => l.id === f).text), false, `${id} does not quote ${f}`);
   }
-  assert.match(plain(spec.whyNot.header), /same <code>apiVersion<\/code>|same apiVersion/);
   assert.match(plain(spec.whyNot['item-rate']), /shares, one band of the grid further down/);
   assert.match(plain(spec.whyNot['item-rate']), /columns 0 to 12 of the 24/);
   assert.match(plain(spec.whyNot['item-corner']), /columns 12 to 24/);
