@@ -27,7 +27,7 @@ const progressOf = (ids) => {
   return p;
 };
 
-test('8.3 fields: second level of act-8 after 8.2, scored with no par time, a sort then a choice, lights the storefront, no card', () => {
+test('8.3 fields: third level of act-8 after 8.2, scored with no par time, a sort then a choice, lights the storefront, no card', () => {
   assert.deepEqual(
     { no: level.no, name: level.name, sub: level.sub, icon: level.icon, rewardTitle: level.rewardTitle, kind: level.kind, actId: level.actId, parMs: level.scoring.parMs, prefix: level.play.prefix },
     { no: '8.3', name: 'Migrating vendors', sub: 'Not everything maps 1:1', icon: '\u{1F69A}', rewardTitle: 'Migration lead', kind: 'level', actId: 'act-8', parMs: null, prefix: 'mv' },
@@ -39,18 +39,18 @@ test('8.3 fields: second level of act-8 after 8.2, scored with no par time, a so
   assert.deepEqual([...level.cards], []);
   assert.equal(Object.values(LIVE.levels).filter((l) => l.rewardTitle === 'Migration lead').length, 1, 'the reward title is unique');
   const act = LIVE.acts.find((a) => a.id === 'act-8');
-  assert.deepEqual([...act.levelIds], ['semantic-convention-versions', ID]);
+  assert.deepEqual([...act.levelIds], ['dashboards-as-code', 'semantic-convention-versions', ID, 'frontend-rum']);
   assert.equal(LIVE.order[LIVE.order.indexOf('semantic-convention-versions') + 1], ID, '8.3 plays right after 8.2');
 });
 
-test('globe: 8.3 lights Vietnam and completes Southeast Asia', () => {
+test('globe: 8.3 lights Vietnam; Southeast Asia stays open until 8.4 (test/frontend-rum.test.mjs)', () => {
   assert.equal(LEVEL_COUNTRY[ID], 'VNM');
   assert.equal(COUNTRY_NAMES.VNM, 'Vietnam');
   const map = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES };
-  const before = progressOf(['semantic-convention-versions']);
-  const fresh = freshlyLit(before, progressOf(['semantic-convention-versions', ID]), LIVE, map);
-  assert.deepEqual(fresh, { countryIds: ['VNM'], regionIds: ['act-8'] });
-  assert.equal(litText(fresh, level, map), 'Vietnam is now lit: Migrating vendors. Southeast Asia is complete.');
+  const before = progressOf(['dashboards-as-code', 'semantic-convention-versions']);
+  const fresh = freshlyLit(before, progressOf(['dashboards-as-code', 'semantic-convention-versions', ID]), LIVE, map);
+  assert.deepEqual(fresh, { countryIds: ['VNM'], regionIds: [] });
+  assert.equal(litText(fresh, level, map), 'Vietnam is now lit: Migrating vendors.');
 });
 
 // ---- step 1: Sort it -----------------------------------------------------------------------

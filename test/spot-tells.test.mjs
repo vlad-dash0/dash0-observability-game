@@ -386,7 +386,7 @@ const CONCEPT_RULES = {
 
 test('the rules see every Spot board, read its fields, each board is solved by its own answer, and the retry model counts mistakes', async () => {
   const specs = await allSpotSpecs();
-  assert.equal(specs.length, 8, 'all eight Spot boards');
+  assert.equal(specs.length, 9, 'all nine Spot boards');
   for (const { no, spec } of specs) {
     const key = `${no} ${spec.id}`;
     const ids = spec.lines.map((l) => l.id);
