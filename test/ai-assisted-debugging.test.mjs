@@ -38,6 +38,7 @@ const HERRINGS = ['recent-changes', 'card-charges'];
 const RIGHT = 'inventory-failing';
 const LEGACY = 'http.status_code';
 const STABLE = 'http.response.status_code';
+const WINDOW = `${TABLE.failuresFrom} to ${TABLE.queryAt}`;
 const fmt = (n) => n.toLocaleString('en-US');
 const per1000 = (e, r) => ((e / r) * 1000).toFixed(1);
 
@@ -338,9 +339,10 @@ test('with the threshold lowered to two clues, every board lacking a clue would 
 
 // ---- the hint tiers on every board -------------------------------------------------------
 
-test('tier 1 points at the idea of step 1: a cause has to explain where the failing requests stop and why both versions fail alike, not the attribute comparison', () => {
+test('tier 1 holds on every board: a cause has to explain where the failing requests stop and whether the release explains them, with no view to open and nothing given away', () => {
   const t = plain(S.hint);
-  assert.equal(t.includes('where the failing requests stop') && t.includes('why both versions fail alike'), true);
+  assert.equal(t.includes('where the failing requests stop') && t.includes('whether the release explains them'), true);
+  assert.equal(/not opened|open|alike|inventory|503/i.test(t), false, 'no view-opening instruction and no clue read out');
   assert.equal(/attribute|status_code|name/i.test(t), false, 'step 1 tier 1 leaves the naming to step 2');
 });
 
@@ -352,7 +354,7 @@ test('no hint tier names the cause on any of the 512 boards: tier 1 is the autho
     for (const id of set) st = openView(S, st, id).state;
     const t1 = hintFor(S, st, 1);
     assert.equal(t1.html, S.hint);
-    assert.equal(/failed-requests|http\.status_code|0 spans|empty|changes|charge|release|payment/i.test(plain(t1.html)), false, 'tier 1 points at no view');
+    assert.equal(/failed-requests|http\.status_code|0 spans|empty|changes|charge|payment/i.test(plain(t1.html)), false, 'tier 1 points at no view');
     assert.deepEqual([t1.views, t1.hypothesis], [[], null]);
     const t2 = hintFor(S, st, 2);
     assert.equal(t2.hypothesis, null);
@@ -585,44 +587,52 @@ test('8.5: opening a view again costs neither time nor a mistake, so repeat open
 const pick = LEVEL.play.steps[1].choice.choices;
 const choice = (key) => pick.find((c) => c.key === key);
 
-test('8.5: step 2 asks why the first query found nothing: one right cause, three that the two queries on screen refute, each with a why', () => {
+test('8.5: step 2 asks why the failed-requests query found nothing: one right cause, three wrong ones that are all about the name, each with a why', () => {
   assert.deepEqual(pick.filter((c) => c.right).map((c) => c.key), ['old-name']);
-  assert.deepEqual(pick.filter((c) => !c.right).map((c) => c.key), ['late-data', 'sampled-out', 'wrong-service']);
-  assert.equal(plain(LEVEL.play.steps[1].question), "Why did the agent's first query return nothing?");
+  assert.deepEqual(pick.filter((c) => !c.right).map((c) => c.key), ['invented-name', 'new-name-wrong', 'case-mismatch']);
+  assert.equal(plain(LEVEL.play.steps[1].question), "Why did the agent's failed-requests query return nothing?");
   const right = plain(choice('old-name').why);
-  for (const w of [STABLE, LEGACY, 'level 8.2', 'Agent0 reads telemetry in the OpenTelemetry semantic conventions it was produced in', 'getAttributeKeys', 'Dash0 MCP Server', 'Use the names the spans carry', `${fmt(failed)} failed since ${TABLE.failuresFrom}`]) assert.equal(right.includes(w), true, w);
-  for (const k of ['late-data', 'sampled-out']) assert.equal(plain(choice(k).why).includes(`${fmt(failed)} failed`) && plain(choice(k).why).includes(`since ${TABLE.failuresFrom}`), true, k);
-  assert.equal(plain(choice('wrong-service').why).includes('service.name = checkout'), true);
-  for (const c of pick.filter((x) => !x.right)) assert.equal(plain(c.why).includes(LEGACY) || /attribute name|opt-in/.test(c.why), false, `${c.key}: a decoy's why does not give away the mechanism`);
+  for (const w of [STABLE, LEGACY, 'level 8.2', 'Agent0 reads telemetry in the OpenTelemetry semantic conventions it was produced in', 'getAttributeKeys', 'Dash0 MCP Server', 'Use the names the spans carry', `${fmt(failed)} failed from ${WINDOW}`]) assert.equal(right.includes(w), true, w);
+  const inv = plain(choice('invented-name').why);
+  for (const w of [LEGACY, STABLE, 'level 8.2']) assert.equal(inv.includes(w), true, `the invented-name decoy is refuted by the migration pair: ${w}`);
+  assert.equal(plain(choice('new-name-wrong').why).includes(`${fmt(failed)} failed from ${WINDOW}`), true);
+  assert.equal(/lower case/.test(plain(choice('case-mismatch').why)), true);
 });
 
-test('8.5: step 2 shows the two queries side by side over one window and one service, with the TABLE figures, and names neither attribute in the prose', () => {
+test('8.5: step 2 shows the two queries side by side over one explicit window and one service, with the TABLE figures, and names neither attribute in the prose', () => {
   const step = LEVEL.play.steps[1];
   const code = step.code;
   const first = code.indexOf(`${LEGACY} = 500`);
   const second = code.indexOf(`${STABLE} = 500`);
-  assert.equal(first > -1 && second > first, true, 'the first query, then the versions query');
-  assert.equal(code.split(`since ${TABLE.failuresFrom}`).length - 1, 2, 'both queries use the one window');
+  assert.equal(first > -1 && second > first, true, 'the failed-requests query, then the versions query');
+  assert.equal(code.split(WINDOW).length - 1, 2, 'both queries carry the one explicit window');
+  assert.equal(code.includes('since'), false, 'no open-ended window');
   assert.equal(code.split('service.name = checkout').length - 1, 2, 'both queries use the one service');
   assert.equal(code.includes('result: 0 spans') && code.includes(`result: ${fmt(failed)} failed`), true);
   assert.equal(failed, 984);
   const intro = plain(step.intro);
-  assert.equal(intro.includes(`${fmt(failed)} failed since ${TABLE.failuresFrom}`), true);
+  assert.equal(intro.includes(`${fmt(failed)} failed from ${WINDOW}`), true);
+  assert.equal(/\blater\b|\bfirst\b/i.test(intro), false, 'no ordering in the intro: nothing says when each query ran');
+  assert.equal(intro.includes('failed-requests query'), true);
   assert.equal(intro.includes('http.') || /status_code/.test(intro), false, 'the intro names neither attribute');
-  assert.equal(plain(view('failed-requests').html).includes(`since ${TABLE.failuresFrom}`), true, 'the legacy view uses the same window');
+  assert.equal(plain(view('failed-requests').html).includes(WINDOW), true, 'the failed-requests view uses the same window');
+  assert.equal(plain(view('failures-by-version').html).includes(`each version had ${fmt(TABLE.versions[0].afterErrors)} failed requests, ${fmt(failed)} failed in all`), true, 'step 1 gives the counts that make the 984');
+  assert.equal(TABLE.versions.reduce((n, x) => n + x.afterErrors, 0), failed);
   assert.equal(/getAttributeKeys/.test(plain(LEVEL.play.finish)) && /Dash0 MCP Server/.test(plain(LEVEL.play.finish)), true);
 });
 
-test('8.5: step 2 labels are balanced: the right one is neither the longest nor the shortest, within 15 characters of the others, only it names the mechanism, no verify tail, no echo of a view tile', () => {
+test('8.5: step 2 labels are balanced: the right one is neither the longest nor the shortest, within 15 characters of the others, attribute or name in more than one label, varied openings, no verify tail', () => {
   const lens = pick.map((c) => plain(c.label).length);
   const right = plain(choice('old-name').label);
   assert.equal(right.length < Math.max(...lens) && right.length > Math.min(...lens), true, lens.join());
   assert.equal(Math.max(...lens) - Math.min(...lens) <= 15, true, lens.join());
-  assert.equal(pick.filter((c) => /attribute|no longer|opt-in|stable|legacy|\bold\b/i.test(c.label)).map((c) => c.key).join(), 'old-name', 'only the right label names the mechanism');
-  assert.equal(pick.every((c) => /^The /.test(c.label) && !/,/.test(c.label)), true, 'one shape: a plain statement of a cause');
+  assert.equal(pick.filter((c) => /\b(attribute|name)\b/i.test(c.label)).length >= 3, true, 'attribute or name is not the right label alone');
+  assert.equal(pick.every((c) => /\b(name|status code)\b/.test(c.label)), true, 'every label is about the name');
+  assert.equal(new Set(pick.map((c) => c.label.split(' ').slice(0, 2).join(' '))).size >= 3, true, 'the labels do not all open alike');
+  assert.equal(pick.every((c) => !/,/.test(c.label)), true, 'one shape: no clause after a comma');
   for (const c of pick) assert.equal(/\b(verify|check|make sure|confirm)\b/i.test(c.label), false, `${c.key}: no verify tail`);
-  for (const c of pick) assert.equal(c.label.includes(LEGACY) || c.label.includes(STABLE), false, `${c.key}: no label repeats the intro's query text`);
-  for (const v of S.views) assert.equal(/attribute|no longer sends/i.test(v.label), false, 'no view tile echoes the right label');
+  for (const c of pick) assert.equal(c.label.includes(LEGACY) || c.label.includes(STABLE), false, `${c.key}: no label repeats the query text`);
+  for (const v of S.views) assert.equal(/attribute|no longer sends/i.test(v.label), false, 'no view tile echoes a label');
 });
 
 test('8.5: a wrong answer on the closing step costs one mistake, once, and leaves 4 stars', () => {
@@ -630,7 +640,7 @@ test('8.5: a wrong answer on the closing step costs one mistake, once, and leave
   for (const id of CLUES) open(id);
   guess(RIGHT);
   click('#aad-next');
-  click('[data-pick="late-data"]');
+  click('[data-pick="invented-name"]');
   assert.equal(slips.mistakes, 1);
   assert.equal(q('[data-finish]').disabled, true, 'Finish waits for the right change');
   click('[data-pick="old-name"]');

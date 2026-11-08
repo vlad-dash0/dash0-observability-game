@@ -4,12 +4,12 @@
 // both versions of checkout, so it is not the release; a failing trace ends at a 503 from the inventory service, before any payment
 // call; the request rate never moved, so it is not a surge). Four views are neutral; two are red herrings (the release list and the
 // card charge times, which point at the release and at the payment provider). The nuance is a neutral view, not a herring: the agent's
-// first question used a legacy attribute name (`http.status_code`, the old name 8.2 teaches) and got 0 spans, which tempts "nothing is
+// failed-requests query used a legacy attribute name (`http.status_code`, the old name 8.2 teaches) and got 0 spans, which tempts "nothing is
 // failing". Looking at it costs no penalty. Step 2 puts it beside the versions query (same window and service, the stable name
 // `http.response.status_code`, 984 failed) and asks WHY it found nothing: the closing Choice grades the nuance.
 // Agents need good semantic conventions as much as people do. Scored. A plain-data Scenario for the incident engine, played through
 // one declarative `incident` step (lib/widgets/incident.mjs, docs/M1-DESIGN.md §4.3, docs/DECLARATIVE-LEVELS.md §2), then one
-// closing Choice on why the first query found nothing, which the incident step does not grade.
+// closing Choice on why the failed-requests query found nothing, which the incident step does not grade.
 // The scenario is designed for this game (issue #138).
 // Spec: https://opentelemetry.io/docs/specs/semconv/non-normative/http-migration/
 // Dash0 docs: https://www.dash0.com/docs/dash0/ai/mcp , https://www.dash0.com/docs/dash0/ai/agent0/overview , https://www.dash0.com/docs/dash0/ai/agent0/overview/use-agent0/query-telemetry-via-mcp
@@ -77,7 +77,7 @@ const VERSIONS_VIEW =
   '<table><caption>Failed requests per 1,000 requests</caption>' +
   `<thead><tr><th scope="col">Version</th><th scope="col">${TABLE.releaseAt} to ${TABLE.failuresFrom}</th><th scope="col">${TABLE.failuresFrom} to ${TABLE.queryAt}</th></tr></thead>` +
   `<tbody>${[OLD, NEW].map((x) => row([x.v, per1000(x.beforeErrors, x.beforeRequests), per1000(x.afterErrors, x.afterRequests)])).join('')}</tbody></table>` +
-  `<p>Both versions fail at the same rate from ${TABLE.failuresFrom}. The version that went live at ${TABLE.releaseAt} ran ${TABLE.beforeMin} minutes before that at the rate of the one that did not change.</p>`;
+  `<p>From ${TABLE.failuresFrom} to ${TABLE.queryAt} each version had ${fmt(OLD.afterErrors)} failed requests, ${fmt(failedAfter)} failed in all. Both versions fail at the same rate from ${TABLE.failuresFrom}. The version that went live at ${TABLE.releaseAt} ran ${TABLE.beforeMin} minutes before that at the rate of the one that did not change.</p>`;
 
 const TRACE_VIEW =
   `<p>The agent opened one of the ${TABLE.sampledTraces} failing traces it found since ${TABLE.failuresFrom}; all ${TABLE.sampledTraces} end the same way. Checkout reserves stock first and takes the payment after.</p>` +
@@ -103,10 +103,10 @@ const SERVICES_VIEW =
   'Every one of them sent data in the last minute.</p>';
 
 const LEGACY_VIEW =
-  `<p>The agent was asked how many checkout requests failed since ${TABLE.failuresFrom}.</p>` +
+  `<p>The agent was asked how many checkout requests failed from ${TABLE.failuresFrom} to ${TABLE.queryAt}.</p>` +
   '<pre><code>spans where service.name = checkout and http.status_code = 500\n' +
   'result: 0 spans</code></pre>' +
-  `<p>The agent's answer: no failed checkout requests since ${TABLE.failuresFrom}.</p>`;
+  `<p>The agent's answer: no failed checkout requests from ${TABLE.failuresFrom} to ${TABLE.queryAt}.</p>`;
 
 const CHANGES_VIEW =
   '<p>The agent was asked what changed in the last hour.</p>' +
@@ -178,34 +178,36 @@ const SCENARIO = {
   ],
   answerAfterViews: 3,
   hint:
-    '<p>A cause has to explain two things: where the failing requests stop, and why both versions fail alike. Which of the views you have not opened could show each?</p>',
+    '<p>A cause has to explain where the failing requests stop and whether the release explains them. Which cause fits what the views show?</p>',
 };
 
-// Step 2: why the agent's first query found nothing. Both queries share the window (since 10:12) and the service, so only the
-// attribute name differs on screen. `why` follows "Right." or "Not quite.".
+// Step 2: why the agent's failed-requests query found nothing. Both queries share the window (10:12 to 10:36) and the service, so only the
+// attribute name differs on screen, and the labels are all about the name: only knowing the 8.2 migration pair separates them.
+// `why` follows "Right." or "Not quite.".
+const WINDOW = `${TABLE.failuresFrom} to ${TABLE.queryAt}`;
 const WHY_EMPTY = [
   {
     key: 'old-name',
-    label: 'The query named an attribute that checkout no longer sends',
+    label: 'The query used the name the status code had before the HTTP conventions went stable',
     right: true,
     why:
-      `The first query asks for http.status_code, the name before the HTTP conventions went stable. Checkout sends http.response.status_code now (its opt-in is http, level 8.2), so the old name matches nothing even while orders fail: the versions query, on the same spans, counted ${fmt(failedAfter)} failed since ${TABLE.failuresFrom}. ` +
+      `The failed-requests query asks for http.status_code, the name before the HTTP conventions went stable. Checkout sends http.response.status_code now (its opt-in is http, level 8.2), so the old name matches nothing even while orders fail: the versions query, on the same spans and the same window, counted ${fmt(failedAfter)} failed from ${WINDOW}. ` +
       'Use the names the spans carry. In Dash0, Agent0 reads telemetry in the OpenTelemetry semantic conventions it was produced in, and getAttributeKeys, one of the tools of the Dash0 MCP Server, lists the attribute keys present, so check the keys present before you ask for a name.',
   },
   {
-    key: 'late-data',
-    label: 'The failing spans reached Dash0 too late for the first query',
-    why: `The versions query counted ${fmt(failedAfter)} failed requests since ${TABLE.failuresFrom} in the same data, so those spans had arrived. Late data would be missing from both queries, and only one of them came back empty.`,
+    key: 'invented-name',
+    label: 'The agent invented an attribute name that OpenTelemetry never had for the status code',
+    why: 'http.status_code was a real OpenTelemetry name: it is the name the HTTP conventions used before http.response.status_code replaced it (the migration pair of level 8.2). The agent did not invent it, but checkout no longer sends it.',
   },
   {
-    key: 'sampled-out',
-    label: 'The failing spans were sampled out before they were stored',
-    why: `Spans that were never stored could not be counted by any query, and the versions query counted ${fmt(failedAfter)} failed ones since ${TABLE.failuresFrom}. They were stored.`,
+    key: 'new-name-wrong',
+    label: 'Checkout spans carry the older attribute name and the versions query used one they lack',
+    why: `The versions query filtered on http.response.status_code and counted ${fmt(failedAfter)} failed from ${WINDOW}, so checkout's spans carry that name. The older name is the one that matches nothing.`,
   },
   {
-    key: 'wrong-service',
-    label: 'The service.name filter pointed at the wrong service',
-    why: 'Both queries filter on service.name = checkout, and the versions query found failed requests with that filter.',
+    key: 'case-mismatch',
+    label: 'The name was spelled in the wrong case and Dash0 matches attribute names exactly',
+    why: 'Both names are written in lower case, as the conventions write them. The two queries differ in the words of the name, http.status_code against http.response.status_code, not in its case.',
   },
 ];
 
@@ -229,15 +231,15 @@ export default {
       },
       {
         intro:
-          `The incident is explained. The agent's first answer was "no failed requests", and later it counted ${fmt(failedAfter)} failed since ${TABLE.failuresFrom}. Here are the two queries, for the same window and the same service.`,
+          `The incident is explained. The agent's failed-requests query answered "no failed requests", and its versions query counted ${fmt(failedAfter)} failed from ${WINDOW}. Here are the two queries, for the same window and the same service.`,
         code:
-          `First query, since ${TABLE.failuresFrom}:\n` +
+          `Failed-requests query, ${WINDOW}:\n` +
           '  spans where service.name = checkout and http.status_code = 500\n' +
           '  result: 0 spans\n\n' +
-          `Versions query, since ${TABLE.failuresFrom}:\n` +
+          `Versions query, ${WINDOW}:\n` +
           '  spans where service.name = checkout and http.response.status_code = 500\n' +
           `  result: ${fmt(failedAfter)} failed`,
-        question: "Why did the agent's first query return nothing?",
+        question: "Why did the agent's failed-requests query return nothing?",
         qid: 'aad-q-why',
         choice: { id: 'aad-why', choices: WHY_EMPTY },
       },
