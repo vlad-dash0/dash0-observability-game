@@ -122,11 +122,11 @@ const ANSWERS = {
     'choice sil-rule: listed-must-be-defined',
   ],
   'head-sampling': [
-    'tradeoff hs-plan: root=ratio-10pct children=follow',
+    'tradeoff hs-plan: checkout=follow payments=follow',
     'choice hs-why: own-decision',
   ],
   'tail-sampling': [
-    'tradeoff ts-budget: wait=wait-25s policies=errors-slow baseline=baseline-5pct',
+    'tradeoff ts-budget: wait=wait-25s policies=errors-slow-baseline',
     'spot ts-spot: traces-processors,traces-exporters',
   ],
   'good-alerts': ['spot ga-spot: counter-value,cause-cpu,no-for', 'choice ga-fix: increase'],

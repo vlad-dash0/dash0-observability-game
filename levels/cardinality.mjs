@@ -10,7 +10,7 @@
 
 // How many distinct values each attribute takes at Kettle & Co (an invented but fixed table). Every
 // number in the copy and every cost below is computed from it, so they cannot disagree.
-const VALUES = { method: 5, route: 14, status: 9, tier: 3, user: 31402, path: 48211 };
+const VALUES = { method: 5, route: 14, status: 9, tier: 3, kind: 8, user: 31402, path: 48211 };
 const n = (x) => x.toLocaleString('en-US');
 const times = (...keys) => keys.map((k) => n(VALUES[k])).join(' × ');
 const product = (...keys) => keys.reduce((acc, k) => acc * VALUES[k], 1);
@@ -18,12 +18,14 @@ const sum = (...xs) => xs.reduce((a, b) => a + b, 0);
 
 const ROUTE_STATUS = product('route', 'status');
 const ROUTE_STATUS_TIER = product('route', 'status', 'tier');
-const PATH_STATUS = product('path', 'status');
-const ROUTE_STATUS_USER = product('route', 'status', 'user');
+const ROUTE_TIER = product('route', 'tier');
+const ROUTE_METHOD = product('route', 'method');
+const TIER_KIND = product('tier', 'kind');
 const COST_NONE = 1; // a counter with no attributes is one series
 const PLAN = sum(ROUTE_STATUS, VALUES.tier, 0);
 const ONE_COUNTER = sum(ROUTE_STATUS_TIER, COST_NONE, 0); // the tier on the requests counter, nothing on the other
-const CAP = 300;
+const TIER_AND_KIND = sum(ROUTE_STATUS, TIER_KIND, 0);
+const CAP = 140;
 
 // Step 1. `why` follows "Right." or "Not quite.".
 const COMBOS = [
@@ -83,49 +85,42 @@ const SPOT = {
 
 // Step 3. Every cost is the product of the number of values of the attributes kept, in series. Adding an
 // attribute to a counter multiplies that counter's cost; a second counter only adds its own. That is the
-// deciding fact: the tier is cheap on its own counter (3) and dear on the requests counter (126 × 3).
-// No cost heuristic finds the plan (test/trade-off-balance.test.mjs probes them all).
+// deciding fact: the tier is cheap on a counter of its own (3) and dear on the requests counter (126 × 3), and
+// every extra attribute on it multiplies it again (3 × 8 = 24). The cards show the costs and not what an
+// option keeps until a Check, so the player has to know what an attribute lets you ask. No blind rule finds
+// the plan (test/trade-off-balance.test.mjs probes them). Needs: 'tier-volume' is a count of traffic for
+// each customer tier, which the requests counter split by tier or the served counter split by tier answers.
 const BUDGET = {
   id: 'cdn-budget',
   unit: 'series',
   cap: CAP,
   helps: { hints: true },
   hint:
-    'A counter\'s series are the number of values of every attribute on it, multiplied together, so each attribute you add to a counter multiplies that counter\'s total. Ask what one more attribute does to the counter that carries it, and which need a span could meet instead.',
+    'A counter\'s series are the number of values of every attribute on it, multiplied together, so each attribute you add multiplies the counter that carries it. Ask what each attribute lets you ask, and what it does to the counter it sits on.',
   knobs: [
     {
       id: 'requests',
       label: 'Counter <code>http.server.requests</code>',
       options: [
+        { id: 'route', label: `<code>http.route</code>: ${n(VALUES.route)}`, cost: VALUES.route },
         {
           id: 'route-status-tier',
           label: `<code>http.route</code>, <code>http.response.status_code</code> and <code>customer.tier</code>: ${times('route', 'status', 'tier')} = ${n(ROUTE_STATUS_TIER)}`,
           cost: ROUTE_STATUS_TIER,
-          keeps: ['traffic-by-route', 'errors-by-route', 'served-by-tier'],
+          keeps: ['errors-by-route', 'tier-volume'],
         },
-        {
-          id: 'route',
-          label: `<code>http.route</code>: ${n(VALUES.route)}`,
-          cost: VALUES.route,
-          keeps: ['traffic-by-route'],
-        },
-        {
-          id: 'path-status',
-          label: `<code>url.path</code> and <code>http.response.status_code</code>: ${times('path', 'status')} = ${n(PATH_STATUS)}`,
-          cost: PATH_STATUS,
-          keeps: ['traffic-by-route', 'errors-by-route'],
-        },
+        { id: 'route-method', label: `<code>http.route</code> and <code>http.request.method</code>: ${times('route', 'method')} = ${n(ROUTE_METHOD)}`, cost: ROUTE_METHOD },
         {
           id: 'route-status',
           label: `<code>http.route</code> and <code>http.response.status_code</code>: ${times('route', 'status')} = ${n(ROUTE_STATUS)}`,
           cost: ROUTE_STATUS,
-          keeps: ['traffic-by-route', 'errors-by-route'],
+          keeps: ['errors-by-route'],
         },
         {
-          id: 'route-status-user',
-          label: `<code>http.route</code>, <code>http.response.status_code</code> and <code>user.id</code>: ${times('route', 'status', 'user')} = ${n(ROUTE_STATUS_USER)}`,
-          cost: ROUTE_STATUS_USER,
-          keeps: ['traffic-by-route', 'errors-by-route', 'one-customer'],
+          id: 'route-tier',
+          label: `<code>http.route</code> and <code>customer.tier</code>: ${times('route', 'tier')} = ${n(ROUTE_TIER)}`,
+          cost: ROUTE_TIER,
+          keeps: ['tier-volume'],
         },
       ],
     },
@@ -135,7 +130,13 @@ const BUDGET = {
       options: [
         { id: 'user', label: `<code>user.id</code>: ${n(VALUES.user)}`, cost: VALUES.user, keeps: ['one-customer'] },
         { id: 'none', label: 'No attributes', cost: COST_NONE },
-        { id: 'tier', label: `<code>customer.tier</code>: ${n(VALUES.tier)}`, cost: VALUES.tier, keeps: ['served-by-tier'] },
+        { id: 'tier', label: `<code>customer.tier</code>: ${n(VALUES.tier)}`, cost: VALUES.tier, keeps: ['tier-volume'] },
+        {
+          id: 'tier-kind',
+          label: `<code>customer.tier</code> and <code>recommendation.type</code>: ${times('tier', 'kind')} = ${n(TIER_KIND)}`,
+          cost: TIER_KIND,
+          keeps: ['tier-volume'],
+        },
       ],
     },
     {
@@ -148,30 +149,30 @@ const BUDGET = {
     },
   ],
   needs: [
-    { id: 'traffic-by-route', label: 'the request rate of each route' },
     { id: 'errors-by-route', label: 'the error rate of each route' },
-    { id: 'served-by-tier', label: 'recommendations served per customer tier' },
+    { id: 'tier-volume', label: 'a count of traffic for each customer tier' },
     { id: 'one-customer', label: 'one customer\'s failing requests' },
   ],
   answer: { requests: 'route-status', served: 'tier', customer: 'span-attribute' },
   whyNot: {
-    'requests:route': 'The request rate of each route, and no status code, so no error rate. A series per route is cheap because it carries one attribute.',
+    'requests:route': 'One series for each route, and no status code, so no error rate of each route.',
+    'requests:route-method': 'It splits each route by method, and the error rate of a route needs the status code, not the method.',
+    'requests:route-tier': 'It counts the traffic of each tier on each route, and with no status code there is no error rate of each route.',
     'requests:route-status-tier':
       `It keeps the tier on the same counter, and every attribute multiplies the counter: ${times('route', 'status', 'tier')} = ${n(ROUTE_STATUS_TIER)}, ` +
-      `where a counter of its own for the tier adds ${VALUES.tier}. With the other counter and the span attribute the plan is ${n(ONE_COUNTER)} series, over the ${n(CAP)}.`,
-    'requests:path-status':
-      `It keeps the per-route view, and a raw URL is a new series for every id: ${n(PATH_STATUS)} series. <code>http.route</code> gives the same view in ${VALUES.route} routes.`,
-    'requests:route-status-user':
-      `Each of ${n(VALUES.user)} users multiplies the whole counter: ${n(ROUTE_STATUS_USER)} series, to find one customer. A span can carry that value for 0 series.`,
+      `where a counter of its own for the tier adds ${VALUES.tier}. With no attributes on the other counter and the span attribute the plan is ${n(ONE_COUNTER)} series, over the ${n(CAP)}.`,
     'served:user':
       `One series for each of ${n(VALUES.user)} users, from a single counter, and still no tier. A per-customer view belongs on a span.`,
-    'served:none': 'One series, and no tier: the question of how many recommendations each tier gets has no answer.',
+    'served:none': 'One series, and no count for each tier on this counter.',
+    'served:tier-kind':
+      `Every attribute multiplies the counter: ${times('tier', 'kind')} = ${n(TIER_KIND)} where the tier alone is ${VALUES.tier}, and the count of traffic for each tier needs only the tier. ` +
+      `With the route and status counter the plan is ${n(TIER_AND_KIND)} series, over the ${n(CAP)}.`,
     'customer:nothing': 'No attribute carries the user anywhere, so one customer\'s failing requests cannot be found.',
   },
   explain:
     `${n(ROUTE_STATUS)} series for the route and status counter, ${VALUES.tier} for the tier counter and 0 for the span attribute. ` +
-    `The tier is cheap on a counter of its own, and an attribute multiplies the counter that carries it. ` +
-    `Putting the tier on the requests counter instead would multiply it: ${times('route', 'status', 'tier')} = ${n(ROUTE_STATUS_TIER)}. ` +
+    'The tier is cheap on a counter of its own, and an attribute multiplies the counter that carries it: ' +
+    `the same tier on the requests counter would make ${times('route', 'status', 'tier')} = ${n(ROUTE_STATUS_TIER)}. ` +
     'Put the route template and the tier on the metrics, where a bounded set of values is what aggregation needs, and the user id on the span, where one value for each request is what a span is for. ' +
     'Spans have their own volume and cost, which this budget does not count.',
 };
@@ -236,7 +237,7 @@ export default {
       {
         intro:
           'The team has a budget of ' +
-          `${n(CAP)} series for the recommendations metrics, and four questions to keep answering. ` +
+          `${n(CAP)} series for the recommendations metrics, and three questions to keep answering. ` +
           'Every option shows its worst case: the product of the number of values of the attributes it keeps, for one ' +
           'metric. A plan costs the sum of the series of its two counters; a span attribute is not a metric series, so it costs 0.',
         question: 'Pick a setting for each of the three: keep every need and stay within the budget.',

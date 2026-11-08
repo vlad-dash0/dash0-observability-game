@@ -105,8 +105,8 @@ test('6.3 per signal: costs and cap are the numbers the copy relies on', () => {
   const cost = (k, o) => spec.knobs.find((x) => x.id === k).options.find((x) => x.id === o).cost;
   assert.deepEqual([spec.unit, spec.cap], ['cost units per day', 30]);
   assert.deepEqual(
-    [cost('interval', 's10'), cost('interval', 's60'), cost('interval', 'm5'), cost('records', 'per-line'), cost('records', 'per-line-trimmed'), cost('records', 'half'), cost('records', 'per-request'), cost('records', 'none'), cost('spans', 'all'), cost('spans', 'tail'), cost('spans', 'head')],
-    [30, 5, 1, 40, 40, 20, 10, 0, 50, 12, 1],
+    [cost('interval', 's10'), cost('interval', 's30'), cost('interval', 's60'), cost('interval', 'm2'), cost('interval', 'm5'), cost('records', 'per-line'), cost('records', 'per-line-trimmed'), cost('records', 'half'), cost('records', 'per-request'), cost('records', 'failed-only'), cost('spans', 'all'), cost('spans', 'tail'), cost('spans', 'tail-errors'), cost('spans', 'head-10'), cost('spans', 'head')],
+    [30, 10, 5, 3, 1, 40, 40, 20, 10, 3, 50, 12, 8, 5, 1],
   );
   assert.equal(cost('interval', 's10') / cost('interval', 's60'), 6, 'ten seconds is six times as many points as sixty');
 });
@@ -121,13 +121,16 @@ test('6.3 per signal: exactly one plan passes (27 of 30) and each shortcut fails
     return [r.total, r.over, r.lost];
   };
   assert.deepEqual(ev('s10', 'per-request', 'tail'), [52, 22, []], 'ten-second metrics break the cap');
+  assert.deepEqual(ev('s30', 'per-request', 'tail'), [32, 2, []], 'thirty-second metrics are twice the points for the same alert');
   assert.deepEqual(ev('s60', 'per-line', 'tail'), [57, 27, []], 'a record per line breaks the cap, though the bytes are the same');
   assert.deepEqual(ev('s60', 'per-line-trimmed', 'tail'), [57, 27, []], 'cutting the bodies does not move a per-signal bill');
-  assert.deepEqual(ev('s60', 'half', 'tail'), [37, 7, ['request-detail']], 'half the records is over the cap and the detail of a request is incomplete');
+  assert.deepEqual(ev('s60', 'half', 'tail'), [37, 7, ['request-detail', 'failed-detail']], 'half the records is over the cap and the detail of a request is incomplete');
+  assert.deepEqual(ev('s60', 'failed-only', 'tail'), [20, 0, ['request-detail']], 'only the failed requests have detail');
+  assert.deepEqual(ev('m2', 'per-request', 'tail'), [25, 0, ['fast-alerts']], 'two-minute metrics miss the alert');
   assert.deepEqual(ev('m5', 'per-request', 'tail'), [23, 0, ['fast-alerts']], 'five-minute metrics miss the alert');
-  assert.deepEqual(ev('s60', 'none', 'tail'), [17, 0, ['request-detail']], 'dropping logs loses the detail');
   assert.deepEqual(ev('s60', 'per-request', 'head'), [16, 0, ['slow-traces']], 'a fixed 1% loses the slow traces');
-  assert.deepEqual(ev('s60', 'none', 'all'), [55, 25, []], 'every span carries the detail and the count breaks the cap');
+  assert.deepEqual(ev('s60', 'per-request', 'tail-errors'), [23, 0, ['slow-traces']], 'failed traces only loses the slow ones');
+  assert.deepEqual(ev('s60', 'failed-only', 'all'), [58, 28, []], 'every span carries the request detail and the count breaks the cap');
   assert.equal(grade(spec, spec.answer).outcome, 'right');
   assert.equal(grade(spec, { interval: 's10', records: 'per-request', spans: 'tail' }).outcome, 'wrong');
 });

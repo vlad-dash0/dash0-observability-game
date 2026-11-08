@@ -1,59 +1,73 @@
-// Blind-strategy probe for Trade-off boards (#265): which plans pass, and which cost or
-// Keeps heuristics (no reading of the concept) would pass. Pure; uses the real evaluatePlan.
-// A strategy picks a set of options per knob (cost ties keep every tied option); it "passes"
-// when ANY of the plans it can produce passes, so a tie never hides a win.
+// Blind-strategy probe for Trade-off boards (#265): which plans pass, and which per-knob rules
+// applied to EVERY knob (no reading of the concept) would pass. Pure; uses the real evaluatePlan.
+// A rule picks a set of options per knob (every option tied on the rule is kept); it "passes"
+// when ANY plan it can produce passes, so a tie never hides a win.
+//
+// Two families. BLIND rules know only what the cards show before a Check (cost, position, label
+// length): the Keeps line is hidden until a Check (trade-off-view.mjs), so these are the rules a
+// player has without knowing the concept. KEEPS rules also read `keeps`; they model a player who
+// has learned the Keeps (from a failed Check) and are pinned where the board's structure allows.
 import { allPlans, evaluatePlan } from '../../lib/widgets/trade-off.mjs';
 
 const passes = (spec, picks) => {
   const r = evaluatePlan(spec, picks);
   return r.over === 0 && r.lost.length === 0;
 };
-const by = (options, score, best) => {
-  const top = options.map(score).reduce((a, b) => (best(a, b) ? a : b));
-  return options.filter((o) => score(o) === top);
-};
-const lowest = (a, b) => a <= b;
-const highest = (a, b) => a >= b;
 const nKeeps = (o) => (o.keeps ?? []).length;
-const cheapestOf = (opts) => by(opts, (o) => o.cost, lowest);
+const plainLen = (o) => o.label.replace(/<[^>]+>/g, '').length;
+const atScore = (opts, score, pickBest) => {
+  const best = opts.map(score).reduce((a, b) => (pickBest(a, b) ? a : b));
+  return opts.filter((o) => score(o) === best);
+};
+const low = (a, b) => a <= b;
+const high = (a, b) => a >= b;
+/** The options at the `k`th distinct cost from the cheapest (clamped to the dearest). */
+const costRank = (opts, k) => {
+  const costs = [...new Set(opts.map((o) => o.cost))].sort((a, b) => a - b);
+  return opts.filter((o) => o.cost === costs[Math.min(k, costs.length - 1)]);
+};
+const cheapestOf = (opts) => atScore(opts, (o) => o.cost, low);
+const middleOf = (list) => [...new Set([list[Math.floor((list.length - 1) / 2)], list[Math.ceil((list.length - 1) / 2)]])];
+const keepers = (opts) => {
+  const k = opts.filter((o) => nKeeps(o) > 0);
+  return k.length ? k : opts;
+};
 
 /** Per-knob rules: options -> the picked options (a list when ties). */
-export const RULES = {
-  cheapest: (opts) => cheapestOf(opts),
-  priciest: (opts) => by(opts, (o) => o.cost, highest),
-  middle: (opts) => {
-    const s = [...opts].sort((a, b) => a.cost - b.cost);
-    return [...new Set([s[Math.floor((s.length - 1) / 2)], s[Math.ceil((s.length - 1) / 2)]])];
+export const BLIND_RULES = {
+  cheapest: (opts) => costRank(opts, 0),
+  'second-cheapest': (opts) => costRank(opts, 1),
+  'middle-cost': (opts) => {
+    const costs = [...new Set(opts.map((o) => o.cost))].sort((a, b) => a - b);
+    return opts.filter((o) => middleOf(costs).includes(o.cost));
   },
-  'cheapest-keeper': (opts) => {
-    const k = opts.filter((o) => nKeeps(o) > 0);
-    return cheapestOf(k.length ? k : opts);
-  },
-  'most-keeps-then-cheapest': (opts) => cheapestOf(by(opts, nKeeps, highest)),
-  'most-keeps': (opts) => by(opts, nKeeps, highest),
+  priciest: (opts) => costRank(opts, Infinity),
   first: (opts) => [opts[0]],
   last: (opts) => [opts[opts.length - 1]],
+  'middle-position': (opts) => middleOf(opts),
+  'longest-label': (opts) => atScore(opts, plainLen, high),
+  'shortest-label': (opts) => atScore(opts, plainLen, low),
 };
+export const KEEPS_RULES = {
+  'cheapest-keeper': (opts) => cheapestOf(keepers(opts)),
+  'second-cheapest-keeper': (opts) => costRank(keepers(opts), 1),
+  'most-keeps-then-cheapest': (opts) => cheapestOf(atScore(opts, nKeeps, high)),
+  'most-keeps': (opts) => atScore(opts, nKeeps, high),
+};
+export const RULES = { ...BLIND_RULES, ...KEEPS_RULES };
 
 const product = (lists) => lists.reduce((acc, l) => acc.flatMap((p) => l.map((o) => [...p, o])), [[]]);
 const toPicks = (spec, opts) => Object.fromEntries(spec.knobs.map((k, i) => [k.id, opts[i].id]));
 
-/** Does the rule, applied to every knob, produce a passing plan? Also its plans. */
+/** The plans rule `rule` can produce on `spec`. */
 export function strategyPlans(spec, rule) {
   return product(spec.knobs.map((k) => RULES[rule](k.options))).map((o) => toPicks(spec, o));
 }
 
-/** { passing: picks[], strategies: {rule: boolean}, singleKnob: {knob: {rule: boolean}} } */
+/** { passing: picks[], strategies: {rule: boolean} } */
 export function probe(spec) {
   const passing = allPlans(spec).filter((p) => passes(spec, p));
   const strategies = {};
   for (const rule of Object.keys(RULES)) strategies[rule] = strategyPlans(spec, rule).some((p) => passes(spec, p));
-  // Single-knob rule: the rule decides one knob; the others are searched exhaustively. True when
-  // that rule's pick on that knob is the answer's, i.e. the rule alone would not mislead there.
-  const singleKnob = {};
-  for (const k of spec.knobs) {
-    singleKnob[k.id] = {};
-    for (const rule of Object.keys(RULES)) singleKnob[k.id][rule] = RULES[rule](k.options).some((o) => o.id === spec.answer[k.id]);
-  }
-  return { passing, strategies, singleKnob };
+  return { passing, strategies };
 }

@@ -1,12 +1,15 @@
-// Trade-off balance (#265): no board is solved by a cost or Keeps heuristic, and each has exactly one
+// Trade-off balance (#265): no board is solved by a rule that does not know the concept, and each has exactly one
 // passing plan and a tempting wrong plan whose failure shows in the numbers. The probe
-// (test/helpers/trade-off-probe.mjs) runs every plan and every blind strategy through the real
-// evaluatePlan; a strategy "passes" when any plan it can produce passes (a cost tie never hides a win).
+// (test/helpers/trade-off-probe.mjs) runs every plan and every per-knob rule through the real evaluatePlan; a
+// rule "passes" when any plan it can produce passes (a tie never hides a win). The cards hide what an option keeps
+// until a Check, so the BLIND rules (cost rank, position, label length) are what a player has without the concept,
+// and none may pass any board. The KEEPS rules (a player who has seen the Keeps) are pinned too; the few that do
+// pass are listed below and pinned exactly, because the board's structure forbids a strict superset there.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { liveRegistry } from '../app.mjs';
 import { evaluatePlan } from '../lib/widgets/trade-off.mjs';
-import { RULES, probe } from './helpers/trade-off-probe.mjs';
+import { BLIND_RULES, KEEPS_RULES, RULES, probe } from './helpers/trade-off-probe.mjs';
 
 const LIVE = liveRegistry();
 const board = (level, id) => LIVE.levels[level].play.steps.find((s) => s.tradeoff?.id === id).tradeoff;
@@ -14,21 +17,30 @@ const plain = (html) => html.replace(/<[^>]+>/g, '');
 
 // The tempting wrong plan of each board: the plan a player who reads the numbers but not the concept would pick.
 const BOARDS = [
-  ['cardinality', 'cdn-budget', { requests: 'route-status-tier', served: 'none', customer: 'span-attribute' }, { total: 379, over: 79, lost: [] }],
-  ['head-sampling', 'hs-plan', { root: 'ratio-10pct', children: 'always-on' }, { total: 3360, over: 2760, lost: ['whole-traces'] }],
-  ['tail-sampling', 'ts-budget', { wait: 'wait-30s', policies: 'errors-slow', baseline: 'baseline-5pct' }, { total: 619.5, over: 69.5, lost: [] }],
+  ['cardinality', 'cdn-budget', { requests: 'route-status-tier', served: 'none', customer: 'span-attribute' }, { total: 379, over: 239, lost: [] }],
+  ['head-sampling', 'hs-plan', { checkout: 'always-on', payments: 'follow' }, { total: 2120, over: 1680, lost: [] }],
+  ['tail-sampling', 'ts-budget', { wait: 'wait-30s', policies: 'errors-slow-baseline' }, { total: 600, over: 50, lost: [] }],
   ['what-costs-money', 'wcm-gb', { traces: 'tail', logs: 'half' }, { total: 65, over: 5, lost: [] }],
   ['what-costs-money', 'wcm-signal', { interval: 's60', records: 'per-line-trimmed', spans: 'tail' }, { total: 57, over: 27, lost: [] }],
   ['the-34-percent-error-rate', 'ser-plan', { sampler: 'errors-10pct', rate: 'stored-spans' }, { total: 145, over: 0, lost: ['true-rate'] }],
 ];
 
+// Keeps rules that pass because the structure allows no strict superset: hs-plan and ts-budget (the plan's one need
+// that only a wait or a root setting meets, with every other option on the knob free or equal).
+const KEEPS_EXEMPT = {
+  'hs-plan': ['most-keeps-then-cheapest', 'most-keeps'],
+  'ts-budget': ['cheapest-keeper', 'most-keeps-then-cheapest', 'most-keeps'],
+};
+
 for (const [level, id, tempting, shown] of BOARDS) {
-  test(`${id}: one passing plan, no blind strategy passes, and the tempting plan fails in the numbers`, () => {
+  test(`${id}: one passing plan, no blind rule passes, and the tempting plan fails in the numbers`, () => {
     const spec = board(level, id);
     const r = probe(spec);
     assert.deepEqual(r.passing, [spec.answer], 'exactly one plan passes, and it is the answer');
     assert.deepEqual(Object.keys(r.strategies).sort(), Object.keys(RULES).sort());
-    assert.deepEqual(Object.entries(r.strategies).filter(([, passes]) => passes).map(([rule]) => rule), [], 'no cost or Keeps rule passes');
+    const passing = (family) => Object.keys(family).filter((rule) => r.strategies[rule]);
+    assert.deepEqual(passing(BLIND_RULES), [], 'no cost-rank, position or label-length rule passes');
+    assert.deepEqual(passing(KEEPS_RULES), KEEPS_EXEMPT[id] ?? [], 'the Keeps rules that pass are exactly the pinned ones');
     const e = evaluatePlan(spec, tempting);
     assert.deepEqual({ total: e.total, over: e.over, lost: e.lost }, shown);
     // The failure is explained: the tempting plan's wrong option has a whyNot line (or its knob does).

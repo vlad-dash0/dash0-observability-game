@@ -49,7 +49,7 @@ const GB = {
   cap: 60,
   helps: { hints: true },
   hint:
-    'The meter here is bytes a day, and a record is as big as what it carries. For each knob, ask where the bytes are, and which need another knob already meets.',
+    'The meter here is bytes a day. Ask where the bytes in a log line are, and what each choice sends of them.',
   knobs: [
     {
       id: 'traces',
@@ -67,6 +67,7 @@ const GB = {
       label: 'Logs',
       options: [
         { id: 'full', label: 'Every request and response body in every log line', cost: 80, keeps: ['incident-logs', 'error-detail'] },
+        { id: 'warn', label: 'Error and warning lines, with the bodies', cost: 14, keeps: ['error-detail'] },
         { id: 'half', label: 'Every second log line, with the bodies', cost: 40, keeps: ['incident-logs'] },
         { id: 'trimmed', label: 'Every log line, with the bodies cut out', cost: 30, keeps: ['incident-logs'] },
         { id: 'errors-only', label: 'Error lines only, with the bodies', cost: 6, keeps: ['error-detail'] },
@@ -86,6 +87,7 @@ const GB = {
     'traces:errors-only': 'The failed traces explain why a request failed, and a slow trace that did not fail is gone.',
     'logs:full': 'The bodies are most of the bytes. When bytes are the meter, a few large fields cost more than many short lines.',
     'logs:half': 'Half the lines, and the bodies are still in the rest: 40 GB, and with the traces the plan is over the budget. The bytes are in the bodies, not in the count.',
+    'logs:warn': 'The warning and error lines explain why a request failed, and the lines around an incident that are neither are gone.',
     'logs:errors-only': 'The error lines explain why a request failed, and the lines around an incident that are not errors are gone.',
   },
   explain:
@@ -108,26 +110,28 @@ const SIGNAL = {
   cap: 30,
   helps: { hints: true },
   hint:
-    'The meter here counts signals: spans, log records and metric data points, not how big each one is. For each knob, ask what changes how many signals it sends, and which need another knob already meets.',
+    'The meter here counts signals: spans, log records and metric data points, not how big each one is. Ask what changes the number of records, spans and data points that go out.',
   knobs: [
     {
       id: 'interval',
       label: 'Metric export interval',
       options: [
-        { id: 's10', label: 'Every 10 seconds', cost: 30, keeps: ['fast-alerts', 'weekly-trend'] },
-        { id: 's60', label: 'Every 60 seconds', cost: 5, keeps: ['fast-alerts', 'weekly-trend'] },
-        { id: 'm5', label: 'Every 5 minutes', cost: 1, keeps: ['weekly-trend'] },
+        { id: 's30', label: 'Every 30 seconds', cost: 10, keeps: ['fast-alerts'] },
+        { id: 'm5', label: 'Every 5 minutes', cost: 1 },
+        { id: 's10', label: 'Every 10 seconds', cost: 30, keeps: ['fast-alerts'] },
+        { id: 's60', label: 'Every 60 seconds', cost: 5, keeps: ['fast-alerts'] },
+        { id: 'm2', label: 'Every 2 minutes', cost: 3 },
       ],
     },
     {
       id: 'records',
       label: 'Log records',
       options: [
-        { id: 'per-line', label: 'One record for each log line', cost: 40, keeps: ['request-detail'] },
-        { id: 'per-line-trimmed', label: 'One record for each log line, with the bodies cut out', cost: 40, keeps: ['request-detail'] },
+        { id: 'per-line', label: 'One record for each log line', cost: 40, keeps: ['request-detail', 'failed-detail'] },
+        { id: 'failed-only', label: 'One record for each failed request, its lines as attributes', cost: 3, keeps: ['failed-detail'] },
+        { id: 'per-request', label: 'One record for each request, lines as attributes', cost: 10, keeps: ['request-detail', 'failed-detail'] },
         { id: 'half', label: 'One record for every second log line', cost: 20 },
-        { id: 'per-request', label: 'One record for each request, lines as attributes', cost: 10, keeps: ['request-detail'] },
-        { id: 'none', label: 'No logs', cost: 0 },
+        { id: 'per-line-trimmed', label: 'One record for each log line, with the bodies cut out', cost: 40, keeps: ['request-detail', 'failed-detail'] },
       ],
     },
     {
@@ -135,27 +139,33 @@ const SIGNAL = {
       label: 'Traces',
       options: [
         { id: 'all', label: 'Send every span, nothing sampled', cost: 50, keeps: ['slow-traces', 'request-detail'] },
-        { id: 'tail', label: 'Tail-sample in the Collector', cost: 12, keeps: ['slow-traces'] },
         { id: 'head', label: 'Head-sample 1% at the SDK, in each service', cost: 1 },
+        { id: 'head-10', label: 'Head-sample 10% at the SDK, in each service', cost: 5 },
+        { id: 'tail', label: 'Tail-sample in the Collector', cost: 12, keeps: ['slow-traces'] },
+        { id: 'tail-errors', label: 'Tail-sample in the Collector, failed traces only', cost: 8 },
       ],
     },
   ],
   needs: [
     { id: 'fast-alerts', label: 'an alert within two minutes of a failure' },
-    { id: 'weekly-trend', label: 'a week of request volume as a trend' },
     { id: 'request-detail', label: 'the detail of each request in the logs' },
+    { id: 'failed-detail', label: 'the detail of each failed request in the logs' },
     { id: 'slow-traces', label: 'the trace of every slow or failed request' },
   ],
   answer: { interval: 's60', records: 'per-request', spans: 'tail' },
   whyNot: {
     'interval:s10': 'A metric sends one data point for each series at every interval, so six times as often is six times the data points for the same information.',
+    'interval:s30': 'It makes twice the data points of a 60-second interval for an alert that a 60-second interval already gives within two minutes.',
     'interval:m5': 'It is cheap, and a failure can go unseen for several minutes before the next point arrives.',
+    'interval:m2': 'A failure can wait a whole interval for the next point, and the alert then comes after the two minutes.',
     'records:per-line': 'The same text in many records. When the meter counts records and not bytes, packing a request\'s lines into one record keeps the detail and cuts the count.',
     'records:per-line-trimmed': 'Smaller records, same count: the meter counts records, so the bill did not move.',
+    'records:failed-only': 'The failed requests are all there, and the requests that did not fail have no detail in the logs.',
     'records:half': 'Half the records, and half the lines of each request are gone, so the detail of a request is incomplete. A request is the unit to pack, not a line to drop.',
-    'records:none': 'No records, no detail of any request in the logs.',
     'spans:all': 'Every span carries the detail of its request, and the count is the bill: 50 units on its own.',
     'spans:head': 'A fixed 1% is picked without looking at the trace, so most slow or failed requests are lost.',
+    'spans:head-10': 'A fixed 10% is picked without looking at the trace, so nine in ten slow or failed requests are lost.',
+    'spans:tail-errors': 'The failed traces are kept, and a slow trace that did not fail is gone.',
   },
   explain:
     'When the meter counts signals, what matters is how many spans, log records and metric data points you send, and how big each one is does not. ' +

@@ -101,8 +101,9 @@ test('renderTradeoff: the cost model, the cap, the needs, and the cost and what 
   assert.match(board, /Cap: 12 GB\/day/);
   assert.equal(qa('[data-tradeoff] .ui-prose li').map((li) => li.textContent).join('|'), 'every error trace|a per-user view');
   assert.equal(qa('[data-option]').map((c) => c.querySelector('.ui-chip').textContent).join('|'), '2 GB/day|8 GB/day|18 GB/day|1 GB/day|3 GB/day|9 GB/day');
-  assert.equal(q('[data-option="tail"] .ui-option-meta span:not(.ui-chip)').textContent, 'Keeps: every error trace');
-  assert.equal(q('[data-option="head"] .ui-option-meta span:not(.ui-chip)').textContent, 'Keeps: nothing you need');
+  assert.equal(q('[data-option="tail"] [data-keeps]').textContent, 'Keeps: every error trace');
+  assert.equal(q('[data-option="head"] [data-keeps]').textContent, 'Keeps: nothing you need');
+  assert.equal(qa('[data-keeps]').every((k) => k.hidden), true, 'no card shows what it keeps before a Check');
 });
 
 test('renderTradeoff: one labelled group per knob (legend keeps authored HTML), one radio card per option, none chosen, one name per knob', () => {
@@ -313,6 +314,20 @@ test('the reference plan is right: success tone, states cost, explains, locks, m
   q('#bill-check').onclick({});
   assert.deepEqual(picked(), ['sampling:tail', 'attrs:tier']);
   assert.deepEqual(counts, { mistakes: 0, hints: 0, done: 1 });
+});
+
+test('Keeps stay hidden until a Check: a failed Check shows the picked cards, a solve shows every card', () => {
+  const { mount } = setup();
+  mount();
+  const shown = () => qa('[data-option]').filter((c) => !c.querySelector('[data-keeps]').hidden).map((c) => `${c.closest('[data-knob]').dataset.knob}:${c.dataset.option}`);
+  plan('tail', 'user');
+  assert.deepEqual(shown(), [], 'picking reveals nothing');
+  check();
+  assert.deepEqual(shown(), ['sampling:tail', 'attrs:user'], 'a failed Check shows what the picked options keep');
+  plan('tail', 'tier');
+  assert.deepEqual(shown(), ['sampling:tail', 'attrs:user'], 'a new pick stays hidden until it is checked');
+  check();
+  assert.equal(shown().length, 6, 'solved: every card shows what it keeps');
 });
 
 test('stars follow the one rule: a failed Check costs a star, a repeat does not', () => {

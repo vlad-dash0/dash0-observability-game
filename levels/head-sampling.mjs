@@ -17,107 +17,119 @@
 // Head sampling decides without looking at the whole trace, so it cannot ensure that traces with an error are kept (the sampling concepts page).
 //
 // Widget: Trade-off. It grades the option the player picks against authored costs and keeps; it does not simulate a
-// sampler. The "break" of a child that ignores its parent (a child set to always_on) is therefore authored arithmetic from
-// the one table below, shown in the copy, not something an engine runs. The root's cost is the whole kept trace, not one
-// knob per service, because a child's cost depends on the root's ratio and the widget adds the costs of the knobs.
+// sampler. A child's cost depends on the root's ratio and the widget adds the costs of the knobs, so the root is not a
+// knob: storefront already runs the 1 in 10 ratio the team wants, and the two knobs are the settings of checkout and
+// payments, whose costs are exact at that ratio. The "break" of a child that ignores its parent (always_on, or a plain
+// traceidratio) is authored arithmetic from the one table below, shown in the copy, not something an engine runs.
 // Spans per second is the unit; the table is invented but fixed, and every number in the copy is computed from it.
 
 // The table. A trace through Kettle & Co's checkout makes 12 spans: 4 in storefront (the root), 5 in checkout, 3 in payments.
 const TRACES = 400; // new traces a second
 const SPANS = { storefront: 4, checkout: 5, payments: 3 };
 const WHOLE = SPANS.storefront + SPANS.checkout + SPANS.payments;
-const CHILDREN = SPANS.checkout + SPANS.payments;
 const CAP = 600; // spans a second the backend budget allows
 
 const n = (x) => x.toLocaleString('en-US');
 const FULL = TRACES * WHOLE;
 const TEN = TRACES * 0.1; // traces a second kept at 1 in 10
-const ONE = TRACES * 0.01;
-const AT_TEN = TEN * WHOLE;
-const AT_ONE = ONE * WHOLE;
 const DROPPED = TRACES - TEN; // traces whose root was dropped
-const ORPHANS = DROPPED * CHILDREN; // their children's spans, exported by children that do not follow the root
 
 const SAMPLER = 'OTEL_TRACES_SAMPLER';
 const ARG = 'OTEL_TRACES_SAMPLER_ARG';
 
-const AT = (r) => TRACES * r; // traces a second kept at ratio r
-const SPANS_AT = (r) => AT(r) * WHOLE;
-const RATIO = (r) => `<code>${SAMPLER}=parentbased_traceidratio</code> and <code>${ARG}=${r}</code>`;
-const ratioOption = (id, r, keeps) => ({
-  id,
-  label: `${RATIO(r)} on <code>storefront</code>: ${n(AT(r))} traces/s × ${WHOLE} = ${n(SPANS_AT(r))}`,
-  cost: SPANS_AT(r),
-  keeps,
-});
+const STOREFRONT = TEN * SPANS.storefront;
+const KIDS_CAP = CAP - STOREFRONT; // spans a second left for checkout and payments once storefront has its share
+const forTen = (service) => TEN * SPANS[service]; // spans a second of a service that follows the root
+const forAll = (service) => TRACES * SPANS[service]; // spans a second of a service that samples every trace itself
+const forRatio = (service, r) => TRACES * r * SPANS[service]; // a service that applies its own ratio to every trace
+const ratioLine = (r) => `<code>${SAMPLER}=traceidratio</code> and <code>${ARG}=${r}</code>`;
 
-// Two knobs: the root's setting, and what the children do with the root's decision. The root's cost is the whole
-// kept trace (all 12 spans), because ParentBased children follow it. The children's second option costs the
-// spans it adds on top, at the 10% root of the team's target (the label says so).
-// No cost or Keeps heuristic finds the plan (test/trade-off-balance.test.mjs probes them all).
+// The root keeps 1 in 10 (storefront, fixed); two knobs set what checkout and payments do with the root's decision.
+// The cards show costs and not what an option keeps until a Check: the player has to know that ParentBased, the
+// default, follows the sampled flag, and what always_on and a plain ratio do instead. No blind rule finds the plan
+// (test/trade-off-balance.test.mjs probes them). Checkout and payments are two knobs, each of whose settings keeps
+// what only that service can: the whole-trace needs are one for each service.
 const PLAN = {
   id: 'hs-plan',
   unit: 'spans/s',
-  cap: CAP,
+  cap: KIDS_CAP,
   helps: { hints: true },
   hint:
-    'The decision is made once, at the root. Ask what checkout and payments do with a trace whose root was dropped, and how many traces a second each ratio keeps.',
+    'The decision is made once, at the root, and the sampled flag travels to the children. Ask what each setting makes a child do with a trace whose root was dropped, and how many spans a second that is.',
   knobs: [
     {
-      id: 'root',
-      label: 'The sampler setting of <code>storefront</code>, the root',
-      options: [
-        {
-          id: 'defaults',
-          label: `Nothing set: the default, <code>${SAMPLER}=parentbased_always_on</code>. Every trace is sampled: ${n(TRACES)} × ${WHOLE} = ${n(FULL)}`,
-          cost: FULL,
-          keeps: ['any-traces', 'enough-traces', 'whole-traces'],
-        },
-        ratioOption('ratio-1pct', 0.01, ['any-traces']),
-        ratioOption('ratio-10pct', 0.1, ['any-traces', 'enough-traces']),
-        ratioOption('ratio-25pct', 0.25, ['any-traces', 'enough-traces']),
-        ratioOption('ratio-50pct', 0.5, ['any-traces', 'enough-traces']),
-      ],
-    },
-    {
-      id: 'children',
-      label: 'The sampler setting of <code>checkout</code> and <code>payments</code>',
+      id: 'checkout',
+      label: 'The sampler setting of <code>checkout</code>',
       options: [
         {
           id: 'always-on',
-          label: `<code>${SAMPLER}=always_on</code>: with a 10% root, ${n(DROPPED)} traces/s × ${CHILDREN} = ${n(ORPHANS)} more`,
-          cost: ORPHANS,
+          label: `<code>${SAMPLER}=always_on</code>, so every trace is sampled: ${n(TRACES)} × ${SPANS.checkout} = ${n(forAll('checkout'))}`,
+          cost: forAll('checkout'),
+          keeps: ['checkout-whole'],
+        },
+        {
+          id: 'ratio',
+          label: `${ratioLine(0.25)}: ${n(TRACES * 0.25)} traces/s × ${SPANS.checkout} = ${n(forRatio('checkout', 0.25))}`,
+          cost: forRatio('checkout', 0.25),
         },
         {
           id: 'follow',
-          label: `Nothing set: the default, <code>${SAMPLER}=parentbased_always_on</code>, follows the root's sampled flag`,
-          cost: 0,
-          keeps: ['whole-traces'],
+          label: `The default, <code>${SAMPLER}=parentbased_always_on</code>: ${n(TEN)} traces/s × ${SPANS.checkout} = ${n(forTen('checkout'))}`,
+          cost: forTen('checkout'),
+          keeps: ['checkout-whole', 'no-orphans'],
+        },
+        { id: 'always-off', label: `<code>${SAMPLER}=always_off</code>: no spans`, cost: 0, keeps: ['no-orphans'] },
+      ],
+    },
+    {
+      id: 'payments',
+      label: 'The sampler setting of <code>payments</code>',
+      options: [
+        {
+          id: 'ratio',
+          label: `${ratioLine(0.5)}: ${n(TRACES * 0.5)} traces/s × ${SPANS.payments} = ${n(forRatio('payments', 0.5))}`,
+          cost: forRatio('payments', 0.5),
+        },
+        {
+          id: 'always-on',
+          label: `<code>${SAMPLER}=always_on</code>, so every trace is sampled: ${n(TRACES)} × ${SPANS.payments} = ${n(forAll('payments'))}`,
+          cost: forAll('payments'),
+          keeps: ['payments-whole'],
+        },
+        {
+          id: 'follow',
+          label: `The default, <code>${SAMPLER}=parentbased_always_on</code>: ${n(TEN)} traces/s × ${SPANS.payments} = ${n(forTen('payments'))}`,
+          cost: forTen('payments'),
+          keeps: ['payments-whole', 'no-orphans'],
         },
       ],
     },
   ],
   needs: [
-    { id: 'any-traces', label: 'some traces every second, never an empty list' },
-    { id: 'enough-traces', label: `about ${n(TEN)} traces a second to look at` },
-    { id: 'whole-traces', label: 'every trace that is kept has all of its spans' },
+    { id: 'checkout-whole', label: 'every kept trace has its checkout spans' },
+    { id: 'payments-whole', label: 'every kept trace has its payments spans' },
+    { id: 'no-orphans', label: 'no spans for a trace whose root was dropped' },
   ],
-  answer: { root: 'ratio-10pct', children: 'follow' },
+  answer: { checkout: 'follow', payments: 'follow' },
   whyNot: {
-    'root:defaults':
-      `It keeps everything, and that is the budget's whole point: ${n(FULL)} spans a second is ${n(FULL / CAP)} times the ${n(CAP)} the backend takes. Head sampling is how you stay under it.`,
-    'root:ratio-1pct':
-      `Whole traces, and cheap: ${n(AT_ONE)} spans a second. But ${n(ONE)} traces a second is too few to learn from, and a rare failure is unlikely to be among them.`,
-    'root:ratio-25pct': `${n(AT(0.25))} traces a second is more than the team needs, and ${n(SPANS_AT(0.25))} spans a second is ${n(SPANS_AT(0.25) / CAP)} times the ${n(CAP)} the backend takes.`,
-    'root:ratio-50pct': `${n(AT(0.5))} traces a second, ${n(SPANS_AT(0.5))} spans a second: ${n(SPANS_AT(0.5) / CAP)} times the ${n(CAP)} the backend takes.`,
-    'children:always-on':
-      `Storefront drops ${n(DROPPED)} of every ${n(TRACES)} traces a second at the root, and checkout and payments, set to <code>always_on</code>, ignore that and sample their spans anyway: ` +
-      `${n(DROPPED)} traces/s × ${CHILDREN} spans = ${n(ORPHANS)} spans a second for traces whose root is gone. Those traces arrive with holes, and they cost ${n(ORPHANS)} spans a second of the budget.`,
+    'checkout:always-on':
+      `Storefront drops ${n(DROPPED)} of every ${n(TRACES)} traces a second at the root, and checkout, set to <code>always_on</code>, ignores that and samples its spans anyway: ` +
+      `${n(forAll('checkout'))} spans a second against the ${n(forTen('checkout'))} of the traces the root kept, and ${n(DROPPED * SPANS.checkout)} of them belong to traces whose root is gone.`,
+    'checkout:ratio':
+      `A plain <code>traceidratio</code> must ignore the parent's sampled flag, so checkout decides for itself: it keeps ${n(TRACES * 0.25)} traces a second whatever the root did, ${n(forRatio('checkout', 0.25))} spans, ` +
+      'and the traces it keeps are not the traces the root kept. Those traces have holes.',
+    'checkout:always-off': 'It records nothing, so checkout has no spans in the traces the root kept, and every one of them has a hole where checkout should be.',
+    'payments:ratio':
+      `A plain <code>traceidratio</code> must ignore the parent's sampled flag, so payments decides for itself: it keeps ${n(TRACES * 0.5)} traces a second whatever the root did, ${n(forRatio('payments', 0.5))} spans, ` +
+      'and the traces it keeps are not the traces the root kept. Those traces have holes.',
+    'payments:always-on':
+      `Payments, set to <code>always_on</code>, samples every trace's spans whatever the root decided: ${n(forAll('payments'))} spans a second against the ${n(forTen('payments'))} of the traces the root kept, ` +
+      `and ${n(DROPPED * SPANS.payments)} of them belong to traces whose root is gone.`,
   },
   explain:
-    `${n(TEN)} of ${n(TRACES)} traces a second, ${WHOLE} spans each. ` +
-    `<code>${SAMPLER}=parentbased_traceidratio</code> with <code>${ARG}=0.1</code> is ParentBased with a TraceIdRatioBased root: the root decides from the trace ID, and every other span follows the parent's sampled flag, ` +
-    'which travels in the <code>traceparent</code> header, so a trace is kept whole or not at all. The ratio is only used for a span with no parent; on a child it never runs. ' +
+    `Storefront keeps ${n(TEN)} of ${n(TRACES)} traces a second, ${n(STOREFRONT)} spans, and checkout and payments follow it. ` +
+    `The default, <code>${SAMPLER}=parentbased_always_on</code>, is ParentBased: for a span with a parent it uses the parent's sampled flag, which travels in the <code>traceparent</code> header, so a trace is kept whole or not at all. ` +
+    'A ratio on a child would never run under ParentBased, because the ratio belongs to the root sampler, which is used only for a span with no parent. ' +
     'These figures are authored from one table, not run by an engine. What head sampling cannot do is look at the trace: it decides at the root, before any error or slow request has happened, ' +
     'so it keeps 1 in 10 of the failures too. Keeping the errors is the job of tail sampling, next.',
 };
@@ -160,8 +172,9 @@ export default {
           `Kettle &amp; Co's checkout makes ${n(TRACES)} traces a second through three services: <code>storefront</code> is the root, then <code>checkout</code> and <code>payments</code>. ` +
           `A trace is ${WHOLE} spans (${SPANS.storefront} in storefront, ${SPANS.checkout} in checkout, ${SPANS.payments} in payments), so keeping everything is ${n(TRACES)} × ${WHOLE} = ${n(FULL)} spans a second, ` +
           `and the backend takes ${n(CAP)} spans a second. Head sampling decides when the root span starts, from the trace ID and a ratio, and passes the decision to the children in the sampled flag of the <code>traceparent</code> header. ` +
+          `Storefront is already set to <code>${SAMPLER}=parentbased_traceidratio</code> and <code>${ARG}=0.1</code>: ${n(TEN)} traces a second, ${n(STOREFRONT)} spans, which leaves ${n(KIDS_CAP)} of the ${n(CAP)} for checkout and payments. ` +
           'The arithmetic below is authored from this table, not run by a sampler.',
-        question: 'Pick the sampler setting for each: keep what the team needs and stay within the budget.',
+        question: 'Pick the sampler setting of checkout and of payments: keep what the team needs and stay within the budget.',
         qid: 'hs-q-plan',
         tradeoff: PLAN,
       },
