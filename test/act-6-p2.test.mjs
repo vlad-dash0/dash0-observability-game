@@ -63,32 +63,34 @@ test('6.3 per host: only consolidating hosts lowers a per-host bill; the three v
 test('6.3 per GB: costs and cap are the numbers the copy relies on', () => {
   const spec = gb();
   const cost = (k, o) => spec.knobs.find((x) => x.id === k).options.find((x) => x.id === o).cost;
-  assert.deepEqual([spec.unit, spec.cap], ['GB per day', 100]);
+  assert.deepEqual([spec.unit, spec.cap], ['GB per day', 60]);
   assert.deepEqual(
-    [cost('traces', 'all'), cost('traces', 'tail'), cost('traces', 'head'), cost('logs', 'full'), cost('logs', 'trimmed'), cost('logs', 'none')],
-    [120, 25, 2, 80, 30, 0],
+    [cost('traces', 'head-25'), cost('traces', 'tail'), cost('traces', 'errors-only'), cost('traces', 'head-10'), cost('traces', 'head-1'), cost('logs', 'full'), cost('logs', 'half'), cost('logs', 'trimmed'), cost('logs', 'errors-only')],
+    [30, 25, 15, 12, 2, 80, 40, 30, 6],
   );
 });
 
-test('6.3 per GB: exactly one plan passes (55 of 100) and each shortcut fails for its own reason', () => {
+test('6.3 per GB: exactly one plan passes (55 of 60) and each shortcut fails for its own reason', () => {
   const spec = gb();
   assert.deepEqual(passing(spec), [{ traces: 'tail', logs: 'trimmed' }]);
   assert.deepEqual(spec.answer, { traces: 'tail', logs: 'trimmed' });
   assert.equal(evaluatePlan(spec, spec.answer).total, 55);
-  const bodies = evaluatePlan(spec, { traces: 'tail', logs: 'full' });
-  assert.deepEqual([bodies.total, bodies.over, bodies.lost.length], [105, 5, 0], 'keeping the bodies alone breaks the cap');
-  const every = evaluatePlan(spec, { traces: 'all', logs: 'trimmed' });
-  assert.deepEqual([every.total, every.over, every.lost.length], [150, 50, 0], 'keeping every span breaks the cap');
-  const cheap = evaluatePlan(spec, { traces: 'head', logs: 'none' });
-  assert.deepEqual([cheap.total, cheap.over, cheap.lost], [2, 0, ['slow-traces', 'incident-logs']], 'the cheapest plan drops both needs');
-  const head = evaluatePlan(spec, { traces: 'head', logs: 'trimmed' });
-  assert.deepEqual([head.over, head.lost], [0, ['slow-traces']], 'a fixed 1% loses the slow traces');
+  const ev = (traces, logs) => {
+    const r = evaluatePlan(spec, { traces, logs });
+    return [r.total, r.over, r.lost];
+  };
+  assert.deepEqual(ev('tail', 'full'), [105, 45, []], 'keeping the bodies breaks the cap');
+  assert.deepEqual(ev('tail', 'half'), [65, 5, []], 'halving the lines is the count answer, and the bodies still break the cap');
+  assert.deepEqual(ev('head-25', 'trimmed'), [60, 0, ['slow-traces', 'error-detail']], 'the dearest plan that fits the cap still drops the slow traces and the reasons');
+  assert.deepEqual(ev('head-1', 'trimmed'), [32, 0, ['slow-traces', 'error-detail']], 'a fixed 1% loses the slow traces and the reasons');
+  assert.deepEqual(ev('errors-only', 'errors-only'), [21, 0, ['slow-traces', 'incident-logs']], 'the cheapest plan that names a need drops two');
+  assert.deepEqual(ev('tail', 'errors-only'), [31, 0, ['incident-logs']], 'error lines alone are not enough to explain an incident');
 });
 
 test('6.3 per GB: the real grader passes the answer and fails a shortcut', () => {
   assert.equal(grade(gb(), gb().answer).outcome, 'right');
-  assert.equal(grade(gb(), { traces: 'head', logs: 'trimmed' }).outcome, 'wrong');
-  assert.equal(grade(gb(), { traces: 'tail', logs: 'full' }).outcome, 'wrong');
+  assert.equal(grade(gb(), { traces: 'head-1', logs: 'trimmed' }).outcome, 'wrong');
+  assert.equal(grade(gb(), { traces: 'tail', logs: 'half' }).outcome, 'wrong');
 });
 
 test('6.3 per GB: the explain teaches size as a lever, sampling and retention as a multiplier, and labels the numbers made up', () => {
@@ -101,31 +103,34 @@ test('6.3 per GB: the explain teaches size as a lever, sampling and retention as
 test('6.3 per signal: costs and cap are the numbers the copy relies on', () => {
   const spec = signal();
   const cost = (k, o) => spec.knobs.find((x) => x.id === k).options.find((x) => x.id === o).cost;
-  assert.deepEqual([spec.unit, spec.cap], ['cost units per day', 40]);
+  assert.deepEqual([spec.unit, spec.cap], ['cost units per day', 30]);
   assert.deepEqual(
-    [cost('interval', 's10'), cost('interval', 's60'), cost('interval', 'm5'), cost('records', 'per-line'), cost('records', 'per-line-trimmed'), cost('records', 'per-request'), cost('records', 'none'), cost('spans', 'all'), cost('spans', 'tail'), cost('spans', 'head')],
-    [30, 5, 1, 40, 40, 10, 0, 50, 12, 1],
+    [cost('interval', 's10'), cost('interval', 's30'), cost('interval', 's60'), cost('interval', 'm2'), cost('interval', 'm5'), cost('records', 'per-line'), cost('records', 'per-line-trimmed'), cost('records', 'half'), cost('records', 'per-request'), cost('records', 'failed-only'), cost('spans', 'all'), cost('spans', 'tail'), cost('spans', 'tail-errors'), cost('spans', 'head-10'), cost('spans', 'head')],
+    [30, 10, 5, 2.5, 1, 40, 40, 20, 10, 3, 50, 12, 8, 5, 1],
   );
   assert.equal(cost('interval', 's10') / cost('interval', 's60'), 6, 'ten seconds is six times as many points as sixty');
 });
 
-test('6.3 per signal: exactly one plan passes (27 of 40) and each shortcut fails for its own reason', () => {
+test('6.3 per signal: exactly one plan passes (27 of 30) and each shortcut fails for its own reason', () => {
   const spec = signal();
   assert.deepEqual(passing(spec), [{ interval: 's60', records: 'per-request', spans: 'tail' }]);
   assert.deepEqual(spec.answer, { interval: 's60', records: 'per-request', spans: 'tail' });
   assert.equal(evaluatePlan(spec, spec.answer).total, 27);
-  const fast = evaluatePlan(spec, { interval: 's10', records: 'per-request', spans: 'tail' });
-  assert.deepEqual([fast.total, fast.over, fast.lost.length], [52, 12, 0], 'ten-second metrics break the cap');
-  const lines = evaluatePlan(spec, { interval: 's60', records: 'per-line', spans: 'tail' });
-  assert.deepEqual([lines.total, lines.over, lines.lost.length], [57, 17, 0], 'a record per line breaks the cap, though the bytes are the same');
-  const smaller = evaluatePlan(spec, { interval: 's60', records: 'per-line-trimmed', spans: 'tail' });
-  assert.deepEqual([smaller.total, smaller.over, smaller.lost.length], [57, 17, 0], 'cutting the bodies does not move a per-signal bill');
-  const slow = evaluatePlan(spec, { interval: 'm5', records: 'per-request', spans: 'tail' });
-  assert.deepEqual([slow.over, slow.lost], [0, ['fast-alerts']], 'five-minute metrics miss the alert');
-  const none = evaluatePlan(spec, { interval: 's60', records: 'none', spans: 'tail' });
-  assert.deepEqual([none.over, none.lost], [0, ['request-detail']], 'dropping logs loses the detail');
-  const head = evaluatePlan(spec, { interval: 's60', records: 'per-request', spans: 'head' });
-  assert.deepEqual([head.over, head.lost], [0, ['slow-traces']], 'a fixed 1% loses the slow traces');
+  const ev = (interval, records, spans) => {
+    const r = evaluatePlan(spec, { interval, records, spans });
+    return [r.total, r.over, r.lost];
+  };
+  assert.deepEqual(ev('s10', 'per-request', 'tail'), [52, 22, []], 'ten-second metrics break the cap');
+  assert.deepEqual(ev('s30', 'per-request', 'tail'), [32, 2, []], 'thirty-second metrics are twice the points for the same alert');
+  assert.deepEqual(ev('s60', 'per-line', 'tail'), [57, 27, []], 'a record per line breaks the cap, though the bytes are the same');
+  assert.deepEqual(ev('s60', 'per-line-trimmed', 'tail'), [57, 27, []], 'cutting the bodies does not move a per-signal bill');
+  assert.deepEqual(ev('s60', 'half', 'tail'), [37, 7, ['request-detail']], 'half the records is over the cap and the detail of a request is incomplete');
+  assert.deepEqual(ev('s60', 'failed-only', 'tail'), [20, 0, ['request-detail']], 'only the failed requests have detail');
+  assert.deepEqual(ev('m2', 'per-request', 'tail'), [24.5, 0, ['fast-alerts']], 'two-minute metrics miss the alert');
+  assert.deepEqual(ev('m5', 'per-request', 'tail'), [23, 0, ['fast-alerts']], 'five-minute metrics miss the alert');
+  assert.deepEqual(ev('s60', 'per-request', 'head'), [16, 0, ['slow-traces']], 'a fixed 1% loses the slow traces');
+  assert.deepEqual(ev('s60', 'per-request', 'tail-errors'), [23, 0, ['slow-traces']], 'failed traces only loses the slow ones');
+  assert.deepEqual(ev('s60', 'failed-only', 'all'), [58, 28, []], 'every span carries the request detail and the count breaks the cap');
   assert.equal(grade(spec, spec.answer).outcome, 'right');
   assert.equal(grade(spec, { interval: 's10', records: 'per-request', spans: 'tail' }).outcome, 'wrong');
 });
@@ -153,7 +158,8 @@ test('6.3: the same lever flips between the two models (bodies cost under per GB
 
 test('6.3 per GB: the meter is GB sent, and retention is the separate multiplier', () => {
   assert.equal(plain(steps[1].intro).includes('per GB sent'), true);
-  assert.equal(plain(steps[1].intro).includes('100 GB sent a day'), true);
+  assert.equal(plain(steps[1].intro).includes('60 GB sent a day'), true);
+  assert.equal(plain(steps[1].intro).includes('every span would be 120 GB a day'), true, 'the baseline of the percentages is on screen');
   assert.equal(/\bstored\b/.test(plain(steps[1].intro)), false, 'the step does not call the meter stored');
   assert.equal(plain(gb().explain).includes('what you store is the daily volume times the days you keep it'), true);
 });

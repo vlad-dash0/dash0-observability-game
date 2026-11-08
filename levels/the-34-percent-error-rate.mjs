@@ -31,6 +31,8 @@ const UNIFORM_ERRORS = Math.round((ERRORS * KEEP_PCT) / 100); // failed traces a
 const DECOY_PCT = 18; // a dearer random policy that still fits the cap
 const DECOY = Math.round((REQUESTS * DECOY_PCT) / 100);
 const DECOY_ERRORS = Math.round((ERRORS * DECOY_PCT) / 100);
+const MORE_PCT = 20; // every error plus a larger share of the rest
+const STORED_MORE = ERRORS + Math.round((HEALTHY * MORE_PCT) / 100);
 const STORED_PCT = Math.round((ERRORS / STORED) * 100);
 const TRUE_PCT = Math.round((ERRORS / REQUESTS) * 100);
 
@@ -63,8 +65,8 @@ const VERDICT = [
   },
 ];
 
-// Step 2: the setup. Two knobs: four sampling policies (the answer last) and two places to compute the rate (the answer first).
-// Eight plans, one passes. Costs are spans a second sent to the backend. Every whyNot is a whole sentence that names its own option, so it holds
+// Step 2: the setup. Two knobs: five sampling policies and three places to compute the rate.
+// Fifteen plans, one passes. Costs are spans a second sent to the backend. Every whyNot is a whole sentence that names its own option, so it holds
 // with either option of the other knob.
 const PLAN = {
   id: 'ser-plan',
@@ -99,6 +101,12 @@ const PLAN = {
           cost: STORED,
           keeps: ['every-error'],
         },
+        {
+          id: 'errors-20pct',
+          label: `Every error plus ${MORE_PCT}% of the rest: ${n(STORED_MORE)} spans/s`,
+          cost: STORED_MORE,
+          keeps: ['every-error'],
+        },
       ],
     },
     {
@@ -109,6 +117,12 @@ const PLAN = {
           id: 'red-before',
           label: 'From RED metrics computed before sampling: data points, no extra spans',
           cost: 0,
+          keeps: ['true-rate'],
+        },
+        {
+          id: 'mirror',
+          label: `From every span, sent to a second backend that counts them: ${n(REQUESTS)} spans/s`,
+          cost: REQUESTS,
           keeps: ['true-rate'],
         },
         {
@@ -128,6 +142,8 @@ const PLAN = {
     'sampler:probabilistic-10pct': `This policy keeps an honest ratio, but only about ${UNIFORM_ERRORS} of the ${ERRORS} failed traces a second, so most failures can't be opened.`,
     'sampler:probabilistic-18pct': `This policy keeps an honest ratio, but only about ${DECOY_ERRORS} of the ${ERRORS} failed traces a second, so most failures can't be opened.`,
     'sampler:keep-all': `Keeping every trace sends ${n(REQUESTS)} spans/s, ${TIMES_OVER} times the cap of ${CAP}.`,
+    'sampler:errors-20pct': `This policy keeps every error and a larger share of the healthy traces: ${n(STORED_MORE)} spans/s, over the cap of ${CAP}.`,
+    'rate:mirror': `Counting every span gives the true rate, and sending all ${n(REQUESTS)} spans a second to a second backend is ${TIMES_OVER} times the cap of ${CAP} on its own.`,
     'rate:stored-spans': `The rate from the spans the backend keeps is a share of kept spans. With every error kept and ${KEEP_PCT}% of the rest, that reads ${WRONG_SUM}, not ${TRUE_PCT}%.`,
   },
   explain:
