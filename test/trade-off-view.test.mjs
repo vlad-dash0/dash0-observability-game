@@ -316,6 +316,20 @@ test('the reference plan is right: success tone, states cost, explains, locks, m
   assert.deepEqual(counts, { mistakes: 0, hints: 0, done: 1 });
 });
 
+test('the cards of each knob are shuffled once per mount through ctx.shuffle, and picking and hints go by id', () => {
+  const order = () => qa('[data-knob]').map((g) => [...g.querySelectorAll('[data-option]')].map((c) => c.dataset.option).join(','));
+  const base = setup();
+  base.mount();
+  const authored = order();
+  const { mount } = setup(withHints(), { shuffle: (a) => [...a].reverse() });
+  mount();
+  assert.deepEqual(order(), authored.map((o) => o.split(',').reverse().join(',')), 'the order comes from ctx.shuffle');
+  plan('tail', 'tier');
+  assert.deepEqual(picked(), ['sampling:tail', 'attrs:tier'], 'picks go by id');
+  check();
+  assert.equal(tone(), 'success');
+});
+
 test('Keeps stay hidden until a Check: a failed Check shows the picked cards, a solve shows every card', () => {
   const { mount } = setup();
   mount();
@@ -391,7 +405,7 @@ test('three hint tiers: the rule, two outlined options of one knob, then the ans
 
   click('#bill-hint'); // tier 2: the first knob not yet right (attrs): the answer and, drawn in reverse, the last decoy
   assert.deepEqual(counts, { mistakes: 0, hints: 2, done: 0 });
-  assert.deepEqual(hintedCards(), ['attrs:tier', 'attrs:user']);
+  assert.deepEqual(hintedCards().sort(), ['attrs:tier', 'attrs:user'], 'the same two cards, wherever the shuffle drew them');
   assert.equal(hintText().startsWith('Hint 2 of 3'), true);
   assert.deepEqual(picked(), ['sampling:tail']);
   pick('attrs', 'user'); // the pointer was about the old picks: a pick drops the outline and the text, free

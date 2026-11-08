@@ -114,15 +114,15 @@ const PLAN = {
       label: 'Where the error rate is computed',
       options: [
         {
-          id: 'mirror',
-          label: `From every span, sent to a second backend that counts them: ${n(REQUESTS)} spans/s`,
-          cost: REQUESTS,
-          keeps: ['true-rate'],
-        },
-        {
           id: 'red-before',
           label: 'From RED metrics computed before sampling: data points, no extra spans',
           cost: 0,
+          keeps: ['true-rate'],
+        },
+        {
+          id: 'mirror',
+          label: `From every span, sent to a second backend that counts them: ${n(REQUESTS)} spans/s`,
+          cost: REQUESTS,
           keeps: ['true-rate'],
         },
         {

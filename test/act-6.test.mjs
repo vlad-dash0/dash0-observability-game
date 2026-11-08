@@ -185,17 +185,17 @@ const SPANS = { storefront: 4, checkout: 5, payments: 3 };
 const WHOLE = SPANS.storefront + SPANS.checkout + SPANS.payments;
 const CHILDREN = SPANS.checkout + SPANS.payments;
 
-test('head sampling: the table behind the copy, recomputed: 12 spans a trace, 4,800 spans/s unsampled, 160 for storefront at one in ten, 440 left', () => {
+test('head sampling: the table behind the copy, recomputed: 12 spans a trace, 4,800 spans/s unsampled, 160 for storefront at one in ten, 600 left', () => {
   assert.equal(WHOLE, 12);
   assert.equal(TRACES * WHOLE, 4800);
   assert.equal(TRACES * 0.1 * SPANS.storefront, 160);
-  assert.equal(600 - 160, 440);
+  assert.equal(760 - 160, 600);
   assert.equal(TRACES * 0.9 * SPANS.checkout, 1800, 'the checkout spans of the 360 traces the root dropped');
   assert.equal(TRACES * 0.9 * SPANS.payments, 1080);
   const spec = hs();
   assert.deepEqual(validateTradeoffSpec(spec), []);
   assert.equal(spec.unit, 'spans/s');
-  assert.equal(spec.cap, 440);
+  assert.equal(spec.cap, 600);
   assert.equal(option(spec, 'checkout', 'follow').cost, TRACES * 0.1 * SPANS.checkout);
   assert.equal(option(spec, 'checkout', 'follow').cost, 200);
   assert.equal(option(spec, 'checkout', 'always-on').cost, 2000);
@@ -204,9 +204,9 @@ test('head sampling: the table behind the copy, recomputed: 12 spans a trace, 4,
   assert.equal(option(spec, 'payments', 'follow').cost, 120);
   assert.equal(option(spec, 'payments', 'always-on').cost, 1200);
   assert.equal(option(spec, 'payments', 'ratio').cost, 600);
-  assert.deepEqual(spec.knobs.map((k) => k.options.map((o) => o.id)), [['always-on', 'ratio', 'follow', 'always-off'], ['ratio', 'always-on', 'follow']]);
+  assert.deepEqual(spec.knobs.map((k) => k.options.map((o) => o.id)), [['always-on', 'ratio', 'follow', 'always-off'], ['follow', 'ratio', 'always-on']]);
   const intro = plain(LIVE.levels['head-sampling'].play.steps[0].intro);
-  for (const w of ['400 traces', '12 spans', '4,800 spans', '600 spans', 'storefront', 'checkout', 'payments', '160 spans', '440 of the 600']) assert.equal(intro.includes(w), true, w);
+  for (const w of ['400 traces', '12 spans', '4,800 spans', '760 spans', 'storefront', 'checkout', 'payments', '160 spans', '600 of the 760']) assert.equal(intro.includes(w), true, w);
   assert.equal(/authored|not run|does not run|simulat/.test(intro + plain(spec.explain)), true, 'the copy says the arithmetic is worked out, not run by an engine');
 });
 
@@ -223,11 +223,12 @@ test('head sampling: exactly one plan passes, the children following the root at
 test('head sampling: every shortcut fails the real grader for its own reason', () => {
   const spec = hs();
   const run = (checkout, payments) => verdictOf(play(spec, hsPlan(checkout, payments)));
-  assert.deepEqual(run('always-on', 'follow'), { outcome: 'wrong', total: 2120, over: 1680, lost: [] }, 'a child that ignores the root samples every trace: over the budget');
-  assert.deepEqual(run('follow', 'always-on'), { outcome: 'wrong', total: 1400, over: 960, lost: [] });
-  assert.deepEqual(run('follow', 'ratio'), { outcome: 'wrong', total: 800, over: 360, lost: ['payments-whole'] }, 'a plain ratio decides for itself: holes, and over budget');
-  assert.deepEqual(run('ratio', 'follow'), { outcome: 'wrong', total: 620, over: 180, lost: ['checkout-whole'] });
+  assert.deepEqual(run('always-on', 'follow'), { outcome: 'wrong', total: 2120, over: 1520, lost: [] }, 'a child that ignores the root samples every trace: over the budget');
+  assert.deepEqual(run('follow', 'always-on'), { outcome: 'wrong', total: 1400, over: 800, lost: [] });
+  assert.deepEqual(run('follow', 'ratio'), { outcome: 'wrong', total: 800, over: 200, lost: [] }, 'a plain ratio keeps the root\'s traces and more whose root was dropped: over budget');
+  assert.deepEqual(run('ratio', 'follow'), { outcome: 'wrong', total: 620, over: 20, lost: [] }, 'the nearest miss: over by 20 spans a second');
   assert.deepEqual(run('always-off', 'follow'), { outcome: 'wrong', total: 120, over: 0, lost: ['checkout-whole'] }, 'cheap, and checkout is missing from every kept trace');
+  assert.deepEqual(run('always-off', 'ratio'), { outcome: 'wrong', total: 600, over: 0, lost: ['checkout-whole'] }, 'the dearest plan that fits still drops checkout');
 });
 
 test('head sampling: a plan with nothing picked is incomplete and free, and a repeated wrong plan is a repeat', () => {
@@ -241,11 +242,13 @@ test('head sampling: a plan with nothing picked is incomplete and free, and a re
 test('head sampling: the nuance is graded: the wrong options say why a child that decides on its own breaks traces', () => {
   const spec = hs();
   const alwaysOn = plain(spec.whyNot['checkout:always-on']);
-  for (const w of ['360 of every 400', '1,800', 'root', '2,000']) assert.equal(alwaysOn.includes(w) || w === 'root' && alwaysOn.includes('root'), true, w);
+  for (const w of ['360 of every 400', '1,800', 'root', '2,000']) assert.equal(alwaysOn.includes(w), true, w);
   const payments = plain(spec.whyNot['payments:always-on']);
   for (const w of ['1,080', '1,200', 'root']) assert.equal(payments.includes(w), true, w);
-  assert.equal(/ignore the parent's sampled flag/.test(plain(spec.whyNot['checkout:ratio'])), true, 'a plain ratio ignores the parent');
-  assert.equal(/holes/.test(plain(spec.whyNot['payments:ratio'])), true);
+  const ratio = plain(spec.whyNot['checkout:ratio']);
+  for (const w of ["ignore the parent's sampled flag", 'a higher ratio samples every trace a lower one does', '60 more whose root was dropped', '300 of them with no root above them']) assert.equal(ratio.includes(w), true, w);
+  assert.equal(plain(spec.whyNot['payments:ratio']).includes('160 more whose root was dropped'), true);
+  assert.equal(plain(spec.whyNot['payments:ratio']).includes('480 of them'), true);
   assert.deepEqual(Object.keys(spec.whyNot).sort(), ['checkout:always-off', 'checkout:always-on', 'checkout:ratio', 'payments:always-on', 'payments:ratio']);
   assert.equal(plain(option(spec, 'checkout', 'always-on').label).includes('always_on'), true);
   assert.equal(plain(option(spec, 'checkout', 'follow').label).includes('parentbased_always_on'), true, 'the default sampler is named');
@@ -298,7 +301,7 @@ test('tail sampling: the table behind the copy, recomputed: 400 traces/s held fo
   assert.equal(spec.cap, 550);
   for (const [id, sec] of [['wait-5s', 5], ['wait-10s', 10], ['wait-15s', 15], ['wait-25s', 25], ['wait-30s', 30]]) assert.equal(option(spec, 'wait', id).cost, held(sec), id);
   for (const o of spec.knobs.find((k) => k.id === 'policies').options) assert.equal(o.cost, 0, `${o.id}: the policies do not change what is held while waiting`);
-  assert.equal(plain(option(spec, 'policies', 'errors-slow-baseline').label).includes('8 + 12 + 19 = 39 of 400'), true);
+  assert.equal(plain(option(spec, 'policies', 'errors-slow-baseline').label).includes('8 + 12 + about 19 more = 39 of 400'), true);
   assert.equal(plain(option(spec, 'policies', 'errors-slow').label).includes('20 of 400'), true);
   assert.equal(plain(option(spec, 'policies', 'probabilistic').label).includes('40 of 400'), true);
   const intro = plain(LIVE.levels['tail-sampling'].play.steps[0].intro);
@@ -516,7 +519,7 @@ test('spot: the explain teaches the nuance with the recomputed figures: the span
   // The figures come from the policies of the Trade-off answer, derived from that option, so the 39 of 400 holds.
   const policies = ts().knobs.find((k) => k.id === 'policies').options.find((o) => o.id === ts().answer.policies).label;
   assert.deepEqual([...policies.matchAll(/<code>(\w+)<\/code>/g)].map((m) => m[1]), ['probabilistic']);
-  assert.equal(policies.includes('8 + 12 + 19 = 39 of 400'), true, 'the policies keep the 39 of 400 the explain uses');
+  assert.equal(policies.includes('8 + 12 + about 19 more = 39 of 400'), true, 'the policies keep the 39 of 400 the explain uses');
   assert.equal(KEPT_ERRORS + KEPT_SLOW + KEPT_BASELINE, 39);
   assert.equal(t.includes('the sampler kept every error and few of the rest'), true);
   assert.equal(t.includes('count sees the spans of all 400 traces a second'), true, 'the count pipeline is the contrast');

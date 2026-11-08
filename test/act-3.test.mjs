@@ -635,6 +635,7 @@ test('cardinality: the budget is a real trade-off with one right plan: the tier 
   // The tempting plans: the tier on the requests counter, and the tier split by one more attribute. Each multiplies a counter.
   assert.deepEqual(ev('route-status-tier', 'none', 'span-attribute'), [379, 239, []], 'the tier on the requests counter multiplies it: 378 + 1 series');
   assert.deepEqual(ev('route-status', 'tier-kind', 'span-attribute'), [150, 10, []], 'one more attribute on the tier counter: 3 × 8 = 24');
+  assert.deepEqual(ev('route-status', 'type', 'span-attribute'), [134, 0, ['tier-volume']], 'the dearest plan that fits the cap still drops the tier');
   assert.deepEqual(ev('route', 'none', 'nothing'), [15, 0, ['errors-by-route', 'tier-volume', 'one-customer']], 'the cheap plan drops three needs');
   assert.deepEqual(ev('route-status', 'user', 'span-attribute'), [126 + 31402, 31402 + 126 - 140, ['tier-volume']], 'a user id on the metric is over the cap and still has no tier');
   assert.deepEqual(ev('route-tier', 'tier', 'span-attribute'), [45, 0, ['errors-by-route']], 'the tier by route says nothing of the errors');

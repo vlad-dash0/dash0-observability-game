@@ -137,6 +137,7 @@ const BUDGET = {
           cost: TIER_KIND,
           keeps: ['tier-volume'],
         },
+        { id: 'type', label: `<code>recommendation.type</code>: ${n(VALUES.kind)}`, cost: VALUES.kind },
       ],
     },
     {
@@ -164,6 +165,7 @@ const BUDGET = {
     'served:user':
       `One series for each of ${n(VALUES.user)} users, from a single counter, and still no tier. A per-customer view belongs on a span.`,
     'served:none': 'One series, and no count for each tier on this counter.',
+    'served:type': `A count for each kind of recommendation, ${VALUES.kind} series, and no count for each customer tier.`,
     'served:tier-kind':
       `Every attribute multiplies the counter: ${times('tier', 'kind')} = ${n(TIER_KIND)} where the tier alone is ${VALUES.tier}, and the count of traffic for each tier needs only the tier. ` +
       `With the route and status counter the plan is ${n(TIER_AND_KIND)} series, over the ${n(CAP)}.`,

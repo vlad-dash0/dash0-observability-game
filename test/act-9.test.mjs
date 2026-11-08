@@ -241,7 +241,7 @@ test('step 2 is a valid two-knob Trade-off whose only passing plan is every erro
   assert.equal(spec.cap, 200);
   assert.deepEqual(spec.knobs.map((k) => [k.id, k.label, k.options.map((o) => o.id)]), [
     ['sampler', 'Sampling policy', ['probabilistic-10pct', 'keep-all', 'probabilistic-18pct', 'errors-10pct', 'errors-20pct']],
-    ['rate', 'Where the error rate is computed', ['mirror', 'red-before', 'stored-spans']],
+    ['rate', 'Where the error rate is computed', ['red-before', 'mirror', 'stored-spans']],
   ]);
   assert.deepEqual(spec.needs.map((x) => [x.id, x.label]), [
     ['every-error', 'every failed trace'],
@@ -280,8 +280,8 @@ test('step 2 plans: all fifteen against an independent oracle, each fails for it
   const sampler = ['probabilistic-10pct', 'keep-all', 'probabilistic-18pct', 'errors-10pct', 'errors-20pct'];
   const expected = [];
   for (const sm of sampler) {
-    expected.push([sm, 'mirror', 'cap']);
     expected.push([sm, 'red-before', sm === 'keep-all' || sm === 'errors-20pct' ? 'cap' : sm === 'errors-10pct' ? 'pass' : 'lost every-error']);
+    expected.push([sm, 'mirror', 'cap']);
     expected.push([sm, 'stored-spans', sm === 'keep-all' || sm === 'errors-20pct' ? 'cap' : sm === 'errors-10pct' ? 'lost true-rate' : 'lost every-error']);
   }
   assert.deepEqual(table, expected);
@@ -311,10 +311,10 @@ test('step 2 shortcuts fail: dearest in cap, most Keeps in cap (dearer tie-break
   assert.equal(passes({ sampler: pick('sampler', greedy), rate: pick('rate', greedy) }), false, 'greedy per knob, dearer tie-break');
 });
 
-test('step 2: position gives nothing away (answer 4th of 5 in the sampler list, 2nd of 3 in rate) and the cap decides (keep-all keeps more than the answer)', () => {
+test('step 2: position gives nothing away (answer 4th of 5 in the sampler list, 1st of 3 in rate) and the cap decides (keep-all keeps more than the answer)', () => {
   const ids = (k) => spec.knobs.find((x) => x.id === k).options.map((o) => o.id);
   assert.equal(ids('sampler').indexOf(spec.answer.sampler), 3);
-  assert.equal(ids('rate').indexOf(spec.answer.rate), 1);
+  assert.equal(ids('rate').indexOf(spec.answer.rate), 0);
   const sampler = spec.knobs.find((x) => x.id === 'sampler').options;
   const best = sampler.find((o) => o.id === spec.answer.sampler);
   const notDominated = sampler.filter((o) => o !== best && !(best.cost <= o.cost && o.keeps.every((x) => (best.keeps ?? []).includes(x))));

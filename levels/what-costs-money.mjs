@@ -55,10 +55,10 @@ const GB = {
       id: 'traces',
       label: 'Traces',
       options: [
-        { id: 'all', label: 'Send every span', cost: 120, keeps: ['slow-traces', 'error-detail'] },
+        { id: 'head-25', label: 'Head-sample 25% at the SDK', cost: 30 },
+        { id: 'tail', label: 'Tail-sample in the Collector: errors, slow traces and a few more', cost: 25, keeps: ['slow-traces', 'error-detail'] },
         { id: 'head-1', label: 'Head-sample 1% at the SDK', cost: 2 },
         { id: 'errors-only', label: 'Tail-sample in the Collector: keep the failed traces and nothing else', cost: 15, keeps: ['error-detail'] },
-        { id: 'tail', label: 'Tail-sample in the Collector: errors, slow traces and a few more', cost: 25, keeps: ['slow-traces', 'error-detail'] },
         { id: 'head-10', label: 'Head-sample 10% at the SDK', cost: 12 },
       ],
     },
@@ -81,7 +81,7 @@ const GB = {
   ],
   answer: { traces: 'tail', logs: 'trimmed' },
   whyNot: {
-    'traces:all': 'It keeps every need and sends 120 GB of spans, twice the 60 GB budget on its own.',
+    'traces:head-25': 'A fixed 25% is picked without looking at the trace, so three in four slow or failed requests are thrown away with the healthy ones.',
     'traces:head-1': 'A fixed 1% is picked without looking at the trace, so almost every slow or failed request is thrown away with the healthy ones.',
     'traces:head-10': 'A fixed 10% is picked without looking at the trace, so nine in ten slow or failed requests are thrown away with the healthy ones.',
     'traces:errors-only': 'The failed traces explain why a request failed, and a slow trace that did not fail is gone.',
@@ -120,18 +120,18 @@ const SIGNAL = {
         { id: 'm5', label: 'Every 5 minutes', cost: 1 },
         { id: 's10', label: 'Every 10 seconds', cost: 30, keeps: ['fast-alerts'] },
         { id: 's60', label: 'Every 60 seconds', cost: 5, keeps: ['fast-alerts'] },
-        { id: 'm2', label: 'Every 2 minutes', cost: 3 },
+        { id: 'm2', label: 'Every 2 minutes', cost: 2.5 },
       ],
     },
     {
       id: 'records',
       label: 'Log records',
       options: [
-        { id: 'per-line', label: 'One record for each log line', cost: 40, keeps: ['request-detail', 'failed-detail'] },
-        { id: 'failed-only', label: 'One record for each failed request, its lines as attributes', cost: 3, keeps: ['failed-detail'] },
-        { id: 'per-request', label: 'One record for each request, lines as attributes', cost: 10, keeps: ['request-detail', 'failed-detail'] },
+        { id: 'per-line', label: 'One record for each log line', cost: 40, keeps: ['request-detail'] },
+        { id: 'failed-only', label: 'One record for each failed request, its lines as attributes', cost: 3 },
+        { id: 'per-request', label: 'One record for each request, lines as attributes', cost: 10, keeps: ['request-detail'] },
         { id: 'half', label: 'One record for every second log line', cost: 20 },
-        { id: 'per-line-trimmed', label: 'One record for each log line, with the bodies cut out', cost: 40, keeps: ['request-detail', 'failed-detail'] },
+        { id: 'per-line-trimmed', label: 'One record for each log line, with the bodies cut out', cost: 40, keeps: ['request-detail'] },
       ],
     },
     {
@@ -149,7 +149,6 @@ const SIGNAL = {
   needs: [
     { id: 'fast-alerts', label: 'an alert within two minutes of a failure' },
     { id: 'request-detail', label: 'the detail of each request in the logs' },
-    { id: 'failed-detail', label: 'the detail of each failed request in the logs' },
     { id: 'slow-traces', label: 'the trace of every slow or failed request' },
   ],
   answer: { interval: 's60', records: 'per-request', spans: 'tail' },

@@ -43,7 +43,13 @@ export const BLIND_RULES = {
   },
   priciest: (opts) => costRank(opts, Infinity),
   first: (opts) => [opts[0]],
+  'second-card': (opts) => [opts[Math.min(1, opts.length - 1)]],
+  'third-card': (opts) => [opts[Math.min(2, opts.length - 1)]],
+  'fourth-card': (opts) => [opts[Math.min(3, opts.length - 1)]],
   last: (opts) => [opts[opts.length - 1]],
+  'second-last-card': (opts) => [opts[Math.max(opts.length - 2, 0)]],
+  'third-last-card': (opts) => [opts[Math.max(opts.length - 3, 0)]],
+  'fourth-last-card': (opts) => [opts[Math.max(opts.length - 4, 0)]],
   'middle-position': (opts) => middleOf(opts),
   'longest-label': (opts) => atScore(opts, plainLen, high),
   'shortest-label': (opts) => atScore(opts, plainLen, low),
@@ -55,6 +61,14 @@ export const KEEPS_RULES = {
   'most-keeps': (opts) => atScore(opts, nKeeps, high),
 };
 export const RULES = { ...BLIND_RULES, ...KEEPS_RULES };
+
+/** Whole-plan rules (not per knob): spend the budget. */
+export const WHOLE_RULES = ['dearest-under-cap'];
+const dearestUnderCap = (spec) => {
+  const fits = allPlans(spec).map((p) => ({ p, r: evaluatePlan(spec, p) })).filter(({ r }) => r.over === 0);
+  const top = Math.max(...fits.map(({ r }) => r.total));
+  return fits.filter(({ r }) => r.total === top).map(({ p }) => p);
+};
 
 const product = (lists) => lists.reduce((acc, l) => acc.flatMap((p) => l.map((o) => [...p, o])), [[]]);
 const toPicks = (spec, opts) => Object.fromEntries(spec.knobs.map((k, i) => [k.id, opts[i].id]));
@@ -69,5 +83,6 @@ export function probe(spec) {
   const passing = allPlans(spec).filter((p) => passes(spec, p));
   const strategies = {};
   for (const rule of Object.keys(RULES)) strategies[rule] = strategyPlans(spec, rule).some((p) => passes(spec, p));
+  strategies['dearest-under-cap'] = dearestUnderCap(spec).some((p) => passes(spec, p));
   return { passing, strategies };
 }

@@ -84,26 +84,26 @@ const BUDGET = {
       label: 'What the <code>tail_sampling</code> policies keep',
       options: [
         {
+          id: 'errors-slow-baseline',
+          label:
+            `Status ERROR, latency above 2 seconds, and 5% of all traces by <code>probabilistic</code>: ` +
+            `${n(ERRORS)} + ${n(SLOW)} + about ${n(BASE)} more = ${n(KEPT)} of ${n(TRACES)} traces/s`,
+          cost: 0,
+          keeps: ['errors-kept', 'slow-kept', 'baseline-kept'],
+        },
+        {
           id: 'errors-slow',
-          label: `<code>status_code</code> ERROR and <code>latency</code> above 2 seconds: ${n(ERRORS + SLOW)} of ${n(TRACES)} traces/s kept`,
+          label: `Traces with status ERROR and traces with latency above 2 seconds, nothing else: ${n(ERRORS + SLOW)} of ${n(TRACES)} traces/s, all of them failed or slow`,
           cost: 0,
           keeps: ['errors-kept', 'slow-kept'],
         },
         {
           id: 'probabilistic',
-          label: `A <code>probabilistic</code> policy at 10% of all traces: ${n(TRACES * 0.1)} of ${n(TRACES)} traces/s, chosen at random`,
+          label: `A <code>probabilistic</code> policy at 10% of all traces: ${n(TRACES * 0.1)} of ${n(TRACES)} traces/s, chosen by the trace ID alone`,
           cost: 0,
           keeps: ['baseline-kept'],
         },
-        {
-          id: 'errors-slow-baseline',
-          label:
-            `ERROR, slow and <code>probabilistic</code> 5%: ` +
-            `${n(ERRORS)} + ${n(SLOW)} + ${n(BASE)} = ${n(KEPT)} of ${n(TRACES)} traces/s`,
-          cost: 0,
-          keeps: ['errors-kept', 'slow-kept', 'baseline-kept'],
-        },
-        { id: 'errors', label: `<code>status_code</code> ERROR: ${n(ERRORS)} of ${n(TRACES)} traces/s`, cost: 0, keeps: ['errors-kept'] },
+        { id: 'errors', label: `Traces with status ERROR, only the failed ones: ${n(ERRORS)} of ${n(TRACES)} traces/s`, cost: 0, keeps: ['errors-kept'] },
       ],
     },
   ],
@@ -121,12 +121,12 @@ const BUDGET = {
     'wait:wait-30s': `It sees every trace whole, and ${n(held(30))} traces held is ${n(mib(30))} MiB: over the ${n(CAP)} MiB the replica has, whichever policies are set, and ${n(mib(30) - mib(25))} MiB more than the ${SLOWEST}-second traces need.`,
     'policies:errors': 'It keeps what failed and drops the slow traces and every healthy one: no slow checkout to open, and nothing fine to compare a failing trace with.',
     'policies:errors-slow': 'It keeps what is wrong and nothing that is fine, so there is no healthy trace to compare a failing one with. A small probabilistic policy next to the other two adds one.',
-    'policies:probabilistic': 'A random 10% is head sampling again, done later: it keeps 1 in 10 of the failed traces and 1 in 10 of the slow ones, and tail sampling exists to do better than that.',
+    'policies:probabilistic': 'A content-blind 10%, like head sampling done later: it keeps about 1 in 10 of the failed traces and 1 in 10 of the slow ones, and tail sampling exists to do better than that.',
   },
   explain:
     `The wait is what costs: ${n(TRACES)} new traces a second, each held for the 25-second <code>decision_wait</code>, is ${n(held(25))} traces at once, under the default <code>num_traces</code> of ${n(NUM_TRACES)}, ` +
     `and ${SLOWEST} seconds is the slowest trace, so a 25-second wait decides on the whole trace with room to spare. Every second beyond that is memory spent for nothing: the 30-second default would be ${n(mib(30) - mib(25))} MiB more. ` +
-    `The policies cost nothing extra in this table, because the processor holds every trace until it decides, whichever policies you set. ` +
+    `The policies cost nothing extra in this table, because with the default <code>trace-complete</code> sampling strategy the processor holds every trace until it decides, whichever policies you set. ` +
     `They keep ${n(ERRORS)} failed and ${n(SLOW)} slow traces a second and ${n(BASE)} healthy ones, ${n(KEPT)} of ${n(TRACES)}, a saving of about ${pct(1 - KEPT / TRACES)} of the traces, and they can only choose that way because they decide on the whole trace. ` +
     'The price is a stateful component that all spans of a trace must reach, which is why 5.4 sent them there by trace ID. ' +
     'A span that arrives after the decision is late, and can get a different decision from the rest of its trace. ' +
