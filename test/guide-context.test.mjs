@@ -240,7 +240,8 @@ test('stepContext carries no answer: no line trips withholds, for every live all
     assert.ok(Array.isArray(lines) && lines.length > 0 && lines.every((l) => typeof l === 'string' && l.trim() !== ''), `${level.id} ${type.idOf(spec)}`);
     const tokens = answerTokens(type, spec);
     if (!LISTS_OPTIONS.has(type.key)) {
-      for (const line of lines) assert.equal(withholds(line, tokens), false, `${level.id} ${type.idOf(spec)}: ${line}`);
+      // A configure line is quoted with a leading bar (and may be a YAML list item), which a reply may not start a line with; the text is what counts.
+      for (const line of lines) assert.equal(withholds(line.replace(/^\|\s*(?:-\s+)?/, ''), tokens), false, `${level.id} ${type.idOf(spec)}: ${line}`);
     }
     const other = contextOf(level, type, scrambled(type.key, spec), step);
     assert.deepEqual(other, lines, `${level.id} ${type.idOf(spec)}: the context depends on the answer`);
@@ -289,31 +290,59 @@ test('stepContext lists options in an order that does not say which is right', (
   assert.deepEqual(contextOf(level, STEP_TYPES.choice, flipped, step), contextOf(level, STEP_TYPES.choice, FIXTURES.choice.spec, step));
 });
 
+test('stepContext does not depend on authoring order: choices, hypotheses, views, options and items reversed (finding 9)', () => {
+  let swept = 0;
+  for (const { level, type, spec, step } of ALLOWED) {
+    const flipped = structuredClone(spec);
+    flipped.choices?.reverse();
+    flipped.hypotheses?.reverse();
+    flipped.views?.reverse();
+    flipped.items?.reverse();
+    for (const k of flipped.knobs ?? []) k.options.reverse();
+    swept++;
+    assert.deepEqual(contextOf(level, type, flipped, step), contextOf(level, type, spec, step), `${level.id} ${type.idOf(spec)}`);
+  }
+  assert.ok(swept > 50);
+});
+
 // ---- answerTokens ----
 
 test('answerTokens per widget', () => {
   const tok = (name) => answerTokens(fx(name).type, FIXTURES[name].spec);
-  assert.deepEqual(tok('choice'), { singles: ['add trace_id to every log line'], pairs: [] });
-  assert.deepEqual(tok('incident'), { singles: ['the payment provider times out'], pairs: [] });
-  assert.deepEqual(tok('spot'), { singles: ['sampler: always_on'], pairs: [] });
+  assert.deepEqual(tok('choice'), { singles: ['add trace id to every log line'], pairs: [] });
+  assert.deepEqual(tok('incident'), { singles: ['the payment provider times out', 'provider', 'times'], pairs: [] }, 'the words only the right hypothesis has');
+  assert.deepEqual(tok('spot'), { singles: ['sampler always on', 'always'], pairs: [] });
   assert.deepEqual(tok('sort'), {
     singles: [],
     pairs: [['requests per second', 'metric'], ['request path of one checkout', 'trace']],
   });
-  assert.deepEqual(tok('build'), { singles: [], pairs: [['charge card (payments)', 'handle order (orders)']] });
+  assert.deepEqual(tok('build'), {
+    singles: [],
+    pairs: [['charge card payments', 'handle order orders'], ['charge card', 'handle order']],
+  });
   assert.deepEqual(tok('buildLogs'), {
     singles: [],
-    pairs: [['order accepted', 'post /orders (orders)'], ['order validated', 'validate order (orders)'], ['listening on port 8080', 'no span']],
+    pairs: [
+      ['order accepted', 'post orders orders'],
+      ['order accepted', 'post orders'],
+      ['order validated', 'validate order orders'],
+      ['order validated', 'validate order'],
+      ...['no span', 'any span', 'outside a span', 'not in a span', 'without a span', 'no trace'].flatMap((n) => [['listening on port 8080', n]]),
+    ],
   });
   assert.deepEqual(tok('tradeoff'), {
-    singles: [],
-    pairs: [['trace retention', 'keep traces 30 days'], ['trace sampling', 'sample errors only']],
+    singles: ['keep traces 30 days', 'sample errors only'],
+    pairs: [['trace retention', 'keep traces 30 days'], ['retention', 'keep traces 30 days'], ['trace sampling', 'sample errors only'], ['sampling', 'sample errors only']],
   });
   assert.deepEqual(tok('query'), {
-    singles: ['sum(rate(http_server_request_duration_seconds_count{route=/pay}[5m]))', 'rate(http_server_request_duration_seconds_count{route=/pay}[5m])', 'http_server_request_duration_seconds_count{route=/pay}[5m]'],
+    singles: [
+      'sum rate http server request duration seconds count route pay 5m',
+      'rate http server request duration seconds count route pay 5m',
+      'http server request duration seconds count route pay 5m',
+    ],
     pairs: [],
   });
-  assert.deepEqual(tok('configure'), { singles: ['passthrough: false'], pairs: [] });
+  assert.deepEqual(tok('configure'), { singles: [], pairs: [['passthrough', 'false']] });
 });
 
 test('answerTokens: build names twins the way the board does, and states links, kind and status', () => {
@@ -326,13 +355,13 @@ test('answerTokens: build names twins the way the board does, and states links, 
   };
   const text = namer(spec.spans, (x) => x).text;
   const { pairs } = answerTokens(STEP_TYPES.build, spec);
-  const norm = (s) => s.toLowerCase();
-  assert.deepEqual(pairs, [
-    [norm(text(spec.spans[1])), 'root'],
-    [norm(text(spec.spans[1])), 'client'],
-    [norm(text(spec.spans[1])), 'error'],
-    [norm(text(spec.spans[1])), norm(text(spec.spans[2]))],
-  ]);
+  const skeleton = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const [, a, b] = spec.spans.map((x) => skeleton(text(x)));
+  const has = (pair) => assert.ok(pairs.some((p) => p[0] === pair[0] && p[1] === pair[1]), pair.join(' + '));
+  for (const word of ['root', 'client', 'error']) has([a, word]);
+  has([a, b]);
+  has(['post checkout', 'post checkout']);
+  assert.notEqual(a, b, 'twins are told apart by their display name');
 });
 
 test('answerTokens is null when a token is too short to filter on, or there is none', () => {
@@ -353,18 +382,21 @@ test('answerTokens is null when a token is too short to filter on, or there is n
 
 test('answerTokens: query sub-expressions already in the starting query are not tokens', () => {
   const spec = { ...FIXTURES.query.spec, given: 'sum(rate(http_server_request_duration_seconds_count{route="/pay"}[5m]))x' };
-  assert.deepEqual(answerTokens(STEP_TYPES.query, spec).singles, ['sum(rate(http_server_request_duration_seconds_count{route=/pay}[5m]))']);
+  assert.deepEqual(answerTokens(STEP_TYPES.query, spec).singles, ['sum rate http server request duration seconds count route pay 5m']);
 });
 
-test('answerTokens: configure tokens are the changed scalars, array items under their key', () => {
+test('answerTokens: configure tokens are the changed leaves as pairs, array items under their key', () => {
   const spec = structuredClone(FIXTURES.configure.spec);
   spec.reference = spec.reference.replace('passthrough: false', 'passthrough: false\n    extract:\n      metadata:\n        - k8s.pod.name');
-  assert.deepEqual(answerTokens(STEP_TYPES.configure, spec).singles, ['passthrough: false', 'metadata: k8s.pod.name']);
+  assert.deepEqual(answerTokens(STEP_TYPES.configure, spec), {
+    singles: ['k8s pod name'],
+    pairs: [['passthrough', 'false'], ['metadata', 'k8s pod name']],
+  });
 });
 
 // ---- withholds ----
 
-const TOK = { singles: ['add trace_id to every log line'], pairs: [['requests per second', 'metric']] };
+const TOK = { singles: ['add trace id to every log line'], pairs: [['requests per second', 'metric']] };
 
 test('withholds blocks an echo, its case, HTML and backtick variants, and code fences', () => {
   assert.equal(withholds('You should add trace_id to every log line.', TOK), true);
@@ -385,11 +417,40 @@ test('withholds passes a neutral hint, and a pair split across sentences', () =>
   assert.equal(withholds('Requests per second matter here\nA metric is a different thing', TOK), false, 'split across lines');
   assert.equal(withholds('Is it requests per second? Metric, maybe.', TOK), false, 'split at a question mark');
   assert.equal(withholds('Version 1.2 of requests per second, a metric', TOK), true, 'a dot inside a number does not end a sentence');
-  assert.equal(withholds('', { singles: [], pairs: [] }), false);
-  const nested = { singles: [], pairs: [['traces', 'head-sample traces at the sdk']] };
+  const nested = { singles: [], pairs: [['traces', 'head sample traces at the sdk']] };
   assert.equal(withholds('Pick head-sample traces at the SDK.', nested), false, 'the shorter part inside the longer one is not a second mention');
   assert.equal(withholds('For traces, pick head-sample traces at the SDK.', nested), true);
   assert.throws(() => withholds('x', null), TypeError, 'no tokens is a refusal, never a pass');
+});
+
+test('withholds: an empty token set is a refusal, not a pass (finding 11)', () => {
+  assert.throws(() => withholds('The answer is X', { singles: [], pairs: [] }), TypeError);
+  assert.throws(() => withholds('', { singles: [], pairs: [] }), TypeError);
+  assert.throws(() => withholds('x', { singles: 'a', pairs: [] }), TypeError);
+});
+
+test('withholds: formatting never changes what a text says, format characters included (findings 1 and 8)', () => {
+  const tok = { singles: [], pairs: [['routing key', 'traceid']] };
+  assert.equal(withholds('**routing_key**: traceID', tok), true, 'markdown and punctuation');
+  assert.equal(withholds('Routing-Key = TraceID', tok), true);
+  assert.equal(withholds('routing\u00a0key\u2192TRACEID', tok), true, 'non-breaking space and an arrow');
+  assert.equal(withholds('\uff52outing_key and trace\u200bID', tok), true, 'a fullwidth letter and a zero-width space');
+  assert.equal(withholds('a routing key, then. TraceID', tok), false, 'a sentence end still splits a pair');
+  assert.equal(withholds('630 is the count', { singles: ['630'], pairs: [] }), true);
+  assert.equal(withholds('6301 is not it', { singles: ['630'], pairs: [] }), false, 'a number is a whole number');
+  assert.equal(withholds('links', { singles: ['link'], pairs: [] }), true, 'a word may go on');
+  assert.equal(withholds('A post checkout beside post checkout.', { singles: [], pairs: [['post checkout', 'post checkout']] }), true);
+  assert.equal(withholds('A post checkout alone.', { singles: [], pairs: [['post checkout', 'post checkout']] }), false, 'twins need two mentions');
+});
+
+test('withholds: a list or a table is withheld (finding 7)', () => {
+  const tok = { singles: ['zzzz'], pairs: [] };
+  for (const reply of ['- one\n- two', 'Look:\n* one', '+ one', '1. one', '2) one', '  - indented', '| a | b |\n|---|---|', 'x\n\u2022 bullet']) {
+    assert.equal(withholds(reply, tok), true, reply);
+  }
+  for (const reply of ['A well-known - rule.', 'Use a hyphen-ated word.', 'In 2024. Then more.', 'a | b in one line']) {
+    assert.equal(withholds(reply, tok), false, reply);
+  }
 });
 
 // ---- the live sweep ----
@@ -447,7 +508,78 @@ function echoOf(type, spec) {
   }
 }
 
-test('live sweep: every allowed step blocks an echo built from raw spec fields, and passes a neutral hint', () => {
+/** One plausible way to say the answer in prose, from the raw spec fields only, in a form other than the token's own (findings 1 to 7). */
+function paraphraseOf(type, spec) {
+  const distinct = (label, others) => {
+    const words = (t) => plainText(t).toLowerCase().split(/[^\p{L}\p{N}]+/u);
+    const seen = new Set(others.flatMap(words));
+    // A hint may use the game's everyday nouns freely, so a paraphrase built on one of them is not a leak.
+    const everyday = /^(?:attributes|collector|services?|requests?|signals?|pipelines?|traces?|metrics?|errors?|processor|exporter|receiver)$/;
+    return words(label).filter((w) => !seen.has(w) && !everyday.test(w) && (/^\d+$/.test(w) ? w.length >= 3 : w.length >= 7)).sort((x, y) => y.length - x.length)[0];
+  };
+  switch (type.key) {
+    case 'choice': {
+      const right = spec.choices.find((c) => c.right).label;
+      const word = distinct(right, spec.choices.filter((c) => !c.right).map((c) => c.label));
+      return word ? `It comes down to ${word}.` : `**${plainText(right).replace(/ /g, ' - ')}**`;
+    }
+    case 'incident': {
+      const right = spec.hypotheses.find((h) => h.right).label;
+      const word = distinct(right, spec.hypotheses.filter((h) => !h.right).map((h) => h.label));
+      return word ? `The cause involves ${word}.` : `**${right.replace(/ /g, ' - ')}**`;
+    }
+    case 'spot': {
+      const fault = spec.lines.find((l) => spec.faults.includes(l.id)).text;
+      const word = distinct(fault, spec.lines.filter((l) => !spec.faults.includes(l.id)).map((l) => l.text));
+      return word ? `${word} is one of them.` : fault.replace(/([{}=,"])/g, ' $1 ');
+    }
+    case 'sort': {
+      const item = spec.items[0];
+      return `${plainText(item.label)} is a ${plainText(spec.buckets.find((b) => b.id === item.bucket).label)}.`;
+    }
+    case 'build': {
+      const byId = (id) => spec.spans.find((s) => s.spanId === id).name;
+      const [id] = Object.keys(spec.answer);
+      if (spec.edit[0] === 'logs') {
+        const log = spec.logs.find((l) => l.id === id);
+        return spec.answer[id] === null ? `${log.body} is not in any span.` : `${log.body} belongs to ${byId(spec.answer[id])}.`;
+      }
+      const want = spec.answer[id];
+      if (Object.hasOwn(want, 'parentId')) return want.parentId === null ? `${byId(id)} is the root.` : `${byId(id)} belongs to ${byId(want.parentId)}.`;
+      if (Object.hasOwn(want, 'kind')) return `${byId(id)} is ${want.kind}.`;
+      if (Object.hasOwn(want, 'status')) return `${byId(id)} is ${want.status}.`;
+      return want.links.length ? `${byId(id)} links to ${byId(want.links[0])}.` : `${byId(id)} has no link.`;
+    }
+    case 'tradeoff': {
+      const knob = spec.knobs[0];
+      const [, code] = /<code>(.*?)<\/code>/.exec(knob.label) ?? [];
+      const head = plainText(knob.options.find((o) => o.id === spec.answer[knob.id]).label).split(':')[0];
+      return `Set ${code ?? plainText(knob.label)} to ${head}.`;
+    }
+    case 'query':
+      return spec.reference.replace(/\s*([(){}[\],=])\s*/g, '$1');
+    case 'configure': {
+      const [key, ...value] = echoOf(type, spec).split(': ');
+      return `Set **${key}** to ${value.join(': ')}.`;
+    }
+    default:
+      return assert.fail(type.key);
+  }
+}
+
+/** Neutral hints, three per widget: they say nothing about the answer, so no live step may withhold them. */
+const NEUTRAL = {
+  choice: ['Re-read what the question asks.', 'Think about which service starts the request.', 'Compare what each option would change for the engineer on call.'],
+  sort: ['Ask what each item tells you about a single request.', 'Think about which signal is best at answering that kind of question.', 'Look at the shape of each item before you place it.'],
+  build: ['Think about which service starts the request.', 'Look at which span begins first and which ends last.', 'Re-read what the question asks.'],
+  incident: ['Look at what each view shows before you commit.', 'Think about what changed just before the alert fired.', 'Re-read the alert and what it measures.'],
+  spot: ['Read each line slowly and ask what it claims.', 'Think about what the target would store.', 'Compare each line with the ones around it.'],
+  tradeoff: ['Add up the cost of each knob before you decide.', 'Think about which need each setting protects.', 'Re-read the budget and what it is measured in.'],
+  query: ['Think about which series the question is about.', 'Look at the dataset and the labels it has.', 'Build the query one step at a time and check each result.'],
+  configure: ['Look at what each pipeline sends where.', 'Think about which component handles which signal.', 'Re-read the schema and the lines you were given.'],
+};
+
+test('live sweep: every allowed step blocks an echo and a paraphrase built from raw spec fields (findings 1 to 7, 10)', () => {
   assert.ok(ALLOWED.length > 50);
   const seen = new Set();
   for (const { level, type, spec } of ALLOWED) {
@@ -456,9 +588,55 @@ test('live sweep: every allowed step blocks an echo built from raw spec fields, 
     const where = `${level.id} ${type.idOf(spec)} (${type.key})`;
     assert.ok(tokens, where);
     assert.equal(withholds(`Here is a nudge. ${echoOf(type, spec)}. Good luck.`, tokens), true, `${where}: echo not blocked`);
-    assert.equal(withholds('Re-read what the question asks.', tokens), false, where);
+    const paraphrase = paraphraseOf(type, spec);
+    assert.equal(withholds(paraphrase, tokens), true, `${where}: paraphrase not blocked: ${paraphrase}`);
   }
   assert.deepEqual([...seen].sort(), ['build', 'choice', 'configure', 'incident', 'query', 'sort', 'spot', 'tradeoff'], 'every step type is swept');
+});
+
+test('live sweep: a neutral hint is never withheld, on any live allowed step', () => {
+  assert.deepEqual(Object.keys(NEUTRAL).sort(), [...new Set(ALLOWED.map((x) => x.type.key))].sort(), 'a neutral set for every swept widget');
+  for (const [key, hints] of Object.entries(NEUTRAL)) assert.ok(hints.length >= 3, key);
+  for (const { level, type, spec } of ALLOWED) {
+    const tokens = answerTokens(type, spec);
+    for (const hint of NEUTRAL[type.key]) assert.equal(withholds(hint, tokens), false, `${level.id} ${type.idOf(spec)} (${type.key}): ${hint}`);
+  }
+});
+
+/** The replies the review of ff6841a found passing, each on the live step it was found on: all must now be withheld. */
+const REVIEW_REPLIES = [
+  ['the-bill', 'Checkout added a user_id label to a counter, so each user gets a series.'],
+  ['res-sort', 'service.name=checkout is a resource attribute.'],
+  ['wcm-gb', 'For traces, tail sample in the collector.'],
+  ['pql-rate', 'sum by(route)(rate(http_server_requests_total{service="checkout",status="500"}[5m]))'],
+  ['agw-config', '**routing_key**: traceID'],
+  ['agw-config', 'Set routing_key to traceID.'],
+  ['det-config', 'List k8s.pod.name, k8s.pod.uid and k8s.namespace.name under metadata.'],
+  ['col-config', 'Set start_at to beginning and use a regex_parser operator.'],
+  ['pipe-config', 'Add health_check under service.extensions and memory_limiter to the processors list.'],
+  ['cor-build', 'Order accepted belongs to POST /checkout.'],
+  ['cor-build', 'Cart validated goes with the validate cart span.'],
+  ['cor-build', 'Listening on port 8080 is not in any span.'],
+  ['ts-budget', 'Set decision_wait to 25 seconds.'],
+  ['hs-plan', 'For checkout, keep the default parentbased_always_on.'],
+  ['wcm-gb', 'For traces, tail-sample in the collector.'],
+  ['cdn-budget', 'For counter recommendations.served, keep customer.tier.'],
+  ['temp-spot', 'emails_sent_total is one of the delta ones.'],
+  ['the-bill', 'The cause is a user_id label on a checkout counter.'],
+  ['temp-convert', 'Use the deltatocumulative processor.'],
+  ['cdn-combos', 'It is 630.'],
+  ['cdn-combos', '5 x 14 x 9 = 630'],
+  ['res-sort', '- service.name = checkout\n- Resource attribute'],
+  ['temp-convert', 'Use the deltato​cumulative processor.'],
+];
+
+test('every reply the review found passing is withheld on its live step', () => {
+  for (const [stepId, reply] of REVIEW_REPLIES) {
+    const found = ALLOWED.filter(({ type, spec }) => type.idOf(spec) === stepId);
+    assert.equal(found.length, 1, `${stepId} is one live allowed step`);
+    const { type, spec } = found[0];
+    assert.equal(withholds(reply, answerTokens(type, spec)), true, `${stepId}: ${JSON.stringify(reply)}`);
+  }
 });
 
 test('no live allowed step has null tokens', () => {
