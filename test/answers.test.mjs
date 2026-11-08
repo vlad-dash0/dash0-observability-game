@@ -145,7 +145,7 @@ const ANSWERS = {
     'choice sc-alert: probe',
   ],
   'everything-is-green': [
-    'incident everything-is-green: span-numbers,who-calls,alert-rules > expired-certificate',
+    'incident everything-is-green: span-numbers,who-calls,outside-request > expired-certificate',
     'choice eig-page: outside-check',
   ],
   'semantic-convention-versions': ['spot scv-spot: http-target,net-host-port,http-status-code', 'choice scv-switch: move-queries'],

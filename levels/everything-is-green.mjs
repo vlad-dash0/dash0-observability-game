@@ -2,12 +2,14 @@
 // an expired TLS certificate on the CDN edge: browsers refuse the connection during the handshake, so no request reaches the
 // instrumented service, and the span-based alerts and the inside-the-cluster health check have nothing to fail on. The player follows it
 // from the span numbers (requests collapse at one window, errors stay at zero), to who still sends requests (only internal tools),
-// to what the alert rules measure (spans, and an internal /health), to a request made from outside (the certificate has expired).
-// Four views hold the chain (clues); two are red herrings; three are neutral. Scored. A plain-data Scenario for the incident engine,
+// to a request made from outside (it resolves and connects, then fails on the certificate), to what the alert rules measure (spans, and
+// an internal /health). Four views hold the chain (clues); two are red herrings; three are neutral. Scored. Three clues unlock the
+// answers, and the outside request is the only view that refutes the second hypothesis in front of the load balancer (a lapsed DNS
+// record or domain), so a board without it keeps two defensible causes and the player has to make the request. A plain-data Scenario for the incident engine,
 // played through one declarative `incident` step (lib/widgets/incident.mjs, docs/M1-DESIGN.md §4.3, docs/DECLARATIVE-LEVELS.md §2),
 // then one closing Choice on what would have paged (7.2: the SLI source; 7.4: probing from outside).
 // The scenario is designed for this game (decided on #135, owner decision 2026-11-01).
-// Spec: https://opentelemetry.io/docs/specs/otel/trace/api/#spankind , https://opentelemetry.io/docs/specs/semconv/http/http-spans/
+// Spec: https://opentelemetry.io/docs/specs/otel/trace/api/#spankind
 // Dash0 docs: https://www.dash0.com/docs/dash0/monitoring/synthetics/synthetic-monitoring , https://www.dash0.com/docs/dash0/monitoring/synthetics/explore-run-details
 //
 // Facts used (each read on the page named in its parentheses, 2026-11-07, as levels/synthetic-checks.mjs uses them): a SERVER span
@@ -22,7 +24,7 @@
 // events for a refused handshake depends on the product and is not claimed.
 //
 // Invented for the game: the company, the hostnames, every number and time, the curl line (curl's usual form for an expired
-// certificate, shown as illustration), the callers view, the load balancer behind the CDN, and the alert rules. Every figure the views
+// certificate, abridged and shown as illustration, since curl's lines differ by version and TLS backend), the callers view, the load balancer behind the CDN, and the alert rules. Every figure the views
 // and the answers state is derived from TABLE below and pinned in test/everything-is-green.test.mjs, so the story and the
 // arithmetic cannot disagree.
 //
@@ -45,9 +47,9 @@ export const TABLE = {
   internal: 240, // requests a window from internal tools, which reach the origin directly
   lastWeek: { at: '09:15', requests: 12300 }, // the same window a week earlier, a normal morning
   expiresAt: '08:00',
-  rules: { errorRatioPct: 2, burnRate: 14.4, p99LimitMs: 1000, rateFloor: 0.5 },
+  rules: { errorRatioPct: 1, burnRate: 14.4, p99LimitMs: 800, rateFloor: 0.5 },
   healthPassed: 60, // of the last 60 one-minute runs
-  hourWindows: 12, // 5-minute windows in the hour behind the 1-hour burn rate
+  outsideAt: '09:22', // the on-call makes the outside request after the 09:21 page
 };
 
 const ratioPct = (w) => Math.round((w.errors / w.requests) * 1000) / 10;
@@ -57,7 +59,7 @@ const [BEFORE, FIRST, NOW] = TABLE.windows;
 const visitors = (w) => w.requests - TABLE.internal;
 const lastWeekVisitors = TABLE.lastWeek.requests - TABLE.internal;
 const dropPct = Math.round(((BEFORE.requests - FIRST.requests) / BEFORE.requests) * 100);
-const hourRequests = TABLE.hourWindows * NOW.requests;
+const rateHalf = TABLE.rules.rateFloor * TABLE.lastWeek.requests; // the line a request-rate rule waits for, from the usual for the hour on the board
 
 const row = (cells, th) => `<tr>${cells.map((c, i) => (th && i === 0 ? `<th scope="row">${c}</th>` : `<td>${c}</td>`)).join('')}</tr>`;
 
@@ -94,8 +96,12 @@ const RULES_VIEW =
   '<p>No rule watches how many requests arrive.</p>';
 
 const OUTSIDE_VIEW =
-  `<p>A request from a laptop outside the network, at ${NOW.at}, to the shop's public hostname:</p>` +
-  '<pre><code>$ curl -sS -I https://shop.kettle.example/\n' +
+  `<p>A request from a laptop outside the network, at ${TABLE.outsideAt}, to the shop's public hostname (curl output, abridged):</p>` +
+  '<pre><code>$ curl -v -I https://shop.kettle.example/\n' +
+  '* Host shop.kettle.example:443 was resolved.\n' +
+  '* Connected to shop.kettle.example (203.0.113.10) port 443\n' +
+  '[...]\n' +
+  '* SSL certificate problem: certificate has expired\n' +
   'curl: (60) SSL certificate problem: certificate has expired</code></pre>' +
   `<p>The certificate the CDN edge serves for <code>shop.kettle.example</code> ends at ${TABLE.expiresAt} today. The same request to the origin by its internal name returns 200.</p>`;
 
@@ -111,8 +117,8 @@ const SCENARIO = {
   views: [
     { id: 'span-numbers', label: 'Server spans of the shop', costMin: 3, kind: 'clue', html: SPANS_VIEW },
     { id: 'who-calls', label: 'Requests by caller', costMin: 3, kind: 'clue', html: CALLERS_VIEW },
-    { id: 'alert-rules', label: 'Alert rules and checks', costMin: 4, kind: 'clue', html: RULES_VIEW },
     { id: 'outside-request', label: 'A request from outside', costMin: 3, kind: 'clue', html: OUTSIDE_VIEW },
+    { id: 'alert-rules', label: 'Alert rules and checks', costMin: 4, kind: 'clue', html: RULES_VIEW },
     {
       id: 'origin-pods',
       label: 'Pods behind the load balancer',
@@ -125,7 +131,7 @@ const SCENARIO = {
       label: 'Recent deploys and config changes',
       costMin: 2,
       kind: 'neutral',
-      html: '<p>The last deploy of the shop was on Tuesday, and no configuration changed today. Nothing was released near 08:00.</p>',
+      html: '<p>The last deploy of the shop was on Tuesday, and nothing was released near 08:00.</p>',
     },
     {
       id: 'database',
@@ -159,8 +165,8 @@ const SCENARIO = {
       label: 'The certificate on the CDN edge has expired, so browsers refuse to connect',
       right: true,
       why:
-        `Requests fell from ${fmt(BEFORE.requests)} to ${fmt(FIRST.requests)} in the window starting ${FIRST.at}, and only internal tools still send any: no browser request reaches the shop. ` +
-        `A request from outside fails on an expired certificate that ends at ${TABLE.expiresAt}. The monitoring is green because it measures requests that arrive: ` +
+        `In the span numbers, requests fell from ${fmt(BEFORE.requests)} to ${fmt(FIRST.requests)} in the window starting ${FIRST.at}, and the callers view shows that only internal tools still send any: no browser request reaches the shop. ` +
+        `The request from outside resolves the hostname and connects, then fails on a certificate that ends at ${TABLE.expiresAt}. The monitoring is green because it measures requests that arrive: ` +
         `${fmt(NOW.errors)} of ${fmt(NOW.requests)} failed is ${one(ratioPct(NOW))}%, the burn rate is ${one(burn(NOW))}, and the health check goes to the origin from inside the cluster, where the certificate is never presented.`,
     },
     {
@@ -169,7 +175,8 @@ const SCENARIO = {
       right: false,
       why:
         'The Collector refused and failed to export nothing apart from 90 seconds of retries at 06:42, and the inventory sync job\'s span arrives in every window. ' +
-        `The load balancer, which does not use spans, counts the same ${fmt(NOW.requests)} requests in the ${NOW.at} window, so the requests are missing before they reach telemetry, not after.`,
+        `The load balancer, which does not use spans, counts the same ${fmt(NOW.requests)} requests in the ${NOW.at} window, so the requests are missing before they reach telemetry, not after. ` +
+        'And dropped spans could not make a visitor\'s request fail on a certificate.',
     },
     {
       id: 'payment-provider-slow',
@@ -178,6 +185,14 @@ const SCENARIO = {
       why:
         'The slow calls ran from 09:02 to 09:06, more than an hour after the traffic fell, and they were test orders from internal tools. ' +
         `Shoppers cannot give up at checkout when they never load the page: browsers sent ${fmt(visitors(NOW))} requests in the ${NOW.at} window against ${fmt(lastWeekVisitors)} a week earlier.`,
+    },
+    {
+      id: 'dns-lapsed',
+      label: 'The shop\'s public hostname no longer resolves, because the DNS record or the domain lapsed',
+      right: false,
+      why:
+        'Only the request from outside rules this out, and it does: the hostname resolved and the connection opened, and the request failed afterwards, at the certificate (curl error 60). ' +
+        'A name that no longer resolved would have failed earlier, with curl error 6, Could not resolve host, before any certificate was presented.',
     },
     {
       id: 'origin-overloaded',
@@ -197,34 +212,34 @@ const SCENARIO = {
 const PAGE = [
   {
     key: 'outside-check',
-    label: 'A synthetic check that requests the public hostname from outside the network every minute and pages when the request fails',
+    label: 'A probe of the public hostname, run every minute from a public location, that pages on failure',
     right: true,
     why:
-      'The check makes the request the way a visitor does, so it meets the expired certificate that the spans and the internal health check never meet. ' +
+      'The check makes the request from outside the network the way a visitor does, so it meets the expired certificate that the spans and the internal health check never meet. ' +
       'In Dash0, a synthetic check sends requests at regular intervals from locations you choose and fires a notification when an assertion fails, and a check run breaks the request into DNS resolution, TCP connection and the SSL/TLS handshake and shows a TLS error as such. ' +
       'It pages in the first minute after the certificate ends and says which step failed.',
   },
   {
     key: 'tighter-ratio',
-    label: `The same error-ratio alert on the shop's server spans, with the threshold lowered from ${TABLE.rules.errorRatioPct}% to 0.1%`,
-    why: `The ratio is ${fmt(NOW.errors)} of ${fmt(NOW.requests)}, which is ${one(ratioPct(NOW))}% under any threshold above zero. A failed handshake never becomes a span, so no threshold can make the spans report it.`,
+    label: `An error-ratio alert on the shop's server spans, with the threshold lowered from ${TABLE.rules.errorRatioPct}% to 0.1%`,
+    why: `The ratio is ${fmt(NOW.errors)} of ${fmt(NOW.requests)}, which is ${one(ratioPct(NOW))}% under any threshold above zero. A failed handshake never becomes a span of the shop's service, so no threshold on the shop's server spans can make them report it.`,
   },
   {
     key: 'load-balancer-sli',
-    label: 'The SLI computed from the load balancer\'s request counts instead of from server spans',
+    label: 'An SLI computed from the load balancer\'s request counts instead of from server spans',
     why:
       `The load balancer is the better source for requests it turned away (7.2), but here the refusal happens in front of it, at the CDN edge. It counted ${fmt(NOW.requests)} requests in the ${NOW.at} window, all good, so its ratio reads ${one(ratioPct(NOW))}% failed just as the spans do.`,
   },
   {
     key: 'faster-health',
-    label: 'The same /health check on the origin, run every 10 seconds instead of every minute',
-    why: `Every run already passes (${TABLE.healthPassed} of ${TABLE.healthPassed}), and a faster run passes faster. The check goes to the origin from inside the cluster, a path that never meets the CDN edge or its certificate.`,
+    label: 'A /health check on the origin from inside the cluster, run every 10 seconds instead of every minute',
+    why: `Every run already passes (${TABLE.healthPassed} of ${TABLE.healthPassed}), and running it more often only repeats a passing result. The check goes to the origin from inside the cluster, a path that never meets the CDN edge or its certificate.`,
   },
   {
     key: 'rate-drop',
     label: `An alert on the request rate of the shop's server spans falling below half of the usual for that hour`,
     why:
-      `This one would have fired: ${fmt(FIRST.requests)} requests in the ${FIRST.at} window against ${fmt(BEFORE.requests)} a window before, far under half. ` +
+      `This one would have fired: the ${NOW.at} window holds ${fmt(NOW.requests)} requests against ${fmt(TABLE.lastWeek.requests)} at that hour a week earlier, far under the half (${fmt(rateHalf)}) it waits for. ` +
       'It says only that traffic fell, and a certificate, a DNS fault, a bad release and a holiday all look the same in it. A probe from outside names the step that failed, which is what the question asks for.',
   },
 ];

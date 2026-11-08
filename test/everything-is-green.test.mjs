@@ -43,14 +43,14 @@ test('everything-is-green: scenario pin: id, budget, answerAfterViews, views wit
   assert.deepEqual(
     S.views.map((v) => `${v.id}|${v.kind}|${v.costMin}`),
     [
-      'span-numbers|clue|3', 'who-calls|clue|3', 'alert-rules|clue|4', 'outside-request|clue|3',
+      'span-numbers|clue|3', 'who-calls|clue|3', 'outside-request|clue|3', 'alert-rules|clue|4',
       'origin-pods|neutral|2', 'last-deploy|neutral|2', 'database|neutral|2',
       'collector-health|herring|4', 'payment-latency|herring|3',
     ],
   );
   assert.deepEqual(
     S.hypotheses.map((h) => `${h.id}|${h.right}`),
-    ['expired-certificate|true', 'collector-dropping|false', 'payment-provider-slow|false', 'origin-overloaded|false'],
+    ['expired-certificate|true', 'collector-dropping|false', 'payment-provider-slow|false', 'dns-lapsed|false', 'origin-overloaded|false'],
   );
 });
 
@@ -75,7 +75,7 @@ test('everything-is-green: a scored Act 7 boss lighting existing nodes, no cards
   );
   assert.equal(LIVE.acts.find((a) => a.id === 'act-7').bossId, ID);
   assert.deepEqual(BOSS.play.steps.map((s) => Object.keys(s).find((k) => ['incident', 'choice'].includes(k))), ['incident', 'choice']);
-  assert.equal(S.hypotheses.length, 4);
+  assert.equal(S.hypotheses.length, 5);
 });
 
 test('everything-is-green: shares storefront and api-gateway with 7.4, and the boss waits for the act\'s four levels', () => {
@@ -122,8 +122,8 @@ test('the table is pinned: three windows, 240 internal requests a window, a norm
     { at: '09:15', requests: 240, errors: 0, p99Ms: 190 },
   ]);
   assert.deepEqual(
-    { sloTarget: TABLE.sloTarget, internal: TABLE.internal, lastWeek: TABLE.lastWeek, expiresAt: TABLE.expiresAt, rules: TABLE.rules, healthPassed: TABLE.healthPassed, hourWindows: TABLE.hourWindows },
-    { sloTarget: 0.999, internal: 240, lastWeek: { at: '09:15', requests: 12300 }, expiresAt: '08:00', rules: { errorRatioPct: 2, burnRate: 14.4, p99LimitMs: 1000, rateFloor: 0.5 }, healthPassed: 60, hourWindows: 12 },
+    { sloTarget: TABLE.sloTarget, internal: TABLE.internal, lastWeek: TABLE.lastWeek, expiresAt: TABLE.expiresAt, rules: TABLE.rules, healthPassed: TABLE.healthPassed, outsideAt: TABLE.outsideAt },
+    { sloTarget: 0.999, internal: 240, lastWeek: { at: '09:15', requests: 12300 }, expiresAt: '08:00', rules: { errorRatioPct: 1, burnRate: 14.4, p99LimitMs: 800, rateFloor: 0.5 }, healthPassed: 60, outsideAt: '09:22' },
   );
 });
 
@@ -141,11 +141,10 @@ test('the span-based ratio is defined, not 0/0: every window has requests, and t
 test('green is explained by the data: every rule reads under its line at the late window, and only the request count would have moved', () => {
   assert.equal(ratio(NOW) * 100 < TABLE.rules.errorRatioPct, true, 'error ratio');
   assert.equal(burn(NOW) < TABLE.rules.burnRate, true, 'burn rate, 5 minutes');
-  assert.equal(TABLE.hourWindows * NOW.requests, 2880, 'the 1-hour window holds 2,880 requests and none failed');
   assert.equal(NOW.p99Ms < TABLE.rules.p99LimitMs, true, 'p99');
   assert.equal(NOW.p99Ms <= BEFORE.p99Ms, true, 'faster than before, never slower');
   assert.equal(TABLE.healthPassed, 60, 'every health run passed');
-  assert.equal(FIRST.requests < TABLE.rules.rateFloor * TABLE.lastWeek.requests, true, 'a request-rate rule would have fired; none exists');
+  assert.equal(NOW.requests < TABLE.rules.rateFloor * TABLE.lastWeek.requests, true, 'a request-rate rule would have fired against the usual for the hour on the board; none exists');
   const rules = plain(view('alert-rules').html);
   assert.equal(rules.includes('No rule watches how many requests arrive'), true);
   assert.equal(/request (rate|count)/i.test(rules.replace('how many requests arrive', '')), false, 'no rate rule is listed');
@@ -167,10 +166,11 @@ test('the views state exactly the table\'s figures', () => {
   assert.equal(callers.includes('Counted by the load balancer 240 12,300'), true);
   assert.equal(TABLE.lastWeek.requests - TABLE.internal, 12060);
   const rules = plain(view('alert-rules').html);
-  for (const w of ['0.0%', 'above 2%', 'above 14.4 in both', '190 ms', 'above 1,000 ms', 'passed 60 of 60']) assert.equal(rules.includes(w), true, w);
+  for (const w of ['0.0%', 'above 1%', 'above 14.4 in both', '190 ms', 'above 800 ms', 'passed 60 of 60']) assert.equal(rules.includes(w), true, w);
   const outside = plain(view('outside-request').html);
   assert.equal(outside.includes('certificate has expired') && outside.includes(`ends at ${TABLE.expiresAt}`), true);
   assert.equal(outside.includes('internal name returns 200'), true);
+  assert.equal(outside.includes(`at ${TABLE.outsideAt}`) && outside.includes('abridged') && outside.includes('was resolved') && outside.includes('Connected to') && outside.includes('curl: (60)'), true, 'dated after the page, marked abridged, resolved and connected, then error 60');
 });
 
 test('the time line holds: the certificate ends at 08:00, the last good window is 07:55, the first bad one 08:00, the first report 08:10, the page 09:21', () => {
@@ -179,6 +179,7 @@ test('the time line holds: the certificate ends at 08:00, the last good window i
   assert.equal(FIRST.at, TABLE.expiresAt);
   const alert = plain(S.alert.html);
   assert.equal(alert.includes('PAGE 09:21') && alert.includes('since 08:10'), true);
+  assert.equal(minutes(TABLE.outsideAt) > minutes('09:21'), true, 'the outside request is made after the page');
   assert.equal(minutes('08:10') > minutes(TABLE.expiresAt), true);
   assert.equal(alert.includes('certificate') || alert.includes('CDN'), false, 'the alert does not give the cause away');
   for (const id of ['span-numbers', 'who-calls', 'alert-rules']) assert.equal(/certificate|TLS|CDN edge, then/.test(plain(view(id).html).replace(/Visitors come through the CDN edge, then the load balancer, then the pods;/, '')), false, `${id} does not name the cause`);
@@ -190,7 +191,7 @@ test('herrings and neutrals are contradicted by the clues, in times and numbers'
   const pay = plain(view('payment-latency').html);
   assert.equal(pay.includes('09:02') && pay.includes('09:06') && pay.includes('14 test orders') && pay.includes('since 08:00'), true);
   assert.equal(plain(view('origin-pods').html).includes('no restarts'), true);
-  assert.equal(plain(view('last-deploy').html).includes('no configuration changed today'), true);
+  assert.equal(plain(view('last-deploy').html).includes('nothing was released near 08:00'), true);
   assert.equal(plain(view('database').html).includes('11 of 200'), true);
 });
 
@@ -210,7 +211,7 @@ test('sources: Spec lines are opentelemetry.io, Dash0 docs lines are dash0.com, 
   const lines = src.split('\n');
   const spec = lines.filter((l) => /^\/\/ Spec: /.test(l)).flatMap((l) => l.match(/https:\/\/[^\s,]+/g) ?? []);
   assert.equal(spec.length > 0 && spec.every((u) => new URL(u).host === 'opentelemetry.io'), true);
-  for (const u of ['https://opentelemetry.io/docs/specs/otel/trace/api/#spankind', 'https://opentelemetry.io/docs/specs/semconv/http/http-spans/']) assert.equal(spec.includes(u), true, u);
+  assert.deepEqual(spec, ['https://opentelemetry.io/docs/specs/otel/trace/api/#spankind'], 'only the page a claim rests on (SpanKind)');
   const docs = lines.filter((l) => /^\/\/ Dash0 docs: /.test(l)).flatMap((l) => l.match(/https:\/\/[^\s,]+/g) ?? []);
   assert.equal(docs.length, 2);
   assert.equal(docs.every((u) => new URL(u).host === 'www.dash0.com' && u.startsWith('https://www.dash0.com/docs/dash0/monitoring/synthetics/')), true);
@@ -269,7 +270,7 @@ test('everything-is-green: the first screen shows the alert, a full budget, nine
   assert.equal(budget(), '20 min left. 0 of 20 min spent');
   assert.equal(board(ID).cells.total, 20);
   assert.equal(qa('[data-view]').length, 9);
-  assert.equal(locked(), 'true,true,true,true');
+  assert.equal(locked(), 'true,true,true,true,true');
   assert.equal(q('#eig-next').disabled, true);
   assert.equal(qa('[data-finish]').length, 0, 'Finish is on the closing step');
 });
@@ -278,20 +279,20 @@ test('everything-is-green: it takes three clue views to unlock the answers (answ
   start();
   open('span-numbers');
   open('outside-request');
-  assert.equal(locked(), 'true,true,true,true');
+  assert.equal(locked(), 'true,true,true,true,true');
   open('who-calls');
-  assert.equal(locked(), 'false,false,false,false');
+  assert.equal(locked(), 'false,false,false,false,false');
 });
 
 test('everything-is-green: neutral and herring views never unlock the answers; only clue views do', () => {
   start();
   for (const id of [...NEUTRALS, ...HERRINGS]) open(id);
-  assert.equal(locked(), 'true,true,true,true', 'every neutral and herring view is open and the answers are still locked');
+  assert.equal(locked(), 'true,true,true,true,true', 'every neutral and herring view is open and the answers are still locked');
   open('span-numbers');
   open('who-calls');
-  assert.equal(locked(), 'true,true,true,true', 'two clues are still not enough');
+  assert.equal(locked(), 'true,true,true,true,true', 'two clues are still not enough');
   open('alert-rules');
-  assert.equal(locked(), 'false,false,false,false');
+  assert.equal(locked(), 'false,false,false,false,false');
 });
 
 // ---- reference path (I7) and shortcuts -----------------------------------------------
@@ -343,7 +344,7 @@ test('everything-is-green: shortcut impossible: three neutrals leave every hypot
   const { finished, slips } = start();
   for (const id of NEUTRALS) open(id);
   assert.equal(budget(), '14 min left. 6 of 20 min spent');
-  assert.equal(locked(), 'true,true,true,true');
+  assert.equal(locked(), 'true,true,true,true,true');
   assert.equal(q('#eig-next').disabled, true);
   assert.equal(finished.length, 0);
   assert.equal(slips.mistakes, 0);
@@ -354,9 +355,9 @@ test('everything-is-green: shortcut impossible: neutrals plus two clues still lo
   for (const id of NEUTRALS) open(id);
   open('span-numbers');
   open('who-calls');
-  assert.equal(locked(), 'true,true,true,true');
+  assert.equal(locked(), 'true,true,true,true,true');
   open('outside-request');
-  assert.equal(locked(), 'false,false,false,false');
+  assert.equal(locked(), 'false,false,false,false,false');
   guess(RIGHT);
   finish();
   assert.equal(slips.mistakes, 0);
@@ -472,9 +473,11 @@ test('everything-is-green: the closing step has one right addition, an outside c
   const healthWhy = plain(choice('faster-health').why);
   assert.equal(healthWhy.includes('60 of 60') && healthWhy.includes('inside the cluster'), true);
   const rateWhy = plain(choice('rate-drop').why);
-  assert.equal(rateWhy.includes('would have fired') && rateWhy.includes('240 requests') && rateWhy.includes('12,000') && rateWhy.includes('names the step'), true, 'the rate alert is fairly granted as firing; it does not name the step');
+  assert.equal(rateWhy.includes('would have fired') && rateWhy.includes('240 requests') && rateWhy.includes('12,300') && rateWhy.includes('6,150') && !rateWhy.includes('12,000') && rateWhy.includes('names the step'), true, 'the rate alert is fairly granted as firing; it does not name the step');
   assert.equal(plain(BOSS.play.steps[1].question).includes('named the step that failed'), true, 'the question asks for what only the probe gives');
   assert.equal(choice('tighter-ratio').label.includes('0.1%'), true);
+  assert.equal(plain(choice('faster-health').why).includes('running it more often only repeats a passing result'), true);
+  assert.equal(plain(choice('tighter-ratio').why).includes('never becomes a span of the shop'), true, 'scoped to the shop\'s own spans');
 });
 
 test('everything-is-green: only the outside check meets the question: the others either stay at 0% or cannot name the step', () => {
@@ -482,7 +485,8 @@ test('everything-is-green: only the outside check meets the question: the others
   assert.equal(ratioNow < 0.1, true, 'under the lowered 0.1% line');
   assert.equal(TABLE.healthPassed === 60, true);
   assert.equal(NOW.requests === TABLE.internal, true, 'the load balancer\'s count equals the internal requests, all good');
-  assert.equal(FIRST.requests < TABLE.rules.rateFloor * BEFORE.requests, true, 'the rate alert fires on the first bad window');
+  assert.equal(TABLE.rules.rateFloor * TABLE.lastWeek.requests, 6150, 'half of the usual for the hour on the board');
+  assert.equal(NOW.requests < 6150, true, 'the rate alert fires against that one baseline');
 });
 
 test('everything-is-green: a wrong answer on the closing step costs one mistake, once, and leaves 4 stars', () => {
@@ -514,4 +518,64 @@ test('everything-is-green: focus walk: first view, an opened heading, the win ca
   assert.equal(focus.last(), '#eig-finish');
   assert.equal(q('[data-finish]').id, 'eig-finish');
   assert.deepEqual(focus.unfocusable(), []);
+});
+
+// ---- the outside request is necessary (#135 review) ------------------------------------
+
+// The views that refute each wrong hypothesis, and the words in each view that do it.
+const REFUTED_BY = {
+  'collector-dropping': { 'collector-health': 'no refusals', 'who-calls': 'Counted by the load balancer 240', 'outside-request': 'certificate has expired' },
+  'payment-provider-slow': { 'payment-latency': 'no browser visitors since 08:00', 'who-calls': 'Browsers 0', 'outside-request': 'certificate has expired' },
+  'dns-lapsed': { 'outside-request': 'was resolved' },
+  'origin-overloaded': { 'origin-pods': 'None is under pressure', 'span-numbers': '190 ms', 'outside-request': 'internal name returns 200' },
+};
+
+test('each refutation is in the text of the view it names, and nothing outside the outside request mentions DNS, the name or a record', () => {
+  for (const [h, byView] of Object.entries(REFUTED_BY)) {
+    for (const [v, words] of Object.entries(byView)) assert.equal(plain(view(v).html).includes(words), true, `${h} / ${v}`);
+  }
+  for (const v of S.views.filter((x) => x.id !== 'outside-request')) {
+    assert.equal(/DNS|resolv|domain|record|hostname|name server/i.test(plain(v.html)), false, `${v.id} cannot refute a lapsed name`);
+  }
+  assert.equal(/DNS|resolv|domain|record|hostname/i.test(plain(S.alert.html)), false);
+});
+
+test('every board that unlocks the answers without the outside request keeps at least two defensible hypotheses (the right one and the lapsed name); with it, exactly one', () => {
+  const ids = S.views.map((v) => v.id);
+  let withOut = 0;
+  let without = 0;
+  for (let mask = 0; mask < 1 << ids.length; mask += 1) {
+    const set = ids.filter((_, i) => mask & (1 << i));
+    let st = newIncident(S);
+    for (const id of set) st = openView(S, st, id).state;
+    if (!canAnswer(S, st)) continue;
+    const defensible = S.hypotheses.filter((h) => h.right || !Object.keys(REFUTED_BY[h.id]).some((v) => set.includes(v))).map((h) => h.id);
+    if (set.includes('outside-request')) {
+      withOut += 1;
+      assert.deepEqual(defensible, [RIGHT], set.join());
+    } else {
+      without += 1;
+      assert.equal(defensible.length >= 2 && defensible.includes('dns-lapsed'), true, set.join());
+    }
+  }
+  assert.equal(without, 32, 'the three other clues with any of the five neutrals and herrings');
+  assert.equal(withOut, 128);
+});
+
+test('the right hypothesis\'s why cites only views that unlock boards can hold: it names the outside request, and the others by their view', () => {
+  const right = plain(S.hypotheses.find((h) => h.id === RIGHT).why);
+  assert.equal(right.includes('The request from outside resolves the hostname and connects, then fails'), true);
+  assert.equal(right.includes('In the span numbers') && right.includes('the callers view shows'), true);
+  assert.equal(S.hypotheses.find((h) => h.id === 'dns-lapsed').why.includes('curl error 60'), true);
+});
+
+test('the closing labels are of similar length: the right one is not the longest, and nothing marks it by shape or by echoing the clue tile', () => {
+  const lens = pick.map((c) => c.label.length);
+  const right = choice('outside-check').label;
+  assert.equal(right.length < Math.max(...lens), true, 'the right label is not the longest');
+  assert.equal(right.length > Math.min(...lens), true, 'nor the shortest');
+  assert.equal(Math.max(...lens) - Math.min(...lens) <= 20, true, lens.join());
+  assert.equal(pick.some((c) => /^The same\b/.test(c.label)), false, 'no "The same ..." pattern');
+  assert.equal(/request from outside/i.test(right), false, 'does not echo the clue tile');
+  assert.equal(pick.every((c) => /^An? /.test(c.label)), true, 'one shape for all five');
 });
