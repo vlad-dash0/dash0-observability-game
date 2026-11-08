@@ -86,6 +86,7 @@ const GB = {
 const SIGNAL = {
   id: 'wcm-signal',
   unit: 'cost units per day',
+  unitOne: 'cost unit per day',
   cap: 40,
   helps: { hints: true },
   hint:

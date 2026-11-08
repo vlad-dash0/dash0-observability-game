@@ -521,3 +521,28 @@ test('a spec id that starts with a digit is invalid (it is an element id and a r
   assert.match(validateTradeoffSpec({ ...fixture(), id: '9-plan' }).join(';'), /spec id "9-plan" is not kebab-case/);
   assert.deepEqual(validateTradeoffSpec(fixture()), []);
 });
+
+test('a spec with unitOne says exactly 1 in it: the chip and the cap line; other amounts keep the plural unit', () => {
+  const s = fixture();
+  s.unit = 'cost units per day';
+  s.unitOne = 'cost unit per day';
+  s.knobs[1].options[0].cost = 1;
+  setup(s);
+  assert.equal(q('[data-knob="attrs"] [data-option="none"] .ui-chip').textContent, '1 cost unit per day');
+  assert.equal(q('[data-knob="attrs"] [data-option="tier"] .ui-chip').textContent, '3 cost units per day');
+  assert.equal(capText(tradeoffView(s, { picks: { sampling: 'tail', attrs: 'tier' }, tried: [], solved: false })), 'Within the cap, 1 cost unit per day to spare.');
+  assert.equal(capText(tradeoffView(s, { picks: { sampling: 'tail', attrs: 'user' }, tried: [], solved: false })), 'Over the cap by 5 cost units per day.');
+  const plain = fixture();
+  plain.knobs[1].options[0].cost = 1;
+  setup(plain);
+  assert.equal(q('[data-knob="attrs"] [data-option="none"] .ui-chip').textContent, '1 GB/day', 'no unitOne: the unit as written');
+  assert.match(validateTradeoffSpec({ ...fixture(), unitOne: ' ' }).join(';'), /unitOne is not non-empty text/);
+});
+
+test('the score-card rule names hints only when the step has them', () => {
+  setup(withHints());
+  assert.match(text('.ui-score-rule'), /a failed Check \(over the cap, or a need dropped\), a hint\./);
+  setup();
+  assert.match(text('.ui-score-rule'), /a failed Check \(over the cap, or a need dropped\)\./);
+  assert.equal(text('.ui-score-rule').includes('hint'), false);
+});
