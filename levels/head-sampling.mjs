@@ -46,6 +46,9 @@ const PLAN = {
   id: 'hs-plan',
   unit: 'spans/s',
   cap: CAP,
+  helps: { hints: true },
+  hint:
+    'The decision is made once, at the root. Ask what a child service does with a trace whose root was dropped, then add up the spans a second the backend would take.',
   knobs: [
     {
       id: 'sampler',

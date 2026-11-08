@@ -282,7 +282,6 @@ const RETIRED = [
 ];
 
 const LEGACY = {
-  'lib/widgets/trade-off-view.mjs': ['btn', 'feedback', 'show', 'tradeoff-keeps', 'tradeoff-option'],
 };
 
 test('T7 retired classes: only LEGACY files emit them, and LEGACY has no stale entry', () => {

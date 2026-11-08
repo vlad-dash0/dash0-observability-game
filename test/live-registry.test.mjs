@@ -239,6 +239,7 @@ const HINTLESS = {
   'semantic-convention-versions': ['spot'],
   'migrating-vendors': ['sort'],
   'frontend-rum': ['build'],
+  'the-34-percent-error-rate': ['tradeoff'], // a live-demo question: no helps on its Trade-off (#160)
 };
 
 test('which widgets have no hints on each live level is pinned, and the how-to-play help says so', () => {
@@ -249,7 +250,7 @@ test('which widgets have no hints on each live level is pinned, and the how-to-p
     const want = HINTLESS[id] ?? [];
     assert.deepEqual([...lv.hintless], want, id);
     for (const t of howToView(lv).topics) {
-      const none = want.includes(t.key) || t.key === 'choice' || t.key === 'tradeoff';
+      const none = want.includes(t.key) || t.key === 'choice';
       assert.equal(t.hints === NO_HINTS, none, `${id} ${t.key}`);
     }
   }

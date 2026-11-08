@@ -92,8 +92,12 @@ test('option and options: kinds as modifiers, states as attributes, radio as a l
   assert.equal(option({ attr: 'hyp', value: 'h1', labelHtml: 'H', kind: 'hypothesis', state: 'locked' }),
     '<button type="button" class="ui-option ui-option--hypothesis" data-hyp="h1" data-state="locked" aria-disabled="true"><span class="ui-option-label">H</span></button>');
   assert.equal(option({ attr: 'opt', value: 'o1', labelHtml: 'Keep 10%', kind: 'radio', name: 'sampling', pressed: true }),
-    '<label class="ui-option ui-option--radio" data-opt="o1"><input type="radio" class="ui-option-input" name="sampling" value="o1" checked>' +
+    '<label class="ui-option ui-option--radio" data-opt="o1" data-picked><input type="radio" class="ui-option-input" name="sampling" value="o1" checked>' +
     '<span class="ui-option-label">Keep 10%</span></label>');
+  // The picked radio card carries data-picked (the CSS has no :has), an unpicked one does not.
+  assert.equal(option({ attr: 'opt', value: 'o1', labelHtml: 'K', kind: 'radio', name: 's', pressed: true }).includes(' data-picked'), true);
+  assert.equal(option({ attr: 'opt', value: 'o1', labelHtml: 'K', kind: 'radio', name: 's', pressed: false }).includes('data-picked'), false);
+  assert.equal(option({ attr: 'opt', value: 'o1', labelHtml: 'K', kind: 'radio', name: 's' }).includes('data-picked'), false);
   for (const [state, want] of [['correct', 'correct'], ['opened', 'opened']]) {
     assert.match(option({ attr: 'x', value: 'v', labelHtml: 'l', state }), new RegExp(`data-state="${want}"`));
   }
@@ -120,6 +124,7 @@ test('meter: 20 cells by default, spent then preview then left; the text line is
   const over = meter({ id: 'cost', label: 'Cost', value: 12, max: 10, cells: 5, over: true });
   assert.deepEqual([...over.matchAll(/data-cell="(\w+)"/g)].map((m) => m[1]), Array(5).fill('over'));
   assert.match(over, /12 of 10<\/span>/);
+  assert.match(meter({ id: 'big', label: 'B', value: 4800, max: 600, unit: 'spans/s', cells: 4 }), /4,800 of 600 spans\/s<\/span>/, 'en-US grouping, as an option card writes it');
   const half = meter({ id: 'h', label: 'H', value: 1, max: 4, cells: 4, previewCells: 9 });
   assert.deepEqual([...half.matchAll(/data-cell="(\w+)"/g)].map((m) => m[1]), ['spent', 'preview', 'preview', 'preview'], 'preview stops at the end');
 });
@@ -153,6 +158,13 @@ test('field, radio, checkbox', () => {
     '<label class="ui-check"><input type="radio" class="ui-check-input" name="k" value="v" checked><span class="ui-check-label">V</span></label>');
   assert.equal(checkbox({ id: 'c1', labelHtml: 'C', disabled: true }),
     '<label class="ui-check"><input type="checkbox" class="ui-check-input" id="c1" disabled><span class="ui-check-label">C</span></label>');
+});
+
+test('radioGroup legendHtml: the legend is trusted HTML (a question with code); exactly one of legend and legendHtml', () => {
+  assert.equal(radioGroup({ legendHtml: 'The <code>x</code> knob', itemsHtml: '' }),
+    '<fieldset class="ui-group"><legend class="ui-group-legend">The <code>x</code> knob</legend></fieldset>');
+  assert.throws(() => radioGroup({ legend: 'a', legendHtml: 'b', itemsHtml: '' }), { name: 'TypeError', message: /exactly one of legend and legendHtml/ });
+  assert.throws(() => radioGroup({ itemsHtml: '' }), { name: 'TypeError', message: /exactly one/ });
 });
 
 test('radioGroup: a fieldset named by its legend; legend escaped, rows trusted', () => {

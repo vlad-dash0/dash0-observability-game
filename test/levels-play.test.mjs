@@ -623,11 +623,9 @@ async function until(sel, max = 50) {
 
 const DEFINED = definedClasses();
 // Classes levels render that no stylesheet defines yet, each owned by a later phase of #158:
-// P5 #160 (Trade-off). Sorted; only shrinks: a phase deletes its own, and an entry
-// no level renders any more fails ("stale"). P7 asserts it is empty.
-const UNDEFINED_ALLOW = [
-  'tradeoff', 'tradeoff-label', 'tradeoff-model', 'tradeoff-need-head', // P5 #160
-];
+// Empty since P5 #160 (Trade-off) took the last entries. Sorted; only shrinks: a phase deletes its
+// own, and an entry no level renders any more fails ("stale"). P7 asserts it is empty.
+const UNDEFINED_ALLOW = [];
 const undefinedSeen = new Set();
 
 /** The classes in `steps` (renderStep strings) and `live` (seen on the page) that no stylesheet defines. */

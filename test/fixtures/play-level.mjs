@@ -87,6 +87,7 @@ export function playFixture() {
             id: 'fx-budget',
             unit: 'GB/day',
             cap: 12,
+            helps: { hints: true },
             knobs: [
               {
                 id: 'sampling',

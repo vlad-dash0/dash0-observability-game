@@ -58,7 +58,7 @@ function playAll(level, during = () => {}, run = start(level)) {
 
 const stars = (level) => (level.scored ? 5 : 0);
 /** The step types with a side column (a wide split and a success card). */
-const SIDE = ['sort', 'build', 'incident', 'spot', 'query', 'configure'];
+const SIDE = ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query', 'configure'];
 
 for (const level of LEVELS) {
   const steps = stepsOf(level);
@@ -99,7 +99,7 @@ for (const level of LEVELS) {
       if (i > 0) click(advanceId(level, i - 1));
       assert.equal(focus.names()[before], driver.first(spec), `step ${i + 1} starts here`);
       for (const sel of driver.solve(spec)) click(sel);
-      // A solved Build it, incident, Sort it, Spot it, Query it or Configure it step focuses its success heading (#146, #143, #156, #160); its Next is enabled.
+      // A solved Build it, incident, Sort it, Spot it, Trade-off, Query it or Configure it step focuses its success heading (#146, #143, #156, #160); its Next is enabled.
       const handOff = SIDE.includes(key) ? `#${spec.id}-win-title` : advanceId(level, i);
       assert.equal(focus.last(), handOff, `step ${i + 1} hands off to its button`);
       assert.equal(q(advanceId(level, i)).disabled, false, `step ${i + 1} opens its button`);
@@ -164,12 +164,12 @@ test('code is plain text: an <img onerror> in it renders escaped', () => {
 
 // ---- T12 (#158): the step frame comes from the kit; the step type decides its width -------
 
-test('P3 T12 every step type says whether its step is wide; Sort it, Build it, the incident board, Spot it, Query it and Configure it are the wide ones', () => {
+test('P3 T12 every step type says whether its step is wide; Sort it, Build it, the incident board, Spot it, Trade-off, Query it and Configure it are the wide ones', () => {
   for (const [key, type] of Object.entries(STEP_TYPES)) assert.equal(typeof type.wide, 'boolean', `${key}.wide`);
   assert.deepEqual(Object.keys(STEP_TYPES).filter((k) => STEP_TYPES[k].wide), SIDE);
 });
 
-test('T12 each step renders one kit step, wide by its type: a sort, build, incident, spot, query or configure step holds the board and its side column', () => {
+test('T12 each step renders one kit step, wide by its type: a sort, build, incident, spot, tradeoff, query or configure step holds the board and its side column', () => {
   const seen = [];
   playAll(FX, (i, { key }) => {
     const wide = STEP_TYPES[key].wide;
@@ -324,7 +324,8 @@ test('validatePlay names the widgets with no hint on any step, the way each moun
   assert.deepEqual(hintless([bare(query, 'query', 'hint')]), [], 'a query step with helps.hints has hints even with no authored hint (the widget rule)');
   const hintsOff = (step) => Object.assign(structuredClone(step), { query: { ...step.query, helps: { hints: false } } });
   assert.deepEqual(hintless([hintsOff(query)]), ['query']);
-  assert.deepEqual(hintless([choice, tradeoff]), [], 'choice and tradeoff never have hints, so they are never named');
+  assert.deepEqual(hintless([choice, tradeoff]), [], 'choice never has hints, so it is never named; a tradeoff with helps.hints has them');
+  assert.deepEqual(hintless([bare(tradeoff, 'tradeoff', 'helps')]), ['tradeoff'], 'a tradeoff step without helps.hints has no Hint button');
 });
 
 test('a play level derives its hintless list; a declared one must equal it', () => {
@@ -413,6 +414,8 @@ test('validatePlay names each problem as the design says', () => {
     [(p) => { p.steps[5].tradeoff.cap = 100; }, 'step 6 (tradeoff "fx-budget"): trade-off: every plan that keeps every need fits the cap, so the cap never bites'],
     [(p) => { p.steps[5].tradeoff.answer.attrs = 'user'; }, 'step 6 (tradeoff "fx-budget"): answer: the reference plan is over the cap by 5'],
     [(p) => { delete p.steps[5].question; }, 'step 6 (tradeoff "fx-budget"): needs a question'],
+    [(p) => { p.steps[5].tradeoff.helps = { hints: 1 }; }, 'step 6 (tradeoff "fx-budget"): helps: "hints" is not true or false'],
+    [(p) => { delete p.steps[5].tradeoff.helps; p.steps[5].tradeoff.hint = 'x'; }, 'step 6 (tradeoff "fx-budget"): hint: shown only when helps.hints is on'],
   ];
   for (const [edit, want] of cases) {
     const got = problems(edit);

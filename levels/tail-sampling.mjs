@@ -55,6 +55,9 @@ const BUDGET = {
   id: 'ts-budget',
   unit: 'MiB',
   cap: CAP,
+  helps: { hints: true },
+  hint:
+    'Each wait costs memory in proportion to the traces held while it runs. Ask which policies keep what the task needs, and which wait lets a whole trace arrive before the decision.',
   knobs: [
     {
       id: 'policies',

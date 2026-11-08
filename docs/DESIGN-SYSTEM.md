@@ -74,11 +74,11 @@ each function's JSDoc for the exact markup.
 | `panel({id, variant, headHtml, sections})` | panel | Card with sections; `inset`, `alert`, `drop` (dashed means drop zone only; Sort it no longer uses it, #261: it categorises with choice options and plain groups, no boxes). |
 | `chip({text, tone, dot, swatch, dashed})` | chip | Mono pill; `data-tone` neutral, success, error, hint, attention. |
 | `button({id, label, variant, disabled, finish, type, icon, describedBy})`, `nextButton(id)`, `finishButton(id)` | button | Pill; `primary` (red, D2), `ghost`, `hint`, `icon`; `describedBy` (an id) points a disabled button at its reason; Finish has `data-finish`. |
-| `option({attr, value, labelHtml, metaHtml, kind, pressed, state, disabled, hinted, name})`, `options({id, labelledBy, layout, itemsHtml})` | option | Selectable card and its group (list, grid, wrap). |
+| `option({attr, value, labelHtml, metaHtml, kind, pressed, state, disabled, hinted, name})`, `options({id, labelledBy, layout, itemsHtml})` | option | Selectable card and its group (list, grid, wrap). The `radio` kind is a label around a real `<input type="radio" name>`: the dot, the label, then the meta line beneath; a picked card carries `data-picked`. |
 | `feedback({id, bar})`, `setFeedback(el, tone, bodyHtml)`, `clearFeedback(el)` | feedback | The one feedback region; tones neutral, success, error (D7). |
-| `meter({id, label, value, max, cells, unit, previewCells, over})` | meter | Cells (20 by default) plus a text line that is the accessible value. |
+| `meter({id, label, value, max, cells, unit, previewCells, over})` | meter | Cells (20 by default) plus a text line that is the accessible value (en-US grouping, so 4800 reads 4,800). |
 | `fold({value, titleHtml, metaHtml, bodyHtml, open, fresh})` | fold | Evidence card that folds to one line: a native `<details>` (caret, an h4 title that takes focus by script, optional meta chips) around its body. `open` starts it open, `fresh` marks the newest (`data-fresh`). Approved by the owner for #143 (2026-11-05); its look awaits the owner's D5 sign-off from that PR's screenshots. |
-| `field({id, label, kind, rows, value, readonly, autocompleteOff, noteHtml})`, `radio({...})`, `checkbox({...})` | field | Labelled text, code or secret input (secret: a write-only `type=password` that asks browsers and password managers not to autofill or save it (they may ignore that), no value, never readonly; for a token; `autocompleteOff` adds `autocomplete="off"` to a text field); radio and checkbox rows (`id, name, value, labelHtml, checked, disabled`).; `radioGroup({legend, itemsHtml})` wraps radio or checkbox rows in a `<fieldset class="ui-group">` whose `<legend>` is the question, so the controls are announced with it. |
+| `field({id, label, kind, rows, value, readonly, autocompleteOff, noteHtml})`, `radio({...})`, `checkbox({...})` | field | Labelled text, code or secret input (secret: a write-only `type=password` that asks browsers and password managers not to autofill or save it (they may ignore that), no value, never readonly; for a token; `autocompleteOff` adds `autocomplete="off"` to a text field); radio and checkbox rows (`id, name, value, labelHtml, checked, disabled`).; `radioGroup({legend, itemsHtml})` wraps radio or checkbox rows in a `<fieldset class="ui-group">` whose `<legend>` is the question (`legend`, text; or `legendHtml`, trusted HTML for a question with `<code>`; exactly one), so the controls are announced with it. |
 | `table({caption, head, rows, numeric})` | table | Data table in a scroll wrap; same look inside `prose`, where `prose()` wraps each table in the same table scroller. A caption makes the scroller a labelled region (`role=region`, `aria-label` = the caption), so a keyboard user who tabs to it hears what it holds. `code` in a cell uses `overflow-wrap: break-word`, so a token breaks only when it would overflow; `anywhere` would lower the column's min-content width, squeeze the columns and split short tokens. A long address should carry `<wbr>` hints at its punctuation. |
 | `stats([{label, value}])`, `dots({total, on, label, decorative, tone})` | stats | Label/value row; dots, spoken by `label` or `decorative` (aria-hidden beside a text line). |
 | `helpChips(id, rows)`, `stars(n, done)`, `sideColumn({id, titleHtml, counts, hints, ruleHtml})` | side | Helps row, five stars, the success, score and hints column. |
@@ -92,7 +92,7 @@ panel section (`kit.css` gives it the section's grid); it never adds a class of 
 incident board (`lib/widgets/incident-view.mjs`) is the reference: one typed `boardView(s, st, ui)`
 feeds every template, and each template is only kit helpers.
 
-States are attributes, never extra classes: `aria-pressed` (selected), `data-state` (`correct`,
+States are attributes, never extra classes: `aria-pressed` (selected; `data-picked` on a radio card), `data-state` (`correct`,
 `wrong`, `locked`, `opened`), `data-hinted`, `data-tone`, `disabled`, `hidden`. Hover, focus and
 disabled each have one rule in `kit.css`; besides it, a disabled toggle option, and a disabled choice option with no `data-state`, fades (its only cue;
 Sort it's category row), while an answered choice card (it has a `data-state`) stays legible.
@@ -147,7 +147,7 @@ its own entries; the last phase asserts them empty and deletes the retired CSS f
 
 **Retired classes** (`RETIRED` in the test): the old buttons (`btn`, `ghost`, `small`, `build-btn`,
 `help-btn`, `back-btn`), options (`choice`, `choices`, `spot-line`, `sort-item`, `sort-bucket-btn`,
-`build-opt`, `build-log`, `tradeoff-option`), feedback (`feedback`, `good`, `info`, `show`,
+`build-opt`, `build-log`, `tradeoff-option`, `tradeoff-keeps`), feedback (`feedback`, `good`, `info`, `show`,
 `build-status`), the lesson frame (`speech`, `bubble`, `q`, `lesson-intro`, `lesson-stage`), fields,
 muted notes, the `build` layout and the `help-*` column.
 
