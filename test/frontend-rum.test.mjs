@@ -285,20 +285,20 @@ test('step 2: the one Dash0 sentence names website monitoring, Core Web Vitals a
 
 // ---- sources and claims ---------------------------------------------------------------------
 
-test('sources: W3C and OpenTelemetry on the Spec line, four Dash0 pages, the Collector README as Docs, reasoning marked, no MDN or web.dev', () => {
+test('sources: W3C and OpenTelemetry on the Spec line, four Dash0 pages, the Collector README as Docs, MDN on the Spec line, reasoning marked, no web.dev', () => {
   const spec = SRC.split('\n').find((l) => /^\/\/ Spec: /.test(l));
-  for (const url of ['https://www.w3.org/TR/trace-context/#traceparent-header', 'https://opentelemetry.io/docs/languages/js/exporters/']) assert.equal(spec.includes(url), true, url);
+  for (const url of ['https://www.w3.org/TR/trace-context/#traceparent-header', 'https://opentelemetry.io/docs/languages/js/exporters/', 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS']) assert.equal(spec.includes(url), true, url);
   const dash0 = SRC.split('\n').find((l) => /^\/\/ Dash0 docs: /.test(l));
   for (const page of ['monitoring/websites/website-monitoring', 'monitoring/websites/correlate-sessions-backend-traces', 'monitoring/websites/proxying-the-ingestion-endpoint', 'monitoring/websites/understand-web-vitals']) {
     assert.equal(dash0.includes(`https://www.dash0.com/docs/dash0/${page}`), true, page);
   }
   assert.match(SRC, /^\/\/ Docs \(GitHub README, not an allowed Spec host; the Collector's CORS settings\): https:\/\/github\.com\/open-telemetry\/opentelemetry-collector\/blob\/main\/receiver\/otlpreceiver\/README\.md#cors-cross-origin-resource-sharing$/m);
   assert.match(SRC, /Facts used/);
-  assert.match(SRC, /Stated as reasoning, with no source on an allowed host/);
+  assert.match(SRC, /Stated as reasoning, with no source \(MDN does not say it in these words\)/);
   assert.match(SRC, /Invented for the game/);
-  const hosts = ['www.w3.org', 'opentelemetry.io', 'www.dash0.com', 'github.com'];
+  const hosts = ['www.w3.org', 'opentelemetry.io', 'www.dash0.com', 'github.com', 'developer.mozilla.org'];
   for (const url of SRC.split('\n').filter((l) => l.startsWith('//')).join('\n').match(/https:\/\/[^\s,):]+(?:\/[^\s,)]*)?/g)) assert.equal(hosts.includes(new URL(url).host), true, url);
-  assert.equal(/developer\.mozilla\.org|web\.dev/.test(SRC), false, 'MDN and web.dev are not cited');
+  assert.equal(/web\.dev/.test(SRC), false, 'web.dev is not cited');
   assert.equal(SRC.includes(String.fromCharCode(0x2014)), false, 'no em dash');
 });
 

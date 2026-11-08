@@ -4,7 +4,7 @@
 // runs past the grid's width, and a layout item that names a panel the file never defines. Then one Choice: how a team with no Kubernetes
 // cluster, whose infrastructure is already in Terraform, gets reviewed dashboards into Dash0. Hints are off on the Spot it step (the
 // default ladder: hints in early acts only). Nothing is parsed or applied.
-// Spec: https://www.dash0.com/docs/dash0/dashboards/manage-dashboards-as-code , https://www.dash0.com/docs/dash0/dashboards/export-dashboards
+// Spec: https://www.dash0.com/docs/dash0/dashboards/manage-dashboards-as-code , https://www.dash0.com/docs/dash0/dashboards/export-dashboards , https://perses.dev/perses/docs/api/dashboard/ , https://perses.dev/perses/docs/concepts/dashboard/
 // Dash0 docs: https://www.dash0.com/docs/dash0/dashboards/manage-dashboards-as-code
 //
 // Facts used (each read on the pages above, 2026-11-07). Manage Dashboards as Code: Dash0 dashboards use the Perses dashboard format;
@@ -20,11 +20,19 @@
 // YAML or JSON file. "Edit as JSON" applies changes immediately when saved and is described as convenient for quick edits and
 // prototyping. Export Dashboards: the Source tab downloads a dashboard as Perses YAML, for sharing, version control or migration.
 //
-// Stated as reasoning, with no source: that a layout item covers the cells from x to x + width and from y to y + height (read from the
-// field names in the Dash0 page's example, whose one item has x, y, width and height), so an item whose x + width is more than the
-// grid's width does not fit; that an item whose `$ref` names no panel of the file has nothing to draw; that the grid items and
-// panels of this board are the game's own; and that a team without a cluster has nowhere to run the operator. Perses itself
-// (perses.dev) is not an allowed host, so no field beyond the Dash0 page's example is shown and no Perses rule is claimed.
+// Perses docs (read 2026-11-08). API, Dashboard (perses.dev/perses/docs/api/dashboard/): a dashboard spec has `display`, and optional
+// `datasources`, `variables`, `panels` and `layouts`; `panels` is a map whose key is the reference of the panel; `layouts` is a list
+// and "in Perses the definition of a panel is uncorrelated from the definition of where to position it"; a layout of `kind: Grid` has
+// `spec.items`, each with `x`, `y`, `width`, `height` (integers) and `content` holding a `$ref` to a panel, as in the page's example
+// `"#/spec/panels/statRAM"`. Concepts, Dashboard (perses.dev/perses/docs/concepts/dashboard/): a dashboard's visual elements are a
+// set of panels, panels are plugged to datasources through queries written in the datasource's query language, and the format is an
+// open, standardized specification meant as a foundation for managing dashboards as code.
+//
+// Stated as reasoning, with no source (neither Perses page says it): that a layout item covers the cells from x to x + width and from
+// y to y + height (read from the field names), so an item whose x + width is more than the grid's width does not fit; that the Perses
+// pages give no grid width, so the width of 24 columns is the game's own; that an item whose `$ref` names no panel of the file has
+// nothing to draw (the pages say `$ref` points at a panel, not what happens when it points at none); that the grid items and panels
+// of this board are the game's own; and that a team without a cluster has nowhere to run the operator.
 //
 // Invented for the game: the company, the file `dashboards/checkout-overview.yaml`, the namespaces `checkout`, `payments` and `tools`,
 // the panel names, the queries, the grid sizes and the layout's width of 24 columns. Each line of the board is one added key, shown with its path from the top of the file (a key whose value is a mapping shows the mapping).
