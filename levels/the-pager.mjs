@@ -14,6 +14,7 @@ import {
   meter,
   option,
   options,
+  prose,
   question,
   setFeedback,
   step,
@@ -131,32 +132,38 @@ export default {
   scoring: { parMs: null },
   run(ctx) {
     const e = ctx.escapeHtml;
+    // The rows so far: a plain full-width kit block, not live. Only the newest row is announced, in the feedback region.
+    const rowsList = (id) => `<div id="${id}"></div>`;
     const alert = question({ id: 'pager-alert', html: e(ALERT) });
     const choices = (list, attr) =>
       options({
         labelledBy: 'pager-alert',
         itemsHtml: list.map((x) => option({ attr, value: x.key, labelHtml: e(x.label) })).join(''),
       });
-    /** Append one row to a kit feedback region, which shows all rows so far (neutral: information only). */
-    const addRow = (region, rowHtml) =>
-      setFeedback(region, 'neutral', `${region.querySelector('[data-feedback-text]').innerHTML}${rowHtml}`);
+    /** Append one row to the plain (not live) list, and announce only that row in the kit feedback region (neutral: information only). */
+    const addRow = (list, region, key, attr, label, body) => {
+      list.rowsHtml = `${list.rowsHtml ?? ''}<p data-${attr}="${key}"><strong>${label}</strong> ${body}</p>`;
+      list.innerHTML = prose(list.rowsHtml);
+      setFeedback(region, 'neutral', `<strong>${label}</strong> ${body}`);
+    };
     const askAnswers = () => {
       ctx.renderStep(
         step({
           wide: false,
-          bodyHtml: `${ctx.speech(LIT_INTRO)}${alert}${choices(ASKS, 'ask')}${feedbackRegion({ id: 'pager-answers' })}`,
+          bodyHtml: `${ctx.speech(LIT_INTRO)}${alert}${choices(ASKS, 'ask')}${rowsList('pager-answer-rows')}${feedbackRegion({ id: 'pager-answers' })}`,
         }),
         actions({ wide: false, buttonsHtml: finishButton('pager-finish') }),
       );
       const finish = ctx.ovActions.querySelector('#pager-finish');
       const answers = ctx.ovBody.querySelector('#pager-answers');
+      const answerRows = ctx.ovBody.querySelector('#pager-answer-rows');
       const buttons = [...ctx.ovBody.querySelectorAll('[data-ask]')];
       buttons.forEach((b, i) => {
         const ask = ASKS[i];
         b.onclick = () => {
           if (b.disabled) return;
           b.disabled = true;
-          addRow(answers, `<p data-answer="${ask.key}"><strong>${ask.label}</strong> ${ask.answer}</p>`);
+          addRow(answerRows, answers, ask.key, 'answer', ask.label, ask.answer);
           finish.disabled = buttons.some((x) => !x.disabled);
           const rest = [...buttons.slice(i + 1), ...buttons.slice(0, i)];
           (rest.find((x) => !x.disabled) ?? finish).focus();
@@ -173,7 +180,7 @@ export default {
         <p id="pager-budget" role="status" aria-live="polite">${budgetText(BUDGET.startPct)}</p>
         <div id="pager-meter-slot">${meterHtml(BUDGET.startPct)}</div>
         <p id="pager-spent"></p>
-        ${choices(LOOKS, 'look')}${feedbackRegion({ id: 'pager-feedback' })}`,
+        ${choices(LOOKS, 'look')}${rowsList('pager-said-rows')}${feedbackRegion({ id: 'pager-feedback' })}`,
       }),
       actions({
         wide: false,
@@ -186,6 +193,7 @@ export default {
     const meterSlot = body.querySelector('#pager-meter-slot');
     const spentEl = body.querySelector('#pager-spent');
     const feedback = body.querySelector('#pager-feedback');
+    const saidRows = body.querySelector('#pager-said-rows');
     const taken = [];
     const buttons = [...body.querySelectorAll('[data-look]')];
     let left = BUDGET.startPct;
@@ -200,7 +208,7 @@ export default {
         taken.push(look);
         meterSlot.innerHTML = meterHtml(left);
         spentEl.innerHTML = spentHtml(taken);
-        addRow(feedback, `<p data-said="${look.key}"><strong>${look.label}</strong> ${look.reason}</p>`);
+        addRow(saidRows, feedback, look.key, 'said', look.label, look.reason);
         escalate.disabled = false;
         if (left === 0) return askAnswers();
         const rest = [...buttons.slice(i + 1), ...buttons.slice(0, i)];

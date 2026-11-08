@@ -144,7 +144,8 @@ for (const [key, label, reason] of LOOKS) {
     click(`[data-look="${key}"]`);
     assert.deepEqual(said(), [key], 'only this look is answered');
     assert.equal(text(`[data-said="${key}"]`), `${label} ${reason}`);
-    assert.equal(q('#pager-feedback').contains(q(`[data-said="${key}"]`)), true, 'stated in the status region');
+    assert.equal(q('#pager-said-rows').contains(q(`[data-said="${key}"]`)), true, 'kept in the plain rows list');
+    assert.equal(q('#pager-feedback').contains(q(`[data-said="${key}"]`)), false, 'not inside the live region');
     assert.equal(budget(), budgetText(75));
     assert.deepEqual(meterCells(), cellsFor(1), 'one cell spent');
     assert.equal(meterLine(), '25 of 100 % spent');
@@ -225,7 +226,7 @@ test('the-pager: part 2 reveals each answer by clicking its question, once', () 
   assert.deepEqual(answered(), ['customers'], 'only the asked question is answered');
   assert.equal(text('[data-answer="customers"]'), `Which customers? ${ASKS[2][2]}`);
   assert.equal(q('[data-ask="customers"]').disabled, true);
-  assert.equal(q('#pager-answers').contains(q('[data-answer="customers"]')), true, 'stated in the status region');
+  assert.equal(q('#pager-answer-rows').contains(q('[data-answer="customers"]')), true, 'kept in the plain rows list');
   const used = q('[data-ask="customers"]');
   used.onclick({ currentTarget: used, target: used });
   assert.deepEqual(answered(), ['customers'], 'a stray click adds nothing');
@@ -290,4 +291,23 @@ test('the-pager focus wraps to the first unused look', () => {
   click('[data-look="service"]');
   assert.equal(focus.last(), 'look:since');
   assert.deepEqual(focus.unfocusable(), []);
+});
+
+test('the-pager: each append changes only the newest row in the live region; earlier rows stay', () => {
+  start();
+  const live = () => q('#pager-feedback [data-feedback-text]').textContent.replace(/\s+/g, ' ').trim();
+  const [, l0, r0] = LOOKS[0];
+  const [, l1, r1] = LOOKS[1];
+  click('[data-look="service"]');
+  assert.equal(live(), `${l0} ${r0}`);
+  click('[data-look="since"]');
+  assert.equal(live(), `${l1} ${r1}`, 'the live region holds only the newest row');
+  assert.deepEqual(said(), ['service', 'since'], 'earlier rows stay in the DOM');
+  assert.equal(q('#pager-said-rows').getAttribute('aria-live'), null, 'the rows list is not live');
+  click('#pager-escalate');
+  const liveA = () => q('#pager-answers [data-feedback-text]').textContent.replace(/\s+/g, ' ').trim();
+  click('[data-ask="trace"]');
+  click('[data-ask="service"]');
+  assert.equal(liveA(), `${ASKS[0][1]} ${ASKS[0][2]}`, 'part 2: only the newest answer is announced');
+  assert.deepEqual(answered(), ['trace', 'service']);
 });
