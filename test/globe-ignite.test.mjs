@@ -84,6 +84,9 @@ test('the announcement names the country and the level; a region win names the r
     litText({ countryIds: ['DEU'], regionIds: [] }, live.levels['the-signals'], { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES }),
     `Germany is now lit: ${live.levels['the-signals'].name}.`,
   );
+  const real = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES };
+  assert.equal(litText({ countryIds: ['USA'], regionIds: [] }, { name: 'Level x' }, real), 'The United States is now lit: Level x.', 'a name that starts with "the" is capitalised at the sentence start');
+  assert.equal(litText({ countryIds: ['PHL'], regionIds: [] }, { name: 'Level x' }, real), 'The Philippines is now lit: Level x.');
 });
 
 // ---- the view of an ignite: dots, ring, camera target ------------------------------------

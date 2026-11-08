@@ -42,7 +42,7 @@ test('8.4 fields: in act-8 after 8.3, scored with no par time, a build then a ch
   assert.deepEqual([...level.cards], []);
   assert.equal(Object.values(LIVE.levels).filter((l) => l.rewardTitle === 'Browser tracer').length, 1, 'the reward title is unique');
   const act = LIVE.acts.find((a) => a.id === 'act-8');
-  assert.deepEqual([...act.levelIds], ['dashboards-as-code', 'semantic-convention-versions', 'migrating-vendors', ID]);
+  assert.deepEqual([...act.levelIds], ['dashboards-as-code', 'semantic-convention-versions', 'migrating-vendors', ID, 'ai-assisted-debugging']);
   assert.equal(LIVE.order[LIVE.order.indexOf('migrating-vendors') + 1], ID, '8.4 plays right after 8.3');
 });
 
@@ -52,11 +52,11 @@ test('card 19 (flush-on-shutdown): 8.4 does not award it, the batch-processor fl
   assert.doesNotMatch(plain(JSON.stringify(level.play)), /flush|shutdown|batch processor/i);
 });
 
-test('globe: 8.4 lights Malaysia and, with the other three levels of act-8, completes Southeast Asia', () => {
+test('globe: 8.4 lights Malaysia and, with the other four levels of act-8, completes Southeast Asia', () => {
   assert.equal(LEVEL_COUNTRY[ID], 'MYS');
   assert.equal(COUNTRY_NAMES.MYS, 'Malaysia');
   const map = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES };
-  const others = ['dashboards-as-code', 'semantic-convention-versions', 'migrating-vendors'];
+  const others = ['dashboards-as-code', 'semantic-convention-versions', 'migrating-vendors', 'ai-assisted-debugging'];
   const fresh = freshlyLit(progressOf(others), progressOf([...others, ID]), LIVE, map);
   assert.deepEqual(fresh, { countryIds: ['MYS'], regionIds: ['act-8'] });
   assert.equal(litText(fresh, level, map), 'Malaysia is now lit: Frontend / RUM. Southeast Asia is complete.');

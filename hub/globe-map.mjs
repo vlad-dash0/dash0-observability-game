@@ -87,6 +87,7 @@ export const LEVEL_COUNTRY = Object.freeze({
   'semantic-convention-versions': 'THA',
   'migrating-vendors': 'VNM',
   'frontend-rum': 'MYS',
+  'ai-assisted-debugging': 'PHL',
   // act-9 Oceania
   'filter-or-sampler': 'NZL',
   'the-34-percent-error-rate': 'AUS',
@@ -104,7 +105,7 @@ export const COUNTRY_NAMES = Object.freeze({
   KAZ: 'Kazakhstan', SAU: 'Saudi Arabia', TUR: 'Turkey', UZB: 'Uzbekistan', TKM: 'Turkmenistan', IRQ: 'Iraq',
   IND: 'India', IRN: 'Iran', PAK: 'Pakistan',
   JPN: 'Japan', CHN: 'China', MNG: 'Mongolia', KOR: 'South Korea',
-  THA: 'Thailand', VNM: 'Vietnam', IDN: 'Indonesia', MYS: 'Malaysia',
+  THA: 'Thailand', VNM: 'Vietnam', IDN: 'Indonesia', MYS: 'Malaysia', PHL: 'the Philippines',
   AUS: 'Australia', NZL: 'New Zealand', PNG: 'Papua New Guinea',
 });
 

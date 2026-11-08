@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { ACTS } from '../levels/index.mjs';
 import { incidentLesson } from '../lib/widgets/incident-view.mjs';
 
-const BOSSES = ['who-is-talking', 'checkout-is-slow', 'the-bill', 'the-3am-errors', 'silence', 'errors-tripled', 'everything-is-green'];
+const BOSSES = ['who-is-talking', 'checkout-is-slow', 'the-bill', 'the-3am-errors', 'silence', 'errors-tripled', 'everything-is-green', 'ai-assisted-debugging'];
 
 /** { id, intro, scenario } for every level that plays an incident, from the live registry. */
 async function incidentBosses() {
@@ -27,7 +27,7 @@ async function incidentBosses() {
 
 const plain = (html) => html.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&times;/g, 'x').replace(/\s+/g, ' ').trim();
 
-test('the incident bosses are exactly the seven this file covers', async () => {
+test('the incident scenarios are exactly the eight this file covers (seven bosses and 8.5)', async () => {
   assert.deepEqual((await incidentBosses()).map((b) => b.id).sort(), [...BOSSES].sort());
 });
 
