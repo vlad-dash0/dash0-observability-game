@@ -6,7 +6,7 @@
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
 import { newBuildState } from '../lib/widgets/build-it.mjs';
-import { prose } from '../lib/ui/index.mjs';
+import { actions, finishButton, nextButton, prose, question, step } from '../lib/ui/index.mjs';
 
 const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
 const NEW_TRACE = '7f3a9c1e5b2d4f6a8c0e2b4d6f8a1c3e';
@@ -117,10 +117,10 @@ export default {
   lights: ['orders'],
   scoring: { parMs: null },
   run(ctx) {
-    const actions = ctx.ovActions;
+    const bar = ctx.ovActions;
     const e = ctx.escapeHtml;
     const next = (onclick) => {
-      const btn = actions.querySelector('#prop-next');
+      const btn = bar.querySelector('#prop-next');
       btn.onclick = onclick;
       return btn;
     };
@@ -136,17 +136,15 @@ export default {
         (r) => `<li><code>${e(r.name)}</code> on ${e(r.service)}, trace <code>${e(r.traceId.slice(0, 8))}</code>, no parent</li>`,
       ).join('');
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: false,
+          bodyHtml: `${ctx.speech(
           'One checkout request went storefront → nginx → checkout, but the backend shows it ' +
             'as two traces. Each hop should pass the trace context on in the ' +
             '<code>traceparent</code> header.',
-        )}</div>
-        <div class="lesson-stage">
-          ${prose(`<p>Headers on each hop:</p><ul>${hops}</ul><p>Root spans for the request:</p><ul>${roots}</ul>`)}
-          <h3 class="q" id="prop-q-where">Where did the trace break?</h3>
-          ${choiceHtml(ctx, WHERE, { id: 'prop', labelledBy: 'prop-q-where' })}
-        </div>`,
-        '<button class="btn" id="prop-next" disabled>Next</button>',
+          )}${prose(`<p>Headers on each hop:</p><ul>${hops}</ul><p>Root spans for the request:</p><ul>${roots}</ul>`)}${question({ id: 'prop-q-where', html: 'Where did the trace break?' })}${choiceHtml(ctx, WHERE, { id: 'prop', labelledBy: 'prop-q-where' })}`,
+        }),
+        actions({ wide: false, buttonsHtml: nextButton('prop-next') }),
       );
       const btn = next(stepValid);
       mountChoice(ctx, WHERE, {
@@ -160,16 +158,15 @@ export default {
 
     const stepValid = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: false,
+          bodyHtml: `${ctx.speech(
           'The fix is one line of nginx config that forwards the header. Before you ship it, ' +
             'check the format: <code>version-traceid-parentid-flags</code>, and a receiver ' +
             'ignores a header that breaks the rules.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="prop-q-tp">Which traceparent would checkout accept?</h3>
-          ${choiceHtml(ctx, VALID, { id: 'prop-tp', labelledBy: 'prop-q-tp' })}
-        </div>`,
-        '<button class="btn" id="prop-next" disabled>Next</button>',
+          )}${question({ id: 'prop-q-tp', html: 'Which traceparent would checkout accept?' })}${choiceHtml(ctx, VALID, { id: 'prop-tp', labelledBy: 'prop-q-tp' })}`,
+        }),
+        actions({ wide: false, buttonsHtml: nextButton('prop-next') }),
       );
       const btn = next(stepTree);
       mountChoice(ctx, VALID, {
@@ -183,18 +180,17 @@ export default {
 
     const stepTree = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: true,
+          bodyHtml: `${ctx.speech(
           `nginx now forwards <code>traceparent: ${e(TRACEPARENT)}</code>, so checkout's spans ` +
             'join trace <code>4bf92f35</code>. Its SERVER span still shows as a root here: give it ' +
             'the parent that the header\'s parent-id names.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q">Join checkout to the request.</h3>
-          ${renderBuild(TREE, newBuildState(TREE), { escapeHtml: e })}
-        </div>`,
-        '<button class="btn" id="prop-finish" data-finish disabled>Finish</button>',
+          )}${question({ html: 'Join checkout to the request.' })}${renderBuild(TREE, newBuildState(TREE), { escapeHtml: e })}`,
+        }),
+        actions({ wide: true, buttonsHtml: finishButton('prop-finish') }),
       );
-      const finish = actions.querySelector('#prop-finish');
+      const finish = bar.querySelector('#prop-finish');
       mountBuild(ctx, TREE, {
         onComplete: () => {
           finish.disabled = false;

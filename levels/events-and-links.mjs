@@ -6,7 +6,7 @@
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
 import { newBuildState } from '../lib/widgets/build-it.mjs';
-import { prose } from '../lib/ui/index.mjs';
+import { actions, finishButton, nextButton, prose, question, step } from '../lib/ui/index.mjs';
 
 const CHARGE = '8f14e45fceea167a';
 const RETRY = '45c48cce2e2d7fbd';
@@ -103,26 +103,25 @@ export default {
   lights: [],
   scoring: { parMs: null },
   run(ctx) {
-    const actions = ctx.ovActions;
+    const bar = ctx.ovActions;
     const e = ctx.escapeHtml;
     const next = (onclick) => {
-      const btn = actions.querySelector('#evl-next');
+      const btn = bar.querySelector('#evl-next');
       btn.onclick = onclick;
       return btn;
     };
 
     const stepRecorded = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: false,
+          bodyHtml: `${ctx.speech(
           'In payments, a handler catches the provider\'s error, records it, and rethrows: ' +
             '<code>catch (err) { span.recordException(err); throw err; } finally { span.end(); }</code>. ' +
             'Nothing else touches the span.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="evl-q">What status does the span end with?</h3>
-          ${choiceHtml(ctx, RECORDED, { id: 'evl', labelledBy: 'evl-q' })}
-        </div>`,
-        '<button class="btn" id="evl-next" disabled>Next</button>',
+          )}${question({ id: 'evl-q', html: 'What status does the span end with?' })}${choiceHtml(ctx, RECORDED, { id: 'evl', labelledBy: 'evl-q' })}`,
+        }),
+        actions({ wide: false, buttonsHtml: nextButton('evl-next') }),
       );
       const btn = next(stepErrors);
       mountChoice(ctx, RECORDED, {
@@ -137,16 +136,14 @@ export default {
     const stepErrors = () => {
       const stories = STORIES.map(([name, service, what]) => `<li><code>${e(name)}</code> (${e(service)}): ${what}</li>`).join('');
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: true,
+          bodyHtml: `${ctx.speech(
           'Here is what happened in three spans. Set each status by the outcome: Error when ' +
             'the operation failed, Unset when it completed, even if it handled an error on the way.',
-        )}</div>
-        <div class="lesson-stage">
-          ${prose(`<ul>${stories}</ul>`)}
-          <h3 class="q">Give each span the status its outcome calls for.</h3>
-          ${renderBuild(ERRORS, newBuildState(ERRORS), { escapeHtml: e })}
-        </div>`,
-        '<button class="btn" id="evl-next" disabled>Next</button>',
+          )}${prose(`<ul>${stories}</ul>`)}${question({ html: 'Give each span the status its outcome calls for.' })}${renderBuild(ERRORS, newBuildState(ERRORS), { escapeHtml: e })}`,
+        }),
+        actions({ wide: true, buttonsHtml: nextButton('evl-next') }),
       );
       const btn = next(stepBatch);
       mountBuild(ctx, ERRORS, {
@@ -159,19 +156,18 @@ export default {
 
     const stepBatch = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: true,
+          bodyHtml: `${ctx.speech(
           'notifications reads three order messages in one batch and sends one email run for ' +
             'them. Each message was published by a different request, so each ' +
             '<code>orders publish</code> span sits in its own trace. <code>send batch</code> can ' +
             'have only one parent, so it stays a root.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q">Connect <code>send batch</code> to every message it handled.</h3>
-          ${renderBuild(BATCH, newBuildState(BATCH), { escapeHtml: e })}
-        </div>`,
-        '<button class="btn" id="evl-finish" data-finish disabled>Finish</button>',
+          )}${question({ html: 'Connect <code>send batch</code> to every message it handled.' })}${renderBuild(BATCH, newBuildState(BATCH), { escapeHtml: e })}`,
+        }),
+        actions({ wide: true, buttonsHtml: finishButton('evl-finish') }),
       );
-      const finish = actions.querySelector('#evl-finish');
+      const finish = bar.querySelector('#evl-finish');
       mountBuild(ctx, BATCH, {
         onComplete: () => {
           finish.disabled = false;
