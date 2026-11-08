@@ -3,6 +3,7 @@
 // edges" line (from serviceEdges) fill in, then says what one wrong kind would cost.
 // Spec: docs/M1-DESIGN.md §6 Act 2.
 // Spec: https://opentelemetry.io/docs/specs/otel/trace/api/#spankind
+import { actions, feedback, finishButton, nextButton, question, setFeedback, step } from '../lib/ui/index.mjs';
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
 import { applyState, newBuildState } from '../lib/widgets/build-it.mjs';
@@ -95,31 +96,30 @@ export default {
   lights: ['payments'],
   scoring: { parMs: null },
   run(ctx) {
-    const actions = ctx.ovActions;
+    const bar = ctx.ovActions;
     const e = ctx.escapeHtml;
 
     const stepMap = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: true,
+          bodyHtml: `${ctx.speech(
           'Every span from this checkout came out INTERNAL, so the service map shows no ' +
             'edges. Backends derive the edges between services from span kinds: CLIENT calls ' +
             'out and SERVER handles the call; PRODUCER sends a message and CONSUMER processes it.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q">Give each span its kind.</h3>
-          ${renderBuild(MAP, newBuildState(MAP), { escapeHtml: e })}
-          <p class="feedback info show" id="kinds-edges" role="status" aria-live="polite">${edgesLine(MAP.spans, e)}</p>
-        </div>`,
-        '<button class="btn" id="kinds-next" disabled>Next</button>',
+          )}${question({ html: 'Give each span its kind.' })}${renderBuild(MAP, newBuildState(MAP), { escapeHtml: e })}${feedback({ id: 'kinds-edges' })}`,
+        }),
+        actions({ wide: true, buttonsHtml: nextButton('kinds-next') }),
       );
-      const next = actions.querySelector('#kinds-next');
+      const next = bar.querySelector('#kinds-next');
       const line = ctx.ovBody.querySelector('#kinds-edges');
+      setFeedback(line, 'neutral', edgesLine(MAP.spans, e));
       mountBuild(ctx, MAP, {
         onComplete: () => {
           // The check passed, so every kind is the answer's: draw the map from it.
           const right = newBuildState(MAP);
           for (const [id, want] of Object.entries(MAP.answer)) right.spans[id].kind = want.kind;
-          line.innerHTML = edgesLine(applyState(MAP, right), e);
+          setFeedback(line, 'neutral', edgesLine(applyState(MAP, right), e));
           next.disabled = false;
           return next;
         },
@@ -129,17 +129,16 @@ export default {
 
     const stepWrongKind = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: false,
+          bodyHtml: `${ctx.speech(
           'A teammate wonders whether kinds matter, and suggests leaving payments\' ' +
             '<code>POST /charge</code> as INTERNAL.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="kinds-q">What happens to the map if <code>POST /charge</code> is INTERNAL?</h3>
-          ${choiceHtml(ctx, WRONG_KIND, { id: 'kinds', labelledBy: 'kinds-q' })}
-        </div>`,
-        '<button class="btn" id="kinds-finish" data-finish disabled>Finish</button>',
+          )}${question({ id: 'kinds-q', html: 'What happens to the map if <code>POST /charge</code> is INTERNAL?' })}${choiceHtml(ctx, WRONG_KIND, { id: 'kinds', labelledBy: 'kinds-q' })}`,
+        }),
+        actions({ wide: false, buttonsHtml: finishButton('kinds-finish') }),
       );
-      const finish = actions.querySelector('#kinds-finish');
+      const finish = bar.querySelector('#kinds-finish');
       mountChoice(ctx, WRONG_KIND, {
         id: 'kinds',
         onRight: () => {
