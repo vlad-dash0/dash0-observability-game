@@ -42,14 +42,15 @@ test('7.4 fields: last level of act-7, scored with no par time, a sort then a ch
   assert.deepEqual([...act.levelIds], ['good-alerts', 'slis-and-slos', 'burn-rate-alerts', ID]);
 });
 
-test('card synthetics-see-the-edge: scoped front, fits a card, a spec page as source, the Dash0 pages traceable from the angle', () => {
+test('card synthetics-see-the-edge: scoped front, fits a card, a spec page as source, the angle carries no bare URL fragment', () => {
   const card = DECK.find((c) => c.id === 'synthetics-see-the-edge');
   assert.equal(card.front, 'Failures in front of your service (DNS, TLS, CDN, load balancer) leave no server span of yours; a probe from outside sees them.');
   assert.equal(card.front.length <= 140, true, `front is ${card.front.length} characters`);
   assert.match(card.front, /in front of your service/, 'scoped, not a universal claim');
-  assert.equal(card.specUrl, 'https://opentelemetry.io/docs/specs/otel/trace/api/#spankind');
+  assert.equal(card.specUrl, 'https://opentelemetry.io/docs/specs/semconv/http/http-spans/');
   for (const w of ['DNS lookup', 'TLS handshake', 'no server span', '0%', 'can happen before', 'client span', 'DNS error included', 'proxy or ingress you instrument']) assert.equal(card.back.includes(w), true, w);
-  for (const w of ['DNS resolution', 'TCP connection', 'SSL/TLS handshake', 'notification', 'monitoring/synthetics/synthetic-monitoring', 'explore-run-details']) assert.equal(card.dash0Angle.includes(w), true, w);
+  for (const w of ['DNS resolution', 'TCP connection', 'SSL/TLS handshake', 'notification']) assert.equal(card.dash0Angle.includes(w), true, w);
+  assert.equal(card.dash0Angle.includes('dash0.com'), false);
   assert.equal((card.front + card.back + card.dash0Angle).includes('\u2014'), false);
 });
 
@@ -83,6 +84,7 @@ test('step 1: the probe items fail before the request reaches the service, the s
   assert.match(why('lb-no-targets'), /forwards nothing to checkout/);
   for (const id of ['handler-throws', 'slow-query', 'inventory-loop', 'bad-deploy']) assert.match(why(id), /server span|trace/, id);
   for (const id of ['payment-dns', 'payment-tls']) assert.match(why(id), /client span/, id);
+  assert.match(why('payment-tls'), /as with a DNS error/);
   assert.match(why('payment-dns'), /the HTTP spans page gives/);
   const intro = plain(SORT_STEP.intro);
   assert.match(intro, /probe is a request the team sends itself/);
@@ -161,6 +163,8 @@ test('step 2: the probe is the one right alert; each alert on spans is shown rea
   assert.deepEqual([requests / usual, requests < usual / 2], [0.75, false], 'the request rate is three quarters of usual, above the half line');
   const why = (k) => plain(choices.find((c) => c.key === k).why);
   assert.match(why('error-ratio'), /0 errors in 3,000 requests, a ratio of 0%/);
+  assert.match(why('error-ratio'), /every browser visitor is refused/);
+  assert.doesNotMatch(why('error-ratio'), /most visitors/);
   assert.match(why('burn-rate'), /0 errors divided by the 0\.001 the SLO allows is a burn rate of 0/);
   assert.match(why('p99'), /180 ms at p99/);
   assert.match(why('rate'), /3,000 requests is three quarters of the 4,000 usual at that hour/);

@@ -74,7 +74,7 @@ const SORT = {
       id: 'payment-tls',
       label: 'The payment provider\'s TLS certificate has expired, so checkout\'s calls to it fail',
       bucket: 'spans',
-      why: 'The handshake fails on the way out of your service, and checkout\'s client span for the call records the error. A TLS failure is invisible to your spans only when it stops requests from reaching you.',
+      why: 'The handshake fails on the way out of your service, and, as with a DNS error, checkout\'s client span for the call records the error. A TLS failure is invisible to your spans only when it stops requests from reaching you.',
     },
     {
       id: 'cdn-stale',
@@ -101,7 +101,7 @@ const ALERT = [
   {
     key: 'error-ratio',
     label: 'Error ratio of checkout\'s server spans above 2%',
-    why: 'The spans hold 0 errors in 3,000 requests, a ratio of 0%. The failed handshakes never reached checkout, so there is nothing to count, and the ratio stays at 0% while most visitors cannot connect.',
+    why: 'The spans hold 0 errors in 3,000 requests, a ratio of 0%. The failed handshakes never reached checkout, so there is nothing to count, and the ratio stays at 0% while every browser visitor is refused. The 3,000 requests are internal tools that do not check certificates.',
   },
   {
     key: 'burn-rate',

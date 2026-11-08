@@ -507,10 +507,9 @@ export const DECK = [
       'error ratio can stay at 0%. A proxy or ingress you instrument records its own span, and a failed call out of your service is recorded ' +
       'by its client span, DNS error included. A synthetic check sends its own request from outside at regular intervals and fails when the lookup, ' +
       'the handshake or the response is wrong. Keep the spans for why a request that arrived went wrong.',
-    specUrl: 'https://opentelemetry.io/docs/specs/otel/trace/api/#spankind',
+    specUrl: 'https://opentelemetry.io/docs/specs/semconv/http/http-spans/',
     dash0Angle:
       'A Dash0 synthetic check runs from public or private locations, shows DNS resolution, TCP connection and the SSL/TLS handshake ' +
-      'for each run, and sends a notification through your channels when an assertion fails ' +
-      '(dash0.com/docs/dash0/monitoring/synthetics/synthetic-monitoring and .../explore-run-details).',
+      'for each run, and sends a notification through your channels when an assertion fails.',
   },
 ];
