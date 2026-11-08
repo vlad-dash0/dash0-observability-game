@@ -42,7 +42,8 @@ const DB = '5e6f708192a3b4c5';
 const CLICK2 = '6f708192a3b4c5d6';
 const PAY2 = '708192a3b4c5d6e7';
 const SERVER2 = '8192a3b4c5d6e7f8';
-const PAY_B = 'c9d8e7f6a5b4c3d2';
+const PAY_B = '2c9d8e7f6a5b4c3d';
+const STATUS = '9b8a7c6d5e4f3a2b';
 
 const span = (traceId, spanId, service, name, kind, startMs, endMs, parentId) => ({
   spanId, traceId, name, service, kind, startMs, endMs, status: 'UNSET', attributes: {}, events: [], parentId, links: [],
@@ -50,19 +51,23 @@ const span = (traceId, spanId, service, name, kind, startMs, endMs, parentId) =>
 
 // Checkout's server span arrived as a root. The browser span its traceparent names is the fetch call (PAY), not the click that began
 // it (CLICK), not the earlier fetch of the cart (CART), not the same-looking call of the other visitor's trace (PAY2), and not the
-// twin in its own trace (PAY_B, the second call of a double-click on Pay, which also encloses the server span): the board labels the
-// twins by their span id, and only the parent id in the header tells which one the server span answers.
+// twin in its own trace, PAY_B: the second checkout call sent, with the same start and end as PAY, enclosing the server span the
+// same way. The board labels the twins by their span id, and only the parent id in the header tells which one the server span answers.
+// The waterfall lists same-start siblings by span id, so PAY_B is the upper twin row and the upper Parent button, and the later fetch
+// of the order status (STATUS, which ends after the server span) sits between the twins and the server span: neither "the upper twin"
+// nor "the row above the server span" is the right span.
 const TREE = {
   id: 'frum-tree',
   spans: [
     span(T1, CLICK, 'shop-web', 'click Pay', 'INTERNAL', 0, 1250, null),
     span(T1, CART, 'shop-web', 'GET /cart', 'CLIENT', 20, 160, CLICK),
-    span(T1, PAY, 'shop-web', 'POST /checkout', 'CLIENT', 200, 1200, CLICK),
-    span(T1, PAY_B, 'shop-web', 'POST /checkout', 'CLIENT', 210, 1190, CLICK),
+    span(T1, PAY_B, 'shop-web', 'POST /checkout', 'CLIENT', 205, 1195, CLICK),
+    span(T1, PAY, 'shop-web', 'POST /checkout', 'CLIENT', 205, 1195, CLICK),
     span(T1, SERVER, 'checkout', 'POST /checkout', 'SERVER', 230, 1160, null),
+    span(T1, STATUS, 'shop-web', 'GET /order-status', 'CLIENT', 1200, 1240, CLICK),
     span(T1, DB, 'checkout', 'INSERT orders', 'CLIENT', 300, 1100, SERVER),
     span(T2, CLICK2, 'shop-web', 'click Pay', 'INTERNAL', 150, 1300, null),
-    span(T2, PAY2, 'shop-web', 'POST /checkout', 'CLIENT', 210, 1180, CLICK2),
+    span(T2, PAY2, 'shop-web', 'POST /checkout', 'CLIENT', 215, 1180, CLICK2),
     span(T2, SERVER2, 'checkout', 'POST /checkout', 'SERVER', 240, 1170, PAY2),
   ],
   edit: ['parent'],
@@ -115,8 +120,8 @@ export default {
         intro:
           'A browser can produce spans too, so a trace can start at the click. In Kettle &amp; Co\'s shop, the instrumentation records a span for the click on Pay and one for each fetch call the click makes. ' +
           `In the lab, the shop and the checkout service share an origin, and the SDK adds <code>traceparent: 00-${T1}-${PAY}-01</code> to the call. ` +
-          'The visitor double-clicked Pay, so two identical calls left the browser in this trace; the board tells them apart by the end of their span id. ' +
-          'Another visitor clicked Pay at the same moment, in trace <code>9d8c7b6a</code>. Checkout\'s server span for the first call arrived as a root.',
+          'The code that sends the checkout call ran twice, so two identical calls left together; the board tells them apart by the end of their span id. ' +
+          'Another visitor clicked Pay at the same moment, in trace <code>9d8c7b6a</code>. Checkout\'s server span for one of the two calls arrived as a root.',
         question: 'Give checkout\'s server span its parent.',
         qid: 'frum-q-tree',
         build: TREE,

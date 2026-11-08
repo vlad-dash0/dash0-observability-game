@@ -13,6 +13,7 @@ import { emptyProgress } from '../lib/progress.mjs';
 import { checkBuild, newBuildState, setParent, validateBuildSpec } from '../lib/widgets/build-it.mjs';
 import { validateBuildHelps } from '../lib/widgets/build-it-help.mjs';
 import { namer } from '../lib/widgets/build-it-names.mjs';
+import { waterfall } from '../lib/widgets/trace.mjs';
 
 const ID = 'frontend-rum';
 const LIVE = liveRegistry();
@@ -77,7 +78,7 @@ test('step 1: a valid parent-only build of two browser traces, no helps, a Check
   assert.deepEqual(tree.edit, ['parent']);
   assert.deepEqual(tree.helps, {});
   assert.equal(Object.hasOwn(tree, 'hint'), false, 'no authored hint (hints off)');
-  assert.equal(tree.spans.length, 9);
+  assert.equal(tree.spans.length, 10);
   assert.equal(new Set(tree.spans.map((s) => s.traceId)).size, 2, 'two traces on the board');
   assert.equal(plain(BUILD_STEP.question), 'Give checkout\'s server span its parent.');
   const server = byName('checkout', 'POST /checkout', 'a3f1c9e2');
@@ -98,7 +99,9 @@ test('step 1: the traceparent in the intro is a valid W3C value and names the fe
   assert.equal(tree.answer[server.spanId].parentId, parentId, 'the answer is the span the header names');
   assert.equal(server.startMs >= named.startMs && server.endMs <= named.endMs, true, 'the call encloses the server span');
   assert.match(plain(BUILD_STEP.intro), /Another visitor clicked Pay at the same moment, in trace 9d8c7b6a/);
-  assert.match(plain(BUILD_STEP.intro), /double-clicked Pay, so two identical calls left the browser in this trace; the board tells them apart by the end of their span id/);
+  assert.match(plain(BUILD_STEP.intro), /server span for one of the two calls arrived as a root/);
+  assert.doesNotMatch(plain(BUILD_STEP.intro), /first call|retry/, 'no word of the intro picks a twin or calls it a retry');
+  assert.match(plain(BUILD_STEP.intro), /code that sends the checkout call ran twice, so two identical calls left together; the board tells them apart by the end of their span id/);
   assert.match(plain(BUILD_STEP.intro), /share an origin/);
 });
 
@@ -113,13 +116,18 @@ function gradeWith(parentId) {
 test('step 1: only the span the header names passes; each tempting parent fails with its own code', () => {
   const click = byName('shop-web', 'click Pay', 'a3f1c9e2');
   const cart = byName('shop-web', 'GET /cart', 'a3f1c9e2');
-  const pay = byName('shop-web', 'POST /checkout', 'a3f1c9e2');
+  const pay = tree.spans.find((s) => s.spanId === traceparent.split('-')[2]);
   const pay2 = byName('shop-web', 'POST /checkout', '9d8c7b6a');
   const click2 = byName('shop-web', 'click Pay', '9d8c7b6a');
   const server2 = byName('checkout', 'POST /checkout', '9d8c7b6a');
-  const twin = byName('shop-web', 'POST /checkout', 'a3f1c9e2', 1);
+  const boardRows = waterfall(tree.spans).rows;
+  const twinRow = boardRows.find((r) => r.name === 'POST /checkout' && r.service === 'shop-web' && r.traceId === pay.traceId);
+  const twin = tree.spans.find((s) => s.spanId === twinRow.spanId);
+  assert.notEqual(twin.spanId, pay.spanId, 'the upper twin on the board is the other call of the trace, not the one the header names');
+  const status = byName('shop-web', 'GET /order-status', 'a3f1c9e2');
+  assert.deepEqual(gradeWith(status.spanId), ['wrong-parent'], 'the later fetch of the order status, which does not enclose the server span');
   assert.deepEqual(gradeWith(pay.spanId), [], 'the fetch call the header names');
-  assert.deepEqual(gradeWith(twin.spanId), ['wrong-parent'], 'the double-click twin in the same trace, which also encloses the server span');
+  assert.deepEqual(gradeWith(twin.spanId), ['wrong-parent'], 'the twin in the same trace, which also encloses the server span');
   assert.deepEqual(gradeWith(undefined), ['wrong-parent'], 'left as a root');
   assert.deepEqual(gradeWith(click.spanId), ['wrong-parent'], 'the click that started the call');
   assert.deepEqual(gradeWith(cart.spanId), ['wrong-parent'], 'the earlier fetch of the cart');
@@ -147,27 +155,61 @@ test('step 1: surface rules for choosing the parent fail, so the header has to b
     assert.notEqual(gradeWith(chosen.spanId).length, 0, `${name} picked ${chosen.name} (${chosen.spanId}) and passed`);
   }
   const same = candidates.filter((s) => s.name === server.name);
-  assert.deepEqual(same.map((s) => gradeWith(s.spanId).length === 0), [true, false, false], 'three browser spans share the server span\'s name: only the first, which the header names, passes');
-  // The same-trace rules no longer pass alone: two CLIENT spans of one trace, same name and service, both enclose the server span.
-  const sameTrace = candidates.filter((s) => s.traceId === server.traceId && s.name === server.name && s.kind === 'CLIENT' && encloses(s));
-  assert.equal(sameTrace.length, 2, 'the double-click twins');
-  const tightest = [...sameTrace].sort((a, b) => width(a) - width(b))[0];
-  const widest = [...sameTrace].sort((a, b) => width(b) - width(a))[0];
-  const earliest = [...sameTrace].sort((a, b) => a.startMs - b.startMs)[0];
-  const latest = [...sameTrace].sort((a, b) => b.startMs - a.startMs)[0];
-  assert.deepEqual([tightest, widest, earliest, latest].map((s) => gradeWith(s.spanId).length === 0), [false, true, true, false], 'tightest and latest fail, widest and earliest pass by coincidence of the numbers: a same-trace rule needs a tie-break the header is the only fair source of');
-  assert.deepEqual(sameTrace.map((s) => gradeWith(s.spanId)), [[], ['wrong-parent']], 'the same-trace rule alone does not decide; of the two only one passes');
+  assert.deepEqual(same.map((s) => gradeWith(s.spanId).length === 0).sort(), [false, false, true], 'three browser spans share the server span\'s name: only the one the header names passes');
+  // The twins are identical calls: same start, same end, both enclose the server span. No timing rule can tell them apart.
+  const passes = (s) => gradeWith(s.spanId).length === 0;
+  const rows = waterfall(tree.spans).rows;
+  const board = rows.map((r) => tree.spans.find((s) => s.spanId === r.spanId));
+  const sameTrace = board.filter((s) => s.traceId === server.traceId && s.name === server.name && s.kind === 'CLIENT' && encloses(s));
+  assert.equal(sameTrace.length, 2, 'the double-bound twins, in board order');
+  assert.deepEqual([sameTrace[0].startMs === sameTrace[1].startMs, sameTrace[0].endMs === sameTrace[1].endMs], [true, true], 'identical times');
+  assert.equal(passes(sameTrace[0]), false, 'the upper twin row on the board is the wrong one');
+  assert.equal(passes(sameTrace[1]), true);
+  const timing = {
+    tightest: (a, b) => width(a) - width(b),
+    widest: (a, b) => width(b) - width(a),
+    'earliest start': (a, b) => a.startMs - b.startMs,
+    'latest start': (a, b) => b.startMs - a.startMs,
+    'earliest end': (a, b) => a.endMs - b.endMs,
+    'latest end': (a, b) => b.endMs - a.endMs,
+    'closest start to the server span': (a, b) => Math.abs(server.startMs - a.startMs) - Math.abs(server.startMs - b.startMs),
+    'closest end to the server span': (a, b) => Math.abs(server.endMs - a.endMs) - Math.abs(server.endMs - b.endMs),
+  };
+  for (const [name, cmp] of Object.entries(timing)) {
+    assert.equal(cmp(sameTrace[0], sameTrace[1]), 0, `${name} cannot separate the twins`);
+    // A stable sort over the rows the player sees keeps the upper twin first.
+    assert.equal(passes([...sameTrace].sort(cmp)[0]), false, `${name} over the board order picked the upper twin and passed`);
+    // The same rule over every enclosing same-trace browser row, in board order.
+    const enclosing = board.filter((s) => s.traceId === server.traceId && s.service === 'shop-web' && encloses(s));
+    assert.equal(passes([...enclosing].sort(cmp)[0]), false, `${name} over the enclosing rows picked ${[...enclosing].sort(cmp)[0].name} and passed`);
+  }
+  // Position beliefs over the real waterfall rows: both are wrong, only the header's parent id passes.
+  const at = rows.findIndex((r) => r.spanId === server.spanId);
+  const browserRows = board.slice(0, at).filter((s) => s.service === 'shop-web' && s.traceId === server.traceId);
+  const beliefs = {
+    'the first POST /checkout row': board.find((s) => s.name === 'POST /checkout' && s.traceId === server.traceId && s.service === 'shop-web'),
+    'the upper twin': sameTrace[0],
+    'the row above the server span': board[at - 1],
+    'the last browser row before the server span': browserRows[browserRows.length - 1],
+    'the first browser row of the trace': browserRows[0],
+    'the first CLIENT row': browserRows.find((s) => s.kind === 'CLIENT'),
+    'the last CLIENT row': [...browserRows].reverse().find((s) => s.kind === 'CLIENT'),
+  };
+  for (const [name, s] of Object.entries(beliefs)) assert.equal(passes(s), false, `${name} (${s.name}, ${s.spanId}) passed`);
+  assert.equal(board[at - 1].name, 'GET /order-status', 'a later fetch sits between the twins and the server span');
+  assert.deepEqual(sameTrace.map((s) => gradeWith(s.spanId)), [['wrong-parent'], []], 'of the two only the header\'s parent id decides');
 });
 
 test('step 1: the board labels the twins by span id, and reading the parent id of the traceparent is what picks the right one', () => {
   const [, , parentId] = traceparent.split('-');
   const twins = tree.spans.filter((s) => s.traceId === byName('checkout', 'POST /checkout', 'a3f1c9e2').traceId && s.name === 'POST /checkout' && s.service === 'shop-web');
   const labels = twins.map((s) => namer(tree.spans, (x) => x).text(s));
-  assert.deepEqual(labels, ['POST /checkout (shop-web, trace a3f1c9e2, span id \u202692a3)', 'POST /checkout (shop-web, trace a3f1c9e2, span id \u2026c3d2)']);
+  assert.deepEqual(labels, ['POST /checkout (shop-web, trace a3f1c9e2, span id \u20264c3d)', 'POST /checkout (shop-web, trace a3f1c9e2, span id \u202692a3)']);
   assert.equal(new Set(labels).size, 2, 'the labels differ only by the span id');
-  assert.equal(labels.map((l) => parentId.endsWith(l.slice(-5, -1))).join(), 'true,false', 'the end of the header\'s parent id matches one label only');
-  assert.deepEqual(twins.map((s) => gradeWith(s.spanId).length === 0), [true, false]);
+  assert.equal(labels.map((l) => parentId.endsWith(l.slice(-5, -1))).join(), 'false,true', 'the end of the header\'s parent id matches one label only');
+  assert.deepEqual(twins.map((s) => gradeWith(s.spanId).length === 0), [false, true]);
   assert.equal(twins.every((s) => s.startMs <= 230 && s.endMs >= 1160), true, 'both twins enclose the server span');
+  assert.deepEqual([twins[0].startMs, twins[0].endMs], [twins[1].startMs, twins[1].endMs], 'identical times');
 });
 
 // ---- step 2: CORS ---------------------------------------------------------------------------
