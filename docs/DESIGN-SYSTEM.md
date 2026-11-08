@@ -71,7 +71,7 @@ each function's JSDoc for the exact markup.
 | `lesson(bodyHtml)` | text | The glow lesson card ("Lesson" eyebrow, glow top left, dot top right). |
 | `question({id, html})`, `stepHead({step, titleHtml, noteHtml})`, `eyebrow(text)` | text | The step's question; "Step N" heading; mono label. |
 | `note(bodyHtml)`, `prose(bodyHtml)`, `codeBlock(text)` | text | Muted small print; classless authored content; escaped code. |
-| `panel({id, variant, headHtml, sections})` | panel | Card with sections; `inset`, `alert`, `drop` (dashed means drop zone only). |
+| `panel({id, variant, headHtml, sections})` | panel | Card with sections; `inset`, `alert`, `drop` (dashed means drop zone only; Sort it no longer uses it, #261: it categorises with choice options and plain groups, no boxes). |
 | `chip({text, tone, dot, swatch, dashed})` | chip | Mono pill; `data-tone` neutral, success, error, hint, attention. |
 | `button({id, label, variant, disabled, finish, type, icon, describedBy})`, `nextButton(id)`, `finishButton(id)` | button | Pill; `primary` (red, D2), `ghost`, `hint`, `icon`; `describedBy` (an id) points a disabled button at its reason; Finish has `data-finish`. |
 | `option({attr, value, labelHtml, metaHtml, kind, pressed, state, disabled, hinted, name})`, `options({id, labelledBy, layout, itemsHtml})` | option | Selectable card and its group (list, grid, wrap). |

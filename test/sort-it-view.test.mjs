@@ -124,7 +124,7 @@ const RETIRED = [
   'query-data', 'query-input', 'query-label', 'query-note', 'show', 'small', 'sort-bucket-btn', 'sort-hint',
   'sort-item', 'speech', 'spot-line', 'tradeoff-keeps', 'tradeoff-option',
 ];
-const INSTR = 'Drag each item into the right bucket, or pick an item and then a bucket.';
+const INSTR = 'Pick an item, then its category, or drag an item onto a category.';
 
 // ---- S1, S2 sortView: the board as data -------------------------------------------------
 
@@ -190,9 +190,18 @@ test('S3 renderSort: kit markup in one split; the side column with a hidden succ
   setup();
   assert.deepEqual(qa('[data-bucket]').map((b) => b.dataset.bucket), ['metric', 'log', 'trace']);
   assert.deepEqual(qa('[data-bucket]').map((b) => b.textContent.trim()), ['Metric', 'Log', 'Trace']);
+  // #261: no boxes. The choice buttons are a plain row; each category is a plain group with a tally heading.
   for (const b of qa('[data-bucket]')) {
-    assert.equal(b.closest('[data-drop]')?.getAttribute('data-drop'), b.dataset.bucket, `${b.dataset.bucket} sits in its drop zone`);
+    assert.equal(b.closest('[data-drop]') === null, true, `${b.dataset.bucket} is a choice button, not inside a drop zone`);
+    assert.equal(b.classList.contains('ui-option--choice'), true, `${b.dataset.bucket} is a kit choice option`);
   }
+  assert.equal(qa('.ui-panel--drop, .sort-buckets').length, 0, 'no drop panel and no bucket grid');
+  assert.deepEqual(qa('[data-drop]').map((g) => g.dataset.drop), ['metric', 'log', 'trace']);
+  for (const g of qa('[data-drop]')) {
+    assert.equal(g.classList.contains('ui-panel'), false, 'a group is not a panel');
+    assert.equal(g.querySelector('[data-bucket-list]').dataset.bucketList, g.dataset.drop, 'its list sits in its group');
+  }
+  assert.deepEqual(qa('.sort-group-title').map((t) => t.textContent.replace(/\s+/g, ' ').trim()), ['Metric \u00b7 0', 'Log \u00b7 0', 'Trace \u00b7 0']);
   assert.deepEqual(enabledBuckets(), [], 'nothing selected: every bucket is disabled');
   assert.deepEqual(qa('[data-bucket-list]').map((l) => `${l.getAttribute('data-bucket-list')}:${l.textContent}`), ['metric:', 'log:', 'trace:']);
   assert.equal(qa('[id="signals-instr"]').length, 1, 'one instruction line');
@@ -231,6 +240,7 @@ test('S3 renderSort: the selected item is pressed and only its untried buckets a
   assert.deepEqual(enabledBuckets(), ['log', 'trace']);
   assert.equal(placed('metric'), 'Request rate');
   assert.equal(placed('log'), '');
+  assert.equal(text('[data-drop="metric"] .sort-group-title'), 'Metric \u00b7 1', 'the tally follows the placed items');
   assert.equal(sorted(), 'Sorted 1 of 4');
 });
 
