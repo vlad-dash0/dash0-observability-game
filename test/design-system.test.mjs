@@ -1,10 +1,10 @@
 // Design-system guards (#158, docs/DESIGN-SYSTEM.md "Guards"): T1-T7, T13, T14 and the
 // no-glow rule. Stylesheets and sources are read as text (test/helpers/css.mjs). Allow lists
-// and LEGACY only shrink: each migration deletes its entries, the last asserts them empty.
+// and LEGACY are empty or only shrink (#158 P7 retired the pre-kit CSS).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  classesInSelector, compounds, contrast, decls, emittedClasses, overlay, ratio, read, resolveColor, rules,
+  classesInSelector, compounds, contrast, decls, definedClasses, emittedClasses, overlay, ratio, read, resolveColor, rules,
   splitTop, styleFiles, stripComments, VARS, walk,
 } from './helpers/css.mjs';
 
@@ -133,9 +133,8 @@ test('T5 no :has() and no !important outside reduced motion and [x-cloak]', () =
 
 // ---- T12 the generic layout: one container, named by the kit ------------------------------
 
-// The legacy hand-written step's stage is the one other `level` container (base.css, until
-// #165 moves those levels onto the kit step). Only shrinks.
-const CONTAINER_ALLOW = ['base.css .lesson-stage'];
+// Empty since #158 P7: the kit step is the only `level` container.
+const CONTAINER_ALLOW = [];
 
 test('T12 the split shows its side column from 960px of the level container: minmax(0, 1fr) and a 300px side', () => {
   const at = sheetRules('kit.css').filter((r) => r.at.includes('@container level (min-width: 960px)'));
@@ -165,7 +164,7 @@ test('T12 harness: a container is keyed only by a lone class, and its declaratio
   assert.deepEqual(decls(r.body).filter(([p]) => CONTAINER_PROP.test(p)), [['container', 'other / size']]);
 });
 
-test('T12 every container query names level; only the kit step (and the listed legacy stage) declares a container, as level / inline-size', () => {
+test('T12 every container query names level; only the kit step declares a container, as level / inline-size', () => {
   const seen = new Set();
   let queries = 0;
   for (const f of SHEETS) {
@@ -281,8 +280,65 @@ const RETIRED = [
   'sort-item', 'speech', 'spot-line', 'tradeoff-keeps', 'tradeoff-option',
 ];
 
-const LEGACY = {
+const LEGACY = {};
+
+test('T7 LEGACY is empty and the retired CSS is gone: nothing on the pre-kit UI can come back', () => {
+  assert.deepEqual(LEGACY, {});
+  const defined = definedClasses();
+  // `show` is also the hub's open state for .overlay, .reward and .notice (hub.css), not feedback.
+  for (const c of RETIRED.filter((x) => x !== 'show')) assert.ok(!defined.has(c), `a stylesheet defines the retired class .${c}; the kit replaced it`);
+  assert.deepEqual(CONTAINER_ALLOW, []);
+});
+
+// Every class a non-kit stylesheet styles is written by some app module or index.html. A rule
+// nothing emits is dead; delete it. A class the scanner cannot see (built from a ${...} part, a
+// variable or an Alpine :class) is listed here against the companion classes its rule must sit
+// with, so `.level-card.dim` stays red while `.globe-probe.dim` passes. Literal emitters need no entry.
+const DYNAMIC_ALLOW = {
+  'hub.css': {
+    // app.mjs `confetti c${(i % 6) + 1}`
+    c1: ['confetti'], c2: ['confetti'], c3: ['confetti'], c4: ['confetti'], c5: ['confetti'], c6: ['confetti'],
+    // app.mjs levelClasses(): the level state plus ' nudge'
+    done: ['level-card'], locked: ['level-card'], nudge: ['level-card'],
+    // lib/globe-render.mjs `globe-probe ${role}` over COLOR_ROLES (lit and pulse are literal in index.html)
+    body: ['globe-probe'], dim: ['globe-probe'], rim: ['globe-probe'], sky: ['globe-probe'],
+    // index.html Alpine :class (overlayOpen, rewardOpen, notice, aboutOpen)
+    open: ['about'], show: ['notice', 'overlay', 'reward'],
+  },
 };
+
+test('T15 every class in base.css, hub.css and widgets.css has an emitter, or a documented dynamic one beside its companion class', () => {
+  const emitted = new Set();
+  for (const f of ['index.html', ...walk('lib', ['.mjs']), ...APP_MODULES]) for (const c of emittedClasses(read(f))) emitted.add(c);
+  assert.ok(emitted.has('confetti') && emitted.has('wf-row') && emitted.has('globe-stage'), 'the scan reads app.mjs, widgets and index.html');
+  const seen = new Set();
+  for (const f of NOT_TOKENS.filter((n) => n !== 'kit.css')) {
+    for (const r of sheetRules(f)) {
+      for (const sel of splitTop(r.selector)) {
+        const here = classesInSelector(sel);
+        for (const c of here) {
+          const companions = DYNAMIC_ALLOW[f]?.[c];
+          if (companions) {
+            assert.ok(companions.some((k) => here.includes(k)), `styles/${f} "${sel}" styles .${c} without ${companions.map((k) => `.${k}`).join(' or ')}; ${c} is only set on those`);
+            seen.add(`${f} ${c}`);
+          } else assert.ok(emitted.has(c), `styles/${f} "${sel}" styles .${c}, which nothing emits; delete the rule`);
+        }
+      }
+    }
+  }
+  for (const [f, map] of Object.entries(DYNAMIC_ALLOW)) {
+    for (const c of Object.keys(map)) {
+      assert.ok(seen.has(`${f} ${c}`), `stale DYNAMIC_ALLOW entry ${f} .${c}`);
+      assert.ok(!emitted.has(c), `DYNAMIC_ALLOW .${c} is written literally somewhere; the scanner sees it, so drop the entry`);
+    }
+  }
+});
+
+test('every :disabled rule that sets opacity uses the disabled-opacity token, not a literal', () => {
+  const dis = SHEETS.flatMap(sheetRules).filter((r) => /:disabled/.test(r.selector) && decls(r.body).some(([p]) => p === 'opacity'));
+  assert.ok(dis.length >= 2, 'kit.css fades its disabled controls');
+  for (const r of dis) assert.equal(decls(r.body).find(([p]) => p === 'opacity')[1], 'var(--opacity-disabled)', r.selector);
+});
 
 test('T7 retired classes: only LEGACY files emit them, and LEGACY has no stale entry', () => {
   assert.deepEqual([...RETIRED].sort(), RETIRED, 'RETIRED stays sorted');
@@ -478,14 +534,6 @@ test('waiting and invalid waterfall rows fade bars and marks, never the row text
     const fade = wf.find((r) => withOpacity(r) && splitTop(r.selector).includes(`${row} .wf-bar`));
     assert.ok(fade, `${row} fades its bar`);
     for (const part of ['.wf-conn', '.wf-sw']) assert.ok(splitTop(fade.selector).includes(`${row} ${part}`), `${row} fades ${part}`);
-  }
-});
-
-test('disabled legacy controls use the disabled-opacity token, not a literal', () => {
-  const dis = sheetRules('base.css').filter((r) => /:disabled/.test(r.selector) && decls(r.body).some(([p]) => p === 'opacity'));
-  assert.ok(dis.length >= 2, 'base.css still styles disabled controls');
-  for (const r of dis) {
-    assert.equal(decls(r.body).find(([p]) => p === 'opacity')[1], 'var(--opacity-disabled)', r.selector);
   }
 });
 

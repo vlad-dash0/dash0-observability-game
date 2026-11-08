@@ -353,7 +353,7 @@ test('every star display (#221): each star rule takes a --color-* token and reac
   const all = readdirSync(join(ROOT, 'styles')).filter((f) => f.endsWith('.css')).flatMap((f) => rules(read(`styles/${f}`)));
   const starRules = all.filter((r) => r.selector.split(',').some((s) => /star/.test(s) && !/win-stars/.test(s)));
   const sels = starRules.map((r) => r.selector);
-  for (const want of ['.star-count span:first-child', '.level-stars', '.reward-card .reward-stars', '.ui-star path', '.help-stars']) {
+  for (const want of ['.star-count span:first-child', '.level-stars', '.reward-card .reward-stars', '.ui-star path']) {
     assert.ok(sels.some((s) => s.split(',').map((x) => x.trim()).includes(want)), `${want} is checked`);
   }
   let checked = 0;

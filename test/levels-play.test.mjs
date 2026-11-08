@@ -622,11 +622,8 @@ async function until(sel, max = 50) {
 // ---- T8 (#158): every class a level shows has a CSS rule --------------------------------
 
 const DEFINED = definedClasses();
-// Classes levels render that no stylesheet defines yet, each owned by a later phase of #158:
-// Empty since P5 #160 (Trade-off) took the last entries. Sorted; only shrinks: a phase deletes its
-// own, and an entry no level renders any more fails ("stale"). P7 asserts it is empty.
+// Empty since #158 P7: every class a level renders has a CSS rule, with no exceptions.
 const UNDEFINED_ALLOW = [];
-const undefinedSeen = new Set();
 
 /** The classes in `steps` (renderStep strings) and `live` (seen on the page) that no stylesheet defines. */
 function undefinedClasses(steps, live) {
@@ -681,7 +678,6 @@ async function checkRunAsync(level, run) {
 function assertRun(level, run, { calls, steps, first, injected, classes }) {
   assert.deepEqual(injected, [], 'the overlay holds an Alpine attribute (set outside renderStep)');
   const missing = undefinedClasses(steps, classes);
-  for (const c of missing) if (UNDEFINED_ALLOW.includes(c)) undefinedSeen.add(c);
   assert.deepEqual(missing.filter((c) => !UNDEFINED_ALLOW.includes(c)), [], 'rendered classes with no CSS rule (T8)');
   assert.ok(first.rendered >= 1, 'run() renders a first step');
   assert.equal(first.finishEnabled, false, 'the first screen has no enabled Finish');
@@ -1041,16 +1037,11 @@ test('harness T8: a class with no CSS rule fails, in a rendered step or added la
   const expect = { stars: 5, cards: [] };
   assert.throws(() => checkRun(level('fx-nope', { body: '<p class="nope">Go on.</p>' }), { play, expect }), /no CSS rule/);
   assert.throws(() => checkRun(level('fx-late', { late: 'ui-lesson nope-late' }), { play, expect }), /no CSS rule/);
-  // Defined classes pass: a kit class and a legacy one.
+  // Defined classes pass: a kit class and a utility one.
   checkRun(level('fx-ok', { body: '<p class="ui-note">Go on.</p>', late: 'visually-hidden' }), { play, expect });
 });
 
 // Runs last: every level above has played, so an allowed class no level renders is stale.
-test('T8 UNDEFINED_ALLOW is sorted and has no stale entry', () => {
-  assert.equal(new Set(UNDEFINED_ALLOW).size, UNDEFINED_ALLOW.length, 'no duplicates');
-  assert.deepEqual([...UNDEFINED_ALLOW].sort(), UNDEFINED_ALLOW, 'sorted');
-  for (const c of UNDEFINED_ALLOW) {
-    assert.ok(!DEFINED.has(c), `UNDEFINED_ALLOW names "${c}", which a stylesheet now defines; delete it`);
-    assert.ok(undefinedSeen.has(c), `stale UNDEFINED_ALLOW entry "${c}": no level renders it any more; delete it`);
-  }
+test('T8 UNDEFINED_ALLOW is empty: every rendered class has a CSS rule', () => {
+  assert.deepEqual(UNDEFINED_ALLOW, []);
 });
