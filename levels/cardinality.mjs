@@ -83,6 +83,9 @@ const BUDGET = {
   id: 'cdn-budget',
   unit: 'series',
   cap: CAP,
+  helps: { hints: true },
+  hint:
+    'The cost of a counter is the number of values of each attribute it keeps, multiplied together. Find the cheapest set of attributes that still keeps each thing you need.',
   knobs: [
     {
       id: 'requests',

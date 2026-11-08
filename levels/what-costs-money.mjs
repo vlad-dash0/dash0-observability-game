@@ -43,6 +43,9 @@ const GB = {
   id: 'wcm-gb',
   unit: 'GB per day',
   cap: 100,
+  helps: { hints: true },
+  hint:
+    'The meter here is bytes a day. For each knob, ask how many bytes each choice sends and which need a cheaper choice would drop.',
   knobs: [
     {
       id: 'traces',
@@ -84,6 +87,9 @@ const SIGNAL = {
   id: 'wcm-signal',
   unit: 'cost units per day',
   cap: 40,
+  helps: { hints: true },
+  hint:
+    'The meter here counts signals: spans, log records and metric data points, not how big each one is. For each knob, ask how many signals each choice sends.',
   knobs: [
     {
       id: 'interval',

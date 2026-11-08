@@ -283,7 +283,6 @@ const RETIRED = [
 
 const LEGACY = {
   'levels/the-pager.mjs': ['btn', 'choice', 'choices', 'feedback', 'info', 'lesson-intro', 'lesson-stage', 'q', 'show'],
-  'lib/widgets/trade-off-view.mjs': ['btn', 'feedback', 'show', 'tradeoff-keeps', 'tradeoff-option'],
 };
 
 test('T7 retired classes: only LEGACY files emit them, and LEGACY has no stale entry', () => {
