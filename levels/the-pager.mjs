@@ -5,7 +5,20 @@
 // The budget is a percent of the error budget, not minutes, in fixed 25% steps. The screen shows a kit meter of 4 cells, the percent left as the headline, and a Spent on chip per look. It is not the incident engine (§4.3). Spec: docs/M1-DESIGN.md §6 Boss the-pager.
 // Spec: https://opentelemetry.io/docs/concepts/observability-primer/#what-is-observability
 
-import { chip, meter } from '../lib/ui/index.mjs';
+import {
+  actions,
+  button,
+  chip,
+  finishButton,
+  feedback as feedbackRegion,
+  meter,
+  option,
+  options,
+  prose,
+  question,
+  setFeedback,
+  step,
+} from '../lib/ui/index.mjs';
 
 const ALERT = 'PAGE: checkout p95 > 2 s (firing)';
 const BUDGET = { startPct: 100, stepPct: 25 };
@@ -118,32 +131,42 @@ export default {
   scored: false,
   scoring: { parMs: null },
   run(ctx) {
-    const alert = `<h3 class="q" id="pager-alert">${ctx.escapeHtml(ALERT)}</h3>`;
+    const e = ctx.escapeHtml;
+    // The rows so far: a plain full-width kit block, not live. Only the newest row is announced, in the feedback region.
+    const rowsList = (id) => `<div id="${id}"></div>`;
+    const alert = question({ id: 'pager-alert', html: e(ALERT) });
+    const choices = (list, attr) =>
+      options({
+        labelledBy: 'pager-alert',
+        itemsHtml: list.map((x) => option({ attr, value: x.key, labelHtml: e(x.label) })).join(''),
+      });
+    /** The newest row is announced in the kit feedback region (neutral: information only); the row it replaces moves into the plain (not live) list, so each row is on screen once. */
+    const addRow = (list, region, key, attr, label, body) => {
+      if (region.newestHtml) {
+        list.rowsHtml = `${list.rowsHtml ?? ''}${region.newestHtml}`;
+        list.innerHTML = prose(list.rowsHtml);
+      }
+      region.newestHtml = `<p data-${attr}="${key}"><strong>${label}</strong> ${body}</p>`;
+      setFeedback(region, 'neutral', region.newestHtml);
+    };
     const askAnswers = () => {
-      const asks = ASKS.map(
-        (a) => `<button class="choice" data-ask="${a.key}">${a.label}</button>`,
-      ).join('');
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(LIT_INTRO)}</div>
-        <div class="lesson-stage">
-          ${alert}
-          <div class="choices" role="group" aria-labelledby="pager-alert">${asks}</div>
-          <div id="pager-answers" role="status" aria-live="polite"></div>
-        </div>`,
-        '<button class="btn" id="pager-finish" data-finish disabled>Finish</button>',
+        step({
+          wide: false,
+          bodyHtml: `${ctx.speech(LIT_INTRO)}${alert}${choices(ASKS, 'ask')}${rowsList('pager-answer-rows')}${feedbackRegion({ id: 'pager-answers' })}`,
+        }),
+        actions({ wide: false, buttonsHtml: finishButton('pager-finish') }),
       );
       const finish = ctx.ovActions.querySelector('#pager-finish');
       const answers = ctx.ovBody.querySelector('#pager-answers');
+      const answerRows = ctx.ovBody.querySelector('#pager-answer-rows');
       const buttons = [...ctx.ovBody.querySelectorAll('[data-ask]')];
       buttons.forEach((b, i) => {
         const ask = ASKS[i];
         b.onclick = () => {
           if (b.disabled) return;
           b.disabled = true;
-          answers.insertAdjacentHTML(
-            'beforeend',
-            `<p class="feedback info show" data-answer="${ask.key}"><strong>${ask.label}</strong> ${ask.answer}</p>`,
-          );
+          addRow(answerRows, answers, ask.key, 'answer', ask.label, ask.answer);
           finish.disabled = buttons.some((x) => !x.disabled);
           const rest = [...buttons.slice(i + 1), ...buttons.slice(0, i)];
           (rest.find((x) => !x.disabled) ?? finish).focus();
@@ -153,20 +176,19 @@ export default {
       buttons[0].focus();
     };
 
-    const looks = LOOKS.map(
-      (l) => `<button class="choice" data-look="${l.key}">${l.label}</button>`,
-    ).join('');
     ctx.renderStep(
-      `<div class="lesson-intro">${ctx.speech(INTRO)}</div>
-      <div class="lesson-stage">
-        ${alert}
+      step({
+        wide: false,
+        bodyHtml: `${ctx.speech(INTRO)}${alert}
         <p id="pager-budget" role="status" aria-live="polite">${budgetText(BUDGET.startPct)}</p>
         <div id="pager-meter-slot">${meterHtml(BUDGET.startPct)}</div>
         <p id="pager-spent"></p>
-        <div class="choices" role="group" aria-labelledby="pager-alert">${looks}</div>
-        <div id="pager-feedback" role="status" aria-live="polite"></div>
-      </div>`,
-      '<button class="btn" id="pager-escalate" disabled>Escalate</button>',
+        ${choices(LOOKS, 'look')}${rowsList('pager-said-rows')}${feedbackRegion({ id: 'pager-feedback' })}`,
+      }),
+      actions({
+        wide: false,
+        buttonsHtml: button({ id: 'pager-escalate', label: 'Escalate', variant: 'primary', disabled: true }),
+      }),
     );
     const body = ctx.ovBody;
     const escalate = ctx.ovActions.querySelector('#pager-escalate');
@@ -174,6 +196,7 @@ export default {
     const meterSlot = body.querySelector('#pager-meter-slot');
     const spentEl = body.querySelector('#pager-spent');
     const feedback = body.querySelector('#pager-feedback');
+    const saidRows = body.querySelector('#pager-said-rows');
     const taken = [];
     const buttons = [...body.querySelectorAll('[data-look]')];
     let left = BUDGET.startPct;
@@ -188,10 +211,7 @@ export default {
         taken.push(look);
         meterSlot.innerHTML = meterHtml(left);
         spentEl.innerHTML = spentHtml(taken);
-        feedback.insertAdjacentHTML(
-          'beforeend',
-          `<p class="feedback info show" data-said="${look.key}"><strong>${look.label}</strong> ${look.reason}</p>`,
-        );
+        addRow(saidRows, feedback, look.key, 'said', look.label, look.reason);
         escalate.disabled = false;
         if (left === 0) return askAnswers();
         const rest = [...buttons.slice(i + 1), ...buttons.slice(0, i)];
