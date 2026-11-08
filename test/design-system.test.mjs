@@ -207,6 +207,7 @@ test('lesson code breaks inside a long token: the lesson card clips, so an unbre
   assert.equal(pick('.ui-lesson code')['overflow-wrap'], 'anywhere');
   assert.equal(pick('.ui-panel').overflow, 'hidden', 'premise: the panel clips too');
   assert.equal(pick('.ui-panel code')['overflow-wrap'], 'anywhere', 'a long trace id in a panel breaks instead of clipping');
+  assert.equal(pick('.ui-panel-sec')['overflow-wrap'], 'anywhere', 'long plain text in a panel section wraps at 320px instead of clipping');
 });
 
 test('palette rule 5: kit.css puts no shadow or glow on anything, only inset rings', () => {
@@ -288,7 +289,6 @@ const LEGACY = {
   'levels/span-kinds.mjs': ['btn', 'feedback', 'info', 'lesson-intro', 'lesson-stage', 'q', 'show'],
   'levels/spans-and-traces.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'levels/the-pager.mjs': ['btn', 'choice', 'choices', 'feedback', 'info', 'lesson-intro', 'lesson-stage', 'q', 'show'],
-  'lib/widgets/configure-it-view.mjs': ['btn', 'configure-inactive', 'configure-input', 'configure-label', 'configure-more', 'configure-note', 'feedback', 'ghost', 'info', 'show', 'small'],
   'lib/widgets/trade-off-view.mjs': ['btn', 'feedback', 'show', 'tradeoff-keeps', 'tradeoff-option'],
 };
 

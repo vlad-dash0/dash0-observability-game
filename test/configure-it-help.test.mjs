@@ -39,7 +39,7 @@ test('validateConfigureHelps names a bad key, a non-boolean, a bad hint and a hi
   assert.deepEqual(validateConfigureHelps(spec({ hint: ' ' })), ['hint: not non-empty text']);
   assert.deepEqual(validateConfigureHelps(spec({ helps: { hints: false } })), ['hint: shown only when helps.hints is on']);
   assert.deepEqual(validateConfigureHelps(spec({ helps: undefined })), ['hint: shown only when helps.hints is on']);
-  assert.deepEqual(validateConfigureHelps(spec({ hint: undefined })), ['hint: required when helps.hints is on']);
+  assert.deepEqual(validateConfigureHelps(spec({ hint: undefined })), [], 'hints on without an authored hint shows the default rule');
 });
 
 // ---- tier 1 --------------------------------------------------------------------------------

@@ -6,8 +6,10 @@ import assert from 'node:assert/strict';
 import { makeDom, q, qa, click } from './helpers/dom.mjs';
 import { recordFocus } from './helpers/focus.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
-import { newConfigureState } from '../lib/widgets/configure-it.mjs';
-import { mountConfigure, renderConfigure } from '../lib/widgets/configure-it-view.mjs';
+import { checkConfig } from '../lib/configure/check.mjs';
+import { newConfigureState, SCHEMAS } from '../lib/widgets/configure-it.mjs';
+import { RULE, mountConfigure, pipelinesHtml, renderConfigure } from '../lib/widgets/configure-it-view.mjs';
+import { CONFIGURE_RULE } from '../lib/widgets/configure-it-help.mjs';
 
 const REF = `receivers:
   otlp:
@@ -32,6 +34,7 @@ function setup(spec = fixture(), opts = {}) {
   const dom = makeDom();
   const focus = recordFocus(dom.window);
   const counts = { mistakes: 0, hints: 0, done: 0 };
+  let swirled = 0;
   const ctx = { ovBody: dom.body, ovActions: dom.actions, escapeHtml, mistake() { counts.mistakes += 1; }, hint() { counts.hints += 1; } };
   dom.body.innerHTML = renderConfigure(spec, newConfigureState(), { escapeHtml, ...opts.render });
   dom.actions.innerHTML = '<button id="finish" disabled>Finish</button>';
@@ -41,18 +44,21 @@ function setup(spec = fixture(), opts = {}) {
     fin.disabled = false;
     return fin;
   };
-  return { dom, focus, counts, mount: (extra = {}) => mountConfigure(ctx, spec, { onComplete, ...opts.mount, ...extra }) };
+  const swirl = () => { swirled += 1; };
+  return { dom, focus, counts, swirled: () => swirled, mount: (extra = {}) => mountConfigure(ctx, spec, { onComplete, swirl, ...opts.mount, ...extra }) };
 }
 
-const feedback = () => q('#cf-feedback').textContent;
+const feedback = () => q('#cf-feedback').textContent.trim();
+const tone = () => q('#cf-feedback').getAttribute('data-tone');
+const HELPS = { helps: { hints: true }, hint: 'Compare the <code>exporters</code> names.' };
 const panel = () => q('#cf-pipelines').textContent;
 const check = (text) => {
   q('#cf-input').value = text;
   click('#cf-check');
 };
 const pipe = (name) => q(`#cf-pipelines [data-pipeline="${name}"]`);
-const stateOf = (name) => pipe(name).querySelector('.configure-state').textContent;
-const flowOf = (name) => pipe(name).querySelector('.configure-flow').textContent;
+const stateOf = (name) => pipe(name).querySelector('.ui-chip').textContent.trim();
+const flowOf = (name) => pipe(name).querySelector('[data-part="flow"]').textContent;
 const items = (sel) => qa(sel).map((li) => li.textContent);
 
 test('renderConfigure: a labelled monospace-ready textarea, a Check button, the pipelines panel, a live feedback region', () => {
@@ -63,14 +69,13 @@ test('renderConfigure: a labelled monospace-ready textarea, a Check button, the 
   for (const [attr, want] of [['spellcheck', 'false'], ['autocomplete', 'off'], ['autocapitalize', 'off'], ['autocorrect', 'off']]) {
     assert.equal(input.getAttribute(attr), want, attr);
   }
-  assert.equal(input.className, 'configure-input');
   assert.equal(q('#cf-check').textContent, 'Check');
   assert.equal(q('#cf-check').localName, 'button');
   const fb = q('#cf-feedback');
   assert.equal(fb.getAttribute('role'), 'status');
   assert.equal(fb.getAttribute('aria-live'), 'polite');
   assert.equal(fb.getAttribute('tabindex'), '-1');
-  assert.equal(q('.configure').hasAttribute('role'), false);
+  assert.equal(q('[data-configure]').hasAttribute('role'), false);
   assert.equal(qa('#cf-hint').length, 0);
   assert.equal(panel(), 'Press Check to see which pipelines flow.');
 });
@@ -88,25 +93,30 @@ test('given prefills the textarea; in the markup it is escaped, so it cannot clo
 
 test('renderConfigure: labelledBy makes a labelled group; a bad token is a TypeError naming the spec', () => {
   setup(fixture(), { render: { labelledBy: 'cf-q' } });
-  assert.equal(q('.configure').getAttribute('role'), 'group');
-  assert.equal(q('.configure').getAttribute('aria-labelledby'), 'cf-q');
+  assert.equal(q('[data-configure]').getAttribute('role'), 'group');
+  assert.equal(q('[data-configure]').getAttribute('aria-labelledby'), 'cf-q');
   assert.throws(() => renderConfigure(fixture(), newConfigureState(), { escapeHtml, labelledBy: 'a b' }), /configure "cf": labelledBy must be a plain token/);
 });
 
-test('the reference passes: Right plus the explanation as markup, every pipeline Flowing, locked, done once, Finish focused', () => {
-  const { counts, focus, mount } = setup();
+test('the reference passes: Right plus the explanation as markup, every pipeline Flowing, locked, done once, the success heading focused', () => {
+  const { counts, focus, swirled, mount } = setup();
   mount();
   check(REF);
   assert.ok(feedback().startsWith('Right. The names must match, exactly.'));
   assert.equal(qa('#cf-feedback code').length, 1);
   assert.equal(stateOf('traces'), 'Flowing');
   assert.equal(flowOf('traces'), 'Receivers: otlp → Processors: batch → Exporters: otlp/dash0');
-  assert.equal(q('.configure-overall').textContent, 'The Collector would start: every pipeline flows.');
-  assert.equal(q('#cf-input').disabled, true);
+  assert.equal(q('[data-part="overall"]').textContent, 'The Collector would start: every pipeline flows.');
+  assert.equal(q('#cf-input').readOnly, true, 'locked read-only, not disabled');
+  assert.equal(q('#cf-input').disabled, false);
   assert.equal(q('#cf-check').disabled, true);
   assert.equal(counts.mistakes, 0);
   assert.equal(counts.done, 1);
-  assert.equal(focus.last(), '#finish');
+  assert.equal(tone(), 'success');
+  assert.equal(q('#cf-win').hasAttribute('hidden'), false, 'the success card is on the right');
+  assert.equal(q('#cf-win-stars').textContent, '5 of 5 stars: 0 failed Checks, 0 hints.');
+  assert.equal(swirled(), 1);
+  assert.equal(focus.last(), '#cf-win-title');
 });
 
 test('an equivalent config written differently passes too', () => {
@@ -125,11 +135,14 @@ test('a wiring error costs one mistake, lists it as data, and shows the pipeline
   assert.deepEqual(items('#cf-feedback li'), ['unknown-ref service.pipelines.traces.exporters[0]: "otlp/dash0x" is not defined under exporters or connectors']);
   assert.equal(counts.mistakes, 1);
   assert.equal(counts.done, 0);
-  assert.equal(q('#cf-input').disabled, false);
+  assert.equal(tone(), 'error', 'a wrong answer is the error tone (D7)');
+  assert.equal(q('#cf-wrong').textContent, '1');
+  assert.equal(q('#cf-wrong-label').textContent, 'failed Check');
+  assert.notEqual(q('#cf-input').readOnly, true);
   assert.equal(stateOf('traces'), 'Stalled');
   assert.equal(flowOf('traces'), 'Receivers: otlp → Processors: none → Exporters: otlp/dash0x (not defined)');
-  assert.deepEqual(items('#cf-pipelines [data-pipeline="traces"] .configure-reasons li'), ['service.pipelines.traces.exporters[0]: "otlp/dash0x" is not defined under exporters or connectors']);
-  assert.equal(q('.configure-overall').textContent, 'The Collector would not start.');
+  assert.deepEqual(items('#cf-pipelines [data-pipeline="traces"] [data-part="reasons"] li'), ['service.pipelines.traces.exporters[0]: "otlp/dash0x" is not defined under exporters or connectors']);
+  assert.equal(q('[data-part="overall"]').textContent, 'The Collector would not start.');
 });
 
 test('two problems are counted in the plural', () => {
@@ -164,6 +177,7 @@ test('the same failing text again, whitespace aside, is free and keeps the pipel
   check(GIVEN);
   check(`${GIVEN}\n\n`);
   assert.equal(feedback(), 'You already checked this config. Nothing new was counted.');
+  assert.equal(tone(), 'neutral');
   assert.equal(counts.mistakes, 1);
   assert.equal(stateOf('traces'), 'Stalled');
   check(`${GIVEN}zz: 1\n`);
@@ -214,6 +228,7 @@ test('blank text is free and asks for a config', () => {
   mount();
   check('  \n ');
   assert.equal(feedback(), 'Type a config first.');
+  assert.equal(tone(), 'neutral');
   assert.equal(counts.mistakes, 0);
 });
 
@@ -247,9 +262,9 @@ test('the pipeline view is drawn from the checker result alone: names, stages, s
   assert.equal(stateOf('beta'), 'Flowing');
   assert.equal(flowOf('alpha'), 'Receivers: r1 → Processors: p1, p2 (not defined) → Exporters: e1');
   assert.equal(flowOf('beta'), 'Receivers: r2 → Processors: none → Exporters: e2');
-  assert.deepEqual(items('#cf-pipelines [data-pipeline="alpha"] .configure-reasons li'), ['service.pipelines.alpha.processors[1]: "p2" is gone']);
-  assert.equal(qa('#cf-pipelines [data-pipeline="beta"] .configure-reasons').length, 0);
-  assert.equal(q('.configure-inactive').textContent, 'Defined but not used by any pipeline: receivers/zed, exporters/otlp/old');
+  assert.deepEqual(items('#cf-pipelines [data-pipeline="alpha"] [data-part="reasons"] li'), ['service.pipelines.alpha.processors[1]: "p2" is gone']);
+  assert.equal(qa('#cf-pipelines [data-pipeline="beta"] [data-part="reasons"]').length, 0);
+  assert.equal(q('[data-part="inactive"]').textContent, 'Defined but not used by any pipeline: receivers/zed, exporters/otlp/old');
   assert.equal(pipe('alpha').getAttribute('data-state'), 'stalled');
   assert.equal(pipe('beta').getAttribute('data-state'), 'flowing');
 });
@@ -262,11 +277,11 @@ test('a pipeline with nothing wrong in it is Flowing even when the config has er
   mount();
   check('x: 1');
   assert.equal(stateOf('alpha'), 'Flowing');
-  assert.equal(q('.configure-overall').textContent, 'The Collector would not start.');
+  assert.equal(q('[data-part="overall"]').textContent, 'The Collector would not start.');
   const none = setup(fixture(), { mount: { check: () => ({ ok: false, errors: [err], doc: {}, verdict: { flowing: false, pipelines: [], inactive: [] } }) } });
   none.mount();
   check('x: 1');
-  assert.equal(q('.configure-overall').textContent, 'No pipelines are defined.');
+  assert.equal(q('[data-part="overall"]').textContent, 'No pipelines are defined.');
 });
 
 test('everything typed or derived from the text is escaped in the pipeline view and the feedback', () => {
@@ -282,7 +297,7 @@ test('everything typed or derived from the text is escaped in the pipeline view 
   assert.ok(panel().includes('<u>x</u>'));
   assert.equal(counts.mistakes, 2);
   check('a: !<i>x</i> 1');
-  assert.equal(qa('i').length, 0);
+  assert.equal(qa('#cf-feedback i').length, 0);
   assert.ok(feedback().includes('unknown scalar tag !<i>'), feedback());
 });
 
@@ -295,16 +310,6 @@ test('a long list of problems is cut with a count, and so are long pipeline list
   assert.ok(feedback().includes('and 7 more problems'));
   assert.equal(qa('#cf-pipelines [data-pipeline]').length, 20);
   assert.ok(panel().includes('and 7 more pipelines'));
-});
-
-test('the hint calls ctx.hint() once, shows trusted markup and locks its button', () => {
-  const { counts, mount } = setup(fixture({ hint: 'Compare the <code>exporters</code> names.' }));
-  mount();
-  click('#cf-hint');
-  assert.equal(counts.hints, 1);
-  assert.equal(q('#cf-hint-text').textContent, 'Compare the exporters names.');
-  assert.equal(qa('#cf-hint-text code').length, 1);
-  assert.equal(q('#cf-hint').disabled, true);
 });
 
 test('focus: the textarea on mount; a failing Check keeps focus where it is', () => {
@@ -363,17 +368,6 @@ test('the reference passes a uses step after a uses slip, and the slip costs not
   assert.equal(counts.done, 1);
 });
 
-test('Escape on the shown hint is handled and moves focus off it; the once-only hint button is disabled, so focus goes to the textarea (#178)', () => {
-  const { focus, mount } = setup(fixture({ hint: 'Compare the <code>exporters</code> names.' }));
-  mount();
-  click('#cf-hint');
-  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
-  q('#cf-hint-text').onkeydown(e);
-  assert.equal(e.defaultPrevented, true);
-  assert.equal(focus.last(), '#cf-input');
-  assert.deepEqual(focus.unfocusable(), []);
-});
-
 // `extensions` and `forbids` (#241): fixed messages, one mistake each, no ids.
 test('a missing extension and a forbidden component each cost one mistake, with a message that names no id', () => {
   const ext = REF.replace('service:\n', 'service:\n  extensions: [pprof]\n').replace('processors:\n', 'extensions:\n  pprof:\nprocessors:\n');
@@ -389,4 +383,168 @@ test('a missing extension and a forbidden component each cost one mistake, with 
   check(two.replace('[otlp/dash0]', '[otlp/dash0, otlp/bad]'));
   assert.equal(feedback(), 'The traces pipeline runs, but it does not do what the task asks yet.');
   assert.equal(b.counts.mistakes, 1);
+});
+
+// ---- the kit view: the wide split, the chips, the hint ladder ---------------------------------
+
+test('renderConfigure: a wide split with the board and the side column; the helps chips say hints are off or on', () => {
+  setup().mount();
+  assert.equal(qa('[data-configure] .ui-split .ui-split-side aside').length, 1, 'the side column beside the board');
+  assert.equal(q('#cf-win').hasAttribute('hidden'), true, 'the success card waits for success');
+  assert.equal(qa('#cf-stars [data-star="possible"]').length, 5);
+  assert.equal(q('.ui-score-rule').textContent, RULE);
+  assert.equal(q('#cf-hint-tier').textContent, 'No hints on this level.');
+  assert.equal(q('[data-help="hints"]').getAttribute('data-on'), 'false');
+  setup(fixture(HELPS));
+  assert.equal(q('[data-help="hints"]').getAttribute('data-on'), 'true');
+  assert.equal(qa('#cf-hint').length, 1);
+});
+
+test('each pipeline carries a chip in words: Flowing for one that flows, Stalled for one that does not', () => {
+  const { mount } = setup();
+  mount();
+  check(GIVEN);
+  assert.equal(pipe('traces').querySelector('.ui-chip').getAttribute('data-tone'), 'error');
+  assert.equal(stateOf('traces'), 'Stalled');
+  check(REF);
+  assert.equal(pipe('traces').querySelector('.ui-chip').getAttribute('data-tone'), 'neutral');
+  assert.equal(stateOf('traces'), 'Flowing');
+  assert.equal(qa('#cf-pipelines [data-pipeline]').length, 1);
+});
+
+test('hint tier 1 charges once per click: ctx.hint() and the score card, the authored hint as markup, the tier line and the next label', () => {
+  const { counts, mount } = setup(fixture(HELPS));
+  mount();
+  assert.equal(q('#cf-hint').textContent.trim(), 'Hint 1 of 3');
+  click('#cf-hint');
+  assert.equal(counts.hints, 1);
+  assert.equal(q('#cf-hints').textContent, '1');
+  assert.ok(q('#cf-hint-text').textContent.includes('Hint 1 of 3'));
+  assert.ok(q('#cf-hint-text').textContent.includes('Compare the exporters names.'));
+  assert.equal(qa('#cf-hint-text code').length, 1);
+  assert.equal(q('#cf-hint').textContent.trim(), 'Hint 2 of 3');
+  assert.ok(q('#cf-hint-tier').textContent.includes('1 of 3 used'));
+  assert.equal(counts.mistakes, 0);
+});
+
+test('hint tiers advance 1, 2, 3 and stop: the label says No more hints once spent, a fourth click does nothing', () => {
+  const { counts, mount } = setup(fixture({ helps: { hints: true } , hint: 'Compare.' }));
+  mount();
+  check(GIVEN);
+  click('#cf-hint');
+  click('#cf-hint');
+  assert.ok(q('#cf-hint-text').textContent.includes('Hint 2 of 3'));
+  assert.ok(q('#cf-hint-text').textContent.includes('In the answer, the traces pipeline lists 1 receiver, 1 processor and 1 exporter; yours lists 1 receiver, 0 processors and 1 exporter. One name yours lists under exporters is not defined under that exact id.'));
+  assert.equal(q('#cf-hint-text').textContent.includes('batch'), false, 'the shape, never the ids');
+  assert.equal(counts.hints, 2);
+  assert.equal(counts.done, 0);
+  assert.equal(q('#cf-hint').textContent.trim(), 'Hint 3 of 3');
+  click('#cf-hint');
+  assert.equal(counts.hints, 3);
+  assert.equal(q('#cf-hint').textContent.trim(), 'Hint');
+  assert.equal(q('#cf-hint').disabled, true);
+  q('#cf-hint').disabled = false;
+  click('#cf-hint');
+  assert.equal(counts.hints, 3, 'no fourth charge');
+});
+
+test('without an authored hint tier 1 is the default rule', () => {
+  const { mount } = setup(fixture({ helps: { hints: true } }));
+  mount();
+  click('#cf-hint');
+  assert.ok(q('#cf-hint-text').textContent.includes(CONFIGURE_RULE));
+});
+
+test('hint tier 3 fills the reference in and Checks it without a mistake: neutral, success card, three hints charged, Check spent', () => {
+  const { counts, focus, swirled, mount } = setup(fixture(HELPS));
+  mount();
+  click('#cf-hint');
+  click('#cf-hint');
+  assert.equal(q('#cf-input').value, GIVEN);
+  click('#cf-hint');
+  assert.equal(q('#cf-input').value, REF);
+  assert.equal(counts.hints, 3);
+  assert.equal(counts.mistakes, 0);
+  assert.equal(counts.done, 1);
+  assert.equal(tone(), 'neutral');
+  assert.ok(feedback().startsWith('Filled in for you. The names must match, exactly.'), feedback());
+  assert.equal(stateOf('traces'), 'Flowing');
+  assert.equal(q('#cf-input').readOnly, true);
+  assert.equal(q('#cf-check').disabled, true);
+  assert.equal(q('#cf-win').hasAttribute('hidden'), false);
+  assert.equal(q('#cf-win-stars').textContent, '2 of 5 stars: 0 failed Checks, 3 hints.');
+  assert.equal(q('#cf-hint').disabled, true);
+  assert.equal(swirled(), 1);
+  assert.equal(focus.last(), '#cf-win-title');
+});
+
+test('the hint cost follows the failed Checks, and the success line counts both', () => {
+  const { mount } = setup(fixture(HELPS));
+  mount();
+  check(GIVEN);
+  assert.equal(q('#cf-hint-cost').textContent, 'costs 1 star');
+  check(`${GIVEN}zz: 1\n`);
+  assert.equal(q('#cf-wrong-label').textContent, 'failed Checks');
+  check(`${GIVEN}yy: 1\n`);
+  assert.equal(q('#cf-hint-cost').textContent, 'costs no star now');
+  click('#cf-hint');
+  check(REF);
+  assert.equal(q('#cf-win-stars').textContent, '2 of 5 stars: 3 failed Checks, 1 hint.');
+});
+
+test('Escape on the shown hint is handled and moves focus to the Hint button while one is left (#178)', () => {
+  const { focus, mount } = setup(fixture(HELPS));
+  mount();
+  click('#cf-hint');
+  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q('#cf-hint-text').onkeydown(e);
+  assert.equal(e.defaultPrevented, true);
+  assert.equal(focus.last(), '#cf-hint');
+  assert.deepEqual(focus.unfocusable(), []);
+});
+
+test('after tier 3 solves the step the Hint button is spent, so Escape on the hint goes to the read-only textarea', () => {
+  const { focus, mount } = setup(fixture(HELPS));
+  mount();
+  click('#cf-hint');
+  click('#cf-hint');
+  click('#cf-hint');
+  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+  q('#cf-hint-text').onkeydown(e);
+  assert.equal(focus.last(), '#cf-input');
+});
+
+test('the Configure it markup emits no retired class, no style attribute and no Alpine attribute', () => {
+  const { mount } = setup(fixture(HELPS));
+  mount();
+  check(GIVEN);
+  const html = q('[data-configure]').outerHTML;
+  const classes = new Set(qa('[data-configure], [data-configure] *').flatMap((el) => (el.getAttribute('class') ?? '').split(/\s+/)));
+  for (const c of ['btn', 'ghost', 'info', 'show', 'small', 'feedback', 'configure-input', 'configure-note', 'configure-label']) {
+    assert.equal(classes.has(c), false, c);
+  }
+  assert.equal([...classes].some((c) => c.startsWith('configure')), false);
+  assert.equal(/\sstyle=|\sx-|\s@|\s:[a-z]|\son[a-z]+=/.test(html), false);
+});
+
+test('when tier 3 cannot finish (the checker fails) the ladder is spent: the label says No more hints and the button is disabled', () => {
+  const { counts, mount } = setup(fixture(HELPS), { mount: { check: () => { throw new Error('boom'); } } });
+  mount();
+  click('#cf-hint');
+  click('#cf-hint');
+  click('#cf-hint');
+  assert.equal(counts.hints, 3);
+  assert.equal(counts.done, 0);
+  assert.equal(q('#cf-hint').textContent.trim(), 'No more hints');
+  assert.equal(q('#cf-hint').disabled, true);
+  assert.equal(q('#cf-hint-cost').hasAttribute('hidden'), true);
+});
+
+test('a Collector that would not start for a reason outside every pipeline says so in the Pipelines panel', () => {
+  const NOTE = 'The problem is outside the pipelines: see the list above.';
+  const html = (text) => pipelinesHtml(checkConfig(text, SCHEMAS.collector), SCHEMAS.collector, escapeHtml);
+  const outside = REF + '  extensions: [health_check]\n';
+  assert.equal(html(outside).includes(NOTE), true, 'service.extensions names an undefined extension');
+  assert.equal(html(REF).includes(NOTE), false, 'a flowing config has nothing to point at');
+  assert.equal(html(REF.replace('[otlp/dash0]', '[nope]')).includes(NOTE), false, 'the problem is inside the pipeline');
 });
