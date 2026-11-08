@@ -101,7 +101,7 @@ test('step 1: the traceparent in the intro is a valid W3C value and names the fe
   assert.match(plain(BUILD_STEP.intro), /Another visitor clicked Pay at the same moment, in trace 9d8c7b6a/);
   assert.match(plain(BUILD_STEP.intro), /server span for one of the two calls arrived as a root/);
   assert.doesNotMatch(plain(BUILD_STEP.intro), /first call|retry/, 'no word of the intro picks a twin or calls it a retry');
-  assert.match(plain(BUILD_STEP.intro), /click handler on Pay was bound twice, so both calls left together and two identical calls are in this trace; the board tells them apart by the end of their span id/);
+  assert.match(plain(BUILD_STEP.intro), /code that sends the checkout call ran twice, so two identical calls left together; the board tells them apart by the end of their span id/);
   assert.match(plain(BUILD_STEP.intro), /share an origin/);
 });
 

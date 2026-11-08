@@ -51,8 +51,8 @@ const span = (traceId, spanId, service, name, kind, startMs, endMs, parentId) =>
 
 // Checkout's server span arrived as a root. The browser span its traceparent names is the fetch call (PAY), not the click that began
 // it (CLICK), not the earlier fetch of the cart (CART), not the same-looking call of the other visitor's trace (PAY2), and not the
-// twin in its own trace, PAY_B: the second call the Pay handler sent, with the same start and end as PAY, enclosing the server span the
-// same way). The board labels the twins by their span id, and only the parent id in the header tells which one the server span answers.
+// twin in its own trace, PAY_B: the second checkout call sent, with the same start and end as PAY, enclosing the server span the
+// same way. The board labels the twins by their span id, and only the parent id in the header tells which one the server span answers.
 // The waterfall lists same-start siblings by span id, so PAY_B is the upper twin row and the upper Parent button, and the later fetch
 // of the order status (STATUS, which ends after the server span) sits between the twins and the server span: neither "the upper twin"
 // nor "the row above the server span" is the right span.
@@ -120,7 +120,7 @@ export default {
         intro:
           'A browser can produce spans too, so a trace can start at the click. In Kettle &amp; Co\'s shop, the instrumentation records a span for the click on Pay and one for each fetch call the click makes. ' +
           `In the lab, the shop and the checkout service share an origin, and the SDK adds <code>traceparent: 00-${T1}-${PAY}-01</code> to the call. ` +
-          'The click handler on Pay was bound twice, so both calls left together and two identical calls are in this trace; the board tells them apart by the end of their span id. ' +
+          'The code that sends the checkout call ran twice, so two identical calls left together; the board tells them apart by the end of their span id. ' +
           'Another visitor clicked Pay at the same moment, in trace <code>9d8c7b6a</code>. Checkout\'s server span for one of the two calls arrived as a root.',
         question: 'Give checkout\'s server span its parent.',
         qid: 'frum-q-tree',

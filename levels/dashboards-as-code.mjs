@@ -55,6 +55,8 @@ const SPOT = {
     'item-rate': 'Its <code>x: 0</code> is the left edge that <code>items[3]</code> shares, one band of the grid further down, and its width of 12 is every item\'s width. Read as cells it covers columns 0 to 12 of the 24, well inside the grid.',
     'item-corner': 'Read as cells it covers columns 12 to 24 of the grid\'s second band (<code>y</code> 6 to 12), which ends exactly at the edge, and it names <code>request_count</code>, a panel the file defines and no other item shows. Its <code>x: 12</code> is not shared with another item, but nothing about it is wrong.',
     'panel-errors': 'This panel is defined, and the item that names it points at the right key. What is wrong with that item is where it sits on the grid, not the panel it shows.',
+    'panel-rate': 'This panel is defined, and its query is in the part of the file not shown. The item that names it points at the right key.',
+    'panel-count': 'This panel is defined, and its query is in the part of the file not shown. The item that names it points at the right key.',
     'query-errors': 'The share of requests that fail: the rate of 5xx requests divided by the rate of all requests over the same 5 minutes, so it is a ratio between 0 and 1.',
   },
   explain:
@@ -111,7 +113,7 @@ export default {
           'Kettle &amp; Co keeps its dashboards in git and applies them with the Dash0 operator for Kubernetes: a <code>PersesDashboard</code> resource in a namespace that has a Dash0 monitoring resource becomes a dashboard in Dash0. ' +
           'The cluster has monitoring resources in <code>checkout</code> and <code>payments</code>, and none in <code>tools</code>. ' +
           'A pull request adds <code>dashboards/checkout-overview.yaml</code>, a new file in the Perses format Dash0 dashboards use. ' +
-          'Below is every line it adds, one key per line with its path from the top of the file. In this game\'s reading, a layout is 24 columns wide. A layout item names its panel in <code>$ref</code>; reading the fields as cells, <code>x</code> and <code>width</code> give the columns it covers, from <code>x</code> to <code>x + width</code>, and <code>y</code> and <code>height</code> the rows.',
+          'Below are the lines that matter for this review, one key per line with its path from the top of the file (the file also gives each panel its query and the layout its kind). In this game\'s reading, a layout is 24 columns wide. A layout item names its panel in <code>$ref</code>; reading the fields as cells, <code>x</code> and <code>width</code> give the columns it covers, from <code>x</code> to <code>x + width</code>, and <code>y</code> and <code>height</code> the rows.',
         question: 'Which lines would you stop in review?',
         qid: 'dac-q-spot',
         spot: SPOT,

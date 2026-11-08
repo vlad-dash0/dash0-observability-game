@@ -247,7 +247,7 @@ test('step 1: no odd-one-out rule over the layout fields picks the faults, and o
 });
 
 test('step 1 whyNot: only on decoys, each a full sentence that names no fault line, the tempting ones covered', () => {
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['display', 'header', 'item-corner', 'item-rate', 'kind', 'panel-errors', 'query-errors']);
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['display', 'header', 'item-corner', 'item-rate', 'kind', 'panel-count', 'panel-errors', 'panel-rate', 'query-errors']);
   for (const [id, t] of Object.entries(spec.whyNot)) {
     assert.match(plain(t), /\S[\s\S]*\.$/, `${id} ends a sentence`);
     for (const f of spec.faults) assert.equal(plain(t).includes(spec.lines.find((l) => l.id === f).text), false, `${id} does not quote ${f}`);
@@ -256,6 +256,7 @@ test('step 1 whyNot: only on decoys, each a full sentence that names no fault li
   assert.match(plain(spec.whyNot['item-rate']), /columns 0 to 12 of the 24/);
   assert.match(plain(spec.whyNot['item-corner']), /columns 12 to 24/);
   assert.doesNotMatch(plain(JSON.stringify(spec.whyNot)), /third item|two rows/);
+  for (const id of ['panel-rate', 'panel-count']) assert.match(plain(spec.whyNot[id]), /This panel is defined, and its query is in the part of the file not shown\./, id);
   assert.match(plain(spec.whyNot['query-errors']), /rate of 5xx requests divided by the rate of all requests/);
 });
 
@@ -266,7 +267,8 @@ test('step 1 explain: the namespace, the width in cells, and the missing panel, 
   }
   assert.doesNotMatch(e, /next column|0 to 12|drawn over each other/, 'no overlap story left');
   const intro = plain(SPOT_STEP.intro);
-  for (const s of ['monitoring resources in checkout and payments, and none in tools', 'dashboards/checkout-overview.yaml', 'a new file', 'every line it adds', 'In this game\'s reading, a layout is 24 columns wide', 'reading the fields as cells']) assert.equal(intro.includes(s), true, s);
+  assert.equal(intro.includes('every line'), false, 'the board is not claimed to be the whole file');
+  for (const s of ['monitoring resources in checkout and payments, and none in tools', 'dashboards/checkout-overview.yaml', 'a new file', 'Below are the lines that matter for this review', '(the file also gives each panel its query and the layout its kind)', 'In this game\'s reading, a layout is 24 columns wide', 'reading the fields as cells']) assert.equal(intro.includes(s), true, s);
 });
 
 // ---- step 2: how a team with no cluster deploys ---------------------------------------------
