@@ -1,9 +1,13 @@
 name: PR findings relay
 
-# Every PR event that can change the findings verdict (a push, draft or ready, a review, a
-# review comment, a thread resolved). This runs the PR's own copy of this file, with a
+# Every PR event that can change the findings verdict and can trigger Actions (a push, draft
+# or ready, a review, a review comment). This runs the PR's own copy of this file, with a
 # read-only token on a fork, so it does nothing: when it completes, pr-findings.yml runs
 # (workflow_run, main's copy, allowed to post the status) and evaluates the PR from scratch.
+# Resolving or unresolving a review thread triggers no workflow (pull_request_review_thread
+# is a webhook event, not an Actions trigger, and naming it here makes GitHub reject this
+# whole file, #268): after resolving a thread, re-run PR findings by hand (Actions, PR
+# findings, Run workflow, the PR number).
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
@@ -11,8 +15,6 @@ on:
     types: [submitted, edited, dismissed]
   pull_request_review_comment:
     types: [created, edited, deleted]
-  pull_request_review_thread:
-    types: [resolved, unresolved]
 
 permissions: {}
 

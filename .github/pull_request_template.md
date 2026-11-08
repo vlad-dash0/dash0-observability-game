@@ -15,10 +15,10 @@
 REVIEW COMMENTS: post findings and dispositions as PR comments in these formats.
 `node tools/pr-findings.mjs <PR>` reads them (all pages) and exits 0 PASS, 1 open
 findings or no review of the head, 2 inconclusive. Merge needs `All checks` green and the `PR findings` status
-green: CI runs this same script on every push, comment, review and resolved thread and
-posts its verdict on the head commit (pending while the PR is a draft). Hiding a comment
-fires no event, and a failed PR findings run may leave the status out of date: re-run it
-then (Actions, PR findings, Run workflow, the PR number).
+green: CI runs this same script on every push, comment and review and posts its verdict
+on the head commit (pending while the PR is a draft). Resolving or unresolving a thread
+and hiding a comment fire no workflow, and a failed PR findings run may leave the status
+out of date: re-run it then (Actions, PR findings, Run workflow, the PR number).
 The latest review must be of the PR head commit, or of an earlier commit from which
 every other commit reachable from the head is a merge commit (for example merges of
 main): otherwise the script prints "no review of head <sha>" and exits 1. A merge
@@ -100,7 +100,8 @@ disposition): post it as a review.
 The PR body is not read: only comments, review bodies and review threads. A finding or
 disposition in the body does not count, and the body may hold checklists and tables.
 
-Inline review threads count as findings; resolve a thread when it is addressed.
+Inline review threads count as findings; resolve a thread when it is addressed, then
+re-run PR findings (resolving a thread triggers no workflow).
 
 What the detector reads is what GitHub renders: each comment's HTML (`bodyHTML`, so run
 `npm ci` first). Sections start at level-1/2 headings (`##` or a `---` underline both
