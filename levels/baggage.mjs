@@ -3,6 +3,7 @@
 // service's spans carry a baggage entry on their own.
 // Spec: docs/M1-DESIGN.md §6 Act 2.
 // Spec: https://opentelemetry.io/docs/concepts/signals/baggage/ , https://www.w3.org/TR/baggage/
+import { actions, finishButton, nextButton, question, step } from '../lib/ui/index.mjs';
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
 import { newSortState } from '../lib/widgets/sort-it.mjs';
@@ -88,22 +89,21 @@ export default {
   lights: [],
   scoring: { parMs: null },
   run(ctx) {
-    const actions = ctx.ovActions;
+    const bar = ctx.ovActions;
 
     const stepSort = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: true,
+          bodyHtml: `${ctx.speech(
           'Baggage is a set of key/value pairs that travels with a request\'s context, from ' +
             'service to service. Storefront wants to put a few entries in it so services ' +
             'further down can use them.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="bag-q-sort">Pick an entry, then say whether it belongs in baggage.</h3>
-          ${renderSort(SORT, newSortState(SORT), { escapeHtml: ctx.escapeHtml, labelledBy: 'bag-q-sort' })}
-        </div>`,
-        '<button class="btn" id="bag-next" disabled>Next</button>',
+        )}${question({ id: 'bag-q-sort', html: 'Pick an entry, then say whether it belongs in baggage.' })}${renderSort(SORT, newSortState(SORT), { escapeHtml: ctx.escapeHtml, labelledBy: 'bag-q-sort' })}`,
+        }),
+        actions({ wide: true, buttonsHtml: nextButton('bag-next') }),
       );
-      const next = actions.querySelector('#bag-next');
+      const next = bar.querySelector('#bag-next');
       mountSort(ctx, SORT, {
         onComplete: () => {
           next.disabled = false;
@@ -115,17 +115,16 @@ export default {
 
     const stepOnSpans = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: false,
+          bodyHtml: `${ctx.speech(
           'Storefront puts <code>tenant.tier=gold</code> in baggage, and the request goes on to ' +
             'recommendations, which runs the usual SDK setup with automatic instrumentation.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="bag-q-spans">Do recommendations\' spans carry <code>tenant.tier</code> from baggage?</h3>
-          ${choiceHtml(ctx, ON_SPANS, { id: 'bag', labelledBy: 'bag-q-spans' })}
-        </div>`,
-        '<button class="btn" id="bag-finish" data-finish disabled>Finish</button>',
+        )}${question({ id: 'bag-q-spans', html: 'Do recommendations\' spans carry <code>tenant.tier</code> from baggage?' })}${choiceHtml(ctx, ON_SPANS, { id: 'bag', labelledBy: 'bag-q-spans' })}`,
+        }),
+        actions({ wide: false, buttonsHtml: finishButton('bag-finish') }),
       );
-      const finish = actions.querySelector('#bag-finish');
+      const finish = bar.querySelector('#bag-finish');
       mountChoice(ctx, ON_SPANS, {
         id: 'bag',
         onRight: () => {

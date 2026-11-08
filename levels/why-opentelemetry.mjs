@@ -2,6 +2,7 @@
 // Collector, semantic conventions), then picks what a shared library depends on: only
 // the API, a no-op until the application installs an SDK. Spec: docs/M1-DESIGN.md §6 Act 0.
 // Spec: https://opentelemetry.io/docs/concepts/instrumentation/libraries/#opentelemetry-api
+import { actions, finishButton, nextButton, question, step } from '../lib/ui/index.mjs';
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
 import { newSortState } from '../lib/widgets/sort-it.mjs';
@@ -95,21 +96,20 @@ export default {
   lights: [],
   scoring: { parMs: null },
   run(ctx) {
-    const actions = ctx.ovActions;
+    const bar = ctx.ovActions;
 
     const stepParts = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: true,
+          bodyHtml: `${ctx.speech(
           'OpenTelemetry is not one thing but a set of vendor-neutral parts. Before you ' +
             'instrument anything, learn which part does what.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="otel-q-parts">Which part of OpenTelemetry is each one?</h3>
-          ${renderSort(PARTS, newSortState(PARTS), { escapeHtml: ctx.escapeHtml, labelledBy: 'otel-q-parts' })}
-        </div>`,
-        '<button class="btn" id="otel-next" disabled>Next</button>',
+        )}${question({ id: 'otel-q-parts', html: 'Which part of OpenTelemetry is each one?' })}${renderSort(PARTS, newSortState(PARTS), { escapeHtml: ctx.escapeHtml, labelledBy: 'otel-q-parts' })}`,
+        }),
+        actions({ wide: true, buttonsHtml: nextButton('otel-next') }),
       );
-      const next = actions.querySelector('#otel-next');
+      const next = bar.querySelector('#otel-next');
       mountSort(ctx, PARTS, {
         onComplete: () => {
           next.disabled = false;
@@ -121,17 +121,16 @@ export default {
 
     const stepDependsOn = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: false,
+          bodyHtml: `${ctx.speech(
           'The payments team ships <code>kettle-payments-client</code>, a library used by 30 ' +
             'services. They want it to emit spans.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="otel-q-dep">Which OpenTelemetry package should the library depend on?</h3>
-          ${choiceHtml(ctx, DEPENDS_ON, { id: 'otel', labelledBy: 'otel-q-dep' })}
-        </div>`,
-        '<button class="btn" id="otel-finish" data-finish disabled>Finish</button>',
+        )}${question({ id: 'otel-q-dep', html: 'Which OpenTelemetry package should the library depend on?' })}${choiceHtml(ctx, DEPENDS_ON, { id: 'otel', labelledBy: 'otel-q-dep' })}`,
+        }),
+        actions({ wide: false, buttonsHtml: finishButton('otel-finish') }),
       );
-      const finish = actions.querySelector('#otel-finish');
+      const finish = bar.querySelector('#otel-finish');
       mountChoice(ctx, DEPENDS_ON, {
         id: 'otel',
         onRight: () => {

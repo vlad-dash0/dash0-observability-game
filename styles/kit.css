@@ -62,7 +62,7 @@
 
 /* ---------- Question, step heading, eyebrow, note, prose, code (text.mjs) ---------- */
 /* D4: centred in a narrow step, left-aligned in a wide one. */
-.ui-question { font-size: var(--text-q); font-weight: var(--weight-semibold); line-height: 1.35; text-align: center; }
+.ui-question { font-size: var(--text-q); font-weight: var(--weight-semibold); line-height: 1.35; text-align: center; overflow-wrap: anywhere; /* a long word or code name wraps at 320px */ }
 .ui-step--wide .ui-question { text-align: left; }
 .ui-eyebrow {
   font-family: var(--font-mono); font-size: 11px; font-weight: var(--weight-semibold); letter-spacing: .08em;
