@@ -4,17 +4,25 @@
 // OTEL_SERVICE_NAME and service.name in OTEL_RESOURCE_ATTRIBUTES disagree.
 // Spec: https://opentelemetry.io/docs/specs/semconv/registry/attributes/service/ , https://opentelemetry.io/docs/specs/semconv/registry/attributes/deployment/ , https://opentelemetry.io/docs/specs/otel/resource/sdk/#specifying-resource-information-via-an-environment-variable , https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/
 // Design: docs/FOUNDATION.md §5 and §6 F6. Player text reaches HTML only via escapeHtml.
+import { actions, codeBlock, finishButton, helpChips, nextButton, prose, question, setFeedback, sideColumn, split, step } from '../lib/ui/index.mjs';
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
-import { escapeFromHint } from '../lib/widgets/focus.mjs';
+import { canFocus } from '../lib/widgets/focus.mjs';
+import { editorPanel, lockEditor } from '../lib/widgets/editor.mjs';
+import { mountHintLadder, ruleText } from '../lib/widgets/help-ladder.mjs';
+import { normalizeConfig } from '../lib/widgets/configure-it.mjs';
 import { checkConfig, effectiveResource, parseEnv, renderIssues } from '../lib/widgets/env-config.mjs';
+import { GIVEN, PROCESS, TARGET, hintFor } from '../lib/widgets/env-config-help.mjs';
+import { playSwirl } from '../lib/swirl-render.mjs';
 
-const TARGET = { serviceName: 'checkout', environment: 'production' };
-const PROCESS = { processName: 'node' };
+// Step 2's score card follows the penalty rules of Configure it (lib/widgets/configure-it-view.mjs).
+const RULE = ruleText({
+  costs: 'a config that Check reports as wrong, a hint',
+  free: 'Checking a config you already checked is free.',
+});
 
-const GIVEN_ENV = [
-  'OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318',
-  'OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=production',
-].join('\n');
+const ENV_NOTE =
+  '<code>OTEL_RESOURCE_ATTRIBUTES</code> is a comma-separated list of <code>key=value</code> pairs. ' +
+  'If one pair is malformed, the spec says the whole value should be discarded and an error reported, so check every pair.';
 
 const CLASH_ENV = [
   'OTEL_SERVICE_NAME=checkout',
@@ -87,32 +95,21 @@ export default {
   lights: ['checkout'],
   run(ctx) {
     const body = ctx.ovBody;
-    const actions = ctx.ovActions;
-    const fb = () => body.querySelector('#nys-feedback');
-    const say = (cls, html) => {
-      fb().className = `feedback ${cls} show`;
-      fb().innerHTML = html;
-    };
-
-    // Step 2's check feedback; the choice steps get theirs from choiceHtml (same id).
-    const feedbackBox =
-      '<div class="feedback" id="nys-feedback" role="status" aria-live="polite" tabindex="-1"></div>';
+    const bar = ctx.ovActions;
 
     const stepShowsUpAs = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
-          'Your first ticket: checkout went live last week and nobody can find its traces. ' +
-            'Its code sets no service name and it runs on a plain Linux VM, so this environment ' +
-            'is all its SDK has to go on. The process is started as <code>node</code>.',
-        )}</div>
-        <div class="lesson-stage">
-          <pre id="nys-config"><code>${GIVEN_ENV}</code></pre>
-          <h3 class="q" id="nys-q-name">What service name does its telemetry show up under?</h3>
-          ${choiceHtml(ctx, SHOWS_UP_AS, { id: 'nys', labelledBy: 'nys-q-name' })}
-        </div>`,
-        '<button class="btn" id="nys-next" disabled>Next</button>',
+        step({
+          wide: false,
+          bodyHtml: `${ctx.speech(
+            'Your first ticket: checkout went live last week and nobody can find its traces. ' +
+              'Its code sets no service name and it runs on a plain Linux VM, so this environment ' +
+              'is all its SDK has to go on. The process is started as <code>node</code>.',
+          )}<div id="nys-config">${codeBlock(GIVEN)}</div>${question({ id: 'nys-q-name', html: 'What service name does its telemetry show up under?' })}${choiceHtml(ctx, SHOWS_UP_AS, { id: 'nys', labelledBy: 'nys-q-name' })}`,
+        }),
+        actions({ wide: false, buttonsHtml: nextButton('nys-next') }),
       );
-      const next = actions.querySelector('#nys-next');
+      const next = bar.querySelector('#nys-next');
       mountChoice(ctx, SHOWS_UP_AS, {
         id: 'nys',
         onRight: () => {
@@ -124,90 +121,110 @@ export default {
     };
 
     const stepFix = () => {
+      const editor = editorPanel({
+        inputId: 'nys-env',
+        label: 'checkout .env',
+        rows: 6,
+        value: GIVEN,
+        noteHtml: ENV_NOTE,
+        actionId: 'nys-check',
+        actionLabel: 'Check',
+        feedbackId: 'nys-feedback',
+      });
+      const chips = helpChips('nys', [
+        { key: 'instant', label: 'Instant feedback', on: true },
+        { key: 'hints', label: 'Hints', on: true },
+      ]);
+      const side = sideColumn({ id: 'nys', titleHtml: 'Config solved', counts: [{ key: 'wrong', label: '' }], hints: true, ruleHtml: RULE });
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
-          'Fix it. Set <code>OTEL_SERVICE_NAME</code> to <code>checkout</code>, add a ' +
-            '<code>service.version</code> to <code>OTEL_RESOURCE_ATTRIBUTES</code> (any version, ' +
-            'say 1.4.2) so you can tell deploys apart, and keep ' +
-            '<code>deployment.environment.name=production</code>. Use that key, not the ' +
-            'deprecated <code>deployment.environment</code>.',
-        )}</div>
-        <div class="lesson-stage">
-          <label class="env-label" for="nys-env">checkout .env</label>
-          <textarea class="env-editor" id="nys-env" rows="6" spellcheck="false"
-            autocapitalize="off" autocomplete="off">${ctx.escapeHtml(GIVEN_ENV)}</textarea>
-          <p class="env-note"><code>OTEL_RESOURCE_ATTRIBUTES</code> is a comma-separated list of
-            <code>key=value</code> pairs. If one pair is malformed, the spec says the whole value
-            should be discarded and an error reported, so check every pair.</p>
-          <button class="btn" id="nys-check">Check</button>
-          <button class="btn ghost small" id="nys-hint">Show a hint</button>
-          <div class="feedback info" id="nys-hint-text" tabindex="-1"></div>
-          ${feedbackBox}
-        </div>`,
-        '<button class="btn" id="nys-next" disabled>Next</button>',
+        step({
+          wide: true,
+          bodyHtml: `${ctx.speech(
+            'Fix it. Set <code>OTEL_SERVICE_NAME</code> to <code>checkout</code>, add a ' +
+              '<code>service.version</code> to <code>OTEL_RESOURCE_ATTRIBUTES</code> (any version, ' +
+              'say 1.4.2) so you can tell deploys apart, and keep ' +
+              '<code>deployment.environment.name=production</code>. Use that key, not the ' +
+              'deprecated <code>deployment.environment</code>.',
+          )}<div data-env-config>${split({ mainHtml: chips + editor, sideHtml: side })}</div>`,
+        }),
+        actions({ wide: true, buttonsHtml: nextButton('nys-next') }),
       );
+      const box = body.querySelector('[data-env-config]');
       const input = body.querySelector('#nys-env');
       const check = body.querySelector('#nys-check');
-      const hint = body.querySelector('#nys-hint');
-      const next = actions.querySelector('#nys-next');
-      let lastFailed = null;
-      input.focus();
-      hint.onclick = () => {
-        ctx.hint();
-        hint.disabled = true;
-        input.focus();
-        const box = body.querySelector('#nys-hint-text');
-        box.classList.add('show');
-        escapeFromHint(box, hint, input);
-        box.innerHTML =
-          'Add a line <code>OTEL_SERVICE_NAME=checkout</code>, then append ' +
-          '<code>,service.version=1.4.2</code> to the <code>OTEL_RESOURCE_ATTRIBUTES</code> value. ' +
-          'Pairs are separated by commas.';
-      };
-      check.onclick = () => {
+      const fb = body.querySelector('#nys-feedback');
+      const next = bar.querySelector('#nys-next');
+      const say = (tone, html) => setFeedback(fb, tone, html);
+      const tried = new Set(); // normalised failing configs, as in Configure it
+      const ladder = mountHintLadder(ctx, box, 'nys', {
+        swirl: playSwirl,
+        fallback: () => input,
+        wrongNouns: ['failed Check', 'failed Checks'],
+        hint: (tier) => hintFor(input.value, tier),
+        fill: (text) => {
+          input.value = text;
+          run({ hinted: true });
+        },
+      });
+
+      /** Check `input.value`. `hinted` marks the tier 3 run: the right answer is then not earned. */
+      function run({ hinted = false } = {}) {
+        if (ladder.done) return;
         const text = input.value;
+        if (!hinted && text.trim() === '') return void say('neutral', 'Type a config first.');
         const result = checkConfig(text, TARGET, PROCESS);
         if (!result.ok) {
-          // Only a new failing config costs a mistake; re-checking the same text does not.
-          const same = text === lastFailed;
-          if (!same) ctx.mistake();
-          lastFailed = text;
+          // Only a new failing config costs a mistake; any config already checked (same after normalising) is free.
+          // A .env parses the same without indentation or blank lines, so the key ignores both.
+          const norm = normalizeConfig(text).split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
+          const same = tried.has(norm);
+          tried.add(norm);
           const n = plural(result.issues.length, 'problem', 'problems');
-          const lead = same ? `Same config as last time: ${n}.` : `Not yet: ${n}.`;
-          say('info', `${lead}${renderIssues(result.issues, ctx.escapeHtml)}`);
+          const issues = prose(renderIssues(result.issues, ctx.escapeHtml));
+          if (same) return void say('neutral', `You already checked this config. Nothing new was counted.${issues}`);
+          ladder.miss();
+          say('error', `Not yet: ${n}.${issues}`);
           return;
         }
-        const attrs = effectiveResource(parseEnv(text).vars, PROCESS).attributes;
+        const { attributes: attrs, source } = effectiveResource(parseEnv(text).vars, PROCESS);
         const e = ctx.escapeHtml;
+        ladder.complete();
+        lockEditor(input, check);
         say(
-          'good',
-          `Config passes. The SDK now reports <code>service.name</code> ${e(attrs['service.name'])}, ` +
+          hinted ? 'neutral' : 'success',
+          `${hinted ? 'Filled in for you. ' : ''}Config passes. The SDK now reports <code>service.name</code> ${e(attrs['service.name'])}, ` +
             `<code>service.version</code> ${e(attrs['service.version'])} and ` +
-            `<code>deployment.environment.name</code> ${e(attrs['deployment.environment.name'])}.`,
+            `<code>deployment.environment.name</code> ${e(attrs['deployment.environment.name'])}.` +
+            (source === 'OTEL_RESOURCE_ATTRIBUTES'
+              ? prose(
+                  'Note: the name comes from the attribute list. That works, but <code>OTEL_SERVICE_NAME</code> is the dedicated variable and wins if both are set.',
+                )
+              : ''),
         );
-        input.readOnly = true;
-        check.disabled = true;
-        hint.disabled = true;
         next.disabled = false;
-        next.focus();
+        ladder.succeed();
+      }
+
+      check.onclick = () => {
+        if (check.disabled) return;
+        run();
       };
       next.onclick = stepWhoWins;
+      (canFocus(input) ? input : fb).focus();
     };
 
     const stepWhoWins = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
-          'Checkout has a name. A week later a teammate pastes settings copied from the cart ' +
-            'service into the deploy, and now both are set.',
-        )}</div>
-        <div class="lesson-stage">
-          <pre><code>${CLASH_ENV}</code></pre>
-          <h3 class="q" id="nys-q-wins">Which service name does the SDK report?</h3>
-          ${choiceHtml(ctx, WHO_WINS, { id: 'nys', labelledBy: 'nys-q-wins' })}
-        </div>`,
-        '<button class="btn" id="nys-finish" data-finish disabled>Finish</button>',
+        step({
+          wide: false,
+          bodyHtml: `${ctx.speech(
+            'Checkout has a name. A week later a teammate pastes settings copied from the cart ' +
+              'service into the deploy, and now both are set.',
+          )}${codeBlock(CLASH_ENV)}${question({ id: 'nys-q-wins', html: 'Which service name does the SDK report?' })}${choiceHtml(ctx, WHO_WINS, { id: 'nys', labelledBy: 'nys-q-wins' })}`,
+        }),
+        actions({ wide: false, buttonsHtml: finishButton('nys-finish') }),
       );
-      const finish = actions.querySelector('#nys-finish');
+      const finish = bar.querySelector('#nys-finish');
       mountChoice(ctx, WHO_WINS, {
         id: 'nys',
         onRight: () => {
@@ -217,7 +234,7 @@ export default {
       });
       finish.onclick = () =>
         ctx.finish({
-          text: 'Checkout now reports as checkout instead of unknown_service:node, so its traces have a home on the map.',
+          text: 'Checkout now reports as checkout instead of unknown_service:node, so its traces now show up under the right name.',
           cards: ['unknown-service'],
         });
     };

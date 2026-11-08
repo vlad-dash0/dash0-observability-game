@@ -83,19 +83,196 @@ test('player config is echoed only escaped', () => {
   assert.match(feedback(), /<img src=x onerror=alert\(1\)>/);
 });
 
-test('the hint is offered once and costs a star', () => {
-  const finished = start();
-  toEditor();
-  click('#nys-hint');
-  assert.match(q('#nys-hint-text').textContent, /OTEL_SERVICE_NAME=checkout/);
-  assert.ok(q('#nys-hint').disabled, 'the hint can be taken only once');
-  q('#nys-env').value = GOOD;
-  click('#nys-check');
+// The hint ladder (#159 E1): three tiers in order, each Hint click one ctx.hint() and one hint on
+// the score card; tier 3 fills REFERENCE and runs the same Check without a mistake.
+const tone = () => q('#nys-feedback').getAttribute('data-tone');
+const hintText = () => q('#nys-hint-text').textContent;
+const finishFrom = (finished) => {
   click('#nys-next');
   click('[data-pick="env-var"]');
   click('[data-finish]');
-  assert.equal(finished.length, 1);
-  assert.equal(finished[0].stars, 4, 'a clean run with one hint');
+  return finished[0].stars;
+};
+
+test('hint tier 1 is the authored hint, costs one star, and the button then offers tier 2', () => {
+  const finished = start();
+  toEditor();
+  assert.equal(q('#nys-hint').textContent, 'Hint 1 of 3');
+  click('#nys-hint');
+  assert.match(hintText(), /^Hint 1 of 3/);
+  assert.match(hintText(), /variable of its own/);
+  assert.equal(q('#nys-hints').textContent, '1');
+  assert.equal(q('#nys-hint').textContent, 'Hint 2 of 3');
+  assert.equal(q('#nys-hint').disabled, false);
+  q('#nys-env').value = GOOD;
+  click('#nys-check');
+  assert.equal(finishFrom(finished), 4, 'one hint, no failed Check');
+});
+
+test('hint tier 2 names the first problem in the player text by its variable, with no value', () => {
+  start();
+  toEditor();
+  click('#nys-hint');
+  click('#nys-hint');
+  assert.match(hintText(), /^Hint 2 of 3/);
+  assert.match(hintText(), /OTEL_SERVICE_NAME is not set, so the SDK falls back to a made-up one/);
+  assert.match(hintText(), /finished answer has 3 pairs, the service name included; yours has 2/);
+});
+
+/** The tier 2 text for `text` in the editor (a fresh level, two Hint clicks). */
+function tier2For(text) {
+  start();
+  toEditor();
+  q('#nys-env').value = text;
+  click('#nys-hint');
+  click('#nys-hint');
+  return hintText();
+}
+const LIST = 'OTEL_RESOURCE_ATTRIBUTES=service.version=1.4.2,deployment.environment.name=production';
+
+test('hint tier 2 names the variable in use: the list when the name comes from it, and where it sits', () => {
+  const t = tier2For(`${LIST.replace('service.version', 'service.name=cart,service.version')}`);
+  assert.match(t, /In OTEL_RESOURCE_ATTRIBUTES \(line 1\): the list's service name is not the one this task asks for/);
+  assert.doesNotMatch(t, /OTEL_SERVICE_NAME|cart|checkout/);
+  const wrongVar = tier2For(`OTEL_SERVICE_NAME=cart\n${LIST}`);
+  assert.match(wrongVar, /In OTEL_SERVICE_NAME \(line 1\): a name is set, but not the one this task asks for/);
+  const second = tier2For(`OTEL_EXPORTER_OTLP_ENDPOINT=http://x\nOTEL_SERVICE_NAME=checkout\nOTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=production`);
+  assert.match(second, /In OTEL_RESOURCE_ATTRIBUTES \(line 3\): the list has no version pair/);
+});
+
+test('hint tier 2 says a variable is not set in the file when it is missing or misspelled', () => {
+  const t = tier2For(`OTEL_SERVICE_NAME=checkout\n${LIST.replace('OTEL_RESOURCE_ATTRIBUTES', 'OTEL_RESOURCE_ATTRIBUTE').replace('service.version=1.4.2,', '')}`);
+  assert.match(t, /OTEL_RESOURCE_ATTRIBUTES is not set in the file/);
+  assert.doesNotMatch(t, /no version pair/);
+});
+
+test('hint tier 3 fills the reference and passes without a mistake, costing the three hints only', () => {
+  const finished = start();
+  toEditor();
+  click('#nys-hint');
+  click('#nys-hint');
+  click('#nys-hint');
+  assert.equal(q('#nys-env').value.includes('OTEL_SERVICE_NAME=checkout'), true, 'the reference is in the editor');
+  assert.equal(q('#nys-env').readOnly, true);
+  assert.equal(tone(), 'neutral', 'a filled-in pass is not a success');
+  assert.match(feedback(), /^Filled in for you\. Config passes\./);
+  assert.equal(q('#nys-wrong').textContent, '0', 'tier 3 is not a failed Check');
+  assert.equal(q('#nys-hints').textContent, '3');
+  assert.equal(q('#nys-hint').disabled, true);
+  assert.ok(!q('#nys-next').disabled);
+  assert.equal(q('#nys-win').hidden, false, 'the success card shows');
+  assert.equal(finishFrom(finished), 2, 'three hints, no mistake');
+});
+
+test('the ladder stops after three hints, and a hint never counts as a failed Check', () => {
+  start();
+  toEditor();
+  for (let i = 0; i < 2; i++) click('#nys-hint');
+  assert.equal(q('#nys-wrong').textContent, '0');
+  assert.equal(q('#nys-hints').textContent, '2');
+  click('#nys-check');
+  assert.equal(q('#nys-wrong').textContent, '1');
+  assert.equal(q('#nys-hints').textContent, '2');
+  click('#nys-hint');
+  assert.equal(q('#nys-hints').textContent, '3');
+  assert.equal(q('#nys-hint').disabled, true, 'the ladder is spent');
+  const hint = q('#nys-hint');
+  hint.onclick({ currentTarget: hint, target: hint });
+  assert.equal(q('#nys-hints').textContent, '3', 'a fourth click is ignored');
+  assert.equal(q('#nys-wrong').textContent, '1');
+});
+
+test('no hint tier before the last gives away the answer: no reference line and no value', () => {
+  start();
+  toEditor();
+  click('#nys-hint');
+  const tier1 = hintText();
+  click('#nys-hint');
+  const tier2 = hintText();
+  for (const text of [tier1, tier2]) {
+    assert.doesNotMatch(text, /checkout|1\.4\.2|production|OTEL_SERVICE_NAME=/);
+  }
+  for (const text of [tier2For(`${LIST}\nOTEL_SERVICE_NAME=cart`), tier2For('OTEL_RESOURCE_ATTRIBUTES=service.name=cart,deployment.environment=prod'), tier2For('OTEL_RESOURCE_ATTRIBUTE=service.version=1.4.2')]) {
+    assert.doesNotMatch(text, /checkout|1\.4\.2|production|OTEL_SERVICE_NAME=|cart/);
+  }
+});
+
+test('Check reads in tones: a new failing config is an error, the same text again neutral, a pass success', () => {
+  start();
+  toEditor();
+  assert.equal(q('#nys-feedback').hasAttribute('hidden'), true, 'nothing said before the first Check');
+  click('#nys-check');
+  assert.equal(tone(), 'error');
+  assert.equal(q('#nys-wrong').textContent, '1');
+  click('#nys-check');
+  assert.equal(tone(), 'neutral');
+  assert.equal(q('#nys-wrong').textContent, '1', 'the same text again is free');
+  q('#nys-env').value = GOOD;
+  click('#nys-check');
+  assert.equal(tone(), 'success');
+});
+
+test('any config already checked is free: a trailing newline, trailing spaces, CRLF and A, B, A cost nothing more', () => {
+  start();
+  toEditor();
+  const A = q('#nys-env').value;
+  const B = `${A}\nOTEL_SERVICE_NAME=cart`;
+  click('#nys-check');
+  assert.equal(q('#nys-wrong').textContent, '1');
+  for (const same of [`${A}\n`, `${A}   `, A.replace(/\n/g, '\r\n'), `\n\n${A}`]) {
+    q('#nys-env').value = same;
+    click('#nys-check');
+    assert.equal(tone(), 'neutral');
+    assert.equal(q('#nys-wrong').textContent, '1', JSON.stringify(same));
+  }
+  q('#nys-env').value = B;
+  click('#nys-check');
+  assert.equal(q('#nys-wrong').textContent, '2');
+  q('#nys-env').value = A;
+  click('#nys-check');
+  assert.equal(tone(), 'neutral');
+  assert.equal(q('#nys-wrong').textContent, '2', 'going back to A is free');
+});
+
+test('a repeat ignores indentation and blank lines: an indented first line and a blank line between lines are free', () => {
+  start();
+  toEditor();
+  const A = q('#nys-env').value;
+  click('#nys-check');
+  assert.equal(q('#nys-wrong').textContent, '1');
+  for (const same of [`  ${A}`, A.replace('\n', '\n\n')]) {
+    assert.notEqual(same, A);
+    q('#nys-env').value = same;
+    click('#nys-check');
+    assert.equal(tone(), 'neutral');
+    assert.equal(q('#nys-wrong').textContent, '1', JSON.stringify(same));
+  }
+});
+
+test('a blank Check is free and neutral, and says what to do', () => {
+  start();
+  toEditor();
+  q('#nys-env').value = '  \n ';
+  click('#nys-check');
+  assert.equal(tone(), 'neutral');
+  assert.equal(feedback(), 'Type a config first.');
+  assert.equal(q('#nys-wrong').textContent, '0');
+});
+
+test('a pass whose name comes from the attribute list works, with a neutral note about OTEL_SERVICE_NAME', () => {
+  start();
+  toEditor();
+  q('#nys-env').value = LIST.replace('service.version', 'service.name=checkout,service.version');
+  click('#nys-check');
+  assert.equal(tone(), 'success');
+  assert.match(feedback(), /^Config passes\./);
+  assert.match(feedback(), /dedicated variable and wins if both are set/);
+  assert.ok(!q('#nys-next').disabled, 'the note blocks nothing');
+  start();
+  toEditor();
+  q('#nys-env').value = GOOD;
+  click('#nys-check');
+  assert.doesNotMatch(feedback(), /dedicated variable/);
 });
 
 test('step 3: Finish waits for the right answer, and both answers are stated in words', () => {
@@ -178,7 +355,7 @@ test('re-checking the same failed config costs nothing more; a new failing one d
   toEditor();
   click('#nys-check');
   click('#nys-check');
-  assert.match(feedback(), /^Same config as last time: 2 problems\./);
+  assert.match(feedback(), /^You already checked this config\. Nothing new was counted\./);
   assert.equal(q('#nys-feedback li') !== null, true, 'the problems are still listed');
   q('#nys-env').value = GOOD;
   click('#nys-check');
@@ -213,11 +390,13 @@ test('focus never drops to the page: each step, pick, hint and pass moves it on'
   assert.equal(lastFocus(), '#nys-next', 'a right pick moves to Next');
   click('#nys-next');
   assert.equal(lastFocus(), '#nys-env', 'step 2 focuses the editor');
+  click('#nys-check');
+  assert.equal(lastFocus(), '#nys-env', 'a failing Check leaves focus in the editor');
   click('#nys-hint');
-  assert.equal(lastFocus(), '#nys-env', 'the spent hint hands focus back to the editor');
+  assert.equal(lastFocus(), '#nys-hint-text', 'a hint focuses its text');
   q('#nys-env').value = GOOD;
   click('#nys-check');
-  assert.equal(lastFocus(), '#nys-next', 'a pass moves to Next');
+  assert.equal(lastFocus(), '#nys-win-title', 'a pass focuses the success card heading');
   click('#nys-next');
   assert.equal(lastFocus(), 'pick:env-var', 'step 3 focuses its first choice');
   click('[data-pick="env-var"]');
@@ -225,14 +404,21 @@ test('focus never drops to the page: each step, pick, hint and pass moves it on'
   assert.deepEqual(focusLog.filter((f) => !f.focusable).map((f) => f.name), [], 'focused only enabled elements');
 });
 
-test('Escape on the shown hint is handled and moves focus to the editor (the hint is once-only) (#178)', () => {
+test('Escape on a shown hint is handled and moves focus to the Hint button, or the editor once the ladder is spent (#178)', () => {
   start();
   toEditor();
   click('#nys-hint');
+  const esc = () => {
+    const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+    q('#nys-hint-text').onkeydown(e);
+    return e.defaultPrevented;
+  };
   focusLog = [];
-  const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
-  q('#nys-hint-text').onkeydown(e);
-  assert.equal(e.defaultPrevented, true);
-  assert.equal(q('#nys-hint-text').getAttribute('tabindex'), '-1');
+  assert.equal(esc(), true);
+  assert.deepEqual(focusLog, [{ name: '#nys-hint', focusable: true }]);
+  click('#nys-hint');
+  click('#nys-hint');
+  focusLog = [];
+  assert.equal(esc(), true, 'the Hint button is spent: Escape goes to the (read-only, still focusable) editor');
   assert.deepEqual(focusLog, [{ name: '#nys-env', focusable: true }]);
 });
