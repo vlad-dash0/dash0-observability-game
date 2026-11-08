@@ -9,6 +9,7 @@ import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { canFocus } from '../lib/widgets/focus.mjs';
 import { editorPanel, lockEditor } from '../lib/widgets/editor.mjs';
 import { mountHintLadder, ruleText } from '../lib/widgets/help-ladder.mjs';
+import { normalizeConfig } from '../lib/widgets/configure-it.mjs';
 import { checkConfig, effectiveResource, parseEnv, renderIssues } from '../lib/widgets/env-config.mjs';
 import { GIVEN, PROCESS, TARGET, hintFor } from '../lib/widgets/env-config-help.mjs';
 import { playSwirl } from '../lib/swirl-render.mjs';
@@ -16,7 +17,7 @@ import { playSwirl } from '../lib/swirl-render.mjs';
 // Step 2's score card follows the penalty rules of Configure it (lib/widgets/configure-it-view.mjs).
 const RULE = ruleText({
   costs: 'a config that Check reports as wrong, a hint',
-  free: 'Checking the same failing config twice in a row is free.',
+  free: 'Checking a config you already checked is free.',
 });
 
 const ENV_NOTE =
@@ -154,7 +155,7 @@ export default {
       const fb = body.querySelector('#nys-feedback');
       const next = bar.querySelector('#nys-next');
       const say = (tone, html) => setFeedback(fb, tone, html);
-      let lastFailed = null;
+      const tried = new Set(); // normalised failing configs, as in Configure it
       const ladder = mountHintLadder(ctx, box, 'nys', {
         swirl: playSwirl,
         fallback: () => input,
@@ -170,19 +171,21 @@ export default {
       function run({ hinted = false } = {}) {
         if (ladder.done) return;
         const text = input.value;
+        if (!hinted && text.trim() === '') return void say('neutral', 'Type a config first.');
         const result = checkConfig(text, TARGET, PROCESS);
         if (!result.ok) {
-          // Only a new failing config costs a mistake; re-checking the same text does not.
-          const same = text === lastFailed;
-          lastFailed = text;
+          // Only a new failing config costs a mistake; any config already checked (same after normalising) is free.
+          const norm = normalizeConfig(text);
+          const same = tried.has(norm);
+          tried.add(norm);
           const n = plural(result.issues.length, 'problem', 'problems');
           const issues = prose(renderIssues(result.issues, ctx.escapeHtml));
-          if (same) return void say('neutral', `Same config as last time: ${n}.${issues}`);
+          if (same) return void say('neutral', `You already checked this config. Nothing new was counted.${issues}`);
           ladder.miss();
           say('error', `Not yet: ${n}.${issues}`);
           return;
         }
-        const attrs = effectiveResource(parseEnv(text).vars, PROCESS).attributes;
+        const { attributes: attrs, source } = effectiveResource(parseEnv(text).vars, PROCESS);
         const e = ctx.escapeHtml;
         ladder.complete();
         lockEditor(input, check);
@@ -190,7 +193,12 @@ export default {
           hinted ? 'neutral' : 'success',
           `${hinted ? 'Filled in for you. ' : ''}Config passes. The SDK now reports <code>service.name</code> ${e(attrs['service.name'])}, ` +
             `<code>service.version</code> ${e(attrs['service.version'])} and ` +
-            `<code>deployment.environment.name</code> ${e(attrs['deployment.environment.name'])}.`,
+            `<code>deployment.environment.name</code> ${e(attrs['deployment.environment.name'])}.` +
+            (source === 'OTEL_RESOURCE_ATTRIBUTES'
+              ? prose(
+                  'Note: the name comes from the attribute list. That works, but <code>OTEL_SERVICE_NAME</code> is the dedicated variable and wins if both are set.',
+                )
+              : ''),
         );
         next.disabled = false;
         ladder.succeed();
@@ -225,7 +233,7 @@ export default {
       });
       finish.onclick = () =>
         ctx.finish({
-          text: 'Checkout now reports as checkout instead of unknown_service:node, so its traces have a home on the map.',
+          text: 'Checkout now reports as checkout instead of unknown_service:node, so its traces now show up under the right name.',
           cards: ['unknown-service'],
         });
     };

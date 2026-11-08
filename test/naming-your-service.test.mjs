@@ -116,9 +116,34 @@ test('hint tier 2 names the first problem in the player text by its variable, wi
   click('#nys-hint');
   assert.match(hintText(), /^Hint 2 of 3/);
   assert.match(hintText(), /In OTEL_SERVICE_NAME: no service name is set/);
-  assert.match(hintText(), /answer's resource has 3 attributes; yours has 2/);
-  q('#nys-env').value = GOOD.replace('service.version=1.4.2,', '');
-  assert.equal(q('#nys-hint').textContent, 'Hint 3 of 3');
+  assert.match(hintText(), /finished answer has 3 pairs, the service name included; yours has 2/);
+});
+
+/** The tier 2 text for `text` in the editor (a fresh level, two Hint clicks). */
+function tier2For(text) {
+  start();
+  toEditor();
+  q('#nys-env').value = text;
+  click('#nys-hint');
+  click('#nys-hint');
+  return hintText();
+}
+const LIST = 'OTEL_RESOURCE_ATTRIBUTES=service.version=1.4.2,deployment.environment.name=production';
+
+test('hint tier 2 names the variable in use: the list when the name comes from it, and where it sits', () => {
+  const t = tier2For(`${LIST.replace('service.version', 'service.name=cart,service.version')}`);
+  assert.match(t, /In OTEL_RESOURCE_ATTRIBUTES \(line 1\): the list's service name is not the one this task asks for/);
+  assert.doesNotMatch(t, /OTEL_SERVICE_NAME|cart|checkout/);
+  const wrongVar = tier2For(`OTEL_SERVICE_NAME=cart\n${LIST}`);
+  assert.match(wrongVar, /In OTEL_SERVICE_NAME \(line 1\): a name is set, but not the one this task asks for/);
+  const second = tier2For(`OTEL_EXPORTER_OTLP_ENDPOINT=http://x\nOTEL_SERVICE_NAME=checkout\nOTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=production`);
+  assert.match(second, /In OTEL_RESOURCE_ATTRIBUTES \(line 3\): the list has no version pair/);
+});
+
+test('hint tier 2 says a variable is not set in the file when it is missing or misspelled', () => {
+  const t = tier2For(`OTEL_SERVICE_NAME=checkout\n${LIST.replace('OTEL_RESOURCE_ATTRIBUTES', 'OTEL_RESOURCE_ATTRIBUTE').replace('service.version=1.4.2,', '')}`);
+  assert.match(t, /OTEL_RESOURCE_ATTRIBUTES is not set in the file/);
+  assert.doesNotMatch(t, /no version pair/);
 });
 
 test('hint tier 3 fills the reference and passes without a mistake, costing the three hints only', () => {
@@ -148,6 +173,13 @@ test('the ladder stops after three hints, and a hint never counts as a failed Ch
   click('#nys-check');
   assert.equal(q('#nys-wrong').textContent, '1');
   assert.equal(q('#nys-hints').textContent, '2');
+  click('#nys-hint');
+  assert.equal(q('#nys-hints').textContent, '3');
+  assert.equal(q('#nys-hint').disabled, true, 'the ladder is spent');
+  const hint = q('#nys-hint');
+  hint.onclick({ currentTarget: hint, target: hint });
+  assert.equal(q('#nys-hints').textContent, '3', 'a fourth click is ignored');
+  assert.equal(q('#nys-wrong').textContent, '1');
 });
 
 test('no hint tier before the last gives away the answer: no reference line and no value', () => {
@@ -159,6 +191,9 @@ test('no hint tier before the last gives away the answer: no reference line and 
   const tier2 = hintText();
   for (const text of [tier1, tier2]) {
     assert.doesNotMatch(text, /checkout|1\.4\.2|production|OTEL_SERVICE_NAME=/);
+  }
+  for (const text of [tier2For(`${LIST}\nOTEL_SERVICE_NAME=cart`), tier2For('OTEL_RESOURCE_ATTRIBUTES=service.name=cart,deployment.environment=prod'), tier2For('OTEL_RESOURCE_ATTRIBUTE=service.version=1.4.2')]) {
+    assert.doesNotMatch(text, /checkout|1\.4\.2|production|OTEL_SERVICE_NAME=|cart/);
   }
 });
 
@@ -175,6 +210,54 @@ test('Check reads in tones: a new failing config is an error, the same text agai
   q('#nys-env').value = GOOD;
   click('#nys-check');
   assert.equal(tone(), 'success');
+});
+
+test('any config already checked is free: a trailing newline, trailing spaces, CRLF and A, B, A cost nothing more', () => {
+  start();
+  toEditor();
+  const A = q('#nys-env').value;
+  const B = `${A}\nOTEL_SERVICE_NAME=cart`;
+  click('#nys-check');
+  assert.equal(q('#nys-wrong').textContent, '1');
+  for (const same of [`${A}\n`, `${A}   `, A.replace(/\n/g, '\r\n'), `\n\n${A}`]) {
+    q('#nys-env').value = same;
+    click('#nys-check');
+    assert.equal(tone(), 'neutral');
+    assert.equal(q('#nys-wrong').textContent, '1', JSON.stringify(same));
+  }
+  q('#nys-env').value = B;
+  click('#nys-check');
+  assert.equal(q('#nys-wrong').textContent, '2');
+  q('#nys-env').value = A;
+  click('#nys-check');
+  assert.equal(tone(), 'neutral');
+  assert.equal(q('#nys-wrong').textContent, '2', 'going back to A is free');
+});
+
+test('a blank Check is free and neutral, and says what to do', () => {
+  start();
+  toEditor();
+  q('#nys-env').value = '  \n ';
+  click('#nys-check');
+  assert.equal(tone(), 'neutral');
+  assert.equal(feedback(), 'Type a config first.');
+  assert.equal(q('#nys-wrong').textContent, '0');
+});
+
+test('a pass whose name comes from the attribute list works, with a neutral note about OTEL_SERVICE_NAME', () => {
+  start();
+  toEditor();
+  q('#nys-env').value = LIST.replace('service.version', 'service.name=checkout,service.version');
+  click('#nys-check');
+  assert.equal(tone(), 'success');
+  assert.match(feedback(), /^Config passes\./);
+  assert.match(feedback(), /dedicated variable and wins if both are set/);
+  assert.ok(!q('#nys-next').disabled, 'the note blocks nothing');
+  start();
+  toEditor();
+  q('#nys-env').value = GOOD;
+  click('#nys-check');
+  assert.doesNotMatch(feedback(), /dedicated variable/);
 });
 
 test('step 3: Finish waits for the right answer, and both answers are stated in words', () => {
@@ -257,7 +340,7 @@ test('re-checking the same failed config costs nothing more; a new failing one d
   toEditor();
   click('#nys-check');
   click('#nys-check');
-  assert.match(feedback(), /^Same config as last time: 2 problems\./);
+  assert.match(feedback(), /^You already checked this config\. Nothing new was counted\./);
   assert.equal(q('#nys-feedback li') !== null, true, 'the problems are still listed');
   q('#nys-env').value = GOOD;
   click('#nys-check');

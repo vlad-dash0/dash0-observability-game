@@ -56,12 +56,12 @@ test('every code the checker can report is mapped and exercised, and no mapping 
 });
 
 test('tier 2 on a bad line names the line number; on a passing text it says to press Check', () => {
-  assert.match(hintFor(`${REFERENCE}\n\nNOEQUALS`, 2).html, /^<p>On line 5: a line is not a valid NAME=value line\./);
+  assert.match(hintFor(`${REFERENCE}\n\nNOEQUALS`, 2).html, /^<p>On line 5: this is not a valid NAME=value line\./);
   assert.equal(hintFor(REFERENCE, 2).html, '<p>Yours already passes: press Check.</p>');
 });
 
 test('tier 2 compares the answer resource size with the player resource size', () => {
-  assert.match(hintFor(GIVEN, 2).html, /The answer's resource has 3 attributes; yours has 2\./);
+  assert.match(hintFor(GIVEN, 2).html, /The finished answer has 3 pairs, the service name included; yours has 2\./);
   assert.match(hintFor('OTEL_SERVICE_NAME=checkout', 2).html, /yours has 1\./);
 });
 
@@ -74,4 +74,15 @@ test('tiers 1 and 2 never contain a reference line or a value', () => {
       assert.doesNotMatch(plain(html), /checkout|1\.4\.2|production/);
     }
   }
+});
+
+test('tier 2 points at the variable in use and at its line, and says a missing variable is not set', () => {
+  const list = 'OTEL_RESOURCE_ATTRIBUTES=service.name=cart,service.version=1.4.2,deployment.environment.name=production';
+  const fromList = hintFor(list, 2).html;
+  assert.match(fromList, /^<p>In <code>OTEL_RESOURCE_ATTRIBUTES<\/code> \(line 1\): the list's service name is not the one/);
+  assert.doesNotMatch(fromList, /OTEL_SERVICE_NAME/);
+  assert.match(hintFor(`OTEL_SERVICE_NAME=cart\n${list}`, 2).html, /^<p>In <code>OTEL_SERVICE_NAME<\/code> \(line 1\): a name is set/);
+  const misspelt = hintFor(`OTEL_SERVICE_NAME=checkout\n${list.replace('RESOURCE_ATTRIBUTES', 'RESOURCE_ATTRIBUTE').replace('service.name=cart,', '')}`, 2).html;
+  assert.match(misspelt, /^<p><code>OTEL_RESOURCE_ATTRIBUTES<\/code> is not set in the file\./);
+  for (const html of [fromList, misspelt]) assert.doesNotMatch(plain(html), /checkout|cart|1\.4\.2|production/);
 });
