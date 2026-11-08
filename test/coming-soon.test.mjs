@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { makeDom } from './helpers/dom.mjs';
 import { fakeStorage } from './helpers/fake-storage.mjs';
 import { COMING_SOON } from '../hub/coming-soon.mjs';
-import { ACT_REGIONS, actOfCountry } from '../hub/globe-map.mjs';
+import { ACT_REGIONS, actOfCountry, islandDots } from '../hub/globe-map.mjs';
 import { COUNTRIES, DOTS } from '../hub/globe-data.mjs';
 import { createGame, liveRegistry } from '../app.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
@@ -90,7 +90,7 @@ test('the live hub lists no soon act; acts 7 and 8 are playable, even a debug hu
 test('no live globe dot is SOON', () => {
   const { game } = liveGame();
   const states = game.globeView().states;
-  assert.equal(states.length, DOTS.length);
+  assert.equal(states.length, DOTS.length + islandDots().length, 'the globe draws the land dots and the island markers');
   assert.equal(states.every((s) => s !== DOT.SOON), true);
   const live = liveRegistry();
   const p = emptyProgress();
