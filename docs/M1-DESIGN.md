@@ -220,7 +220,8 @@ View `lib/widgets/build-it-view.mjs` (redesigned in #146 from the owner-approved
   time: N problems.`). Each hint tier costs one `ctx.hint()`. Retrying is free; Reset puts the
   board back and keeps what was paid.
 - **Right column** (markup: `sideColumn` and `helpChips` in `lib/ui/side.mjs`; behaviour:
-  `lib/widgets/help-ladder.mjs`, shared; Sort it adopted it in #156): about
+  `lib/widgets/help-ladder.mjs`, shared; Sort it adopted it in #156; Query it and Configure it share the
+  Hint click and score drawing in its `mountHintLadder`, #247): about
   300px and sticky beside the board from about 960px of widget width (a container query), else
   stacked under it: the success card (hidden until success; heading focused, no focus ring;
   stars line; the spec's `closing`), the score card (wrong drops or failed Checks, hints, five

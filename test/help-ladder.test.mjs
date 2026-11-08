@@ -9,7 +9,7 @@ import { recordFocus } from './helpers/focus.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { helpChips, sideColumn } from '../lib/ui/index.mjs';
 import * as ladder from '../lib/widgets/help-ladder.mjs';
-import { hintCost, ladderText, LADDER, mountSide, PENALTY, RULE, ruleText, starsLabel, validateHelps } from '../lib/widgets/help-ladder.mjs';
+import { hintCost, ladderText, LADDER, mountHintLadder, mountSide, PENALTY, RULE, ruleText, starsLabel, validateHelps } from '../lib/widgets/help-ladder.mjs';
 import { RULE as SORT_RULE, PENALTY as SORT_PENALTY } from '../lib/widgets/sort-it-view.mjs';
 import { RULE as SPOT_RULE, PENALTY as SPOT_PENALTY } from '../lib/widgets/spot-it-view.mjs';
 import { RULE as INCIDENT_RULE, PENALTY as INCIDENT_PENALTY } from '../lib/widgets/incident-view.mjs';
@@ -19,7 +19,7 @@ const sideHtml = (id, { hints, title }) =>
   sideColumn({ id, titleHtml: title, counts: [{ key: 'wrong', label: '' }], hints, ruleHtml: RULE });
 
 test('help-ladder keeps the behaviour; the markup lives in the kit (lib/ui/side.mjs)', () => {
-  assert.deepEqual(Object.keys(ladder).sort(), ['HINT_TIERS', 'LADDER', 'PENALTY', 'RULE', 'boardStars', 'hintCost', 'ladderText', 'mountSide', 'ruleText', 'starsLabel', 'validateHelps']);
+  assert.deepEqual(Object.keys(ladder).sort(), ['HINT_TIERS', 'LADDER', 'PENALTY', 'RULE', 'boardStars', 'hintCost', 'ladderText', 'mountHintLadder', 'mountSide', 'ruleText', 'starsLabel', 'validateHelps']);
 });
 
 test('LADDER is generated from scoreStars', () => {
@@ -192,4 +192,17 @@ test('ladderText: a rung wider than the margin is read as the last rung (the doc
 
 test('ladderText: a rule that never settles is refused, not printed', () => {
   assert.throws(() => ladderText((p) => p % 2), /still changing/);
+});
+
+test('mountHintLadder: succeed() alone leaves the Hint button disabled and the stars final', () => {
+  const dom = makeDom();
+  recordFocus(dom.window);
+  dom.body.innerHTML = `<div id="box">${sideHtml('s3', { hints: true, title: 'Done' })}</div>`;
+  const ctx = { ovBody: dom.body, escapeHtml, mistake() {}, hint() {} };
+  const lad = mountHintLadder(ctx, q('#box'), 's3', { wrongNouns: ['failed Check', 'failed Checks'], hint: () => ({ html: '' }), fill() {} });
+  assert.equal(q('#s3-hint').disabled, false);
+  lad.succeed();
+  assert.equal(lad.done, true);
+  assert.equal(q('#s3-hint').disabled, true);
+  assert.equal(q('#s3-stars').getAttribute('aria-label'), '5 of 5 stars');
 });
