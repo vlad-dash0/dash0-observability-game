@@ -2,6 +2,7 @@
 // trace and profile, and names the newest, still-maturing signal (profiles: spec Alpha,
 // OTLP Development, checked 2026-10-30). Spec: docs/M1-DESIGN.md §6 Act 0.
 // Spec: https://opentelemetry.io/docs/concepts/signals/profiles/
+import { actions, finishButton, nextButton, question, step } from '../lib/ui/index.mjs';
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
 import { newSortState } from '../lib/widgets/sort-it.mjs';
@@ -130,21 +131,20 @@ export default {
   lights: [],
   scoring: { parMs: null },
   run(ctx) {
-    const actions = ctx.ovActions;
-    const next = () => actions.querySelector('#sig-next');
+    const bar = ctx.ovActions;
+    const next = () => bar.querySelector('#sig-next');
     const unlock = (btn) => () => {
       btn.disabled = false;
       return btn;
     };
 
-    const sortStep = (spec, intro, question, then) => {
+    const sortStep = (spec, intro, questionHtml, then) => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(intro)}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="${spec.id}-q">${question}</h3>
-          ${renderSort(spec, newSortState(spec), { escapeHtml: ctx.escapeHtml, labelledBy: `${spec.id}-q` })}
-        </div>`,
-        '<button class="btn" id="sig-next" disabled>Next</button>',
+        step({
+          wide: true,
+          bodyHtml: `${ctx.speech(intro)}${question({ id: `${spec.id}-q`, html: questionHtml })}${renderSort(spec, newSortState(spec), { escapeHtml: ctx.escapeHtml, labelledBy: `${spec.id}-q` })}`,
+        }),
+        actions({ wide: true, buttonsHtml: nextButton('sig-next') }),
       );
       mountSort(ctx, spec, { onComplete: unlock(next()) });
       next().onclick = then;
@@ -169,14 +169,13 @@ export default {
 
     const stepNewest = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech('One of the four is still settling.')}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="sig-q-new">Which signal is the newest and still maturing?</h3>
-          ${choiceHtml(ctx, NEWEST, { id: 'sig', labelledBy: 'sig-q-new' })}
-        </div>`,
-        '<button class="btn" id="sig-finish" data-finish disabled>Finish</button>',
+        step({
+          wide: false,
+          bodyHtml: `${ctx.speech('One of the four is still settling.')}${question({ id: 'sig-q-new', html: 'Which signal is the newest and still maturing?' })}${choiceHtml(ctx, NEWEST, { id: 'sig', labelledBy: 'sig-q-new' })}`,
+        }),
+        actions({ wide: false, buttonsHtml: finishButton('sig-finish') }),
       );
-      const finish = actions.querySelector('#sig-finish');
+      const finish = bar.querySelector('#sig-finish');
       mountChoice(ctx, NEWEST, { id: 'sig', onRight: unlock(finish) });
       finish.onclick = () =>
         ctx.finish({

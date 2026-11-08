@@ -196,6 +196,11 @@ test('a chip never overflows its container: capped at the container width, and i
   assert.equal(chip['overflow-wrap'], 'anywhere', 'and break inside a long word');
 });
 
+test('a question breaks inside a long unbreakable word, so it never overflows at 320px', () => {
+  const q = Object.fromEntries(sheetRules('kit.css').filter((r) => r.selector === '.ui-question').flatMap((r) => decls(r.body)));
+  assert.equal(q['overflow-wrap'], 'anywhere');
+});
+
 test('lesson code breaks inside a long token: the lesson card clips, so an unbreakable token would be cut off', () => {
   const pick = (sel) => Object.fromEntries(sheetRules('kit.css').filter((r) => r.selector === sel).flatMap((r) => decls(r.body)));
   assert.equal(pick('.ui-lesson').overflow, 'hidden', 'premise: the card clips');
@@ -276,18 +281,13 @@ const RETIRED = [
 ];
 
 const LEGACY = {
-  'levels/baggage.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'levels/checkout-is-slow.mjs': ['btn', 'lesson-intro', 'lesson-stage'],
   'levels/context-propagation.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'levels/events-and-links.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
-  'levels/monitoring-vs-observability.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'levels/naming-your-service.mjs': ['btn', 'env-editor', 'env-label', 'env-note', 'feedback', 'ghost', 'info', 'lesson-intro', 'lesson-stage', 'q', 'show', 'small'],
   'levels/span-kinds.mjs': ['btn', 'feedback', 'info', 'lesson-intro', 'lesson-stage', 'q', 'show'],
   'levels/spans-and-traces.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
-  'levels/status-and-errors.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'levels/the-pager.mjs': ['btn', 'choice', 'choices', 'feedback', 'info', 'lesson-intro', 'lesson-stage', 'q', 'show'],
-  'levels/the-signals.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
-  'levels/why-opentelemetry.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'lib/widgets/configure-it-view.mjs': ['btn', 'configure-inactive', 'configure-input', 'configure-label', 'configure-more', 'configure-note', 'feedback', 'ghost', 'info', 'show', 'small'],
   'lib/widgets/trade-off-view.mjs': ['btn', 'feedback', 'show', 'tradeoff-keeps', 'tradeoff-option'],
 };

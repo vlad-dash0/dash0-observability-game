@@ -2,6 +2,7 @@
 // into the ones a dashboard was built for and the new ones nobody planned, then names
 // what makes the new kind answerable. Spec: docs/M1-DESIGN.md §6 Act 0.
 // Spec: https://opentelemetry.io/docs/concepts/observability-primer/#what-is-observability
+import { actions, finishButton, nextButton, question, step } from '../lib/ui/index.mjs';
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
 import { newSortState } from '../lib/widgets/sort-it.mjs';
@@ -98,21 +99,20 @@ export default {
   lights: [],
   scoring: { parMs: null },
   run(ctx) {
-    const actions = ctx.ovActions;
+    const bar = ctx.ovActions;
 
     const stepSort = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: true,
+          bodyHtml: `${ctx.speech(
           'Day one on call. Before your first page, sort the questions people ask about a ' +
             'system: the ones a dashboard was built for in advance, and the new ones nobody planned for.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="mvo-q-sort">Pick a question, then the kind it is.</h3>
-          ${renderSort(SORT, newSortState(SORT), { escapeHtml: ctx.escapeHtml, labelledBy: 'mvo-q-sort' })}
-        </div>`,
-        '<button class="btn" id="mvo-next" disabled>Next</button>',
+        )}${question({ id: 'mvo-q-sort', html: 'Pick a question, then the kind it is.' })}${renderSort(SORT, newSortState(SORT), { escapeHtml: ctx.escapeHtml, labelledBy: 'mvo-q-sort' })}`,
+        }),
+        actions({ wide: true, buttonsHtml: nextButton('mvo-next') }),
       );
-      const next = actions.querySelector('#mvo-next');
+      const next = bar.querySelector('#mvo-next');
       mountSort(ctx, SORT, {
         onComplete: () => {
           next.disabled = false;
@@ -124,17 +124,16 @@ export default {
 
     const stepAnswerable = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: false,
+          bodyHtml: `${ctx.speech(
           'Monitoring answers the known questions. Observability is being able to answer the ' +
             'new ones from the telemetry your system already sends, without shipping new code.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="mvo-q-why">What makes the second kind answerable?</h3>
-          ${choiceHtml(ctx, ANSWERABLE, { id: 'mvo', labelledBy: 'mvo-q-why' })}
-        </div>`,
-        '<button class="btn" id="mvo-finish" data-finish disabled>Finish</button>',
+        )}${question({ id: 'mvo-q-why', html: 'What makes the second kind answerable?' })}${choiceHtml(ctx, ANSWERABLE, { id: 'mvo', labelledBy: 'mvo-q-why' })}`,
+        }),
+        actions({ wide: false, buttonsHtml: finishButton('mvo-finish') }),
       );
-      const finish = actions.querySelector('#mvo-finish');
+      const finish = bar.querySelector('#mvo-finish');
       mountChoice(ctx, ANSWERABLE, {
         id: 'mvo',
         onRight: () => {
