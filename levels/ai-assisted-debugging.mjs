@@ -77,7 +77,7 @@ const VERSIONS_VIEW =
   '<table><caption>Failed requests per 1,000 requests</caption>' +
   `<thead><tr><th scope="col">Version</th><th scope="col">${TABLE.releaseAt} to ${TABLE.failuresFrom}</th><th scope="col">${TABLE.failuresFrom} to ${TABLE.queryAt}</th></tr></thead>` +
   `<tbody>${[OLD, NEW].map((x) => row([x.v, per1000(x.beforeErrors, x.beforeRequests), per1000(x.afterErrors, x.afterRequests)])).join('')}</tbody></table>` +
-  `<p>From ${TABLE.failuresFrom} to ${TABLE.queryAt} each version had ${fmt(OLD.afterErrors)} failed requests, ${fmt(failedAfter)} failed in all. Both versions fail at the same rate from ${TABLE.failuresFrom}. The version that went live at ${TABLE.releaseAt} ran ${TABLE.beforeMin} minutes before that at the rate of the one that did not change.</p>`;
+  `<p>Both versions fail at the same rate from ${TABLE.failuresFrom}: from ${TABLE.failuresFrom} to ${TABLE.queryAt} each version had ${fmt(OLD.afterErrors)} failed requests, ${fmt(failedAfter)} failed in all. The version that went live at ${TABLE.releaseAt} ran ${TABLE.beforeMin} minutes before that at the rate of the one that did not change.</p>`;
 
 const TRACE_VIEW =
   `<p>The agent opened one of the ${TABLE.sampledTraces} failing traces it found since ${TABLE.failuresFrom}; all ${TABLE.sampledTraces} end the same way. Checkout reserves stock first and takes the payment after.</p>` +
@@ -178,7 +178,7 @@ const SCENARIO = {
   ],
   answerAfterViews: 3,
   hint:
-    '<p>A cause has to explain where the failing requests stop and whether the release explains them. Which cause fits what the views show?</p>',
+    '<p>A cause has to explain where the failing requests stop and whether the release explains the failures. Which cause fits what the views show?</p>',
 };
 
 // Step 2: why the agent's failed-requests query found nothing. Both queries share the window (10:12 to 10:36) and the service, so only the

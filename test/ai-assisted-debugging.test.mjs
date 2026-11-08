@@ -339,9 +339,9 @@ test('with the threshold lowered to two clues, every board lacking a clue would 
 
 // ---- the hint tiers on every board -------------------------------------------------------
 
-test('tier 1 holds on every board: a cause has to explain where the failing requests stop and whether the release explains them, with no view to open and nothing given away', () => {
+test('tier 1 holds on every board: a cause has to explain where the failing requests stop and whether the release explains the failures, with no view to open and nothing given away', () => {
   const t = plain(S.hint);
-  assert.equal(t.includes('where the failing requests stop') && t.includes('whether the release explains them'), true);
+  assert.equal(t.includes('where the failing requests stop') && t.includes('whether the release explains the failures'), true);
   assert.equal(/not opened|open|alike|inventory|503/i.test(t), false, 'no view-opening instruction and no clue read out');
   assert.equal(/attribute|status_code|name/i.test(t), false, 'step 1 tier 1 leaves the naming to step 2');
 });
