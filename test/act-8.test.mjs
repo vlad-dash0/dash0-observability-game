@@ -44,7 +44,7 @@ const spotRun = (ids) => {
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-8 follows act-7, holds 8.1 to 8.4 in order, no boss, and is not coming soon; nothing is coming soon', () => {
+test('act-8 follows act-7, holds its levels in order, no boss, and is not coming soon; nothing is coming soon', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-8');
   assert.ok(act, 'act-8 is in the registry');
   assert.deepEqual(
@@ -82,8 +82,8 @@ test('act-8 opens when acts 0-7 are complete, or once entered', () => {
   const act = LIVE.acts[index];
   assert.equal(isActComplete(act, emptyProgress()), false);
   assert.equal(isActComplete(act, progressOf([ID])), false, '8.2 alone leaves the others to play');
-  assert.equal(isActComplete(act, progressOf([ID, 'migrating-vendors', 'dashboards-as-code'])), false, 'three of the four leave 8.4 to play');
-  assert.equal(isActComplete(act, progressOf(['dashboards-as-code', ID, 'migrating-vendors', 'frontend-rum'])), true, 'its four levels complete it (no boss)');
+  assert.equal(isActComplete(act, progressOf([ID, 'migrating-vendors', 'dashboards-as-code'])), false, 'a level left to play leaves the act open');
+  assert.equal(isActComplete(act, progressOf(['dashboards-as-code', ID, 'migrating-vendors', 'frontend-rum'])), true, 'all the levels of the act complete it (no boss)');
 });
 
 test('8.2 fields: scored with no par time, in act-8, lights storefront, awards no card; mechanics as derived', () => {
@@ -207,7 +207,7 @@ test('sources: the two opentelemetry.io pages, a Spec line, a cited Dash0 page b
 
 // ---- the globe -----------------------------------------------------------------------------
 
-test('globe: 8.2 lights Thailand, and Southeast Asia is complete only with all four levels (test/frontend-rum.test.mjs)', () => {
+test('globe: 8.2 lights Thailand, and Southeast Asia is complete only with every level of the act (test/frontend-rum.test.mjs)', () => {
   assert.equal(LEVEL_COUNTRY[ID], 'THA');
   assert.equal(COUNTRY_NAMES.THA, 'Thailand');
   assert.equal(ACT_REGIONS['act-8'].region, 'Southeast Asia');

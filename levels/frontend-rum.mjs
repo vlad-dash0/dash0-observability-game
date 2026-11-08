@@ -42,19 +42,23 @@ const DB = '5e6f708192a3b4c5';
 const CLICK2 = '6f708192a3b4c5d6';
 const PAY2 = '708192a3b4c5d6e7';
 const SERVER2 = '8192a3b4c5d6e7f8';
+const PAY_B = 'c9d8e7f6a5b4c3d2';
 
 const span = (traceId, spanId, service, name, kind, startMs, endMs, parentId) => ({
   spanId, traceId, name, service, kind, startMs, endMs, status: 'UNSET', attributes: {}, events: [], parentId, links: [],
 });
 
 // Checkout's server span arrived as a root. The browser span its traceparent names is the fetch call (PAY), not the click that began
-// it (CLICK), not the earlier fetch of the cart (CART), and not the same-looking call of the other visitor's trace (PAY2).
+// it (CLICK), not the earlier fetch of the cart (CART), not the same-looking call of the other visitor's trace (PAY2), and not the
+// twin in its own trace (PAY_B, the second call of a double-click on Pay, which also encloses the server span): the board labels the
+// twins by their span id, and only the parent id in the header tells which one the server span answers.
 const TREE = {
   id: 'frum-tree',
   spans: [
     span(T1, CLICK, 'shop-web', 'click Pay', 'INTERNAL', 0, 1250, null),
     span(T1, CART, 'shop-web', 'GET /cart', 'CLIENT', 20, 160, CLICK),
     span(T1, PAY, 'shop-web', 'POST /checkout', 'CLIENT', 200, 1200, CLICK),
+    span(T1, PAY_B, 'shop-web', 'POST /checkout', 'CLIENT', 210, 1190, CLICK),
     span(T1, SERVER, 'checkout', 'POST /checkout', 'SERVER', 230, 1160, null),
     span(T1, DB, 'checkout', 'INSERT orders', 'CLIENT', 300, 1100, SERVER),
     span(T2, CLICK2, 'shop-web', 'click Pay', 'INTERNAL', 150, 1300, null),
@@ -111,7 +115,8 @@ export default {
         intro:
           'A browser can produce spans too, so a trace can start at the click. In Kettle &amp; Co\'s shop, the instrumentation records a span for the click on Pay and one for each fetch call the click makes. ' +
           `In the lab, the shop and the checkout service share an origin, and the SDK adds <code>traceparent: 00-${T1}-${PAY}-01</code> to the call. ` +
-          'Another visitor clicked Pay at the same moment, in trace <code>9d8c7b6a</code>. Checkout\'s server span for your call arrived as a root.',
+          'The visitor double-clicked Pay, so two identical calls left the browser in this trace; the board tells them apart by the end of their span id. ' +
+          'Another visitor clicked Pay at the same moment, in trace <code>9d8c7b6a</code>. Checkout\'s server span for the first call arrived as a root.',
         question: 'Give checkout\'s server span its parent.',
         qid: 'frum-q-tree',
         build: TREE,
@@ -119,7 +124,7 @@ export default {
       {
         intro:
           'In production the shop is served from <code>https://shop.kettle.example</code>, the checkout API from <code>https://api.kettle.example</code> and the telemetry endpoint from <code>https://otlp.kettle.example</code>: three origins. ' +
-          'The SDK is set to send trace context to the API\'s origin; by default it sends it only to the page\'s own origin. Since then, two requests fail. ' +
+          'The SDK is set to send trace context to the API\'s origin; by default it sends it only to the page\'s own origin. The API already allows the shop\'s origin, <code>https://shop.kettle.example</code>. Since then, two requests fail. ' +
           'The SDK\'s export <code>POST https://otlp.kettle.example/v1/traces</code> is blocked: the reply has no <code>Access-Control-Allow-Origin</code> header, and no browser spans reach Dash0. ' +
           'Before the checkout call to <code>https://api.kettle.example</code>, the browser asks whether it may send the header <code>traceparent</code>. ' +
           'The reply lists <code>Access-Control-Allow-Headers: Content-Type, Authorization</code>, so the browser does not send the call, and the payment fails.',

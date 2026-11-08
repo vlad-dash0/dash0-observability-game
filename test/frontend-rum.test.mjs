@@ -1,5 +1,5 @@
 // Level 8.4 "Frontend / RUM" beyond the generated play-through (test/play.test.mjs, test/answers.test.mjs, test/levels-play.test.mjs):
-// level fields and the globe (which completes Southeast Asia); the Build it board of two browser traces read against the traceparent
+// level fields and the globe (which completes Southeast Asia with every level of the act); the Build it board of two browser traces, one with a twin call read against the traceparent
 // header in the intro, and every tempting parent graded through the real checkBuild; the CORS Choice as a two-by-two of placements read
 // from the replies the intro shows; the sources and what the copy does not claim. Asserts strings, numbers and booleans only.
 import { test } from 'node:test';
@@ -12,6 +12,7 @@ import { freshlyLit, litText } from '../lib/globe-ignite.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
 import { checkBuild, newBuildState, setParent, validateBuildSpec } from '../lib/widgets/build-it.mjs';
 import { validateBuildHelps } from '../lib/widgets/build-it-help.mjs';
+import { namer } from '../lib/widgets/build-it-names.mjs';
 
 const ID = 'frontend-rum';
 const LIVE = liveRegistry();
@@ -21,14 +22,14 @@ const level = LIVE.levels[ID];
 const [BUILD_STEP, CORS_STEP] = level.play.steps;
 const tree = BUILD_STEP.build;
 const choices = CORS_STEP.choice.choices;
-const byName = (service, name, trace) => tree.spans.find((s) => s.service === service && s.name === name && s.traceId.startsWith(trace));
+const byName = (service, name, trace, nth = 0) => tree.spans.filter((s) => s.service === service && s.name === name && s.traceId.startsWith(trace))[nth];
 const progressOf = (ids) => {
   const p = emptyProgress();
   for (const id of ids) p.levels[id] = { stars: 3, at: null };
   return p;
 };
 
-test('8.4 fields: last level of act-8, scored with no par time, a build then a choice, lights storefront and api-gateway, awards no card', () => {
+test('8.4 fields: in act-8 after 8.3, scored with no par time, a build then a choice, lights storefront and api-gateway, awards no card', () => {
   assert.deepEqual(
     { no: level.no, name: level.name, sub: level.sub, icon: level.icon, rewardTitle: level.rewardTitle, kind: level.kind, actId: level.actId, parMs: level.scoring.parMs, prefix: level.play.prefix },
     { no: '8.4', name: 'Frontend / RUM', sub: 'The trace starts in the browser', icon: '\u{1F310}', rewardTitle: 'Browser tracer', kind: 'level', actId: 'act-8', parMs: null, prefix: 'frum' },
@@ -50,7 +51,7 @@ test('card 19 (flush-on-shutdown): 8.4 does not award it, the batch-processor fl
   assert.doesNotMatch(plain(JSON.stringify(level.play)), /flush|shutdown|batch processor/i);
 });
 
-test('globe: 8.4 lights Malaysia and completes Southeast Asia', () => {
+test('globe: 8.4 lights Malaysia and, with the other three levels of act-8, completes Southeast Asia', () => {
   assert.equal(LEVEL_COUNTRY[ID], 'MYS');
   assert.equal(COUNTRY_NAMES.MYS, 'Malaysia');
   const map = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES };
@@ -76,7 +77,7 @@ test('step 1: a valid parent-only build of two browser traces, no helps, a Check
   assert.deepEqual(tree.edit, ['parent']);
   assert.deepEqual(tree.helps, {});
   assert.equal(Object.hasOwn(tree, 'hint'), false, 'no authored hint (hints off)');
-  assert.equal(tree.spans.length, 8);
+  assert.equal(tree.spans.length, 9);
   assert.equal(new Set(tree.spans.map((s) => s.traceId)).size, 2, 'two traces on the board');
   assert.equal(plain(BUILD_STEP.question), 'Give checkout\'s server span its parent.');
   const server = byName('checkout', 'POST /checkout', 'a3f1c9e2');
@@ -97,6 +98,7 @@ test('step 1: the traceparent in the intro is a valid W3C value and names the fe
   assert.equal(tree.answer[server.spanId].parentId, parentId, 'the answer is the span the header names');
   assert.equal(server.startMs >= named.startMs && server.endMs <= named.endMs, true, 'the call encloses the server span');
   assert.match(plain(BUILD_STEP.intro), /Another visitor clicked Pay at the same moment, in trace 9d8c7b6a/);
+  assert.match(plain(BUILD_STEP.intro), /double-clicked Pay, so two identical calls left the browser in this trace; the board tells them apart by the end of their span id/);
   assert.match(plain(BUILD_STEP.intro), /share an origin/);
 });
 
@@ -115,7 +117,9 @@ test('step 1: only the span the header names passes; each tempting parent fails 
   const pay2 = byName('shop-web', 'POST /checkout', '9d8c7b6a');
   const click2 = byName('shop-web', 'click Pay', '9d8c7b6a');
   const server2 = byName('checkout', 'POST /checkout', '9d8c7b6a');
+  const twin = byName('shop-web', 'POST /checkout', 'a3f1c9e2', 1);
   assert.deepEqual(gradeWith(pay.spanId), [], 'the fetch call the header names');
+  assert.deepEqual(gradeWith(twin.spanId), ['wrong-parent'], 'the double-click twin in the same trace, which also encloses the server span');
   assert.deepEqual(gradeWith(undefined), ['wrong-parent'], 'left as a root');
   assert.deepEqual(gradeWith(click.spanId), ['wrong-parent'], 'the click that started the call');
   assert.deepEqual(gradeWith(cart.spanId), ['wrong-parent'], 'the earlier fetch of the cart');
@@ -143,10 +147,27 @@ test('step 1: surface rules for choosing the parent fail, so the header has to b
     assert.notEqual(gradeWith(chosen.spanId).length, 0, `${name} picked ${chosen.name} (${chosen.spanId}) and passed`);
   }
   const same = candidates.filter((s) => s.name === server.name);
-  assert.deepEqual(same.map((s) => gradeWith(s.spanId).length === 0), [true, false], 'two browser spans share the server span\'s name: a name rule wins in one list order and loses in the other');
-  // Only a rule that reads the header passes, and a trace-aware tightest-enclosing rule is the one honest shortcut: it reads the trace id too.
-  const sameTrace = candidates.filter((s) => s.traceId === server.traceId && encloses(s)).sort((a, b) => width(a) - width(b))[0];
-  assert.deepEqual(gradeWith(sameTrace.spanId), [], 'tightest enclosing span of the same trace is the header\'s span, by construction of real traces');
+  assert.deepEqual(same.map((s) => gradeWith(s.spanId).length === 0), [true, false, false], 'three browser spans share the server span\'s name: only the first, which the header names, passes');
+  // The same-trace rules no longer pass alone: two CLIENT spans of one trace, same name and service, both enclose the server span.
+  const sameTrace = candidates.filter((s) => s.traceId === server.traceId && s.name === server.name && s.kind === 'CLIENT' && encloses(s));
+  assert.equal(sameTrace.length, 2, 'the double-click twins');
+  const tightest = [...sameTrace].sort((a, b) => width(a) - width(b))[0];
+  const widest = [...sameTrace].sort((a, b) => width(b) - width(a))[0];
+  const earliest = [...sameTrace].sort((a, b) => a.startMs - b.startMs)[0];
+  const latest = [...sameTrace].sort((a, b) => b.startMs - a.startMs)[0];
+  assert.deepEqual([tightest, widest, earliest, latest].map((s) => gradeWith(s.spanId).length === 0), [false, true, true, false], 'tightest and latest fail, widest and earliest pass by coincidence of the numbers: a same-trace rule needs a tie-break the header is the only fair source of');
+  assert.deepEqual(sameTrace.map((s) => gradeWith(s.spanId)), [[], ['wrong-parent']], 'the same-trace rule alone does not decide; of the two only one passes');
+});
+
+test('step 1: the board labels the twins by span id, and reading the parent id of the traceparent is what picks the right one', () => {
+  const [, , parentId] = traceparent.split('-');
+  const twins = tree.spans.filter((s) => s.traceId === byName('checkout', 'POST /checkout', 'a3f1c9e2').traceId && s.name === 'POST /checkout' && s.service === 'shop-web');
+  const labels = twins.map((s) => namer(tree.spans, (x) => x).text(s));
+  assert.deepEqual(labels, ['POST /checkout (shop-web, trace a3f1c9e2, span id \u202692a3)', 'POST /checkout (shop-web, trace a3f1c9e2, span id \u2026c3d2)']);
+  assert.equal(new Set(labels).size, 2, 'the labels differ only by the span id');
+  assert.equal(labels.map((l) => parentId.endsWith(l.slice(-5, -1))).join(), 'true,false', 'the end of the header\'s parent id matches one label only');
+  assert.deepEqual(twins.map((s) => gradeWith(s.spanId).length === 0), [true, false]);
+  assert.equal(twins.every((s) => s.startMs <= 230 && s.endMs >= 1160), true, 'both twins enclose the server span');
 });
 
 // ---- step 2: CORS ---------------------------------------------------------------------------
@@ -159,6 +180,7 @@ test('step 2: the intro shows two failing replies as data: no allow-origin on th
   for (const s of [
     'https://shop.kettle.example', 'https://api.kettle.example', 'https://otlp.kettle.example', 'three origins',
     'by default it sends it only to the page\'s own origin',
+    'The API already allows the shop\'s origin, https://shop.kettle.example',
     'POST https://otlp.kettle.example/v1/traces is blocked: the reply has no Access-Control-Allow-Origin header, and no browser spans reach Dash0',
     'asks whether it may send the header traceparent',
     'Access-Control-Allow-Headers: Content-Type, Authorization',

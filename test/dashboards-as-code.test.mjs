@@ -1,6 +1,6 @@
 // Level 8.1 "Dashboards as code" beyond the generated play-through (test/play.test.mjs, test/answers.test.mjs, test/spot-tells.test.mjs,
 // test/spot-ladder.test.mjs): level fields and the globe; the Spot it board of twelve added lines read by an independent oracle (the
-// namespaces the operator watches, the grid arithmetic, the panels the file defines); surface rules played through the real checkSpot; the
+// namespaces the operator watches, the grid arithmetic on a 24-column grid, the panels the file defines); surface rules played through the real checkSpot; the
 // Choice (a team with no cluster); the sources and what the copy does not claim. Asserts strings, numbers and booleans only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -84,7 +84,7 @@ function readLine(text) {
 const segments = (path) => path.split('.').filter(Boolean).map((p) => p.replace(/\[\d+\]$/, '')).filter(Boolean);
 const keysOf = (v) => (v !== null && typeof v === 'object' ? Object.entries(v).flatMap(([k, x]) => [k, ...keysOf(x)]) : []);
 
-test('step 1: a valid config board of twelve added lines, hints off, faults on the metadata line and two layout items', () => {
+test('step 1: a valid config board of twelve added lines, hints off, faults on the metadata line and two layout items among four', () => {
   assert.equal(SPOT_STEP.qid, 'dac-q-spot');
   assert.equal(spec.id, 'dac-spot');
   assert.equal(spec.target, 'config');
@@ -93,7 +93,7 @@ test('step 1: a valid config board of twelve added lines, hints off, faults on t
   assert.deepEqual(spec.helps, { hints: false });
   assert.equal(Object.hasOwn(spec, 'hint'), false, 'no authored hint (hints off)');
   assert.deepEqual(spec.faults, ['metadata', 'item-errors', 'item-latency']);
-  assert.equal(layout(spec), '.F...' + '.FF' + '....');
+  assert.equal(layout(spec), '.F..' + '.FF.' + '....');
   assert.equal(spec.lines.length, 12);
   for (const l of spec.lines) assert.match(l.text, /^\+ /, `${l.id} is an added line`);
   assert.equal(spotRun(spec.faults).state.solved, true, 'the three faults solve it');
@@ -136,28 +136,18 @@ test('step 1 oracle: an independent reading of the diff flags exactly the faults
     const panel = /^spec\.panels\.(\w+)$/.exec(path);
     if (panel) defined.add(panel[1]);
   }
-  // Two items overlap when they share rows and their column spans cross.
-  const overlaps = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-  const crossing = new Set();
-  for (let i = 0; i < items.length; i += 1) {
-    for (let j = i + 1; j < items.length; j += 1) {
-      if (overlaps(items[i], items[j])) {
-        // The item that breaks the column the others share is the one to move.
-        const columns = items.map((it) => it.x);
-        const odd = [items[i], items[j]].filter((it) => columns.filter((c) => c === it.x).length === 1);
-        for (const it of odd) crossing.add(it.id);
-      }
-    }
-  }
+  // Reading the fields as cells on a 24-column grid, an item does not fit when x + width is more than 24.
+  const GRID = 24;
+  const crossing = new Set(items.filter((it) => it.x + it.width > GRID).map((it) => it.id));
   found.push(...crossing);
   found.push(...refs.filter((r) => !defined.has(r.panel)).map((r) => r.id));
   assert.deepEqual([...new Set(found)].sort(), [...spec.faults].sort());
-  // The numbers the explanation quotes: the first item covers 0 to 12 on rows 0 to 6, the second starts at 6.
-  const [first, second, third] = items;
-  assert.deepEqual([first.x + first.width, second.x, third.y], [12, 6, 6]);
-  assert.equal(overlaps(first, second), true);
-  assert.equal(overlaps(first, third), false, 'the third item sits below the first');
-  assert.equal(overlaps(second, third), false);
+  // The numbers the explanation quotes: the second item starts at 18 and is 12 wide, so it ends at column 30 of 24; the fourth ends at 24.
+  const [first, second, third, fourth] = items;
+  assert.deepEqual([second.x, second.width, second.x + second.width], [18, 12, 30]);
+  assert.deepEqual([first.x + first.width, third.y, fourth.x, fourth.x + fourth.width, fourth.y], [12, 6, 12, 24, 6]);
+  assert.equal(items.filter((it) => it.x + it.width > GRID).length, 1, 'one item runs past the grid, so the fault is one line');
+  assert.equal(items.length, 4);
   assert.deepEqual([...defined].sort(), ['error_ratio', 'request_rate']);
 });
 
@@ -186,30 +176,61 @@ test('step 1: the two non-fault layout items and the two panels are honest decoy
     }
   }
   // The faults are not the only lines with a layout item, a namespace or an x value.
-  assert.equal(spec.lines.filter((l) => l.text.includes('$ref')).length, 3);
-  assert.equal(spec.lines.filter((l) => l.text.includes('$ref') && !spec.faults.includes(l.id)).length, 1);
+  assert.equal(spec.lines.filter((l) => l.text.includes('$ref')).length, 4);
+  assert.equal(spec.lines.filter((l) => l.text.includes('$ref') && !spec.faults.includes(l.id)).length, 2);
   assert.equal(textOf('item-rate').includes('x: 0'), true);
   assert.equal(textOf('item-latency').includes('x: 0'), true, 'a fault also starts at x: 0');
 });
 
+test('step 1: no odd-one-out rule over the layout fields picks the faults, and over all 4,095 selections only the reference passes', () => {
+  const items = spec.lines.filter((l) => /\.items\[\d\]$/.test(readLine(l.text).path)).map((l) => ({ id: l.id, ...readLine(l.text).value }));
+  assert.deepEqual(items.map((it) => it.id), ['item-rate', 'item-errors', 'item-latency', 'item-corner']);
+  const refs = items.map((it) => it.content.$ref.replace('#/spec/panels/', ''));
+  const defined = items.filter((it, i) => ['request_rate', 'error_ratio'].includes(refs[i]));
+  assert.equal(defined.length, 3, 'three of the four items name a defined panel');
+  // "Pick the item whose field differs from the rest", one field at a time: the odd ones are never the faulty pair.
+  const faultItems = ['item-errors', 'item-latency'];
+  const oddOnes = (field) => items.filter((it) => items.filter((o) => o[field] === it[field]).length === 1).map((it) => it.id);
+  assert.deepEqual(oddOnes('x'), ['item-errors', 'item-corner'], 'x: the second item and the decoy');
+  for (const f of ['y', 'width', 'height']) assert.deepEqual(oddOnes(f), [], `${f} has no odd one out`);
+  for (const f of ['x', 'y', 'width', 'height']) {
+    const picked = ['metadata', ...oddOnes(f)];
+    assert.equal(spotRun(picked).state.solved, false, `the odd one out on ${f} (${picked}) does not solve it`);
+    assert.equal(faultItems.every((id) => oddOnes(f).includes(id)), false, `${f} does not single out both faulty items`);
+  }
+  // Every non-empty selection of the twelve lines through the real checkSpot: exactly the reference solves it.
+  const ids = spec.lines.map((l) => l.id);
+  const passing = [];
+  for (let mask = 1; mask < 2 ** ids.length; mask += 1) {
+    const picked = ids.filter((_, i) => mask & (1 << i));
+    if (spotRun(picked).state.solved) passing.push(picked.join(','));
+  }
+  assert.deepEqual(passing, [spec.faults.slice().sort((a, b) => ids.indexOf(a) - ids.indexOf(b)).join(',')], 'only the reference passes');
+  assert.equal(2 ** ids.length - 1, 4095);
+});
+
 test('step 1 whyNot: only on decoys, each a full sentence that names no fault line, the tempting ones covered', () => {
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['datasource', 'header', 'item-rate', 'panel-errors', 'query-errors', 'query-rate']);
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['datasource', 'header', 'item-corner', 'item-rate', 'panel-errors', 'query-errors', 'query-rate']);
   for (const [id, t] of Object.entries(spec.whyNot)) {
     assert.match(plain(t), /\S[\s\S]*\.$/, `${id} ends a sentence`);
     for (const f of spec.faults) assert.equal(plain(t).includes(spec.lines.find((l) => l.id === f).text), false, `${id} does not quote ${f}`);
   }
   assert.match(plain(spec.whyNot.header), /same <code>apiVersion<\/code>|same apiVersion/);
-  assert.match(plain(spec.whyNot['item-rate']), /overlap needs a second item/);
+  assert.match(plain(spec.whyNot['item-rate']), /shares, one band of the grid further down/);
+  assert.match(plain(spec.whyNot['item-rate']), /columns 0 to 12 of the 24/);
+  assert.match(plain(spec.whyNot['item-corner']), /columns 12 to 24/);
+  assert.doesNotMatch(plain(JSON.stringify(spec.whyNot)), /third item|two rows/);
   assert.match(plain(spec.whyNot['query-errors']), /rate of 5xx requests divided by the rate of all requests/);
 });
 
-test('step 1 explain: the namespace, the overlap in cells, and the missing panel, each with its numbers; it grades lines, not a parsed file', () => {
+test('step 1 explain: the namespace, the width in cells, and the missing panel, each with its numbers; it grades lines, not a parsed file', () => {
   const e = plain(spec.explain);
-  for (const s of ['namespace: tools', 'checkout', 'payments', 'x: 6', '0 to 12', '(y 0 to 6)', 'at 12', 'latency_p99', 'request_rate', 'error_ratio', 'grades the lines you select, not a parsed file', 'Perses schema']) {
+  for (const s of ['namespace: tools', 'checkout', 'payments', 'Reading the fields as cells', 'x: 18', '12 wide', 'column 30 on a grid of 24', 'x: 12', 'latency_p99', 'request_rate', 'error_ratio', 'grades the lines you select, not a parsed file', 'Perses schema']) {
     assert.equal(e.includes(s), true, s);
   }
+  assert.doesNotMatch(e, /next column|0 to 12|drawn over each other/, 'no overlap story left');
   const intro = plain(SPOT_STEP.intro);
-  for (const s of ['monitoring resources in checkout and payments, and none in tools', 'dashboards/checkout-overview.yaml', 'a new file', 'every line it adds']) assert.equal(intro.includes(s), true, s);
+  for (const s of ['monitoring resources in checkout and payments, and none in tools', 'dashboards/checkout-overview.yaml', 'a new file', 'every line it adds', 'A Grid is 24 columns wide', 'reading the fields as cells']) assert.equal(intro.includes(s), true, s);
 });
 
 // ---- step 2: how a team with no cluster deploys ---------------------------------------------
