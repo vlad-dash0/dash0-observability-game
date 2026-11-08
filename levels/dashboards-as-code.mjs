@@ -27,15 +27,15 @@
 // (perses.dev) is not an allowed host, so no field beyond the Dash0 page's example is shown and no Perses rule is claimed.
 //
 // Invented for the game: the company, the file `dashboards/checkout-overview.yaml`, the namespaces `checkout`, `payments` and `tools`,
-// the panel names, the queries, the grid sizes and the Grid's width of 24 columns. Each line of the board is one added key, shown with its path from the top of the file.
+// the panel names, the queries, the grid sizes and the Grid's width of 24 columns. Each line of the board is one added key, shown with its path from the top of the file (a key whose value is a mapping shows the mapping).
 
 const SPOT = {
   id: 'dac-spot',
   target: 'config',
   helps: { hints: false },
   lines: [
-    { id: 'metadata', text: '+ {apiVersion: perses.dev/v1alpha1, kind: PersesDashboard, metadata: {name: checkout-overview, namespace: tools}}' },
-    { id: 'grid', text: '+ spec.layouts[0].kind: Grid' },
+    { id: 'header', text: '+ apiVersion: perses.dev/v1alpha1' },
+    { id: 'metadata', text: '+ metadata: {name: checkout-overview, namespace: tools}' },
     { id: 'item-rate', text: '+ spec.layouts[0].spec.items[0]: {x: 0, "y": 0, width: 12, height: 6, content: {$ref: "#/spec/panels/request_rate"}}' },
     { id: 'item-errors', text: '+ spec.layouts[0].spec.items[1]: {x: 18, "y": 0, width: 12, height: 6, content: {$ref: "#/spec/panels/error_ratio"}}' },
     { id: 'item-corner', text: '+ spec.layouts[0].spec.items[2]: {x: 12, "y": 6, width: 12, height: 6, content: {$ref: "#/spec/panels/request_count"}}' },
@@ -49,6 +49,7 @@ const SPOT = {
   ],
   faults: ['metadata', 'item-errors', 'item-latency'],
   whyNot: {
+    header: 'The same <code>apiVersion</code> as the example in Dash0\'s documentation of a dashboard the operator manages. Nothing here needs to change.',
     'item-rate': 'Its <code>x: 0</code> is the left edge that <code>items[3]</code> shares, one band of the grid further down, and its width of 12 is every item\'s width. Read as cells it covers columns 0 to 12 of the 24, well inside the grid.',
     'item-corner': 'Read as cells it covers columns 12 to 24 of the grid\'s second band (<code>y</code> 6 to 12), which ends exactly at the edge, and it names <code>request_count</code>, a panel the file defines and no other item shows. Its <code>x: 12</code> is not shared with another item, but nothing about it is wrong.',
     'panel-errors': 'This panel is defined, and the item that names it points at the right key. What is wrong with that item is where it sits on the grid, not the panel it shows.',

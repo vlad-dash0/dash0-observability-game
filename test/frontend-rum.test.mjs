@@ -13,6 +13,7 @@ import { emptyProgress } from '../lib/progress.mjs';
 import { checkBuild, newBuildState, setParent, validateBuildSpec } from '../lib/widgets/build-it.mjs';
 import { validateBuildHelps } from '../lib/widgets/build-it-help.mjs';
 import { namer } from '../lib/widgets/build-it-names.mjs';
+import { waterfall } from '../lib/widgets/trace.mjs';
 
 const ID = 'frontend-rum';
 const LIVE = liveRegistry();
@@ -151,20 +152,37 @@ test('step 1: surface rules for choosing the parent fail, so the header has to b
   }
   const same = candidates.filter((s) => s.name === server.name);
   assert.deepEqual(same.map((s) => gradeWith(s.spanId).length === 0), [false, true, false], 'three browser spans share the server span\'s name: only the one the header names passes, and it is not the first listed');
-  // The same-trace rules no longer pass alone: two CLIENT spans of one trace, same name and service, both enclose the server span.
+  // The twins are identical calls: same start, same end, both enclose the server span. No timing or list-order rule can tell them apart.
   const sameTrace = candidates.filter((s) => s.traceId === server.traceId && s.name === server.name && s.kind === 'CLIENT' && encloses(s));
   assert.equal(sameTrace.length, 2, 'the double-click twins');
-  const tightest = [...sameTrace].sort((a, b) => width(a) - width(b))[0];
-  const widest = [...sameTrace].sort((a, b) => width(b) - width(a))[0];
-  const earliest = [...sameTrace].sort((a, b) => a.startMs - b.startMs)[0];
-  const latest = [...sameTrace].sort((a, b) => b.startMs - a.startMs)[0];
-  const firstListed = sameTrace[0];
+  assert.deepEqual([sameTrace[0].startMs === sameTrace[1].startMs, sameTrace[0].endMs === sameTrace[1].endMs], [true, true], 'identical times');
   const passes = (s) => gradeWith(s.spanId).length === 0;
-  // The "original call" beliefs (earliest, widest, longest, first listed) all pick the other call; the header's call is the later, tighter one.
-  assert.deepEqual([earliest, widest, firstListed].map(passes), [false, false, false], 'earliest, widest/longest and first listed fail');
-  assert.deepEqual([tightest, latest].map(passes), [true, true], 'the later, tighter call is the header\'s, so only the header\'s parent id decides, not a belief about the first call');
-  assert.equal(width(widest) > width(tightest) && earliest.startMs < latest.startMs, true, 'the twins differ on both axes');
-  assert.deepEqual(sameTrace.map((s) => gradeWith(s.spanId)), [['wrong-parent'], []], 'of the two only the header\'s passes');
+  const pickBy = (cmp) => [...sameTrace].sort(cmp)[0];
+  const timing = {
+    tightest: (a, b) => width(a) - width(b),
+    widest: (a, b) => width(b) - width(a),
+    longest: (a, b) => (b.endMs - b.startMs) - (a.endMs - a.startMs),
+    'earliest start': (a, b) => a.startMs - b.startMs,
+    'latest start': (a, b) => b.startMs - a.startMs,
+    'earliest end': (a, b) => a.endMs - b.endMs,
+    'latest end': (a, b) => b.endMs - a.endMs,
+    'closest start to the server span': (a, b) => Math.abs(server.startMs - a.startMs) - Math.abs(server.startMs - b.startMs),
+    'closest end to the server span': (a, b) => Math.abs(server.endMs - a.endMs) - Math.abs(server.endMs - b.endMs),
+  };
+  for (const [name, cmp] of Object.entries(timing)) {
+    assert.equal(sameTrace.every((x) => cmp(x, sameTrace[0]) === 0 && cmp(sameTrace[0], x) === 0), true, `${name} cannot separate the twins`);
+    // Whichever twin a stable sort puts first, in either list order, the rule's pick is decided by order alone: it passes in one order, fails in the other.
+    const picks = [sameTrace, [...sameTrace].reverse()].map((list) => [...list].sort(cmp)[0]);
+    assert.deepEqual(picks.map(passes).sort(), [false, true], `${name} picks by list order only`);
+  }
+  assert.equal(pickBy(timing.tightest) === sameTrace[0], true);
+  // The row directly above the server span in the real waterfall is the wrong twin, so "the bar right above the orphan" fails.
+  const rows = waterfall(tree.spans).rows;
+  const at = rows.findIndex((r) => r.spanId === server.spanId);
+  const above = tree.spans.find((s) => s.spanId === rows[at - 1].spanId);
+  assert.deepEqual([above.name, above.traceId === server.traceId], ['POST /checkout', true], 'the row above the server span is a twin');
+  assert.equal(passes(above), false, 'the row right above the server span is the wrong twin');
+  assert.deepEqual(sameTrace.map((s) => gradeWith(s.spanId)), [['wrong-parent'], []], 'of the two only the header\'s parent id decides');
 });
 
 test('step 1: the board labels the twins by span id, and reading the parent id of the traceparent is what picks the right one', () => {
@@ -176,6 +194,7 @@ test('step 1: the board labels the twins by span id, and reading the parent id o
   assert.equal(labels.map((l) => parentId.endsWith(l.slice(-5, -1))).join(), 'false,true', 'the end of the header\'s parent id matches one label only');
   assert.deepEqual(twins.map((s) => gradeWith(s.spanId).length === 0), [false, true]);
   assert.equal(twins.every((s) => s.startMs <= 230 && s.endMs >= 1160), true, 'both twins enclose the server span');
+  assert.deepEqual([twins[0].startMs, twins[0].endMs], [twins[1].startMs, twins[1].endMs], 'identical times');
 });
 
 // ---- step 2: CORS ---------------------------------------------------------------------------

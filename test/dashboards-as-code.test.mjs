@@ -93,7 +93,8 @@ test('step 1: a valid config board of twelve added lines, hints off, faults on t
   assert.deepEqual(spec.helps, { hints: false });
   assert.equal(Object.hasOwn(spec, 'hint'), false, 'no authored hint (hints off)');
   assert.deepEqual(spec.faults, ['metadata', 'item-errors', 'item-latency']);
-  assert.equal(layout(spec), 'F.' + '.F.F' + '......', 'the two faulty items are not adjacent');
+  assert.deepEqual(spec.lines.slice(0, 2).map((l) => l.id), ['header', 'metadata'], 'a header decoy sits right above the metadata fault');
+  assert.equal(layout(spec), '.F' + '.F.F' + '......', 'the two faulty items are not adjacent');
   assert.equal(spec.lines.length, 12);
   for (const l of spec.lines) assert.match(l.text, /^\+ /, `${l.id} is an added line`);
   assert.equal(spotRun(spec.faults).state.solved, true, 'the three faults solve it');
@@ -109,8 +110,11 @@ test('step 1: every field on the board is one the Dash0 example shows, and the l
       assert.equal(DOCS_KEYS.has(key) || NAMED.has(key), true, `${l.id}: ${key} is a field of the Dash0 example or a name the game gives`);
     }
   }
-  const head = readLine(spec.lines.find((l) => l.id === 'metadata').text).value;
-  assert.deepEqual([head.apiVersion, head.kind, head.metadata.name], ['perses.dev/v1alpha1', 'PersesDashboard', 'checkout-overview'], 'the header of the Dash0 example, folded into the metadata line');
+  const head = readLine(spec.lines.find((l) => l.id === 'header').text);
+  assert.deepEqual([head.path, head.value], ['apiVersion', 'perses.dev/v1alpha1'], 'the header of the Dash0 example, on its own line');
+  const meta = readLine(spec.lines.find((l) => l.id === 'metadata').text);
+  assert.deepEqual([meta.path, meta.value.name, meta.value.namespace], ['metadata', 'checkout-overview', 'tools'], 'the metadata line has a path like the others');
+  for (const l of spec.lines) assert.notEqual(readLine(l.text).path, '', `${l.id}: every line shows its path, so none looks odd by having none`);
   for (const id of ['panel-rate', 'panel-errors', 'panel-count']) {
     const v = readLine(spec.lines.find((l) => l.id === id).text).value;
     assert.deepEqual([v.kind, v.spec.plugin.kind], ['Panel', 'TimeSeriesChart']);
@@ -125,7 +129,7 @@ test('step 1 oracle: an independent reading of the diff flags exactly the faults
   const refs = [];
   for (const l of spec.lines) {
     const { path, value } = readLine(l.text);
-    if (path === '' && !WATCHED.includes(value.metadata.namespace)) found.push(l.id);
+    if (path === 'metadata' && !WATCHED.includes(value.namespace)) found.push(l.id);
     const item = /^spec\.layouts\[0\]\.spec\.items\[(\d)\]$/.exec(path);
     if (item) {
       items.push({ id: l.id, ...value });
@@ -221,7 +225,7 @@ test('step 1: no odd-one-out rule over the layout fields picks the faults, and o
 });
 
 test('step 1 whyNot: only on decoys, each a full sentence that names no fault line, the tempting ones covered', () => {
-  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['item-corner', 'item-rate', 'panel-errors', 'query-count', 'query-errors', 'query-rate']);
+  assert.deepEqual(Object.keys(spec.whyNot).sort(), ['header', 'item-corner', 'item-rate', 'panel-errors', 'query-count', 'query-errors', 'query-rate']);
   for (const [id, t] of Object.entries(spec.whyNot)) {
     assert.match(plain(t), /\S[\s\S]*\.$/, `${id} ends a sentence`);
     for (const f of spec.faults) assert.equal(plain(t).includes(spec.lines.find((l) => l.id === f).text), false, `${id} does not quote ${f}`);
