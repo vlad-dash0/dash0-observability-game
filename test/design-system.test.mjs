@@ -195,9 +195,11 @@ test('a chip never overflows its container: capped at the container width, and i
   assert.equal(chip['overflow-wrap'], 'anywhere', 'and break inside a long word');
 });
 
-test('a question breaks inside a long unbreakable word, so it never overflows at 320px', () => {
-  const q = Object.fromEntries(sheetRules('kit.css').filter((r) => r.selector === '.ui-question').flatMap((r) => decls(r.body)));
-  assert.equal(q['overflow-wrap'], 'anywhere');
+test('question, note, option and field label break inside a long unbreakable token, so none overflows at 320px', () => {
+  for (const sel of ['.ui-question', '.ui-note', '.ui-option', '.ui-field-label']) {
+    const d = Object.fromEntries(sheetRules('kit.css').filter((r) => r.selector === sel).flatMap((r) => decls(r.body)));
+    assert.equal(d['overflow-wrap'], 'anywhere', `${sel} must wrap a long token`);
+  }
 });
 
 test('lesson code breaks inside a long token: the lesson card clips, so an unbreakable token would be cut off', () => {
