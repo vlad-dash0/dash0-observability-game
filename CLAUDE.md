@@ -60,11 +60,11 @@ package files out (keep its lines to the forms `tools/serve.mjs` parses).
 - No AI-attribution trailers (`Co-Authored-By`, "Generated with") in commits or PRs.
 - Merge gate: `All checks` green and the `PR findings` status green. The status is the
   canonical findings check: `.github/workflows/pr-findings.yml` runs `tools/pr-findings.mjs`
-  on every push, comment, review and thread change and posts its verdict on the PR head
+  on every push, comment and review (not on a thread resolve, which triggers no workflow) and posts its verdict on the PR head
   (pending on a draft; the latest review must cover the PR head, see the PR template);
   `node tools/pr-findings.mjs <PR>` is the same script locally, for the details (review
-  comment formats: `.github/pull_request_template.md`). A failed PR findings run, or a
-  hidden comment, can leave the status out of date: re-run the workflow (Actions, PR
+  comment formats: `.github/pull_request_template.md`). A failed PR findings run, a
+  resolved thread or a hidden comment can leave the status out of date: re-run the workflow (Actions, PR
   findings, Run workflow, the PR number) before merging.
 - PR bodies carry no full-suite test count: CI shows it.
 

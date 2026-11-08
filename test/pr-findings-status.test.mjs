@@ -187,11 +187,12 @@ test('the status workflow runs only on events that run main\'s copy of it', () =
 
 test('the relay covers every PR event that can change the verdict and has no permissions', () => {
   assert.deepEqual(Object.keys(RELAY_YML.on).sort(),
-    ['pull_request', 'pull_request_review', 'pull_request_review_comment', 'pull_request_review_thread']);
+    ['pull_request', 'pull_request_review', 'pull_request_review_comment']);
   for (const t of ['opened', 'reopened', 'synchronize', 'ready_for_review', 'converted_to_draft']) {
     assert.ok(RELAY_YML.on.pull_request.types.includes(t), t);
   }
-  assert.deepEqual(RELAY_YML.on.pull_request_review_thread.types.sort(), ['resolved', 'unresolved']);
+  assert.deepEqual(RELAY_YML.on.pull_request_review.types.sort(), ['dismissed', 'edited', 'submitted']);
+  assert.deepEqual(RELAY_YML.on.pull_request_review_comment.types.sort(), ['created', 'deleted', 'edited']);
   assert.deepEqual(RELAY_YML.permissions, {});
   for (const job of Object.values(RELAY_YML.jobs)) assert.equal(job.permissions, undefined);
   // It runs the PR's own copy, so it must check out and run nothing.
@@ -230,6 +231,43 @@ test('report runs one at a time per PR, so an older evaluation never posts last'
   assert.match(c.group, /\$\{\{ matrix\.pr \}\}/);
   assert.equal(c['cancel-in-progress'], false);
   assert.equal(FINDINGS.jobs.report.strategy.matrix.pr, '${{ fromJSON(needs.resolve.outputs.prs) }}');
+});
+
+// GitHub rejects a whole workflow file that names an event Actions cannot trigger on (a
+// webhook-only event such as pull_request_review_thread), and it then never runs (#268).
+// https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows
+const ACTIONS_EVENTS = new Set([
+  'branch_protection_rule', 'check_run', 'check_suite', 'create', 'delete', 'deployment',
+  'deployment_status', 'discussion', 'discussion_comment', 'fork', 'gollum', 'image_version',
+  'issue_comment', 'issues', 'label', 'merge_group', 'milestone', 'page_build', 'public',
+  'pull_request', 'pull_request_review', 'pull_request_review_comment', 'pull_request_target',
+  'push', 'registry_package', 'release', 'repository_dispatch', 'schedule', 'status', 'watch',
+  'workflow_call', 'workflow_dispatch', 'workflow_run',
+]);
+// Activity types per event, for the events these workflows use.
+const ACTIONS_TYPES = {
+  pull_request: ['assigned', 'unassigned', 'labeled', 'unlabeled', 'opened', 'edited', 'closed',
+    'reopened', 'synchronize', 'converted_to_draft', 'locked', 'unlocked', 'enqueued', 'dequeued',
+    'milestoned', 'demilestoned', 'ready_for_review', 'review_requested', 'review_request_removed',
+    'auto_merge_enabled', 'auto_merge_disabled'],
+  pull_request_review: ['submitted', 'edited', 'dismissed'],
+  pull_request_review_comment: ['created', 'edited', 'deleted'],
+  issue_comment: ['created', 'edited', 'deleted'],
+  workflow_run: ['completed', 'requested', 'in_progress'],
+};
+
+test('every workflow triggers only on events (and activity types) that GitHub Actions accepts', () => {
+  for (const name of ['ci.yml', 'pr-findings.yml', 'pr-findings-relay.yml']) {
+    const on = yaml(name).on;
+    const events = typeof on === 'string' ? [on] : Array.isArray(on) ? on : Object.keys(on);
+    for (const event of events) {
+      assert.ok(ACTIONS_EVENTS.has(event), `${name}: ${event} is not an Actions trigger`);
+      const types = on[event]?.types;
+      if (types === undefined) continue;
+      assert.ok(ACTIONS_TYPES[event], `${name}: ${event} has types but no allow-list here`);
+      for (const t of types) assert.ok(ACTIONS_TYPES[event].includes(t), `${name}: ${event}.${t}`);
+    }
+  }
 });
 
 test('every action in every workflow is pinned to a commit sha', () => {
