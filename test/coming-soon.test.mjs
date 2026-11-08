@@ -1,5 +1,5 @@
 // "Coming soon" acts on the live data (#177 P7). The list in hub/coming-soon.mjs is empty now: Act 7
-// left it with 7.1 and Act 8 with 8.2. It stays, never in levels/index.mjs ACTS, so a future soon act
+// left it with 7.1 and Act 8 with 8.3, its last level. It stays, never in levels/index.mjs ACTS, so a future soon act
 // is invisible to the registry, unlock, progress, stars and cards; only the hub's act list and the
 // globe read it. The mechanism itself, for any list, is covered by fixtures in test/game.test.mjs and
 // test/globe-view.test.mjs.

@@ -49,6 +49,11 @@ const SORT = {
       label: 'An alert when the error ratio stays above 2% for 5 minutes',
       bucket: 'translated',
       why: 'Failed requests divided by all requests over the same window means the same thing in PromQL, and the "for 5 minutes" condition has a counterpart in an alert rule. The meaning survives the move.',
+      whyNot: {
+        approximated: 'It is a ratio of two <code>rate</code>s, and both extrapolate the same way over the same window, so the extrapolation cancels and the ratio is unchanged in practice. That is why it differs from the exact count, which has no second number to cancel against.',
+        manual: 'Nothing here is left to rebuild: the ratio and the "for 5 minutes" condition both convert as written.',
+        skipped: 'An error-ratio alert is still needed in the new tool, so it is not left behind.',
+      },
     },
     {
       id: 'agent-panel',
@@ -70,9 +75,9 @@ const SORT = {
     },
     {
       id: 'p99-alert',
-      label: 'An alert on the 99th percentile of checkout latency above 1 second',
+      label: 'An alert on the 99th percentile of checkout latency above 1.2 seconds',
       bucket: 'approximated',
-      why: 'It is the same estimate as the p95 chart, now deciding whether someone is paged. Step 2 shows a window where the estimate and the raw-sample percentile land on opposite sides of a threshold.',
+      why: 'It is the same estimate as the p95 chart, now deciding whether someone is paged, and 1.2 s sits inside a bucket, not on a boundary, so the estimate is interpolated there. Step 2 shows a window where the estimate and the raw-sample percentile land on opposite sides of a threshold.',
     },
     {
       id: 'retired-alert',
@@ -85,12 +90,22 @@ const SORT = {
       label: 'A big number showing exactly how many checkouts failed in the last hour',
       bucket: 'approximated',
       why: 'It becomes <code>increase</code> over an hour, which extrapolates to cover the full window, so it can read 41.7 where the old tool said 42. The number is right to within a fraction, not exact.',
+      whyNot: {
+        translated: 'The query converts, but the result does not mean the same: <code>increase</code> extrapolates to cover the full window, so it can return a fraction where the old tool counted whole checkouts.',
+        manual: 'Nobody has to rebuild it. The query converts on its own, and only the exactness is lost.',
+        skipped: 'The count is still wanted, so it is carried over, with the caveat that it is close, not exact.',
+      },
     },
     {
       id: 'paging-alert',
       label: 'An alert that phones the on-call engineer through the old tool\'s own paging app',
       bucket: 'manual',
       why: 'The condition may well convert, but the phone call does not: the paging app, the schedule and the escalation steps have to be set up again by hand in the new tool\'s notification channels.',
+      whyNot: {
+        translated: 'Only the condition translates. The phone call goes through the old tool\'s own paging app, which the new tool does not have, so the paging side is set up again by hand.',
+        approximated: 'Nothing about the numbers is estimated here. What is missing is the paging path itself, and no query turns that into something close.',
+        skipped: 'The engineer still has to be paged, so the need stays and the path is rebuilt.',
+      },
     },
     {
       id: 'unused-dashboard',
@@ -100,9 +115,14 @@ const SORT = {
     },
     {
       id: 'disk-alert',
-      label: 'An alert that the disk fills within 4 hours, from the old tool\'s straight-line forecast',
+      label: 'An alert that the disk fills within 4 hours, from the old tool\'s least-squares straight-line forecast over the last 6 hours',
       bucket: 'translated',
-      why: 'PromQL has <code>predict_linear</code>, which fits a straight line to a gauge over a window and projects it forward. It is the same method, so the alert means the same thing.',
+      why: 'PromQL has <code>predict_linear</code>, which fits a straight line to a gauge over a window and projects it forward. With a 6 hour window and 4 hours ahead it is the same least-squares method over the same window, so the alert means the same thing.',
+      whyNot: {
+        approximated: 'A forecast sounds like an estimate, but <code>predict_linear</code> is the same least-squares line over the same 6 hour window, so nothing is approximated by the move.',
+        manual: 'PromQL has the function, so nobody rebuilds anything by hand.',
+        skipped: 'A disk that fills is exactly what the team still wants to hear about.',
+      },
     },
     {
       id: 'logs-panel',
@@ -116,7 +136,7 @@ const SORT = {
 const FIX = [
   {
     key: 'boundary',
-    label: 'Add a bucket boundary at 1.2 s, then run both alerts side by side',
+    label: 'Add a bucket boundary at 1.2 s to the request-duration histogram',
     right: true,
     why:
       'The estimate is only as good as the buckets around the threshold. With boundaries at 0.5, 1 and 2.5 s, the 990th request of 1,000 falls in the 1 to 2.5 s bucket, 5 of its 15 requests in, so the estimate is 1 + 5/15 &times; 1.5 = 1.5 s. ' +
@@ -126,18 +146,18 @@ const FIX = [
   },
   {
     key: 'keep',
-    label: 'Keep the converted alert, since it is the same query in a new syntax',
+    label: 'Keep the converted alert and watch whether it pages again',
     why: 'It is not the same query. The old tool computed the percentile from raw samples; the new one estimates it from buckets. In this window the two readings sit on opposite sides of the threshold, so the new alert pages for a window the old one called healthy.',
   },
   {
     key: 'raise',
     label: 'Raise the converted threshold to 1.5 s so it stops paging',
-    why: 'The estimate reads 1.5 s whenever the slow requests are spread over the whole 1 to 2.5 s bucket, whether they took 1.05 s or 1.4 s. A threshold of 1.5 s fits this window and misses the next one where the real p99 is 1.4 s, a latency the old alert would have paged on.',
+    why: 'The estimate comes from the bucket counts, not from how long the slow requests took: it reads 1.5 s for 1.05 s and for 1.4 s alike. A threshold of 1.5 s fits this window and misses the next one where the real p99 is 1.4 s, a latency the old alert would have paged on.',
   },
   {
     key: 'mean',
     label: 'Alert on the mean latency instead, from the histogram\'s sum and count',
-    why: 'The mean needs no buckets, and it changes what the alert says. Every request in this window took under 1.1 s, so the mean cannot reach 1.2 s; it would stay quiet even if the tail were far slower, because a few slow requests barely move an average over 1,000.',
+    why: 'The mean needs no buckets, and it changes what the alert says. Every request in this window took at most 1.1 s, so the mean cannot reach 1.2 s; it would stay quiet even if the tail were far slower, because a few slow requests barely move an average over 1,000.',
   },
 ];
 
@@ -160,7 +180,7 @@ export default {
           'A move rarely maps one to one, so each construct ends up in one of four places. ' +
           '<b>Translated</b>: it means the same thing in the new tool. <b>Approximated</b>: it converts to something close, and the numbers can differ. ' +
           '<b>Manual</b>: it is still needed and nothing converts it, so someone rebuilds it. <b>Skipped</b>: nothing in the new tool needs it. ' +
-          'The new tool receives counters, gauges and histograms with fixed buckets.',
+          'The new tool receives counters, gauges and histograms, here with fixed bucket boundaries.',
         question: 'Sort each dashboard panel and alert by what the move does to it.',
         qid: 'mv-q-sort',
         sort: SORT,
@@ -176,7 +196,7 @@ export default {
       },
     ],
     finish:
-      'Moving off a proprietary tool is mostly translation, with a few places where the meaning shifts: a percentile becomes an estimate from buckets, an exact count becomes an extrapolated one, and what has no counterpart is rebuilt or left behind. ' +
+      'Moving off a proprietary tool is part translation, with several places where the meaning shifts: a percentile becomes an estimate from buckets, an exact count becomes an extrapolated one, and what has no counterpart is rebuilt or left behind. ' +
       'Check each converted query against the old one on the same data before you switch it off.',
   },
 };

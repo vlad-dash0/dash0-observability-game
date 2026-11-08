@@ -72,7 +72,7 @@ test('step 1: a valid sort of twelve constructs into the four generic buckets, t
   assert.deepEqual(sort.buckets.map((b) => sort.items.filter((i) => i.bucket === b.id).length), [3, 3, 3, 3]);
   for (const i of sort.items) assert.equal(plain(i.why).length > 40, true, `${i.id} has a why`);
   const intro = plain(SORT_STEP.intro);
-  for (const w of ['Translated: it means the same thing in the new tool', 'Approximated: it converts to something close, and the numbers can differ', 'Manual: it is still needed and nothing converts it, so someone rebuilds it', 'Skipped: nothing in the new tool needs it', 'counters, gauges and histograms with fixed buckets']) {
+  for (const w of ['Translated: it means the same thing in the new tool', 'Approximated: it converts to something close, and the numbers can differ', 'Manual: it is still needed and nothing converts it, so someone rebuilds it', 'Skipped: nothing in the new tool needs it', 'counters, gauges and histograms, here with fixed bucket boundaries']) {
     assert.equal(intro.includes(w), true, w);
   }
 });
@@ -89,6 +89,35 @@ test('step 1: the whys name the PromQL behaviour each translated or approximated
   assert.match(why('memory-chart'), /A gauge is plotted as it is/);
   assert.match(why('paging-alert'), /notification channels/);
   assert.match(why('unused-dashboard'), /a decision, not a gap/);
+});
+
+test('step 1: the p99 alert carries the 1.2 s threshold of step 2, which is not a bucket boundary, so it stays Approximated', () => {
+  const p99 = sort.items.find((i) => i.id === 'p99-alert');
+  assert.equal(plain(p99.label), 'An alert on the 99th percentile of checkout latency above 1.2 seconds');
+  assert.equal(p99.bucket, 'approximated');
+  assert.equal([0.5, 1, 2.5].includes(1.2), false, '1.2 s is not a boundary of the coarse buckets');
+  assert.match(plain(FIX_STEP.intro), /pages above 1\.2 seconds/);
+  assert.match(plain(p99.why), /inside a bucket, not on a boundary/);
+});
+
+test('step 1: the tempting slips each say why, and the disk forecast pins its method and window', () => {
+  const item = (id) => sort.items.find((i) => i.id === id);
+  const not = (id, b) => plain(item(id).whyNot[b]);
+  assert.deepEqual(Object.keys(item('ratio-alert').whyNot).sort(), ['approximated', 'manual', 'skipped']);
+  assert.match(not('ratio-alert', 'approximated'), /both extrapolate the same way/);
+  assert.match(not('ratio-alert', 'approximated'), /ratio is unchanged in practice/);
+  assert.match(not('failed-count', 'translated'), /extrapolates to cover the full window/);
+  assert.match(not('paging-alert', 'translated'), /paging app/);
+  assert.match(not('disk-alert', 'approximated'), /same least-squares line over the same 6 hour window/);
+  assert.match(plain(item('disk-alert').label), /least-squares straight-line forecast over the last 6 hours/);
+  assert.match(plain(item('disk-alert').why), /6 hour window and 4 hours ahead/);
+  for (const id of ['ratio-alert', 'failed-count', 'paging-alert', 'disk-alert']) assert.equal(Object.keys(item(id).whyNot).includes(item(id).bucket), false, id);
+});
+
+test('finish: part translation, not mostly translation', () => {
+  const fin = plain(level.play.finish);
+  assert.match(fin, /is part translation, with several places where the meaning shifts/);
+  assert.doesNotMatch(fin, /mostly translation/);
 });
 
 test('step 1: the same kind of thing lands in different buckets, so an alert, a chart or a panel is no tell', () => {
@@ -208,15 +237,20 @@ test('step 2: one right answer; the labels are balanced and give nothing away; e
   assert.equal(choices.filter((c) => /converted/.test(c.label)).length, 2, 'two labels say "converted", two do not: it marks no odd one out');
   assert.equal(choices.filter((c) => /\d/.test(plain(c.label))).length, 2, 'two labels carry a figure');
   const why = (k) => plain(choices.find((c) => c.key === k).why);
+  // No tell from a verify tail or a straw-man reason: the right label has no second clause, and two wrong ones do.
+  const clause = (k) => /,| so | then | since | instead /.test(plain(choices.find((c) => c.key === k).label));
+  assert.deepEqual(['boundary', 'keep', 'raise', 'mean'].map(clause), [false, false, true, true], 'the right label is not the only one without a second clause, and none carries a verify tail');
+  for (const c of choices) assert.doesNotMatch(plain(c.label), /side by side|both alerts|same query/i, c.key);
+  assert.match(why('boundary'), /Running both alerts for a while/);
   assert.match(why('keep'), /not the same query/);
   assert.match(why('keep'), /opposite sides of the threshold/);
   // Raising to 1.5 s: the estimate is 1.5 s for slow requests anywhere in the bucket, and a strict "above 1.5" never fires on it.
   assert.equal(1.5 > 1.5, false, 'a threshold of 1.5 s is not crossed by an estimate of 1.5 s');
-  assert.match(why('raise'), /whether they took 1\.05 s or 1\.4 s/);
+  assert.match(why('raise'), /for 1\.05 s and for 1\.4 s alike/);
   assert.match(why('raise'), /misses the next one where the real p99 is 1\.4 s/);
   // The mean: every request took under 1.1 s, so the mean cannot reach 1.2 s.
   assert.equal(1.1 < 1.2, true);
-  assert.match(why('mean'), /Every request in this window took under 1\.1 s, so the mean cannot reach 1\.2 s/);
+  assert.match(why('mean'), /Every request in this window took at most 1\.1 s, so the mean cannot reach 1\.2 s/);
 });
 
 // ---- sources and claims ---------------------------------------------------------------------
