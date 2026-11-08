@@ -1,7 +1,7 @@
 // Authored tier-1 hints (#190): every Sort it and Spot it step with hints on declares its own
 // `hint`, tier 1 shows exactly that (not the generic SORT_RULE / SPOT_RULE), the hint does not
-// give the answer away, and it is inline HTML, because tier 1 wraps it in a <p>. The six incident
-// bosses (#182) author theirs too: one paragraph, shown as written by tier 1, naming neither a clue
+// give the answer away, and it is inline HTML, because tier 1 wraps it in a <p>. The seven incident
+// bosses (#182) and level 8.5 (#138) author theirs too: one paragraph, shown as written by tier 1, naming neither a clue
 // view nor the cause.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -166,9 +166,9 @@ async function incidentScenarios() {
   return out;
 }
 
-test('there are six incident bosses, and each declares an authored hint that tier 1 shows as written, not the generic rule', async () => {
+test('there are eight incident scenarios (seven bosses and 8.5), and each declares an authored hint that tier 1 shows as written, not the generic rule', async () => {
   const all = await incidentScenarios();
-  assert.equal(all.length, 6);
+  assert.equal(all.length, 8);
   for (const { id, scenario } of all) {
     assert.equal(typeof scenario.hint, 'string', `${id}: a hint`);
     assert.notEqual(scenario.hint.trim(), '', id);

@@ -2,6 +2,7 @@
 // Alpine build and local references. Spec: docs/FOUNDATION.md §6 F1 and §7.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -58,6 +59,21 @@ function directives(csp) {
     }),
   );
 }
+
+test('git tracks no node_modules path, and .gitignore ignores a bare node_modules', (t) => {
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  let tracked;
+  try {
+    tracked = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+  } catch {
+    t.skip('git is not available');
+    return;
+  }
+  const bad = tracked.filter((p) => p.split('/').includes('node_modules'));
+  assert.deepEqual(bad, []);
+  const lines = readFileSync(join(root, '.gitignore'), 'utf8').split('\n').map((l) => l.trim());
+  assert.ok(lines.includes('node_modules'), '.gitignore needs a bare node_modules line (a trailing slash misses symlinks)');
+});
 
 test('index.html has no inline scripts', () => {
   const scripts = [...document.querySelectorAll('script')];

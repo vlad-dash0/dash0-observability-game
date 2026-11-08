@@ -136,7 +136,29 @@ const ANSWERS = {
     'choice sl-budget: thousand',
     'choice sl-edge: load-balancer',
   ],
+  'burn-rate-alerts': [
+    'query br-burn: checkout-http@3600 sum(rate(http_server_requests_total{service="checkout", status="500"}[1h])) / sum(rate(http_server_requests_total{service="checkout"}[1h])) / 0.001',
+    'choice br-rule: both',
+  ],
+  'synthetic-checks': [
+    'sort sc-sort: handler-throws=spans tls-expired=probe payment-dns=spans slow-query=spans dns-dropout=probe inventory-loop=spans dns-stale=probe payment-tls=spans cdn-stale=probe bad-deploy=spans lb-no-targets=probe',
+    'choice sc-alert: probe',
+  ],
+  'everything-is-green': [
+    'incident everything-is-green: span-numbers,who-calls,outside-request > expired-certificate',
+    'choice eig-page: outside-check',
+  ],
+  'dashboards-as-code': ['spot dac-spot: metadata,item-errors,item-latency', 'choice dac-deploy: terraform'],
+  'frontend-rum': ['build frum-tree: 4d5e6f708192a3b4.parent=3c4d5e6f708192a3', 'choice frum-cors: page-origin-api-header'],
+  'ai-assisted-debugging': [
+    'incident ai-assisted-debugging: failures-by-version,failing-trace,request-rate > inventory-failing',
+    'choice aad-why: old-name',
+  ],
   'semantic-convention-versions': ['spot scv-spot: http-target,net-host-port,http-status-code', 'choice scv-switch: move-queries'],
+  'migrating-vendors': [
+    'sort mv-sort: p95-chart=approximated ratio-alert=translated agent-panel=skipped anomaly-chart=manual memory-chart=translated p99-alert=approximated retired-alert=skipped failed-count=approximated paging-alert=manual unused-dashboard=skipped disk-alert=translated logs-panel=manual',
+    'choice mv-fix: boundary',
+  ],
   'filter-or-sampler': ['choice fos-verdict: wrong', 'sort fos-sort: errors-whole=tail healthz=filter slow-no-cache=both slow=tail debug-logs=filter many-spans=tail production-only=filter via-payments=tail errors-no-keepalive=both'],
   'the-34-percent-error-rate': ['choice ser-verdict: wrong', 'tradeoff ser-plan: sampler=errors-10pct rate=red-before'],
   'errors-tripled': [

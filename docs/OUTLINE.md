@@ -140,18 +140,19 @@ Each level lists **concept** / **OTel nuance** / **Dash0 tie-in** / **mechanic**
 | --- | --- | --- | --- | --- |
 | 7.1 Good alerts | Symptoms not causes; `for` durations; flapping | Alerting on a cumulative counter's value instead of its rate | Dash0 check rules are Prometheus-compatible | Spot it |
 | 7.2 SLIs and SLOs | Good events / valid events; error budgets | Choosing the SLI from server spans vs load-balancer metrics | n/a | Query it |
-| 7.3 Burn-rate alerts | Multi-window, multi-burn-rate | Short window alone pages on blips; long window alone pages too late | Check rules + notification channels | Query it |
-| 7.4 Synthetic checks | Probing from outside | Synthetics catch DNS/TLS/CDN problems your spans never see | Dash0 synthetic checks | Configure it |
+| 7.3 Burn-rate alerts | Multi-window, multi-burn-rate | Short window alone pages on blips; long window alone starts slowly and keeps paging after the fix | Check rules + notification channels | Query it + Choice |
+| 7.4 Synthetic checks | Probing from outside | Synthetics catch DNS/TLS/CDN problems that stop requests reaching your service (your spans still record failed calls out of it) | Dash0 synthetic checks | Sort it + Choice |
+| Boss: "Everything is green" | The span-based SLI and an inside-the-cluster health check stay green while an expired CDN edge certificate keeps every visitor out | Server spans only count requests that arrive; probe from outside (7.2, 7.4) | Dash0 synthetic checks | Incident + Choice |
 
 ### Act 8: Operating at scale ("As code")
 
 | Level | Concept | Nuance | Dash0 tie-in | Mechanic |
 | --- | --- | --- | --- | --- |
-| 8.1 Dashboards as code | Versioned, reviewed dashboards | n/a | Dash0 dashboards are Perses-based; manage them with Terraform or the Kubernetes operator | Configure it |
+| 8.1 Dashboards as code | Versioned, reviewed dashboards | n/a | Dash0 dashboards are Perses-based; manage them with Terraform or the Kubernetes operator | Spot it + Choice |
 | 8.2 Semantic convention versions | Conventions evolve: `http.method` became `http.request.method` | `OTEL_SEMCONV_STABILITY_OPT_IN` and dual-emitting during migration | Dash0 chart filters name these attributes (dots as underscores in PromQL), so move them before the switch | Spot it |
-| 8.3 Migrating vendors | Moving dashboards and alerts off a proprietary tool | Proprietary query languages don't map 1:1 | DART: Datadog/Sentry/etc. to Dash0 + Terraform | Sort it |
-| 8.4 Frontend / RUM | Browser telemetry, Web Vitals, sessions | Browser spans and CORS for the OTLP endpoint | Dash0 website monitoring | Build it |
-| 8.5 AI-assisted debugging | Letting an agent query your telemetry | Agents need good semantic conventions as much as humans do | Dash0 MCP server and Agent0 | Incident (with the guide as copilot) |
+| 8.3 Migrating vendors | Moving dashboards and alerts off a proprietary tool | Proprietary query languages don't map 1:1: translated, approximated, manual or skipped (a percentile becomes a bucket estimate) | Dash0 imports Grafana dashboards (Prometheus queries and common panel types; a placeholder otherwise). DART is not named: no accepted source documents it | Sort it + Choice |
+| 8.4 Frontend / RUM | Browser telemetry, Web Vitals, sessions | Browser spans and CORS for the OTLP endpoint | Dash0 website monitoring | Build it + Choice |
+| 8.5 AI-assisted debugging | Letting an agent query your telemetry | Agents need good semantic conventions as much as humans do | Dash0 MCP Server and Agent0 | Incident (the agent simulated as authored views; the guide as copilot is out of scope, #17) + Choice |
 | Final boss: "It's us" | A real incident in the game's own telemetry, in Dash0 | n/a | Everything together | Incident |
 
 ## 5. Nuance cards (collectibles)

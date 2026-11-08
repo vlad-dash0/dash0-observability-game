@@ -19,12 +19,14 @@
 //
 // Act: { id, no, name, sub, levels: [level, ...], boss: level | null }.
 import agentVsGateway from './agent-vs-gateway.mjs';
+import aiAssistedDebugging from './ai-assisted-debugging.mjs';
 import autoVsManual from './auto-vs-manual.mjs';
 import baggage from './baggage.mjs';
 import cardinality from './cardinality.mjs';
 import checkoutIsSlow from './checkout-is-slow.mjs';
 import collectingLogs from './collecting-logs.mjs';
 import connectToDash0 from './connect-to-dash0.mjs';
+import dashboardsAsCode from './dashboards-as-code.mjs';
 import contextPropagation from './context-propagation.mjs';
 import correlation from './correlation.mjs';
 import detectorsAndKubernetes from './detectors-and-kubernetes.mjs';
@@ -32,6 +34,7 @@ import distributions from './distributions.mjs';
 import errorsTripled from './errors-tripled.mjs';
 import eventsAndLinks from './events-and-links.mjs';
 import exemplars from './exemplars.mjs';
+import frontendRum from './frontend-rum.mjs';
 import goodAlerts from './good-alerts.mjs';
 import headSampling from './head-sampling.mjs';
 import histograms from './histograms.mjs';
@@ -47,8 +50,12 @@ import promqlBasics from './promql-basics.mjs';
 import resources from './resources.mjs';
 import redAndUse from './red-and-use.mjs';
 import silence from './silence.mjs';
+import everythingIsGreen from './everything-is-green.mjs';
 import slisAndSlos from './slis-and-slos.mjs';
+import burnRateAlerts from './burn-rate-alerts.mjs';
+import syntheticChecks from './synthetic-checks.mjs';
 import semanticConventionVersions from './semantic-convention-versions.mjs';
+import migratingVendors from './migrating-vendors.mjs';
 import spanKinds from './span-kinds.mjs';
 import spansAndTraces from './spans-and-traces.mjs';
 import statusAndErrors from './status-and-errors.mjs';
@@ -136,8 +143,8 @@ export const ACTS = [
     sub: 'Wake me only when it matters',
     badges: ['dash0'],
     teaser: 'Good alerts, SLOs and error budgets, burn-rate alerts and synthetic checks.',
-    levels: [goodAlerts, slisAndSlos],
-    boss: null,
+    levels: [goodAlerts, slisAndSlos, burnRateAlerts, syntheticChecks],
+    boss: everythingIsGreen,
   },
   {
     id: 'act-8',
@@ -147,7 +154,7 @@ export const ACTS = [
     badges: ['dash0'],
     teaser:
       'Dashboards as code, semantic convention upgrades, migrating vendors, browser telemetry and AI-assisted debugging.',
-    levels: [semanticConventionVersions],
+    levels: [dashboardsAsCode, semanticConventionVersions, migratingVendors, frontendRum, aiAssistedDebugging],
     boss: null,
   },
   {

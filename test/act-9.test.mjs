@@ -63,7 +63,7 @@ test('act-9 "Live Demo" is the last act, after act-8, holding 9.1, 9.2 then 9.3 
     { no: 9, name: 'Live Demo', sub: 'Does that answer hold?', levelIds: [ID91, ID92, ID93], bossId: BOSS },
   );
   assert.deepEqual(LIVE.acts.map((a) => a.id).slice(-2), ['act-8', 'act-9']);
-  assert.deepEqual(LIVE.order.slice(LIVE.order.indexOf('semantic-convention-versions')), ['semantic-convention-versions', ID91, ID92, ID93, BOSS], 'act-9 plays after 8.2, last: 9.1, 9.2, 9.3, then its boss');
+  assert.deepEqual(LIVE.order.slice(LIVE.order.indexOf('dashboards-as-code')), ['dashboards-as-code', 'semantic-convention-versions', 'migrating-vendors', 'frontend-rum', 'ai-assisted-debugging', ID91, ID92, ID93, BOSS], 'act-9 plays after 8.5, last: 9.1, 9.2, 9.3, then its boss');
 });
 
 test('act-9 unlocks like the acts before it: open when acts 0-8 are complete, or once entered', () => {
@@ -159,7 +159,7 @@ test('adding acts 7 and 8 changes no state outside act-9, and locks act-9 again 
     ['head-sampling'],
   ];
   const k = fixtures.indexOf(acts0to6);
-  assert.deepEqual(without.order, LIVE.order.filter((id) => id !== 'good-alerts' && id !== 'slis-and-slos' && id !== 'semantic-convention-versions'));
+  assert.deepEqual(without.order, LIVE.order.filter((id) => id !== 'good-alerts' && id !== 'slis-and-slos' && id !== 'burn-rate-alerts' && id !== 'synthetic-checks' && id !== 'everything-is-green' && id !== 'dashboards-as-code' && id !== 'semantic-convention-versions' && id !== 'migrating-vendors' && id !== 'frontend-rum' && id !== 'ai-assisted-debugging'));
   const changed = [];
   fixtures.forEach((ids, i) => {
     const p = progressOf(ids);

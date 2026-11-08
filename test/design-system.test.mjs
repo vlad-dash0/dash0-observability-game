@@ -272,7 +272,7 @@ test('T6 only lib/ui/*.mjs emits ui- classes (index.html is the one static excep
 const RETIRED = [
   'back-btn', 'btn', 'bubble', 'build', 'build-btn', 'build-editing', 'build-group-title', 'build-layout',
   'build-log', 'build-logs', 'build-main', 'build-opt', 'build-pick', 'build-status', 'choice', 'choices', 'configure-inactive',
-  'configure-input', 'configure-label', 'configure-more', 'configure-note', 'env-editor', 'env-label', 'env-note',
+  'configure-input', 'configure-label', 'configure-more', 'configure-note', 'env-editor', 'env-issues', 'env-label', 'env-note',
   'feedback', 'ghost', 'good', 'help-btn', 'help-chip', 'help-chips', 'help-chips-title', 'help-cost', 'help-count',
   'help-counts', 'help-h', 'help-hint-head', 'help-hint-row', 'help-hint-text', 'help-pips', 'help-rule',
   'help-score', 'help-side', 'help-star', 'help-stars', 'help-swirl', 'help-tier', 'help-win', 'help-win-closing',
@@ -282,7 +282,6 @@ const RETIRED = [
 ];
 
 const LEGACY = {
-  'levels/naming-your-service.mjs': ['btn', 'env-editor', 'env-label', 'env-note', 'feedback', 'ghost', 'info', 'lesson-intro', 'lesson-stage', 'q', 'show', 'small'],
   'lib/widgets/trade-off-view.mjs': ['btn', 'feedback', 'show', 'tradeoff-keeps', 'tradeoff-option'],
 };
 

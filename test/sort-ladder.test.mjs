@@ -1,5 +1,5 @@
 // The Sort it help ladder per level (#156): every Sort it step
-// declares its helps explicitly, and the eleven Sort levels follow the default ladder. Hints are on
+// declares its helps explicitly, and the Sort levels follow the default ladder. Hints are on
 // in the first lessons (0.1, 0.2, 0.3, 1.1, 2.3) and off later (2.5, 2.7, 3.1, 4.1, 5.6, 9.1). A step
 // with no helps key would have hints off (sortHelps), but the ladder is a decision, so it is
 // written down on each step. The specs are read from each level's `play` and its CONTENT export.
@@ -25,6 +25,8 @@ const LADDER = {
   '3.1': false,
   '4.1': false,
   '5.6': false,
+  '7.4': false,
+  '8.3': false,
   '9.1': false,
 };
 
@@ -43,7 +45,7 @@ async function sortLevels() {
   return out;
 }
 
-test('the Sort levels are exactly the eleven on the ladder', async () => {
+test('the Sort levels are exactly the ones on the ladder', async () => {
   const found = (await sortLevels()).map((l) => l.no).sort();
   assert.deepEqual(found, Object.keys(LADDER).sort());
 });
