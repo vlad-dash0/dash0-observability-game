@@ -12,8 +12,8 @@ export default {
   run(ctx) {
     ctx.renderStep(
       `${ctx.speech('Which signal tells you <b>where</b> a request spent its time?')}
-       <button class="choice" data-pick="trace">A trace</button>
-       <button class="choice" data-pick="metric">A metric</button>
+       <button class="ui-option" data-pick="trace">A trace</button>
+       <button class="ui-option" data-pick="metric">A metric</button>
        <p id="fx-feedback"></p>`,
       '<button id="fx-next" disabled>Next</button>',
     );

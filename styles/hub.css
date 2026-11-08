@@ -206,15 +206,6 @@
   border-top: 1px solid var(--color-border); background: var(--color-surface);
 }
 .lesson-actions:empty { display: none; }
-/* A hand-written level's Next, Finish or Escalate (the legacy .btn until #165 moves those
-   levels onto the kit) looks like the kit's primary pill (D2) and sits where a narrow step's
-   actions bar puts it: right-aligned to the narrow column (percent margins are of this bar). */
-.lesson-actions .btn {
-  display: block; width: auto; margin: 0 max(0px, calc((100% - var(--layout-narrow)) / 2)) 0 auto;
-  padding: 9px 20px; border-radius: var(--radius-pill); box-shadow: none;
-  font-size: var(--text-md); font-weight: var(--weight-semibold); line-height: 1.3;
-}
-
 /* ---------- Reward card ---------- */
 .reward {
   position: fixed; inset: 0; z-index: 80; display: none;

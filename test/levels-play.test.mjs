@@ -623,8 +623,7 @@ async function until(sel, max = 50) {
 
 const DEFINED = definedClasses();
 // Classes levels render that no stylesheet defines yet, each owned by a later phase of #158:
-// Empty since P5 #160 (Trade-off) took the last entries. Sorted; only shrinks: a phase deletes its
-// own, and an entry no level renders any more fails ("stale"). P7 asserts it is empty.
+// Empty since #158 P7: every class a level renders has a CSS rule, with no exceptions.
 const UNDEFINED_ALLOW = [];
 const undefinedSeen = new Set();
 
@@ -1041,12 +1040,13 @@ test('harness T8: a class with no CSS rule fails, in a rendered step or added la
   const expect = { stars: 5, cards: [] };
   assert.throws(() => checkRun(level('fx-nope', { body: '<p class="nope">Go on.</p>' }), { play, expect }), /no CSS rule/);
   assert.throws(() => checkRun(level('fx-late', { late: 'ui-lesson nope-late' }), { play, expect }), /no CSS rule/);
-  // Defined classes pass: a kit class and a legacy one.
+  // Defined classes pass: a kit class and a utility one.
   checkRun(level('fx-ok', { body: '<p class="ui-note">Go on.</p>', late: 'visually-hidden' }), { play, expect });
 });
 
 // Runs last: every level above has played, so an allowed class no level renders is stale.
-test('T8 UNDEFINED_ALLOW is sorted and has no stale entry', () => {
+test('T8 UNDEFINED_ALLOW is empty: every rendered class has a CSS rule', () => {
+  assert.deepEqual(UNDEFINED_ALLOW, []);
   assert.equal(new Set(UNDEFINED_ALLOW).size, UNDEFINED_ALLOW.length, 'no duplicates');
   assert.deepEqual([...UNDEFINED_ALLOW].sort(), UNDEFINED_ALLOW, 'sorted');
   for (const c of UNDEFINED_ALLOW) {

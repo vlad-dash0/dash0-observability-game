@@ -27,7 +27,7 @@ neutral.
 | `styles/tokens.css` | Every colour (primitives and semantic `--color-*`) and the scale tokens. |
 | `styles/kit.css` | All kit CSS; every selector names a `ui-` class. |
 | `styles/widgets.css` | Layouts only a widget has (the trace waterfall `wf-*`), around kit components. Append-only. |
-| `styles/base.css`, `styles/hub.css` | Reset, legacy components (retiring), hub chrome. |
+| `styles/base.css`, `styles/hub.css` | Reset and typography, hub chrome. No pre-kit component CSS is left (#158 P7). |
 | `lib/ui/*.mjs` | The helpers (`lib/ui/index.mjs` exports them all). |
 | `test/helpers/css.mjs` | Stylesheet parser, colour resolution, contrast, class scanners. |
 
@@ -134,7 +134,8 @@ token with a contrast check.
 | T4 | design-system | Only `kit.css` names `ui-` classes; its selectors are kit-scoped, no ids. |
 | T5 | design-system | No `:has(` and no `!important` (reduced motion, `[x-cloak]`); no glows. |
 | T6 | design-system | Only `lib/ui` emits `ui-` classes (`index.html` is the static exception). |
-| T7 | design-system | Retired classes: only files in `LEGACY` emit them; a stale entry fails. |
+| T7 | design-system | Retired classes: no file emits them (`LEGACY` is empty) and no stylesheet defines them. |
+| T15 | design-system | Every class in `base.css`, `hub.css`, `widgets.css` has an emitter, or a documented `DYNAMIC_ALLOW` entry. |
 | T8, T9 | levels-play, static | Every class a level renders (each step, the page after each click) and `index.html` writes has a CSS rule. |
 | T12 | play, design-system | The step frame is the kit's, wide by `STEP_TYPES[*].wide`; one `level` container. |
 | T10 | ui | Exact markup, escaping, TypeErrors, CSP-safe output, every class defined in `kit.css`. |
@@ -142,14 +143,16 @@ token with a contrast check.
 | T13 | design-system | Contrast of the kit tokens in both themes; faded waterfall rows keep 4.5:1 text. |
 | T14 | design-system | Tone colours colour only markers. |
 
-`LEGACY`, `UNDEFINED_ALLOW` (T8) and `CONTAINER_ALLOW` (T12) only shrink: each migration deletes
-its own entries; the last phase asserts them empty and deletes the retired CSS from `base.css`.
+`LEGACY`, `UNDEFINED_ALLOW` (T8) and `CONTAINER_ALLOW` (T12) are empty and asserted empty: the
+legacy UI is gone, and nothing on it can come back.
 
-**Retired classes** (`RETIRED` in the test): the old buttons (`btn`, `ghost`, `small`, `build-btn`,
+**Retired classes** (`RETIRED` in the test; no markup emits them and no stylesheet defines them, so
+a new use fails T7 and T8): the old buttons (`btn`, `ghost`, `small`, `build-btn`,
 `help-btn`, `back-btn`), options (`choice`, `choices`, `spot-line`, `sort-item`, `sort-bucket-btn`,
-`build-opt`, `build-log`, `tradeoff-option`, `tradeoff-keeps`), feedback (`feedback`, `good`, `info`, `show`,
+`build-opt`, `build-log`, `tradeoff-option`, `tradeoff-keeps`), feedback (`feedback`, `good`, `info`,
 `build-status`), the lesson frame (`speech`, `bubble`, `q`, `lesson-intro`, `lesson-stage`), fields,
-muted notes, the `build` layout and the `help-*` column.
+muted notes, the `build` layout and the `help-*` column. (`show` stays in `hub.css` as the open state of
+the overlay, reward card and notice.)
 
 Review only: visual quality against the prototypes, spacing, closed-set membership, and
 screenshots at 375 and 1280px in both themes on every UI PR.
