@@ -6,6 +6,7 @@
 // Spec: https://opentelemetry.io/docs/specs/semconv/http/http-spans/ (span B: an HTTP client span is named "{method} {target}"
 // only when a low-cardinality target such as url.template is available, else "{method}"; storefront's call names no
 // template, so it is "POST", not "POST api-gateway". No other span here is named POST, so labels stay distinct, #69.)
+import { actions, finishButton, nextButton, question, step } from '../lib/ui/index.mjs';
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
 import { newBuildState } from '../lib/widgets/build-it.mjs';
@@ -98,24 +99,23 @@ export default {
   lights: ['storefront', 'api-gateway'],
   scoring: { parMs: null },
   run(ctx) {
-    const actions = ctx.ovActions;
+    const bar = ctx.ovActions;
     const next = (onclick) => {
-      const btn = actions.querySelector('#sat-next');
+      const btn = bar.querySelector('#sat-next');
       btn.onclick = onclick;
       return btn;
     };
 
     const stepOneTrace = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: false,
+          bodyHtml: `${ctx.speech(
           'A customer pays. The request passes through storefront and api-gateway, and each ' +
             'service records spans for its part of the work: one span per operation.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="sat-q-one">What makes these spans one trace?</h3>
-          ${choiceHtml(ctx, ONE_TRACE, { id: 'sat', labelledBy: 'sat-q-one' })}
-        </div>`,
-        '<button class="btn" id="sat-next" disabled>Next</button>',
+          )}${question({ id: 'sat-q-one', html: 'What makes these spans one trace?' })}${choiceHtml(ctx, ONE_TRACE, { id: 'sat', labelledBy: 'sat-q-one' })}`,
+        }),
+        actions({ wide: false, buttonsHtml: nextButton('sat-next') }),
       );
       const btn = next(stepTree);
       mountChoice(ctx, ONE_TRACE, {
@@ -129,17 +129,16 @@ export default {
 
     const stepTree = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: true,
+          bodyHtml: `${ctx.speech(
           'The spans of trace <code>4bf92f35</code> reach the backend one by one, as each one ends. ' +
             'The first is already placed. Give each new span its parent as it arrives, so the ' +
             'request reads top to bottom. A trace id is the request\'s id: every span of one ' +
             'request carries it, so spans with different trace ids are never parent and child.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q">Rebuild the request's span tree.</h3>
-          ${renderBuild(TREE, newBuildState(TREE), { escapeHtml: ctx.escapeHtml })}
-        </div>`,
-        '<button class="btn" id="sat-next" disabled>Next</button>',
+          )}${question({ html: `Rebuild the request's span tree.` })}${renderBuild(TREE, newBuildState(TREE), { escapeHtml: ctx.escapeHtml })}`,
+        }),
+        actions({ wide: true, buttonsHtml: nextButton('sat-next') }),
       );
       const btn = next(stepOther);
       mountBuild(ctx, TREE, {
@@ -152,17 +151,16 @@ export default {
 
     const stepOther = () => {
       ctx.renderStep(
-        `<div class="lesson-intro">${ctx.speech(
+        step({
+          wide: false,
+          bodyHtml: `${ctx.speech(
           '<code>GET /products</code> on storefront ran while api-gateway handled the checkout, ' +
             'yet it stays a root.',
-        )}</div>
-        <div class="lesson-stage">
-          <h3 class="q" id="sat-q-other">What is <code>GET /products</code>?</h3>
-          ${choiceHtml(ctx, OTHER, { id: 'sat-e', labelledBy: 'sat-q-other' })}
-        </div>`,
-        '<button class="btn" id="sat-finish" data-finish disabled>Finish</button>',
+          )}${question({ id: 'sat-q-other', html: 'What is <code>GET /products</code>?' })}${choiceHtml(ctx, OTHER, { id: 'sat-e', labelledBy: 'sat-q-other' })}`,
+        }),
+        actions({ wide: false, buttonsHtml: finishButton('sat-finish') }),
       );
-      const finish = actions.querySelector('#sat-finish');
+      const finish = bar.querySelector('#sat-finish');
       mountChoice(ctx, OTHER, {
         id: 'sat-e',
         onRight: () => {

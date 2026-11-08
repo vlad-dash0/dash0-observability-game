@@ -282,12 +282,7 @@ const RETIRED = [
 ];
 
 const LEGACY = {
-  'levels/checkout-is-slow.mjs': ['btn', 'lesson-intro', 'lesson-stage'],
-  'levels/context-propagation.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
-  'levels/events-and-links.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'levels/naming-your-service.mjs': ['btn', 'env-editor', 'env-label', 'env-note', 'feedback', 'ghost', 'info', 'lesson-intro', 'lesson-stage', 'q', 'show', 'small'],
-  'levels/span-kinds.mjs': ['btn', 'feedback', 'info', 'lesson-intro', 'lesson-stage', 'q', 'show'],
-  'levels/spans-and-traces.mjs': ['btn', 'lesson-intro', 'lesson-stage', 'q'],
   'levels/the-pager.mjs': ['btn', 'choice', 'choices', 'feedback', 'info', 'lesson-intro', 'lesson-stage', 'q', 'show'],
   'lib/widgets/trade-off-view.mjs': ['btn', 'feedback', 'show', 'tradeoff-keeps', 'tradeoff-option'],
 };

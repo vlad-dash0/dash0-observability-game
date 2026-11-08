@@ -5,6 +5,7 @@
 // (lib/widgets/incident.mjs, docs/M1-DESIGN.md §4.3). Spec: docs/M1-DESIGN.md §6 Boss
 // checkout-is-slow.
 // Spec: https://opentelemetry.io/docs/concepts/signals/traces/ , https://opentelemetry.io/docs/specs/semconv/database/database-spans/
+import { actions, finishButton, step } from '../lib/ui/index.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { incidentLesson, renderIncident, mountIncident } from '../lib/widgets/incident-view.mjs';
 import { newIncident } from '../lib/widgets/incident.mjs';
@@ -162,11 +163,11 @@ export default {
   scoring: { parMs: null },
   run(ctx) {
     ctx.renderStep(
-      `<div class="lesson-intro">${ctx.speech(
-        incidentLesson(INTRO),
-      )}</div>
-      <div class="lesson-stage">${renderIncident(SCENARIO, newIncident(SCENARIO), { escapeHtml: ctx.escapeHtml })}</div>`,
-      '<button class="btn" id="cis-finish" data-finish disabled>Finish</button>',
+      step({
+        wide: true,
+        bodyHtml: `${ctx.speech(incidentLesson(INTRO))}${renderIncident(SCENARIO, newIncident(SCENARIO), { escapeHtml: ctx.escapeHtml })}`,
+      }),
+      actions({ wide: true, buttonsHtml: finishButton('cis-finish') }),
     );
     const finish = ctx.ovActions.querySelector('#cis-finish');
     mountIncident(ctx, SCENARIO, {
