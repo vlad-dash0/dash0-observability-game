@@ -1,12 +1,14 @@
 // Zero-dependency dev server that behaves like the Vercel deployment: it sends the
 // headers vercel.json declares (so the CSP bites locally) and refuses whatever
 // .vercelignore keeps out of the deployment (node_modules/ included), plus dotfiles.
+// It also runs `api/<name>.mjs` at `/api/<name>` (GET and POST) through a Node-to-Web Request adapter, as
+// Vercel does; `GUIDE_STUB=1` swaps the guide's model call for a canned reply (local dev only, no key needed).
 // Usage: npm run dev   (PORT=8080 npm run dev to change the port)
 import { createServer } from 'node:http';
 import { readFile, realpath, stat } from 'node:fs/promises';
 import { readFileSync, realpathSync } from 'node:fs';
 import { extname, join, relative, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const REPO = resolve(fileURLToPath(new URL('..', import.meta.url)));
 
@@ -22,6 +24,13 @@ const TYPES = {
   '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8',
 };
+
+const API_NAME = /^\/api\/([a-z0-9]+(?:-[a-z0-9]+)*)$/;
+const API_METHODS = ['GET', 'POST'];
+/** The adapter refuses a request body over this; the function enforces its own, smaller limit. */
+const API_MAX_BODY = 16 * 1024;
+/** What the stubbed model says: neutral, so it passes the answer filter. */
+export const STUB_REPLY = 'Re-read what the question asks, then look at what each option says about it.';
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
@@ -85,6 +94,29 @@ export function ignoreMatcher(text) {
   };
 }
 
+/** A `fetch` that answers every Messages call with `STUB_REPLY`, for `GUIDE_STUB=1`. */
+const stubFetch = async () => Response.json({ content: [{ type: 'text', text: STUB_REPLY }] });
+
+/** The request body, or null when it is over `API_MAX_BODY`. */
+async function readBody(req) {
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > API_MAX_BODY) return null;
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+/** `req` as a Web Request, the shape a Vercel function gets. */
+function toWebRequest(req, body) {
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+  const host = req.headers.host ?? 'localhost';
+  return new Request(`http://${host}${req.url}`, { method: req.method, headers, body: req.method === 'POST' ? body : undefined });
+}
+
 const inside = (root, p) => p === root || p.startsWith(root + sep);
 
 // The real path of the file to serve for the decoded request path, or null (404).
@@ -103,10 +135,11 @@ async function resolveFile(root, ignored, decoded) {
   // Dotfiles (.git, .env); `..` means outside the root, which the guard above owns.
   if (rel.split('/').some((part) => part.startsWith('.') && part !== '..')) return null;
   if (ignored(rel)) return null; // not deployed, so not served
+  if (rel.startsWith('api/')) return null; // function source runs, it is never read as a file
   return file;
 }
 
-export function startServer({ root = REPO, port = 3000, host = '127.0.0.1', log = console.log } = {}) {
+export function startServer({ root = REPO, port = 3000, host = '127.0.0.1', log = console.log, stub = process.env.GUIDE_STUB === '1' } = {}) {
   const realRoot = realpathSync(root);
   const config = JSON.parse(readFileSync(join(realRoot, 'vercel.json'), 'utf8'));
   config.headers?.forEach((rule) => sourceRegExp(rule.source)); // fail at startup
@@ -117,6 +150,20 @@ export function startServer({ root = REPO, port = 3000, host = '127.0.0.1', log 
     throw new Error(`tools/serve.mjs: cannot read ${join(realRoot, '.vercelignore')}: ${err.code}`);
   }
   const ignored = ignoreMatcher(ignoreText);
+
+  if (stub) log('GUIDE_STUB=1: /api/guide answers with a canned reply, no model is called');
+  const modules = new Map();
+  // `api/<name>.mjs` loaded once. The guide under the stub is built here with a fake key and the canned fetch.
+  const handlersFor = async (name) => {
+    if (!modules.has(name)) {
+      modules.set(name, (async () => {
+        const file = join(realRoot, 'api', `${name}.mjs`);
+        const mod = await import(pathToFileURL(file).href);
+        return stub && name === 'guide' ? mod.createGuide({ env: { ANTHROPIC_API_KEY: 'stub' }, fetch: stubFetch }) : mod;
+      })());
+    }
+    return modules.get(name);
+  };
 
   const server = createServer(async (req, res) => {
     const send = (status, body, headers, type = 'text/plain; charset=utf-8') => {
@@ -132,6 +179,26 @@ export function startServer({ root = REPO, port = 3000, host = '127.0.0.1', log 
       return send(400, 'Bad Request\n', headersFor(config, pathname));
     }
     const headers = headersFor(config, decoded);
+    const api = API_NAME.exec(decoded);
+    if (api) {
+      if (!API_METHODS.includes(req.method)) return send(405, 'Method Not Allowed\n', { ...headers, Allow: API_METHODS.join(', ') });
+      if (ignored(`api/${api[1]}.mjs`) || !(await stat(join(realRoot, 'api', `${api[1]}.mjs`)).then((st) => st.isFile(), () => false))) {
+        return send(404, 'Not Found\n', headers);
+      }
+      try {
+        const body = req.method === 'POST' ? await readBody(req) : undefined;
+        if (body === null) return send(413, 'Payload Too Large\n', headers);
+        const handler = (await handlersFor(api[1]))[req.method];
+        if (typeof handler !== 'function') return send(404, 'Not Found\n', headers);
+        const out = await handler(toWebRequest(req, body));
+        const outHeaders = { ...headers, ...Object.fromEntries(out.headers) };
+        res.writeHead(out.status, outHeaders);
+        return res.end(Buffer.from(await out.arrayBuffer()));
+      } catch (err) {
+        log(`tools/serve.mjs: ${decoded}: ${err.code ?? err.message}`);
+        return send(500, 'Internal Server Error\n', headers);
+      }
+    }
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(405, 'Method Not Allowed\n', headers);
     const file = await resolveFile(realRoot, ignored, decoded);
     if (!file) return send(404, 'Not Found\n', headers);

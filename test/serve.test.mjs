@@ -8,7 +8,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, w
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { headersFor, ignoreMatcher, startServer } from '../tools/serve.mjs';
+import { headersFor, ignoreMatcher, startServer, STUB_REPLY } from '../tools/serve.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const vercel = JSON.parse(readFileSync(join(ROOT, 'vercel.json'), 'utf8'));
@@ -93,6 +93,14 @@ before(async () => {
   writeFileSync(join(root, 'vercel.json'), JSON.stringify({ headers: [] }));
   writeFileSync(join(root, '.vercelignore'), '# none\n');
   symlinkSync(join(tmp, 'secret.txt'), join(root, 'link.txt'));
+  mkdirSync(join(root, 'api'));
+  writeFileSync(
+    join(root, 'api', 'hello.mjs'),
+    `export async function POST(req) {
+       const got = await req.text();
+       return new Response(JSON.stringify({ got, type: req.headers.get('content-type'), path: new URL(req.url).pathname }), { status: 201, headers: { 'x-hello': 'yes' } });
+     }`,
+  );
   site = await listen({ root });
 });
 after(() => {
@@ -178,4 +186,104 @@ test('header sources outside (...) groups are literal', () => {
   const config = { headers: [{ source: '/sw.js', headers: [{ key: 'X-T', value: '1' }] }] };
   assert.deepEqual(headersFor(config, '/sw.js'), { 'X-T': '1' });
   assert.deepEqual(headersFor(config, '/swXjs'), {});
+});
+
+// ---- api/<name>.mjs routes (the guide, #17 P2) ---------------------------------------
+
+function send(port, method, path, { body, headers = {} } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = request({ host: '127.0.0.1', port, path, method, headers }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString() }));
+    });
+    req.on('error', reject);
+    req.setTimeout(2000, () => req.destroy(new Error(`no response for ${method} ${path}`)));
+    req.end(body);
+  });
+}
+const JSON_TYPE = { 'content-type': 'application/json' };
+const question = (over = {}) => JSON.stringify({ v: 1, levelId: 'resources', stepId: 'res-pod', question: 'What does a resource describe?', ...over });
+
+test('POST /api/<name> reaches api/<name>.mjs as a Web Request, and the vercel.json headers still apply', async () => {
+  const res = await send(site.port, 'POST', '/api/hello', { body: 'ping', headers: { 'content-type': 'text/x' } });
+  assert.equal(res.status, 201);
+  assert.equal(res.headers['x-hello'], 'yes');
+  assert.deepEqual(JSON.parse(res.body), { got: 'ping', type: 'text/x', path: '/api/hello' });
+  const real = await send(repo.port, 'GET', '/api/guide');
+  assertHeaders(real, rule('/(.*)'));
+});
+
+test('a method the function does not export, or a name with no function, is refused', async () => {
+  assert.equal((await send(site.port, 'GET', '/api/hello')).status, 404, 'hello exports no GET');
+  assert.equal((await send(site.port, 'PUT', '/api/hello', { body: 'x' })).status, 405);
+  assert.equal((await send(site.port, 'DELETE', '/api/hello')).status, 405);
+  assert.equal((await send(site.port, 'POST', '/api/nothing', { body: 'x' })).status, 404);
+  assert.equal((await send(site.port, 'GET', '/api/hello/extra')).status, 404);
+  assert.equal((await send(site.port, 'POST', '/api/hello', { body: 'x'.repeat(20000) })).status, 413);
+});
+
+test('function source is never served as a file', async () => {
+  for (const path of ['/api/hello.mjs', '/api/guide.mjs', '/api/guide.mjs?x=1', '/api/%67uide.mjs']) {
+    const target = path.includes('guide') ? repo : site;
+    const res = await get(target.port, path);
+    assert.equal(res.status, 404, path);
+    assert.ok(!res.body.includes('createGuide') && !res.body.includes('export'), path);
+  }
+});
+
+test('the real guide answers on /api/guide: status on GET, 503 on POST without a key', async () => {
+  const saved = process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
+  try {
+    const status = await send(repo.port, 'GET', '/api/guide');
+    assert.equal(status.status, 200);
+    assert.deepEqual(JSON.parse(status.body), { v: 1, configured: false });
+    const ask = await send(repo.port, 'POST', '/api/guide', { body: question(), headers: JSON_TYPE });
+    assert.equal(ask.status, 503);
+    assert.deepEqual(JSON.parse(ask.body), { error: 'not-configured' });
+  } finally {
+    if (saved !== undefined) process.env.ANTHROPIC_API_KEY = saved;
+  }
+});
+
+test('GUIDE_STUB: the guide answers with a canned reply, no key and no network', async () => {
+  const stub = await listen({ stub: true });
+  try {
+    assert.deepEqual(JSON.parse((await send(stub.port, 'GET', '/api/guide')).body), { v: 1, configured: true });
+    const origin = `http://127.0.0.1:${stub.port}`;
+    const ask = await send(stub.port, 'POST', '/api/guide', { body: question(), headers: { ...JSON_TYPE, origin } });
+    assert.equal(ask.status, 200);
+    assert.deepEqual(JSON.parse(ask.body), { ok: true, hint: STUB_REPLY });
+    const cross = await send(stub.port, 'POST', '/api/guide', { body: question(), headers: { ...JSON_TYPE, origin: 'http://evil.test' } });
+    assert.equal(cross.status, 403);
+  } finally {
+    stub.server.close();
+  }
+});
+
+// A static import or re-export with a relative path, on one line or several (`import {\n a,\n b\n} from './x.mjs'`).
+const IMPORT = /^\s*(?:import|export)\b[^'"]*?from\s*['"](\.[^'"]+)['"]|^\s*import\s*['"](\.[^'"]+)['"]/gm;
+
+test('the import walk reads multi-line imports', () => {
+  const found = [...`import {\n  a,\n  b,\n} from './guide-api.test.mjs';\nimport './static.test.mjs';\nexport { c } from './game.test.mjs';`.matchAll(IMPORT)].map((m) => m[1] ?? m[2]);
+  assert.deepEqual(found, ['./guide-api.test.mjs', './static.test.mjs', './game.test.mjs']);
+});
+
+test('the real .vercelignore keeps api/ and everything the guide imports in the deployment', () => {
+  const ignored = ignoreMatcher(readFileSync(join(ROOT, '.vercelignore'), 'utf8'));
+  assert.ok(!ignored('api/guide.mjs'), 'api/ deploys');
+  // Walk the static imports from the function: each file must deploy, or the function fails on Vercel.
+  const seen = new Set();
+  const walk = (rel) => {
+    if (seen.has(rel)) return;
+    seen.add(rel);
+    assert.ok(!ignored(rel), `${rel} is imported by the guide but .vercelignore keeps it out`);
+    const src = readFileSync(join(ROOT, rel), 'utf8');
+    for (const [, a, b] of src.matchAll(IMPORT)) {
+      walk(join(dirname(rel), a ?? b));
+    }
+  };
+  walk('api/guide.mjs');
+  assert.ok(seen.has('lib/guide/context.mjs') && seen.has('levels/index.mjs'), 'the walk reached the core and the levels');
 });
