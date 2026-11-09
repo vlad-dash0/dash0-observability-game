@@ -9,7 +9,7 @@ export const MIN_DOTS = 6;
 
 // The narrow exceptions, each a country below MIN_DOTS that a level uses. South Korea has 5 dots on the 110m data (it is small),
 // and the only other unused East Asia country with 6 or more dots is North Korea (6), passed over for a demo-friendlier pick; Taiwan
-// has 2. The Solomon Islands have 2: Oceania's only other unused countries with land dots (New Caledonia has 2 as well, none else),
+// has 2. The Solomon Islands have 2 (New Caledonia also has 2; no other unused Oceania country has land dots),
 // and the owner chose to count a 2-dot country as visible for Act 9 (#240). A code listed here needs at least its own minimum
 // instead of MIN_DOTS (test/globe-data.test.mjs checks each entry is used by a level, equals the country's dot count and is below MIN_DOTS).
 export const MIN_DOTS_EXCEPTIONS = Object.freeze({ KOR: 5, SLB: 2 });
