@@ -29,8 +29,9 @@ const ID94 = 'the-trace-that-starts-in-the-middle';
 const ID95 = 'lost-in-translation';
 const ID96 = 'the-alert-that-stayed-green';
 const ID97 = 'two-vendors-one-weekend';
+const ID98 = 'edge-of-the-platform';
 const BOSS = 'its-us';
-const LEVELS9 = [ID91, ID92, ID93, ID94, ID95, ID96, ID97];
+const LEVELS9 = [ID91, ID92, ID93, ID94, ID95, ID96, ID97, ID98];
 const ID = ID92; // the 9.2 tests below
 const LIVE = liveRegistry();
 const MAX_STARS = expectedStarMax(LIVE);
@@ -61,14 +62,14 @@ const sort91 = S91_STEP?.sort;
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-9 "Live Demo" is the last act, after act-8, holding 9.1, 9.2, 9.3, 9.4, 9.5, then 9.6 and the lab boss "It\'s us"', () => {
+test('act-9 "Live Demo" is the last act, after act-8, holding 9.1, 9.2, 9.3, 9.4 to 9.8 and the lab boss "It\'s us"', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-9');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 9, name: 'Live Demo', sub: 'Does that answer hold?', levelIds: [ID91, ID92, ID93, ID94, ID95, ID96, ID97], bossId: BOSS },
+    { no: 9, name: 'Live Demo', sub: 'Does that answer hold?', levelIds: [ID91, ID92, ID93, ID94, ID95, ID96, ID97, ID98], bossId: BOSS },
   );
   assert.deepEqual(LIVE.acts.map((a) => a.id).slice(-2), ['act-8', 'act-9']);
-  assert.deepEqual(LIVE.order.slice(LIVE.order.indexOf('dashboards-as-code')), ['dashboards-as-code', 'semantic-convention-versions', 'migrating-vendors', 'frontend-rum', 'ai-assisted-debugging', ID91, ID92, ID93, ID94, ID95, ID96, ID97, BOSS], 'act-9 plays after 8.5, last: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, then its boss');
+  assert.deepEqual(LIVE.order.slice(LIVE.order.indexOf('dashboards-as-code')), ['dashboards-as-code', 'semantic-convention-versions', 'migrating-vendors', 'frontend-rum', 'ai-assisted-debugging', ID91, ID92, ID93, ID94, ID95, ID96, ID97, ID98, BOSS], 'act-9 plays after 8.5, last: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, then its boss');
 });
 
 test('act-9 unlocks like the acts before it: open when acts 0-8 are complete, or once entered', () => {
@@ -99,13 +100,13 @@ test('act-9 unlocks like the acts before it: open when acts 0-8 are complete, or
     assert.equal(levelState(id, progressOf([...acts0to6, ID]), LIVE), want, id);
   }
   // The boss opens once the act's levels are done, and not before.
-  assert.equal(levelState(BOSS, progressOf([...acts0to6, ID91, ID92]), LIVE), 'locked', '9.3 to 9.7 are still to do');
-  assert.deepEqual(lockReason(BOSS, progressOf([...acts0to6, ID91, ID92]), LIVE), { kind: 'boss', remaining: [ID93, ID94, ID95, ID96, ID97] });
-  assert.deepEqual(lockReason(BOSS, progressOf([...acts0to6, ID91, ID92, ID93]), LIVE), { kind: 'boss', remaining: [ID94, ID95, ID96, ID97] }, 'the boss needs 9.4 to 9.7');
-  assert.deepEqual(lockReason(BOSS, progressOf([...acts0to6, ID91, ID92, ID93, ID95, ID96, ID97]), LIVE), { kind: 'boss', remaining: [ID94] }, 'and 9.4 on its own');
-  assert.deepEqual(lockReason(BOSS, progressOf([...acts0to6, ID91, ID92, ID93, ID94, ID96, ID97]), LIVE), { kind: 'boss', remaining: [ID95] });
-  assert.deepEqual(lockReason(BOSS, progressOf([...acts0to6, ID91, ID92, ID93, ID94, ID95, ID97]), LIVE), { kind: 'boss', remaining: [ID96] });
-  assert.deepEqual(lockReason(BOSS, progressOf([...acts0to6, ID91, ID92, ID93, ID94, ID95, ID96]), LIVE), { kind: 'boss', remaining: [ID97] });
+  assert.equal(levelState(BOSS, progressOf([...acts0to6, ID91, ID92]), LIVE), 'locked', '9.3 to 9.8 are still to do');
+  assert.deepEqual(lockReason(BOSS, progressOf([...acts0to6, ID91, ID92]), LIVE), { kind: 'boss', remaining: [ID93, ID94, ID95, ID96, ID97, ID98] });
+  assert.deepEqual(lockReason(BOSS, progressOf([...acts0to6, ID91, ID92, ID93]), LIVE), { kind: 'boss', remaining: [ID94, ID95, ID96, ID97, ID98] }, 'the boss needs 9.4 to 9.8');
+  const rest = (skip) => [ID94, ID95, ID96, ID97, ID98].filter((id) => id !== skip);
+  for (const id of [ID94, ID95, ID96, ID97, ID98]) {
+    assert.deepEqual(lockReason(BOSS, progressOf([...acts0to6, ID91, ID92, ID93, ...rest(id)]), LIVE), { kind: 'boss', remaining: [id] }, `${id} alone holds the boss shut`);
+  }
   assert.equal(levelState(BOSS, progressOf([...before, ...LEVELS9]), LIVE), 'open');
 
   const withoutBoss = before.filter((id) => id !== 'errors-tripled');
@@ -118,23 +119,19 @@ test('act-9 unlocks like the acts before it: open when acts 0-8 are complete, or
   assert.deepEqual(lockReason(ID, emptyProgress(), LIVE), { kind: 'act', actId: 'act-0' });
 });
 
-test('act-9 is complete only when all seven of its levels and the boss are done', () => {
+test('act-9 is complete only when all eight of its levels and the boss are done', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-9');
   assert.equal(isActComplete(act, emptyProgress()), false);
   assert.equal(isActComplete(act, progressOf([ID92])), false, '9.2 alone');
   assert.equal(isActComplete(act, progressOf([ID91])), false, '9.1 alone');
   assert.equal(isActComplete(act, progressOf([ID93])), false, '9.3 alone');
   assert.equal(isActComplete(act, progressOf([ID91, ID92])), false, '9.1 and 9.2 without the rest');
-  assert.equal(isActComplete(act, progressOf([ID96])), false, '9.6 alone');
-  assert.equal(isActComplete(act, progressOf([ID94])), false, '9.4 alone');
-  assert.equal(isActComplete(act, progressOf([ID95])), false, '9.5 alone');
-  assert.equal(isActComplete(act, progressOf([ID91, ID92, ID93, ID94, ID95, ID96])), false, '9.1 to 9.6 without 9.7');
-  assert.equal(isActComplete(act, progressOf([ID91, ID92, ID93, ID95, ID96, ID97, BOSS])), false, 'everything but 9.4');
-  assert.equal(isActComplete(act, progressOf([ID91, ID92, ID93, ID94, ID96, ID97, BOSS])), false, 'everything but 9.5');
-  assert.equal(isActComplete(act, progressOf([ID91, ID92, ID93, ID94, ID95, ID97, BOSS])), false, 'everything but 9.6');
-  assert.equal(isActComplete(act, progressOf(LEVELS9)), false, 'the seven levels without the boss');
-  assert.equal(isActComplete(act, progressOf([ID91, ID92, ID93, ID94, ID95, ID96, BOSS])), false, 'everything but 9.7');
-  assert.equal(isActComplete(act, progressOf([ID97])), false, '9.7 alone');
+  for (const id of [ID94, ID95, ID96, ID97, ID98]) assert.equal(isActComplete(act, progressOf([id])), false, `${id} alone`);
+  assert.equal(isActComplete(act, progressOf([ID91, ID92, ID93, ID94, ID95, ID96, ID97])), false, '9.1 to 9.7 without 9.8');
+  for (const id of [ID94, ID95, ID96, ID97, ID98]) {
+    assert.equal(isActComplete(act, progressOf([...LEVELS9.filter((x) => x !== id), BOSS])), false, `everything but ${id}`);
+  }
+  assert.equal(isActComplete(act, progressOf(LEVELS9)), false, 'the eight levels without the boss');
   assert.equal(isActComplete(act, progressOf([BOSS])), false, 'the boss alone');
   assert.equal(isActComplete(act, progressOf([...LEVELS9, BOSS])), true);
 });
@@ -155,7 +152,7 @@ test('adding act-9 re-locks nothing in acts 0-8: every level has the state it ha
     [ID91, ID92],
     ['head-sampling'],
   ];
-  assert.deepEqual(without.order, LIVE.order.slice(0, -(LEVELS9.length + 1)), 'act-9 is seven levels and a boss');
+  assert.deepEqual(without.order, LIVE.order.slice(0, -(LEVELS9.length + 1)), 'act-9 is eight levels and a boss');
   for (const ids of fixtures) {
     const p = progressOf(ids);
     for (const id of without.order) assert.equal(levelState(id, p, LIVE), levelState(id, p, without), `${id} with ${ids.length} done`);
@@ -554,7 +551,7 @@ test('9.1 sources: the Spec and Dash0 URLs, only allowed hosts, the LIVE-DEMO so
 
 // ---- the globe -----------------------------------------------------------------------------
 
-test('globe: 9.2 lights Australia, 9.1 New Zealand, 9.3 Papua New Guinea, 9.4 the Solomon Islands, 9.5 New Caledonia, 9.6 Fiji, 9.7 Vanuatu; Oceania completes with the boss', () => {
+test('globe: 9.2 lights Australia, 9.1 New Zealand, 9.3 Papua New Guinea, 9.4 the Solomon Islands, 9.5 New Caledonia, 9.6 Fiji, 9.7 Vanuatu, 9.8 Samoa; Oceania completes with the boss', () => {
   assert.equal(LEVEL_COUNTRY[ID92], 'AUS');
   assert.equal(LEVEL_COUNTRY[ID91], 'NZL');
   assert.equal(LEVEL_COUNTRY[ID93], 'PNG');
@@ -569,30 +566,35 @@ test('globe: 9.2 lights Australia, 9.1 New Zealand, 9.3 Papua New Guinea, 9.4 th
   assert.equal(LEVEL_COUNTRY[ID97], 'VUT');
   assert.equal(COUNTRY_NAMES.VUT, 'Vanuatu');
   assert.equal(COUNTRY_NAMES.FJI, 'Fiji');
+  assert.equal(LEVEL_COUNTRY[ID98], 'WSM');
+  assert.equal(COUNTRY_NAMES.WSM, 'Samoa');
   assert.equal(ACT_REGIONS['act-9'].region, 'Oceania');
   const map = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES };
   const level93 = LIVE.levels[ID93];
   const first = freshlyLit(emptyProgress(), progressOf([ID92]), LIVE, map);
-  assert.deepEqual(first, { countryIds: ['AUS'], regionIds: [] }, '9.1, 9.3 and 9.5 are still open, so the region is not');
+  assert.deepEqual(first, { countryIds: ['AUS'], regionIds: [] }, '9.1 and 9.3 to 9.8 are still open, so the region is not');
   assert.equal(litText(first, level, map), 'Australia is now lit: The 34% error rate.');
   const second = freshlyLit(progressOf([ID92]), progressOf([ID92, ID91]), LIVE, map);
-  assert.deepEqual(second, { countryIds: ['NZL'], regionIds: [] }, '9.3 and 9.5 are still open');
+  assert.deepEqual(second, { countryIds: ['NZL'], regionIds: [] }, '9.3 to 9.8 are still open');
   assert.equal(litText(second, level91, map), 'New Zealand is now lit: Filter, sampler, or both?', 'no "?." and no region line');
   const third = freshlyLit(progressOf([ID92, ID91]), progressOf([ID92, ID91, ID93]), LIVE, map);
-  assert.deepEqual(third, { countryIds: ['PNG'], regionIds: [] }, '9.4 to 9.7 and the boss are still to do');
+  assert.deepEqual(third, { countryIds: ['PNG'], regionIds: [] }, '9.4 to 9.8 and the boss are still to do');
   assert.equal(litText(third, level93, map), 'Papua New Guinea is now lit: Connect the game to Dash0.');
   const fourth = freshlyLit(progressOf([ID92, ID91, ID93]), progressOf([ID92, ID91, ID93, ID94]), LIVE, map);
-  assert.deepEqual(fourth, { countryIds: ['SLB'], regionIds: [] }, '9.5, 9.6, 9.7 and the boss are still to do');
+  assert.deepEqual(fourth, { countryIds: ['SLB'], regionIds: [] }, '9.5 to 9.8 and the boss are still to do');
   assert.equal(litText(fourth, LIVE.levels[ID94], map), 'The Solomon Islands is now lit: The trace that starts in the middle.');
   const fifth = freshlyLit(progressOf([ID92, ID91, ID93, ID94]), progressOf([ID92, ID91, ID93, ID94, ID95]), LIVE, map);
-  assert.deepEqual(fifth, { countryIds: ['NCL'], regionIds: [] }, '9.6, 9.7 and the boss are still to do');
+  assert.deepEqual(fifth, { countryIds: ['NCL'], regionIds: [] }, '9.6 to 9.8 and the boss are still to do');
   assert.equal(litText(fifth, LIVE.levels[ID95], map), 'New Caledonia is now lit: Lost in translation.');
   const sixth = freshlyLit(progressOf([ID92, ID91, ID93, ID94, ID95]), progressOf([ID92, ID91, ID93, ID94, ID95, ID96]), LIVE, map);
-  assert.deepEqual(sixth, { countryIds: ['FJI'], regionIds: [] }, '9.7 and the boss are still to do');
+  assert.deepEqual(sixth, { countryIds: ['FJI'], regionIds: [] }, '9.7, 9.8 and the boss are still to do');
   assert.equal(litText(sixth, LIVE.levels[ID96], map), 'Fiji is now lit: The alert that stayed green.');
-  const seventh = freshlyLit(progressOf([ID92, ID91, ID93, ID94, ID95, ID96]), progressOf(LEVELS9), LIVE, map);
-  assert.deepEqual(seventh, { countryIds: ['VUT'], regionIds: [] }, 'the boss is still to do');
+  const seventh = freshlyLit(progressOf([ID92, ID91, ID93, ID94, ID95, ID96]), progressOf([ID92, ID91, ID93, ID94, ID95, ID96, ID97]), LIVE, map);
+  assert.deepEqual(seventh, { countryIds: ['VUT'], regionIds: [] }, '9.8 and the boss are still to do');
   assert.equal(litText(seventh, LIVE.levels[ID97], map), 'Vanuatu is now lit: Two vendors, one weekend.');
+  const eighth = freshlyLit(progressOf([ID92, ID91, ID93, ID94, ID95, ID96, ID97]), progressOf(LEVELS9), LIVE, map);
+  assert.deepEqual(eighth, { countryIds: ['WSM'], regionIds: [] }, 'the boss is still to do');
+  assert.equal(litText(eighth, LIVE.levels[ID98], map), 'Samoa is now lit: Edge of the platform.');
   // The boss has no country: finishing it completes the region, named by the region.
   const boss = freshlyLit(progressOf(LEVELS9), progressOf([...LEVELS9, BOSS]), LIVE, map);
   assert.deepEqual(boss, { countryIds: [], regionIds: ['act-9'] });
