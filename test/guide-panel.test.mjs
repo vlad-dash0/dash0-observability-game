@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { makeDom, q, qa, click } from './helpers/dom.mjs';
 import { STEP_DRIVERS, stepsOf } from './helpers/step-drivers.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
-import { runPlay, validatePlay } from '../lib/play.mjs';
+import { runPlay, STEP_TYPES, validatePlay } from '../lib/play.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
 import { liveRegistry } from '../app.mjs';
 import { createGuide } from '../api/guide.mjs';
@@ -208,12 +208,12 @@ test('withheld, upstream, rate-limited (minutes shown), unavailable, rejected an
   const cases = [
     ['withheld', () => res(200, { ok: false, error: 'withheld' }), /answer/],
     ['upstream', () => res(502, { error: 'upstream' }), /could not answer/],
-    ['rate-limited', () => res(429, { error: 'rate-limited', retryAfterS: 150 }), /3 minutes/],
+    ['rate-limited', () => res(429, { error: 'rate-limited', retryAfterS: 150 }), /busy right now.*3 minutes/],
     ['rate-limited, one minute', () => res(429, { error: 'rate-limited', retryAfterS: 20 }), /1 minute\b/],
     ['unavailable', () => res(404, { error: 'unavailable' }), /not available/],
     ['not configured', () => res(503, { error: 'not-configured' }), /not available/],
     ['rejected', () => res(400, { ok: false, error: 'bad-request', field: 'question' }), /could not take/],
-    ['network', () => { throw new Error('offline'); }, /could not be reached/],
+    ['network', () => { throw new Error('offline'); }, /did not answer/],
   ];
   for (const [name, make, says] of cases) {
     const fetch = fakeFetch((call) => {
@@ -268,7 +268,7 @@ test('closing while pending aborts the request: no charge, no stale reply', asyn
   assert.ok(!reply().textContent.includes('Too late'));
 });
 
-test('Next while pending aborts that step\'s request: no charge, no stale reply on the next step', async () => {
+test('Next aborts the step signal: no charge, no stale reply on the next step (the solve already drops it; the close test covers the signal alone)', async () => {
   const fx = playFixture();
   fx.play.steps = [fx.play.steps[0], fx.play.steps[5]];
   const level = buildRegistry([{ id: 'a', no: 0, levels: [fx], boss: null }], {
@@ -296,7 +296,10 @@ test('a solved step disables Ask and the box; a reply arriving after it is dropp
   type('Why?');
   assert.equal(q('#guide-ask').disabled, false);
   click('#guide-ask');
+  assert.match(reply().textContent, /Asking/);
   solve(oneStep('choice'));
+  assert.equal(reply().hidden, true, 'the loading line goes with the solve');
+  assert.equal(reply().textContent, '');
   assert.equal(q('#guide-ask').disabled, true);
   assert.equal(q('#guide-q').disabled, true);
   pending[0].resolve({ kind: 'ok', hint: 'After the fact.' });
@@ -394,4 +397,28 @@ test('MAX_QUESTION is the server\'s limit: the longest is taken, one more is ref
   assert.equal(over.status, 400);
   assert.equal(over.body.field, 'question');
   assert.match(readFileSync(new URL('../lib/guide/client.mjs', import.meta.url), 'utf8'), /MAX_QUESTION = 300;/);
+});
+
+test('a widget that is done while it mounts still gets a disabled panel', () => {
+  const real = STEP_TYPES.choice.mount;
+  STEP_TYPES.choice.mount = (ctx, spec, { onDone }) => onDone();
+  try {
+    open(oneStep('choice'));
+    assert.equal(q('#guide-ask').disabled, true);
+    assert.equal(q('#guide-q').disabled, true);
+  } finally {
+    STEP_TYPES.choice.mount = real;
+  }
+});
+
+test('the copy says one thing about cost: an answer is one hint, every other reply is free', () => {
+  const free = ['withheld', 'rate-limited', 'unavailable', 'upstream', 'rejected', 'failed'];
+  for (const kind of free) {
+    const t = outcomeText({ kind, retryAfterS: 60 });
+    assert.match(t, /This one is free\./, kind);
+    assert.doesNotMatch(t, /charged/, kind);
+  }
+  assert.doesNotMatch(outcomeText({ kind: 'rate-limited', retryAfterS: 60 }), /you have asked/i, 'the instance cap trips it too');
+  assert.doesNotMatch(outcomeText({ kind: 'failed' }), /connection/i, 'a 500 is not the connection');
+  assert.match(guidePanelHtml(), /Each answer you get counts as one hint\. Other replies are free\./);
 });

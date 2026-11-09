@@ -285,7 +285,7 @@ opened before the answer arrives has no panel. `ask(levelId, stepId, question, s
 `guideAllowed(type, spec)`, `runPlay` mounts `lib/guide/panel.mjs` after `type.mount`: into the side column's empty
 `[data-guide-slot]` on a board, at the end of the step on a choice step. The panel is built from the kit only and shows
 the reply as escaped text; one request at a time; `ctx.askedGuide()` runs once, on `ok`, while the step is unsolved and
-its per-step `AbortController` (aborted by Next, Back and close) has not fired; every other outcome is free. `?mode=debug`
+its per-step `AbortController` (aborted by Next and close) has not fired; every other outcome is free. `?mode=debug`
 shows the panel like any other mode. `MAX_QUESTION` in the client mirrors the server's limit (a test checks both).
 
 ## 3. Invariants
