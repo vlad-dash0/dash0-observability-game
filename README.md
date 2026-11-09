@@ -34,7 +34,12 @@ npm test        # node --test over test/**/*.test.mjs
 ```
 
 The dev server 404s what `.vercelignore` excludes and, stricter than Vercel, every
-dotfile. It deploys to Vercel as static files (serverless `api/` functions come later).
+dotfile. It deploys to Vercel as static files plus the `api/` functions, run locally at `/api/<name>`.
+
+"Ask the guide" (`api/guide.mjs`, docs/FOUNDATION.md §2.8) needs `ANTHROPIC_API_KEY` in the Vercel project's
+environment (Production and Preview). Without it the function answers "not configured" and the game hides the
+guide. Locally `GUIDE_STUB=1 npm run dev` answers with a canned reply and needs no key. The rate limit is best
+effort (per instance, in memory), not a quota.
 
 ## Lineage
 

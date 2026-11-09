@@ -206,6 +206,61 @@ shader, registered in the release registry) and a gentle wave across the region,
 time `dt`. Reduced motion: no effect, the globe faces the country at once. Opening a level
 disposes the globe, which cancels the effect.
 
+### 2.8 Ask the guide: the server function (#17)
+
+`api/guide.mjs` is the game's one serverless function: a Vercel Node function in the Web format (a `Request` in, a
+`Response` out, one named export per HTTP method, `GET` and `POST`). No build step: Vercel's Node.js runtime docs
+(vercel.com/docs/functions/runtimes/node-js) say "to use native ES modules in JavaScript handlers, use `.mjs`
+(for example `api/index.mjs`)" and allow "export each HTTP method as a separate export"
+(vercel.com/docs/functions/functions-api-reference shows `api/hello.js` with `export function GET(request)`).
+Not yet proven on a deployment: confirm on a preview deploy that `GET /api/guide` answers `{configured:false}` and
+that tracing `../app.mjs` bundles `levels/`, `lib/` and `vendor/js-yaml-5.5.0.mjs`. If `.mjs` is not picked up,
+fall back to `api/guide.js` (same code; `package.json` has `"type": "module"`). The module also exports
+`createGuide({env, fetch, now, log, limiter, registry})`, which `GET` and `POST` are bound from (to `process.env`,
+`globalThis.fetch`, `Date.now`, a JSON `console.log` and a module-level limiter); tests and the dev stub use it.
+
+The function reads no docs at runtime (`/docs/` is in `.vercelignore`). It builds the step context only from the
+registry (`liveRegistry()` from `app.mjs`, the one construction site; importing it has no side effect) through
+`lib/guide/context.mjs`, so the player sends ids, never context. `test/serve.test.mjs` walks the function's static
+imports and fails if `.vercelignore` would drop one.
+
+`GET /api/guide`: `200 {v:1, configured}`, `Cache-Control: no-store`; configured is `ANTHROPIC_API_KEY` set to a
+non-empty string. `POST /api/guide`: `application/json`, at most 2048 bytes, body exactly
+`{v:1, levelId, stepId, question}` (`question` trimmed, 1 to 300 characters, no control characters; any other
+field, such as the player's current pick, is `400 body`: a pick would make the guide a yes/no oracle). The step
+must be a `play` step the guide may speak on (`guideAllowed`) with a trustworthy token set (`answerTokens(type,
+spec, step)` not null); otherwise it is refused before any model call. One call to
+`POST https://api.anthropic.com/v1/messages` (model `claude-haiku-5-5`, `max_tokens` 300, 8 s timeout,
+`x-api-key`, `anthropic-version: 2023-06-01`); the reply is the joined text blocks, withheld when `withholds`
+says it states the answer, else trimmed and cut at 600 characters.
+
+| status | body | when |
+|---|---|---|
+| 200 | `{ok:true, hint}` | answered |
+| 200 | `{ok:false, error:'withheld'}` | the filter tripped; the reply is never sent |
+| 400 | `{ok:false, error:'bad-request', field}` | bad JSON, version, id, question or extra field |
+| 403 | `{error:'forbidden'}` | `Origin` present and its host differs from the request host |
+| 404 | `{error:'unknown-step'}` | run level, unknown level or step id |
+| 404 | `{error:'unavailable'}` | step not allowed, or no trustworthy token set |
+| 405, 413, 415 | `{error}` | method, body over 2048 bytes, not `application/json` |
+| 429 | `{error:'rate-limited', retryAfterS}` + `Retry-After` | limiter |
+| 500 | `{error:'internal'}` | an unexpected throw; its text is never sent or logged |
+| 502 | `{error:'upstream'}` | non-2xx, timeout, malformed body, empty text |
+| 503 | `{error:'not-configured'}` | no key; the model is not called |
+
+Rate limit (`lib/guide/limit.mjs`), best effort and in memory: 6 questions per client per fixed 10 minutes, and 60 a
+minute for the whole instance; the client is the first `x-forwarded-for` value, else `unknown`; the map holds at
+most 2000 clients and drops the oldest. A cold start empties it and parallel instances each keep their own, so it
+slows a runaway client, it is not a quota. Only requests that reach the model count.
+
+Privacy: the key is in no response, header or log line, and neither are the question, the reply or the address.
+One log line per request, `{msg:'guide', levelId, stepId, outcome, status, ms}` (ids null until validated). There is
+no client telemetry for the guide.
+
+Local: `tools/serve.mjs` runs `api/<name>.mjs` at `/api/<name>` (GET and POST) and never serves `api/` source as a
+file. `GUIDE_STUB=1 npm run dev` answers the guide with a canned reply and no key; the stub exists only in the dev
+server.
+
 ## 3. Invariants
 
 Registry (`validateRegistry` reports all at once): act and level ids unique across all acts
