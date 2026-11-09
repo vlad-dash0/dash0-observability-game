@@ -599,6 +599,14 @@ export function createGame(deps) {
       this.refreshGlobe();
     },
 
+    // The page behind an open kit modal must not scroll: a class on <html> (index.html x-effect keeps it
+    // in step with the three flags; the rule is in base.css, never an inline style).
+    scrollLocked() {
+      return this.howToOpen || this.aboutOpen || this.saveOpen;
+    },
+    syncScrollLock() {
+      doc.documentElement.classList.toggle('modal-open', this.scrollLocked());
+    },
     // Tab (and Shift+Tab) wrap inside the open kit modal; the page behind is inert, so without this
     // focus would fall out to the browser's own controls. Not a modal (the level, the reward): untouched.
     openModalSelector() {

@@ -1215,6 +1215,33 @@ test('the open How to play modal traps Tab; with none open nothing is trapped', 
   assert.ok(modal);
 });
 
+test('the page scroll is locked while How to play, About or Save code is open, and only then', () => {
+  const s = cardGame();
+  const root = s.dom.document.documentElement;
+  s.game.syncScrollLock();
+  assert.equal(root.classList.contains('modal-open'), false);
+  s.game.openLevel('w');
+  s.game.syncScrollLock();
+  assert.equal(root.classList.contains('modal-open'), true, 'How to play');
+  s.game.closeHowTo();
+  s.game.syncScrollLock();
+  assert.equal(root.classList.contains('modal-open'), false, 'the level alone does not lock the page');
+  s.game.closeOverlay();
+  s.game.aboutOpen = true;
+  s.game.syncScrollLock();
+  assert.equal(root.classList.contains('modal-open'), true, 'About');
+  s.game.aboutOpen = false;
+  s.game.saveOpen = true;
+  s.game.syncScrollLock();
+  assert.equal(root.classList.contains('modal-open'), true, 'Save code');
+  assert.equal(shell.querySelector('.app').getAttribute('x-effect'), 'syncScrollLock()', 'index.html keeps it in step');
+  assert.match(read('styles/base.css'), /html\.modal-open, html\.modal-open body \{ overflow: hidden; \}/);
+});
+
+test('the How to play header button stays on one line at 320px', () => {
+  assert.match(read('styles/hub.css'), /#ov-howto-open \{[^}]*white-space: nowrap/);
+});
+
 test('the level header names the level number, and Incident for a boss', () => {
   const s = cardGame();
   s.game.openLevel('w');

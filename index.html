@@ -23,7 +23,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 </head>
 <body>
-<div class="app" x-data="game" @keydown.escape.window="onEscape($event)" @keydown.tab.window="trapTab($event)">
+<div class="app" x-data="game" @keydown.escape.window="onEscape($event)" @keydown.tab.window="trapTab($event)" x-effect="syncScrollLock()">
 
   <!-- The hub: inert while the level, reward or About dialog is open, so Tab and Enter cannot
        reach the cards behind it. Alpine removes the attribute when the value is false. -->
