@@ -69,6 +69,7 @@ const EXPECTED_ORDER = [
   'filter-or-sampler',
   'the-34-percent-error-rate',
   'connect-to-dash0',
+  'lost-in-translation',
   'the-alert-that-stayed-green',
   'its-us',
 ];
@@ -159,7 +160,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
       no: 9,
       name: 'Live Demo',
       sub: 'Does that answer hold?',
-      levelIds: ['filter-or-sampler', 'the-34-percent-error-rate', 'connect-to-dash0', 'the-alert-that-stayed-green'],
+      levelIds: ['filter-or-sampler', 'the-34-percent-error-rate', 'connect-to-dash0', 'lost-in-translation', 'the-alert-that-stayed-green'],
       bossId: 'its-us',
     },
   ]);
@@ -240,6 +241,7 @@ const HINTLESS = {
   'semantic-convention-versions': ['spot'],
   'migrating-vendors': ['sort'],
   'frontend-rum': ['build'],
+  'lost-in-translation': ['spot'], // a live-demo question: no helps on its Spot (#240)
   'the-34-percent-error-rate': ['tradeoff'], // a live-demo question: no helps on its Trade-off (#160)
   'the-alert-that-stayed-green': ['query'], // a live-demo question: no helps on its Query it
 };

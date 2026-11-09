@@ -19,14 +19,16 @@ import { emptyProgress, starTotals } from '../lib/progress.mjs';
 import { isActComplete, isActUnlocked, levelState, lockReason } from '../lib/unlock.mjs';
 import { allPlans, evaluatePlan, validateTradeoffSpec } from '../lib/widgets/trade-off.mjs';
 import { validateSortSpec } from '../lib/widgets/sort-it.mjs';
+import { validateSpotSpec } from '../lib/widgets/spot-it.mjs';
 import { validateSortHelps } from '../lib/widgets/sort-it-help.mjs';
 
 const ID91 = 'filter-or-sampler';
 const ID92 = 'the-34-percent-error-rate';
 const ID93 = 'connect-to-dash0';
+const ID95 = 'lost-in-translation';
 const ID96 = 'the-alert-that-stayed-green';
 const BOSS = 'its-us';
-const LEVELS9 = [ID91, ID92, ID93, ID96];
+const LEVELS9 = [ID91, ID92, ID93, ID95, ID96];
 const ID = ID92; // the 9.2 tests below
 const LIVE = liveRegistry();
 const MAX_STARS = expectedStarMax(LIVE);
@@ -57,14 +59,14 @@ const sort91 = S91_STEP?.sort;
 
 // ---- the act ------------------------------------------------------------------------
 
-test('act-9 "Live Demo" is the last act, after act-8, holding 9.1, 9.2, 9.3, then 9.6 and the lab boss "It\'s us"', () => {
+test('act-9 "Live Demo" is the last act, after act-8, holding 9.1, 9.2, 9.3, 9.5, then 9.6 and the lab boss "It\'s us"', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-9');
   assert.deepEqual(
     { no: act.no, name: act.name, sub: act.sub, levelIds: [...act.levelIds], bossId: act.bossId },
-    { no: 9, name: 'Live Demo', sub: 'Does that answer hold?', levelIds: [ID91, ID92, ID93, ID96], bossId: BOSS },
+    { no: 9, name: 'Live Demo', sub: 'Does that answer hold?', levelIds: [ID91, ID92, ID93, ID95, ID96], bossId: BOSS },
   );
   assert.deepEqual(LIVE.acts.map((a) => a.id).slice(-2), ['act-8', 'act-9']);
-  assert.deepEqual(LIVE.order.slice(LIVE.order.indexOf('dashboards-as-code')), ['dashboards-as-code', 'semantic-convention-versions', 'migrating-vendors', 'frontend-rum', 'ai-assisted-debugging', ID91, ID92, ID93, ID96, BOSS], 'act-9 plays after 8.5, last: 9.1, 9.2, 9.3, 9.6, then its boss');
+  assert.deepEqual(LIVE.order.slice(LIVE.order.indexOf('dashboards-as-code')), ['dashboards-as-code', 'semantic-convention-versions', 'migrating-vendors', 'frontend-rum', 'ai-assisted-debugging', ID91, ID92, ID93, ID95, ID96, BOSS], 'act-9 plays after 8.5, last: 9.1, 9.2, 9.3, 9.5, 9.6, then its boss');
 });
 
 test('act-9 unlocks like the acts before it: open when acts 0-8 are complete, or once entered', () => {
@@ -95,8 +97,8 @@ test('act-9 unlocks like the acts before it: open when acts 0-8 are complete, or
     assert.equal(levelState(id, progressOf([...acts0to6, ID]), LIVE), want, id);
   }
   // The boss opens once the act's levels are done, and not before.
-  assert.equal(levelState(BOSS, progressOf([...acts0to6, ID91, ID92]), LIVE), 'locked', '9.3 and 9.6 are still to do');
-  assert.deepEqual(lockReason(BOSS, progressOf([...acts0to6, ID91, ID92]), LIVE), { kind: 'boss', remaining: [ID93, ID96] });
+  assert.equal(levelState(BOSS, progressOf([...acts0to6, ID91, ID92]), LIVE), 'locked', '9.3, 9.5 and 9.6 are still to do');
+  assert.deepEqual(lockReason(BOSS, progressOf([...acts0to6, ID91, ID92]), LIVE), { kind: 'boss', remaining: [ID93, ID95, ID96] });
   assert.equal(levelState(BOSS, progressOf([...before, ...LEVELS9]), LIVE), 'open');
 
   const withoutBoss = before.filter((id) => id !== 'errors-tripled');
@@ -109,16 +111,18 @@ test('act-9 unlocks like the acts before it: open when acts 0-8 are complete, or
   assert.deepEqual(lockReason(ID, emptyProgress(), LIVE), { kind: 'act', actId: 'act-0' });
 });
 
-test('act-9 is complete only when all four of its levels and the boss are done', () => {
+test('act-9 is complete only when all five of its levels and the boss are done', () => {
   const act = LIVE.acts.find((a) => a.id === 'act-9');
   assert.equal(isActComplete(act, emptyProgress()), false);
   assert.equal(isActComplete(act, progressOf([ID92])), false, '9.2 alone');
   assert.equal(isActComplete(act, progressOf([ID91])), false, '9.1 alone');
   assert.equal(isActComplete(act, progressOf([ID93])), false, '9.3 alone');
-  assert.equal(isActComplete(act, progressOf([ID91, ID92])), false, '9.1 and 9.2 without 9.3');
-  assert.equal(isActComplete(act, progressOf([ID91, ID92, ID93])), false, '9.1 to 9.3 without 9.6');
+  assert.equal(isActComplete(act, progressOf([ID91, ID92])), false, '9.1 and 9.2 without 9.3, 9.5 and 9.6');
+  assert.equal(isActComplete(act, progressOf([ID91, ID92, ID93])), false, '9.1 to 9.3 without 9.5 and 9.6');
   assert.equal(isActComplete(act, progressOf([ID96])), false, '9.6 alone');
-  assert.equal(isActComplete(act, progressOf(LEVELS9)), false, 'the four levels without the boss');
+  assert.equal(isActComplete(act, progressOf([ID91, ID92, ID93, ID95])), false, '9.1 to 9.5 without 9.6');
+  assert.equal(isActComplete(act, progressOf([ID95])), false, '9.5 alone');
+  assert.equal(isActComplete(act, progressOf(LEVELS9)), false, 'the five levels without the boss');
   assert.equal(isActComplete(act, progressOf([BOSS])), false, 'the boss alone');
   assert.equal(isActComplete(act, progressOf([...LEVELS9, BOSS])), true);
 });
@@ -139,7 +143,7 @@ test('adding act-9 re-locks nothing in acts 0-8: every level has the state it ha
     [ID91, ID92],
     ['head-sampling'],
   ];
-  assert.deepEqual(without.order, LIVE.order.slice(0, -5));
+  assert.deepEqual(without.order, LIVE.order.slice(0, -(LEVELS9.length + 1)));
   for (const ids of fixtures) {
     const p = progressOf(ids);
     for (const id of without.order) assert.equal(levelState(id, p, LIVE), levelState(id, p, without), `${id} with ${ids.length} done`);
@@ -538,33 +542,137 @@ test('9.1 sources: the Spec and Dash0 URLs, only allowed hosts, the LIVE-DEMO so
 
 // ---- the globe -----------------------------------------------------------------------------
 
-test('globe: 9.2 lights Australia, 9.1 New Zealand, 9.3 Papua New Guinea, 9.6 Fiji; Oceania completes with the boss', () => {
+test('globe: 9.2 lights Australia, 9.1 New Zealand, 9.3 Papua New Guinea, 9.5 New Caledonia, 9.6 Fiji; Oceania completes with the boss', () => {
   assert.equal(LEVEL_COUNTRY[ID92], 'AUS');
   assert.equal(LEVEL_COUNTRY[ID91], 'NZL');
   assert.equal(LEVEL_COUNTRY[ID93], 'PNG');
   assert.equal(COUNTRY_NAMES.AUS, 'Australia');
   assert.equal(COUNTRY_NAMES.NZL, 'New Zealand');
   assert.equal(COUNTRY_NAMES.PNG, 'Papua New Guinea');
+  assert.equal(LEVEL_COUNTRY[ID95], 'NCL');
+  assert.equal(COUNTRY_NAMES.NCL, 'New Caledonia');
   assert.equal(LEVEL_COUNTRY[ID96], 'FJI');
   assert.equal(COUNTRY_NAMES.FJI, 'Fiji');
   assert.equal(ACT_REGIONS['act-9'].region, 'Oceania');
   const map = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES };
   const level93 = LIVE.levels[ID93];
   const first = freshlyLit(emptyProgress(), progressOf([ID92]), LIVE, map);
-  assert.deepEqual(first, { countryIds: ['AUS'], regionIds: [] }, '9.1 and 9.3 are still open, so the region is not');
+  assert.deepEqual(first, { countryIds: ['AUS'], regionIds: [] }, '9.1, 9.3 and 9.5 are still open, so the region is not');
   assert.equal(litText(first, level, map), 'Australia is now lit: The 34% error rate.');
   const second = freshlyLit(progressOf([ID92]), progressOf([ID92, ID91]), LIVE, map);
-  assert.deepEqual(second, { countryIds: ['NZL'], regionIds: [] }, '9.3 is still open');
+  assert.deepEqual(second, { countryIds: ['NZL'], regionIds: [] }, '9.3 and 9.5 are still open');
   assert.equal(litText(second, level91, map), 'New Zealand is now lit: Filter, sampler, or both?', 'no "?." and no region line');
-  const third = freshlyLit(progressOf([ID92, ID91, ID96]), progressOf([ID92, ID91, ID96, ID93]), LIVE, map);
-  assert.deepEqual(third, { countryIds: ['PNG'], regionIds: [] }, 'the boss is still to do');
+  const third = freshlyLit(progressOf([ID92, ID91]), progressOf([ID92, ID91, ID93]), LIVE, map);
+  assert.deepEqual(third, { countryIds: ['PNG'], regionIds: [] }, '9.5, 9.6 and the boss are still to do');
   assert.equal(litText(third, level93, map), 'Papua New Guinea is now lit: Connect the game to Dash0.');
-  const fourth = freshlyLit(progressOf([ID92, ID91, ID93]), progressOf(LEVELS9), LIVE, map);
-  assert.deepEqual(fourth, { countryIds: ['FJI'], regionIds: [] }, 'the boss is still to do');
-  assert.equal(litText(fourth, LIVE.levels[ID96], map), 'Fiji is now lit: The alert that stayed green.');
+  const fourth = freshlyLit(progressOf([ID92, ID91, ID93]), progressOf([ID92, ID91, ID93, ID95]), LIVE, map);
+  assert.deepEqual(fourth, { countryIds: ['NCL'], regionIds: [] }, '9.6 and the boss are still to do');
+  assert.equal(litText(fourth, LIVE.levels[ID95], map), 'New Caledonia is now lit: Lost in translation.');
+  const fifth = freshlyLit(progressOf([ID92, ID91, ID93, ID95]), progressOf(LEVELS9), LIVE, map);
+  assert.deepEqual(fifth, { countryIds: ['FJI'], regionIds: [] }, 'the boss is still to do');
+  assert.equal(litText(fifth, LIVE.levels[ID96], map), 'Fiji is now lit: The alert that stayed green.');
   // The boss has no country: finishing it completes the region, named by the region.
   const boss = freshlyLit(progressOf(LEVELS9), progressOf([...LEVELS9, BOSS]), LIVE, map);
   assert.deepEqual(boss, { countryIds: [], regionIds: ['act-9'] });
   assert.equal(litText(boss, LIVE.levels[BOSS], map), "Oceania is now lit: It's us.");
   assert.equal(LEVEL_COUNTRY[BOSS], undefined, 'a boss carries no country');
+});
+
+// ---- level 9.5: Lost in translation --------------------------------------------------------------
+
+const SRC95 = read(`levels/${ID95}.mjs`);
+const level95 = LIVE.levels[ID95];
+const [V95, S95_STEP] = level95.play.steps;
+const choices95 = V95.choice.choices;
+const spot95 = S95_STEP.spot;
+// What each instrument kind exports under OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta, typed here from the OTLP exporter
+// spec table on purpose (an independent oracle for the board), and which services set the preference (the intro says: orders, checkout).
+const DELTA_KINDS = ['Counter', 'ObservableCounter', 'Histogram'];
+const CHANGED = ['orders', 'checkout'];
+const labelOf = (text, name) => text.match(new RegExp(`${name}="([^"]*)"`))?.[1];
+
+test('9.5 fields: scored with no par time, in act-9, lights the collector, awards no card; widget spot, no hints', () => {
+  assert.deepEqual(
+    { no: level95.no, name: level95.name, sub: level95.sub, rewardTitle: level95.rewardTitle, kind: level95.kind, actId: level95.actId, scored: level95.scored, parMs: level95.scoring.parMs },
+    { no: '9.5', name: 'Lost in translation', sub: 'Does that answer hold?', rewardTitle: 'Delta decoder', kind: 'level', actId: 'act-9', scored: true, parMs: null },
+  );
+  assert.deepEqual([...level95.mechanics], ['spot']);
+  assert.equal(level95.play.prefix, 'lit');
+  assert.deepEqual([...level95.cards], []);
+  assert.deepEqual([...level95.lights], ['collector']);
+  assert.deepEqual([...level95.hintless], ['spot']);
+});
+
+test('9.5 step 1 is a verdict Choice with exactly one right answer, "counters and histograms", whose label is neither longest nor shortest and is not first', () => {
+  assert.equal(V95.qid, 'lit-q-verdict');
+  assert.equal(V95.choice.id, 'lit-verdict');
+  assert.equal(choices95.length, 3);
+  assert.deepEqual(choices95.filter((c) => c.right).map((c) => c.key), ['wrong']);
+  const lens = choices95.map((c) => plain(c.label).length);
+  const at = choices95.findIndex((c) => c.right);
+  assert.equal(at > 0, true, 'the right choice is not first');
+  assert.equal(lens[at] < Math.max(...lens) && lens[at] > Math.min(...lens), true, `lengths ${lens.join(', ')}`);
+  assert.equal(Math.max(...lens) - Math.min(...lens) <= 10, true, `lengths ${lens.join(', ')}`);
+  assert.match(plain(choices95[at].label), /counters and histograms/);
+  assert.match(plain(choices95.find((c) => c.key === 'all-delta').label), /UpDownCounters/, 'the tempting pick is every series');
+  assert.match(plain(V95.intro), /presenter/);
+  assert.match(plain(V95.intro), /OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta/);
+  assert.match(plain(choices95[at].why), /UpDownCounter and Asynchronous UpDownCounter instruments stay cumulative/);
+});
+
+test('9.5 step 2 Spot: a valid metric board of 7 lines, 3 faults, hints off, no line states its temporality', () => {
+  assert.equal(S95_STEP.qid, 'lit-q-spot');
+  assert.equal(spot95.target, 'metric');
+  assert.deepEqual(validateSpotSpec(spot95), []);
+  assert.equal(spot95.lines.length, 7);
+  assert.equal(spot95.faults.length, 3);
+  assert.equal(spot95.helps?.hints ?? false, false);
+  for (const l of spot95.lines) assert.equal(/temporality|delta|cumulative|_total/i.test(l.text), false, l.id);
+});
+
+test('9.5 step 2 oracle: a line is a fault exactly when its instrument turns delta and its service changed the preference', () => {
+  // Each line's expected status follows from two independent facts, so removing either one changes the answer set.
+  const fault = (l) => DELTA_KINDS.includes(labelOf(l.text, 'instrument')) && CHANGED.includes(labelOf(l.text, 'service'));
+  assert.deepEqual(spot95.lines.filter(fault).map((l) => l.id), [...spot95.faults]);
+  const byKind = (l) => DELTA_KINDS.includes(labelOf(l.text, 'instrument'));
+  const byService = (l) => CHANGED.includes(labelOf(l.text, 'service'));
+  assert.equal(spot95.lines.filter(byKind).length > spot95.faults.length, true, '"pick every Counter" over-picks (payments is unchanged)');
+  assert.equal(spot95.lines.filter(byService).length > spot95.faults.length, true, '"pick every orders and checkout line" over-picks');
+  // the tempting pick and the tempting miss
+  const kinds = spot95.lines.map((l) => labelOf(l.text, 'instrument'));
+  assert.equal(kinds.includes('UpDownCounter'), true);
+  assert.equal(spot95.faults.includes(spot95.lines[kinds.indexOf('ObservableCounter')].id), true, 'the Asynchronous Counter is a fault');
+  assert.equal(spot95.faults.includes(spot95.lines[kinds.indexOf('UpDownCounter')].id), false, 'the UpDownCounter is not');
+  assert.equal(labelOf(spot95.lines.find((l) => l.id === 'payments-declined').text, 'instrument'), 'Counter');
+  assert.equal(spot95.faults.includes('payments-declined'), false);
+});
+
+test('9.5 step 2 every non-fault explains itself, naming its own reason, and the intro names the services that changed', () => {
+  const nonFaults = spot95.lines.filter((l) => !spot95.faults.includes(l.id)).map((l) => l.id);
+  assert.deepEqual(Object.keys(spot95.whyNot).sort(), [...nonFaults].sort());
+  assert.match(spot95.whyNot['orders-in-flight'], /UpDownCounter stays cumulative/);
+  assert.match(spot95.whyNot['db-pool'], /UpDownCounter stays cumulative/);
+  assert.match(spot95.whyNot['queue-depth'], /no aggregation temporality/);
+  assert.match(spot95.whyNot['payments-declined'], /payments did not change its preference/);
+  assert.match(plain(S95_STEP.intro), /orders.*checkout.*changed the preference to delta.*payments.*did not/);
+  // the decisive rule is restated on the board's own screen, in the board's names, and says what those names are
+  assert.match(plain(S95_STEP.intro), /Counter, ObservableCounter and Histogram export delta; UpDownCounter and ObservableUpDownCounter stay cumulative; a gauge has no temporality/);
+  assert.match(plain(S95_STEP.intro), /SDK class names.*Asynchronous Counter/);
+});
+
+test('9.5 sources: Spec lines on allowed hosts, a Docs line for the README, Facts and Invented notes, no em dash, no pricing, no Dash0 claim', () => {
+  for (const url of [
+    'https://opentelemetry.io/docs/specs/otel/metrics/sdk_exporters/otlp/',
+    'https://opentelemetry.io/docs/specs/otel/metrics/data-model/#gauge',
+    'https://opentelemetry.io/docs/specs/otel/compatibility/prometheus_and_openmetrics/#sums',
+  ]) assert.equal(SRC95.split('\n').some((line) => line.startsWith('// Spec: ') && line.includes(url)), true, url);
+  assert.match(SRC95, /^\/\/ Docs \(GitHub README, not an allowed Spec host\).*\n\/\/ https:\/\/github\.com\/open-telemetry\/opentelemetry-collector-contrib\/blob\/v0\.164\.0\/exporter\/prometheusremotewriteexporter\/README\.md/m);
+  assert.match(SRC95, /Delta: Choose Delta aggregation temporality for Counter, Asynchronous Counter and Histogram/, 'the spec sentence is quoted');
+  assert.match(SRC95.split('\n').slice(0, 12).join('\n'), /docs\/LIVE-DEMO\.md/);
+  assert.match(SRC95, /Facts used/);
+  assert.match(SRC95, /Invented/);
+  const copy = plain(JSON.stringify(level95.play));
+  assert.equal(/dash0/i.test(copy), false, 'no Dash0 claim without a Dash0 docs page');
+  assert.equal(/pric|\$|dollar|cost per|per GB|invoice|bill/i.test(copy), false, 'no pricing copy');
+  assert.equal(SRC95.includes('\u2014'), false, 'no em dash');
 });
