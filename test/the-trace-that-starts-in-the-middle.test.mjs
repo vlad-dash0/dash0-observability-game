@@ -26,7 +26,7 @@ const byId = (id) => tree.spans.find((s) => s.spanId === id);
 const byName = (service, name) => tree.spans.find((s) => s.service === service && s.name === name);
 const WEB_C = byId('9c3e1a7d4b6f2085');
 const WEB_C2A = byId('2f8b6d0a1c5e9347');
-const WEB_C2B = byId('7a1d5f3b9e0c4628');
+const WEB_C2B = byId('f7a1d5f3b9e0c462');
 const CART_S = byName('cart', 'POST /cart/checkout');
 const CART_C = byId('e0a4c8f2b6d19375');
 const CART_C2A = byId('3d7b1f5a9c2e8064');
@@ -177,13 +177,14 @@ test('step 2: every other parent for either server span fails; the enclosing SER
   assert.deepEqual(gradeWith(WEB_C.spanId, CART_C2B.spanId), ['wrong-parent:payments'], 'the parallel POST of cart');
 });
 
-test('step 2 blind rules: name match, verb, middle, every extremal timing rule, first and last row all fail through checkBuild', () => {
+test('step 2 blind rules: name match, verb, middle, every extremal timing rule, largest and smallest span ID, first and last row all fail through checkBuild', () => {
   const callerOf = { cart: 'web', payments: 'cart' };
   const rows = waterfall(tree.spans).rows.map((row) => byId(row.spanId)); // board order
   /** The client spans of the caller that enclose `server`, in board order. */
   const cands = (server) => rows.filter((s) => s.kind === 'CLIENT' && s.service === callerOf[server.service] && s.startMs <= server.startMs && s.endMs >= server.endMs);
   const width = (p) => p.endMs - p.startMs;
-  const by = (key, dir = 1) => (server) => [...cands(server)].sort((a, b) => dir * (key(a) - key(b)))[0];
+  const cmp = (x, y) => (x < y ? -1 : x > y ? 1 : 0);
+  const by = (key, dir = 1) => (server) => [...cands(server)].sort((a, b) => dir * cmp(key(a), key(b)))[0];
   const nth = (key, i) => (server) => [...cands(server)].sort((a, b) => key(a) - key(b))[i];
   const verb = (name) => name.split(' ')[0];
   const rules = {
@@ -200,6 +201,8 @@ test('step 2 blind rules: name match, verb, middle, every extremal timing rule, 
     'middle by width': nth(width, 1),
     'middle by start': nth((c) => c.startMs, 1),
     'middle by end': nth((c) => c.endMs, 1),
+    'largest span ID': by((c) => c.spanId, -1),
+    'smallest span ID': by((c) => c.spanId),
     'first row': (server) => cands(server)[0],
     'middle row': (server) => cands(server)[1],
     'last row': (server) => cands(server)[2],

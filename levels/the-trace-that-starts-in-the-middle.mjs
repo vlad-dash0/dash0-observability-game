@@ -32,7 +32,7 @@ const T = '5d2b8f0e7c41a396b0d4e8f21a7c3b95';
 const WEB_S = '1e7a3c9d5b2f8046';
 const WEB_C = '9c3e1a7d4b6f2085';
 const WEB_C2A = '2f8b6d0a1c5e9347';
-const WEB_C2B = '7a1d5f3b9e0c4628';
+const WEB_C2B = 'f7a1d5f3b9e0c462';
 const CART_S = '4b9e2c6a0d8f1573';
 const CART_C = 'e0a4c8f2b6d19375';
 const CART_C2A = '3d7b1f5a9c2e8064';
@@ -51,7 +51,7 @@ const span = (spanId, service, name, kind, startMs, endMs, parentId) => ({
 // that carried the header and two parallel calls), all enclosing it, so timing cannot pick. Client spans carry the bare HTTP method as
 // their name (a client has no route to put in a name), so no server name matches a client name; the right client is not its caller's
 // only POST (one parallel call is a POST too, listed above it on the web board); and the timings share no position between the two
-// hops (web: the right client is the latest to start, the tightest and the first to end; cart: the earliest to start, the widest and
+// hops, and no span ID order picks it either (the decoy POST on web has the largest ID there, the right one on cart) (web: the right client is the latest to start, the tightest and the first to end; cart: the earliest to start, the widest and
 // the last to end), so no rule by name, verb, middle, extreme or row position passes both hops (test/the-trace-that-starts-in-the-middle.test.mjs).
 // Only the ids tell them apart, read from the header against the id table.
 const TREE = {
