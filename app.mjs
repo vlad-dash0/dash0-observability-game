@@ -12,7 +12,7 @@ import { DOTS } from './hub/globe-data.mjs';
 import { GAME_SUMMARY } from './hub/about.mjs';
 import { badgeViews } from './hub/badges.mjs';
 import { COMING_SOON } from './hub/coming-soon.mjs';
-import { ACT_REGIONS, actOfCountry, COUNTRY_NAMES, LEVEL_COUNTRY } from './hub/globe-map.mjs';
+import { ACT_REGIONS, actOfCountry, COUNTRY_NAMES, islandDots, LEVEL_COUNTRY } from './hub/globe-map.mjs';
 import { NODE_IDS } from './hub/map-data.mjs';
 import { ACTS } from './levels/index.mjs';
 import { shuffle as kitShuffle } from './lib/lesson-kit.mjs';
@@ -93,7 +93,7 @@ export function createGame(deps) {
     deck = DECK,
     globe: mountGlobe = null,
     globeMap = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES, actOf: actOfCountry },
-    dots = DOTS,
+    dots = [...DOTS, ...islandDots()],
     comingSoon = COMING_SOON,
     now = Date.now,
     rand = Math.random,
