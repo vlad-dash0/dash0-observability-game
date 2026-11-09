@@ -60,7 +60,7 @@ test('step 1: the intro and the table name neither ForceFlush nor a flush, and n
   const before = plain(`${FIX_STEP.intro} ${FIX_STEP.show} ${FIX_STEP.question}`);
   assert.doesNotMatch(before, /flush|shutdown|OTEL_BSP|link/i);
   assert.match(before, /120 ms/);
-  assert.match(before, /5,000 ms/);
+  assert.match(before, /5000 ms/);
 });
 
 test('step 1 whyNots hold against the numbers: the delay is longer than the 120 ms invocation, Shutdown is once per provider', () => {
@@ -97,7 +97,7 @@ test('step 2: a valid links-only build, no helps, the reference answer passes ch
   assert.deepEqual(spec.edit, ['links']);
   assert.deepEqual(spec.helps, {});
   assert.equal(Object.hasOwn(spec, 'hint'), false);
-  assert.equal(plain(BATCH_STEP.question), 'Connect orders process to every message it handled.');
+  assert.equal(plain(BATCH_STEP.question), 'Connect orders process to the messages of this batch, and only those.');
   assert.deepEqual(gradeLinks(ANSWER), { ok: true, codes: [] });
 });
 
@@ -186,19 +186,39 @@ test('step 2: the span id of the fourth message sits between two of the batch\'s
 
 // ---- the message list the step needs ---------------------------------------------------------
 
-test('step 2 shows the batch\'s message list: three messages with their creation span ids and traces, in order, and not the fourth', () => {
+test('step 2 shows the batch\'s message list by trace only: three messages with their traces, no span ids, and not the fourth', () => {
   assert.deepEqual(CONTENT.messages.map((m) => [m.message, m.spanId]), [['m-1', P1], ['m-2', P2], ['m-3', P3]]);
   const shown = plain(BATCH_STEP.show);
   for (const m of CONTENT.messages) {
-    assert.equal(shown.includes(m.spanId), true, `${m.message} ${m.spanId}`);
     assert.equal(shown.includes(m.trace), true, `${m.message} trace ${m.trace}`);
     assert.equal(m.trace, shortTrace(byId(m.spanId).traceId));
   }
-  assert.equal(shown.includes(P4), false, 'the next batch\'s message is not listed');
-  assert.equal(shown.includes(shortTrace(byId(P4).traceId)), false);
-  assert.equal(shown.includes(REQ_A), false);
-  assert.match(shown, /Messages in this batch/);
-  assert.equal(FIX_STEP.show.includes(P1), false, 'step 1 carries no message list: the list is on the step that needs it');
+  for (const s of spec.spans) assert.equal(shown.includes(s.spanId), false, `no span id on the table: ${s.spanId}`);
+  assert.doesNotMatch(shown, /Created by|span/i);
+  assert.match(shown, /Messages in this batch.*Message.*In trace/);
+  assert.equal(shown.includes(shortTrace(byId(P4).traceId)), false, 'the next batch\'s message is not listed');
+  assert.equal(shown.includes(shortTrace(byId(PROC).traceId)), false);
+  // the trace of the first message also holds the request span, so the trace code alone does not separate the publish span from its parent
+  assert.equal(byId(REQ_A).traceId, byId(P1).traceId);
+  assert.equal(spec.spans.filter((s) => s.traceId === byId(P1).traceId).length, 2, 'trace 1 holds REQ_A and P1');
+  assert.equal(FIX_STEP.show.includes(shortTrace(byId(P1).traceId)), false, 'step 1 carries no message list: the list is on the step that needs it');
+});
+
+test('step 1 labels are parallel: no purpose clause, and the same shape', () => {
+  for (const c of choices) assert.doesNotMatch(plain(c.label), /\bso\b/, 'no purpose clause');
+  assert.deepEqual(choices.map((c) => /^(Set|Call) \S+ (to|on) /.test(plain(c.label))), [true, true, true]);
+});
+
+test('step 1: reasoning in a why is labelled as reasoning (the delay and the Shutdown whys)', () => {
+  assert.match(plain(choices[0].why), /reasoning from the numbers, not a quote/);
+  assert.match(plain(choices[1].why), /reasoning from the scenario, not a quote/);
+});
+
+test('the copy says "a batch span processor", not a default one; one format for 5000 ms; the semconv version is named', () => {
+  assert.doesNotMatch(SRC, /default batch span processor/);
+  assert.match(plain(FIX_STEP.intro), /a batch span processor/);
+  assert.equal(/5,000/.test(plain(JSON.stringify(level.play))), false);
+  assert.match(SRC, /semantic conventions 1\.45\.0/);
 });
 
 test('step 2 copy: the intro does not name a link, a flush or the answer', () => {

@@ -1,5 +1,5 @@
 // Level 9.8: Edge of the platform. Act 9 "Live Demo" (docs/LIVE-DEMO.md), Samoa. Kettle & Co's order function runs on a serverless platform that
-// suspends its environment right after a handler returns, with the SDK's default batch span processor. Its spans never arrive. The player picks
+// suspends its environment right after a handler returns, with a batch span processor. Its spans never arrive. The player picks
 // the fix that gets every invocation's spans out before the handler returns (Choice: ForceFlush on the tracer provider; lowering the batch delay
 // and calling Shutdown each time are the two that sound right and fail), then connects the worker's batch span to the three messages it handled
 // (Build it, `edit: ['links']`), one from each of three traces, with two decoys: a publish span whose message is not in this batch, and the
@@ -15,7 +15,7 @@
 // "The default value is 5000". SDK environment variables: OTEL_BSP_SCHEDULE_DELAY is the "Delay interval (in milliseconds) between two
 // consecutive exports", default 5000. Trace SDK, TracerProvider Shutdown: "Shutdown MUST be called only once for each TracerProvider instance.
 // After the call to Shutdown, subsequent attempts to get a Tracer are not allowed." Shutdown "MUST be implemented at least by invoking Shutdown
-// within all internal processors", and for a SpanProcessor "Shutdown MUST include the effects of ForceFlush". Messaging spans: "A single
+// within all internal processors", and for a SpanProcessor "Shutdown MUST include the effects of ForceFlush". Messaging spans (semantic conventions 1.45.0, status Development): "A single
 // "Process" or "Receive" span can account for a single message, for a batch of messages, or for no message at all", and "For each message it
 // accounts for, the "Process" or "Receive" span SHOULD link to the message's creation context"; span links are "the only option to correlate
 // producer and consumer(s) in batch scenarios as a span can only have a single parent".
@@ -54,17 +54,17 @@ const span = (spanId, traceId, service, name, kind, startMs, endMs, parentId = n
 const FIX = [
   {
     key: 'lower-delay',
-    label: `Set OTEL_BSP_SCHEDULE_DELAY to ${LOWER_MS} ms, so batches export sooner`,
+    label: `Set OTEL_BSP_SCHEDULE_DELAY to ${LOWER_MS} ms in the function\'s environment`,
     why:
       `A shorter delay is still a timer. The invocation takes ${HANDLER_MS} ms and the root span ends as the handler returns, so the timer cannot fire before the last span exists, ` +
       `and from then on the environment is suspended. ${LOWER_MS} ms is longer than the whole invocation, and no value of the delay changes the order: span ends, handler returns, environment suspended, timer due. (This is reasoning from the numbers, not a quote.)`,
   },
   {
     key: 'shutdown',
-    label: 'Call Shutdown on the tracer provider at the end of every invocation',
+    label: 'Call Shutdown on the tracer provider at the end of each request',
     why:
       'Shutdown does export what is pending (a SpanProcessor\'s Shutdown "MUST include the effects of ForceFlush"), but the SDK spec says it "MUST be called only once for each TracerProvider instance" and that after it "subsequent attempts to get a Tracer are not allowed". ' +
-      'The same environment serves the next request, and a shut-down provider can no longer give it a tracer.',
+      'The same environment serves the next request, and a shut-down provider can no longer give it a tracer. (The last part is reasoning from the scenario, not a quote.)',
   },
   {
     key: 'force-flush',
@@ -103,8 +103,8 @@ const MESSAGES = [['m-1', P1], ['m-2', P2], ['m-3', P3]].map(([message, spanId])
 });
 
 const messageTable =
-  '<table><caption>Messages in this batch</caption><thead><tr><th scope="col">Message</th><th scope="col">Created by span</th><th scope="col">In trace</th></tr></thead><tbody>' +
-  MESSAGES.map((m) => `<tr><td>${m.message}</td><td><code>${m.spanId}</code></td><td><code>${m.trace}</code></td></tr>`).join('') +
+  '<table><caption>Messages in this batch</caption><thead><tr><th scope="col">Message</th><th scope="col">In trace</th></tr></thead><tbody>' +
+  MESSAGES.map((m) => `<tr><td>${m.message}</td><td><code>${m.trace}</code></td></tr>`).join('') +
   '</tbody></table>';
 
 /** The level's answer tables (pinned by test/edge-of-the-platform.test.mjs). */
@@ -125,13 +125,13 @@ export default {
     steps: [
       {
         intro:
-          'Kettle &amp; Co\'s order function runs on a serverless platform, with the SDK\'s default batch span processor. In the trace backend, almost no span from the function ever shows up. ' +
+          'Kettle &amp; Co\'s order function runs on a serverless platform, with a batch span processor. In the trace backend, almost no span from the function ever shows up. ' +
           `Each request takes ${HANDLER_MS} ms, and the platform suspends the environment right after the handler returns, as some FaaS platforms do. A later request may land on the same environment.`,
         show:
           '<table><caption>One request, in time</caption><thead><tr><th scope="col">Time</th><th scope="col">What happens</th></tr></thead><tbody>' +
           '<tr><td>0 ms</td><td>The request arrives; the first span starts</td></tr>' +
           `<tr><td>${HANDLER_MS} ms</td><td>The handler returns; the platform suspends the environment</td></tr>` +
-          `<tr><td>${DELAY_MS.toLocaleString('en-US')} ms</td><td>The default delay of the batch span processor</td></tr></tbody></table>`,
+          `<tr><td>${DELAY_MS} ms</td><td>The default delay of the batch span processor</td></tr></tbody></table>`,
         question: 'Which change gets the spans of every request out?',
         qid: 'eop-q-fix',
         choice: { id: 'eop-fix', choices: FIX },
@@ -141,7 +141,7 @@ export default {
           `The spans arrive now. At ${START} ms the platform hands the worker a batch of three messages, and <code>orders process</code> handles all three in one invocation. ` +
           'Each message was published by a different request. The worker\'s span starts a trace of its own.',
         show: messageTable,
-        question: 'Connect <code>orders process</code> to every message it handled.',
+        question: 'Connect <code>orders process</code> to the messages of this batch, and only those.',
         qid: 'eop-q-batch',
         build: BATCH,
       },
