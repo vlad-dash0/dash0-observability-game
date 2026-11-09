@@ -188,6 +188,8 @@ disposes it while a level covers the hub and on `pagehide`, and shows the text f
 three.js, the colours or WebGL are unavailable. Level `lights` stay level data, validated
 against `hub/map-data.mjs` `NODE_IDS`, and are no longer drawn.
 
+Island markers (#240). Fiji, Vanuatu and Samoa have no land dot on the 110m data, so `hub/globe-map.mjs` `ISLANDS` (hand-written, frozen: subregion and the capital's `[lat, lon]`) places each on its 3 nearest lattice points that are not land (`islandDots(k = 3)`, pure, deterministic, same `[lat, lon, iso3, subregion]` shape as `DOTS`). The one seam is `createGame`'s `dots` default in `app.mjs`, `[...DOTS, ...islandDots()]`; `dotStates`, `regionCentre` and ignite see them as ordinary dots, and `hub/globe-data.mjs` and its SHA pin are untouched. Polynesia is in `ACT_REGIONS['act-9']` so Samoa's markers belong to Oceania. A level PR for one of these countries adds it to `LEVEL_COUNTRY`; `test/globe-data.test.mjs` reads land plus island dots.
+
 Act 9 (Oceania) uses its three countries: `filter-or-sampler` NZL, `the-34-percent-error-rate` AUS, `connect-to-dash0` PNG (docs/DASH0-LAB.md). `test/globe-data.test.mjs` `HOME` has a box for each. Its boss `its-us` (the lab) carries no country and pulses, then lights, the whole Oceania region like any boss.
 
 Coming soon (#177 P7): `hub/coming-soon.mjs` `COMING_SOON` lists announced acts (`{id, no, name,
