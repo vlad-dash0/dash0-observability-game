@@ -1202,6 +1202,55 @@ test('Escape with the card open closes the card, not the level', () => {
   assert.equal(typing.game.overlayOpen, true);
 });
 
+test('the open How to play modal traps Tab; with none open nothing is trapped', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  assert.equal(s.game.openModalSelector(), '#howto-modal');
+  const modal = s.dom.document.querySelector('#howto-modal');
+  const key = (shiftKey) => ({ key: 'Tab', shiftKey, preventDefault() {} });
+  assert.equal(s.game.trapTab(key(true)), true, 'focus is outside the modal here, so it is pulled in');
+  s.game.closeHowTo();
+  assert.equal(s.game.openModalSelector(), null);
+  assert.equal(s.game.trapTab(key(false)), false);
+  assert.ok(modal);
+});
+
+test('the page scroll is locked while How to play, About or Save code is open, and only then', () => {
+  const s = cardGame();
+  const root = s.dom.document.documentElement;
+  s.game.syncScrollLock();
+  assert.equal(root.classList.contains('modal-open'), false);
+  s.game.openLevel('w');
+  s.game.syncScrollLock();
+  assert.equal(root.classList.contains('modal-open'), true, 'How to play');
+  s.game.closeHowTo();
+  s.game.syncScrollLock();
+  assert.equal(root.classList.contains('modal-open'), false, 'the level alone does not lock the page');
+  s.game.closeOverlay();
+  s.game.aboutOpen = true;
+  s.game.syncScrollLock();
+  assert.equal(root.classList.contains('modal-open'), true, 'About');
+  s.game.aboutOpen = false;
+  s.game.saveOpen = true;
+  s.game.syncScrollLock();
+  assert.equal(root.classList.contains('modal-open'), true, 'Save code');
+  assert.equal(shell.querySelector('.app').getAttribute('x-effect'), 'syncScrollLock()', 'index.html keeps it in step');
+  assert.match(read('styles/base.css'), /html\.modal-open, html\.modal-open body \{ overflow: hidden; \}/);
+});
+
+test('the How to play header button stays on one line at 320px', () => {
+  assert.match(read('styles/hub.css'), /#ov-howto-open \{[^}]*white-space: nowrap/);
+});
+
+test('the level header names the level number, and Incident for a boss', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  assert.equal(s.game.overlayNo, 'Level 0.2');
+  s.game.closeOverlay();
+  s.game.openLevel('x');
+  assert.equal(s.game.overlayNo, 'Level 0.1');
+});
+
 test('Escape that a widget already handled leaves the card alone', () => {
   const s = cardGame();
   s.game.openLevel('w');
@@ -1214,7 +1263,8 @@ test('the card never blocks finishing and is not level DOM', () => {
   s.game.openLevel('w');
   assert.equal(s.game.howToOpen, true);
   assert.equal(s.dom.document.querySelector('#ov-body #ov-howto') === null, true);
-  assert.ok(s.dom.document.querySelector('.overlay #ov-howto'), 'the card is overlay markup');
+  assert.equal(s.dom.document.querySelector('.overlay #ov-howto') === null, true, 'the modal is not rendered in the level overlay');
+  assert.ok(s.dom.document.querySelector('.app > #howto-modal #ov-howto'), 'it is a modal beside the overlay');
   assert.equal(s.dom.document.querySelector('[data-finish]').disabled, false);
   ctxs.w.finish({ text: 'finished with the card open' });
   assert.equal(s.game.rewardOpen, true);
@@ -1437,7 +1487,7 @@ test('index.html: ? is a kit icon button with a name; the About dialog is outsid
   assert.equal(open.getAttribute('aria-label'), 'How this game works');
   assert.equal(open.getAttribute('@click'), 'openAbout()');
   assert.ok(open.closest('.hub-header'), '? is in the header');
-  const about = shell.querySelector('.about');
+  const about = shell.querySelector('#about-modal.ui-modal');
   assert.equal(about.getAttribute('role'), 'dialog');
   assert.equal(about.getAttribute('aria-modal'), 'true');
   assert.equal(about.getAttribute('aria-labelledby'), 'about-title');
@@ -1448,24 +1498,32 @@ test('index.html: ? is a kit icon button with a name; the About dialog is outsid
   assert.equal(read('index.html').includes('x-html'), false, 'no x-html');
 });
 
-test('index.html: the How to play control and card', () => {
+test('index.html: the How to play control and modal', () => {
   const open = shell.querySelector('#ov-howto-open');
   assert.ok(open.closest('.lesson-top'), 'the reopen button is in the level header');
   assert.deepEqual(open.getAttribute('class').split(' '), ['ui-btn', 'ui-btn--ghost']);
   assert.equal(open.getAttribute('type'), 'button');
   assert.equal(open.getAttribute('x-show'), 'howTo.topics.length > 0');
   assert.equal(open.getAttribute(':aria-expanded'), 'howToExpanded()');
+  assert.equal(open.getAttribute('aria-haspopup'), 'dialog');
   assert.equal(open.getAttribute('aria-controls'), 'ov-howto');
   assert.equal(open.getAttribute('@click'), 'toggleHowTo()');
+  const modal = shell.querySelector('#howto-modal');
   const card = shell.querySelector('#ov-howto');
-  assert.ok(card.closest('.overlay'), 'the card is overlay markup');
-  assert.equal(card.closest('[x-ignore]') === null, true, 'Alpine renders it');
-  assert.equal(shell.querySelector('.level-host #ov-howto, [x-ignore] #ov-howto') === null, true);
-  assert.equal(card.closest('.level-host') === null, true, 'a step never wipes it');
-  assert.equal(card.getAttribute('aria-labelledby'), 'ov-howto-title');
-  assert.equal(card.closest('[x-show="howToOpen"]') !== null, true, 'shown by howToOpen');
-  assert.equal(card.hasAttribute('aria-modal'), false, 'not modal');
+  assert.ok(modal.classList.contains('ui-modal') && modal.contains(card));
+  assert.equal(modal.closest('.overlay') === null, true, 'a sibling of the overlay: the overlay can go inert');
+  assert.equal(modal.closest('#hub') === null, true);
+  assert.equal(modal.closest('[x-ignore]') === null, true, 'Alpine renders it');
+  assert.equal(modal.getAttribute('role'), 'dialog');
+  assert.equal(modal.getAttribute('aria-modal'), 'true', 'modal');
+  assert.equal(modal.getAttribute('aria-labelledby'), 'ov-howto-title');
+  assert.equal(modal.getAttribute('x-show'), 'howToOpen');
+  assert.equal(shell.querySelector('.overlay').getAttribute(':inert'), 'howToOpen', 'the level is inert while it is open');
   assert.equal(shell.querySelector('#ov-howto-title').getAttribute('tabindex'), '-1');
+  const x = card.querySelector('#ov-howto-x');
+  assert.deepEqual(x.getAttribute('class').split(' '), ['ui-btn', 'ui-btn--icon']);
+  assert.equal(x.getAttribute('@click'), 'closeHowTo()');
+  assert.ok(x.getAttribute('aria-label'));
   for (const [id, click] of [['ov-howto-close', 'closeHowTo()'], ['ov-howto-hide', 'hideHowTo()']]) {
     const b = card.querySelector(`#${id}`);
     assert.deepEqual(b.getAttribute('class').split(' '), ['ui-btn', 'ui-btn--ghost'], `${id} is ghost: one primary per screen`);

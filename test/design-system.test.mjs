@@ -304,8 +304,8 @@ const DYNAMIC_ALLOW = {
     done: ['level-card'], locked: ['level-card'], nudge: ['level-card'],
     // lib/globe-render.mjs `globe-probe ${role}` over COLOR_ROLES (lit and pulse are literal in index.html)
     body: ['globe-probe'], dim: ['globe-probe'], rim: ['globe-probe'], sky: ['globe-probe'],
-    // index.html Alpine :class (overlayOpen, rewardOpen, notice, aboutOpen)
-    open: ['about', 'save-dialog'], show: ['notice', 'overlay', 'reward'],
+    // index.html Alpine :class (overlayOpen, rewardOpen, notice)
+    show: ['notice', 'overlay', 'reward'],
   },
 };
 
@@ -374,6 +374,29 @@ test('T13 lesson text, muted text and the eyebrow reach 4.5:1 on the card and it
   // The prototype's light eyebrow (#a8650f) fails, which is why the kit has its own ink.
   const proto = ratio([0xa8, 0x65, 0x0f], resolveColor('var(--color-surface)', 'light'));
   assert.ok(proto < 4.5, `prototype eyebrow is ${proto.toFixed(2)}`);
+});
+
+test('T13 modal text reaches 4.5:1 on its card, glowed head, foot and the About act cards, both themes', () => {
+  const mix = (a, b, wa) => a.map((v, i) => Math.round(v * wa + b[i] * (1 - wa)));
+  for (const theme of ['light', 'dark']) {
+    const surface = resolveColor('var(--color-surface)', theme);
+    const bg = resolveColor('var(--color-bg)', theme);
+    const fills = {
+      card: surface,
+      head: overlay('--color-lesson-glow', '--color-surface', theme),
+      foot: mix(bg, surface, 0.45), // .ui-modal-foot: color-mix(in srgb, bg 45%, surface)
+      'about act card': mix(bg, surface, 0.35), // .about-acts li
+    };
+    for (const fg of ['--color-text', '--color-text-muted']) {
+      for (const [name, fill] of Object.entries(fills)) {
+        const r = ratio(resolveColor(`var(${fg})`, theme), fill);
+        assert.ok(r >= 4.5, `${theme}: ${fg} on the modal ${name} is ${r.toFixed(2)}, needs 4.5`);
+      }
+    }
+  }
+  const kit = read('styles/kit.css');
+  assert.match(kit, /\.ui-modal-foot \{[^}]*color-mix\(in srgb, var\(--color-bg\) 45%, var\(--color-surface\)\)/, 'the foot fill the test mixes');
+  assert.match(read('styles/hub.css'), /\.about-acts li \{[^}]*color-mix\(in srgb, var\(--color-bg\) 35%, var\(--color-surface\)\)/, 'the act card fill the test mixes');
 });
 
 test('T13 meter cells left and the alert red reach 3:1 (non-text) on surface and bg, both themes', () => {

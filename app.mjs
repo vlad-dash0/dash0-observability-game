@@ -22,6 +22,7 @@ import { freshlyLit, igniteView, litText } from './lib/globe-ignite.mjs';
 import { dotStates, globeLabel, globeLines, globeTarget } from './lib/globe-view.mjs';
 import { hideHelp, readHiddenHelp } from './lib/help-prefs.mjs';
 import { howToView } from './lib/how-to-play.mjs';
+import { trapTab } from './lib/modal-focus.mjs';
 import { createLevelContext } from './lib/level-context.mjs';
 import { cardTotals, mergeProgress, recordCompletion, registryIds, starTotals } from './lib/progress.mjs';
 import { MAX_STARS } from './lib/scoring.mjs';
@@ -168,6 +169,7 @@ export function createGame(deps) {
     ].sort((a, b) => a.no - b.no),
     overlayOpen: false,
     overlayTitle: '',
+    overlayNo: '',
     currentLevelId: null,
     nudgeId: null,
     rewardOpen: false,
@@ -413,6 +415,7 @@ export function createGame(deps) {
       session = controller;
       this.currentLevelId = id;
       this.overlayTitle = level.name;
+      this.overlayNo = level.kind === 'boss' ? 'Incident' : level.no ? `Level ${level.no}` : '';
       this.overlayOpen = true;
       // The card is decided before the level runs; stored choices are read at every open, so
       // another tab's Don't show again counts. A failed read shows the card.
@@ -449,9 +452,10 @@ export function createGame(deps) {
       }, NUDGE_MS);
     },
 
-    // ---------- How to play card ----------
-    // The card lives in .overlay markup, outside the level's DOM: a step never wipes it, it is
-    // not modal and never blocks Finish. Focus returns to the reopen button when it closes.
+    // ---------- How to play modal ----------
+    // A kit modal outside .overlay and the level's DOM: a step never wipes it. While it is open the
+    // overlay is inert (index.html :inert="howToOpen") and Tab stays inside (trapTab). Focus returns
+    // to the header's How to play button when it closes.
     howToExpanded() {
       return this.howToOpen ? 'true' : 'false';
     },
@@ -595,7 +599,28 @@ export function createGame(deps) {
       this.refreshGlobe();
     },
 
-    // One window-level Escape handler: closes the reward, else the About dialog, else Save code, else the How to play card, else the level, but never the
+    // The page behind an open kit modal must not scroll: a class on <html> (index.html x-effect keeps it
+    // in step with the three flags; the rule is in base.css, never an inline style).
+    scrollLocked() {
+      return this.howToOpen || this.aboutOpen || this.saveOpen;
+    },
+    syncScrollLock() {
+      doc.documentElement.classList.toggle('modal-open', this.scrollLocked());
+    },
+    // Tab (and Shift+Tab) wrap inside the open kit modal; the page behind is inert, so without this
+    // focus would fall out to the browser's own controls. Not a modal (the level, the reward): untouched.
+    openModalSelector() {
+      if (this.howToOpen) return '#howto-modal';
+      if (this.saveOpen) return '#save-modal';
+      if (this.aboutOpen) return '#about-modal';
+      return null;
+    },
+    trapTab(e) {
+      const sel = this.openModalSelector();
+      return sel === null ? false : trapTab(e, doc.querySelector(sel), doc);
+    },
+
+    // One window-level Escape handler: closes the reward, else the About dialog, else Save code, else the How to play modal, else the level, but never the
     // level while the player is typing in it. A widget that handled the Escape (it called
     // preventDefault, e.g. Build it cancelling a pick) owns it.
     onEscape(e) {
