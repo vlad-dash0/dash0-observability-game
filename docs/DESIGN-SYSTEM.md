@@ -106,9 +106,32 @@ pass it); the level overlay is as wide as the widest step. Every step is the `le
 960px)` and stacks below. The 960 is a literal: custom properties do not work in container
 conditions. Kit text inside a clipping container (`overflow: hidden`) must be able to break a long token: lesson `code` and `code` inside a `.ui-panel` (which clips too, and is no table cell) set `overflow-wrap: anywhere`, as feedback, chips and options already do. Questions are centred in narrow steps and left-aligned in wide ones (D4).
 
+## Modal
+
+One dialog shell for How to play (`#howto-modal`), About (`#about-modal`) and Save code (`#save-modal`)
+(#282, owner direction 2026-11-08; D5 sign-off from the PR screenshots). Its markup is static in
+`index.html` (the one place that writes `ui-` classes by hand, like the buttons), because Alpine opens
+it with `x-show`; `test/modal.test.mjs` pins every shell to the same parts:
+
+| Part | Class | Holds |
+| --- | --- | --- |
+| Backdrop | `ui-modal` | Fixed, dimmed and blurred; `role="dialog"`, `aria-modal="true"`, named by its h2. |
+| Card | `ui-modal-card` | Surface with a hairline top accent (red to orange); body scrolls inside it (`max-block-size: 100%`), so it fits 320px. |
+| Head | `ui-modal-head`, `ui-modal-heading` | Mono `ui-eyebrow`, the h2 (`tabindex="-1"`, focus lands here), and a `ui-btn--icon` close with a name. The lesson glow sits behind it. |
+| Body | `ui-modal-body` | The scrolling content: `ui-modal-topic` sections (a heading and muted text) and `ui-modal-note`; a `ui-panel` placed directly in it loses its box (Save code). |
+| Foot | `ui-modal-foot` | Optional buttons, right-aligned; one primary at most (About's Close; How to play's are ghost, the level behind owns the primary). |
+
+Behaviour: focus moves to the title on open and back to the opener on close (`app.mjs` `focusSoon`);
+Escape closes the top modal (`onEscape`); the page behind is inert (`#hub` via `hubInert()`, `.overlay`
+via `:inert="howToOpen"`, so How to play sits beside the overlay, never inside it); Tab and Shift+Tab wrap
+inside (`lib/modal-focus.mjs`, `trapTab`); motion is a short fade and slide that the global
+reduced-motion rule shortens. The reward card is not a modal of this kind (D3: it keeps its glow).
+How to play opens by itself the first time a widget type appears (as before) and from the level header's
+How to play button.
+
 ## Focus
 
-A level opens with focus on Back (`#ov-back`, set by `openLevel` in `app.mjs` after `level.run`); a widget's mount focus (first line, input, radio) only takes effect on later steps, and after a Check or Next focus moves to the feedback or the next step.
+A level opens with focus on Back (`#ov-back`, set by `openLevel` in `app.mjs` after `level.run`), or on the How to play modal's title when it opens by itself; a widget's mount focus (first line, input, radio) only takes effect on later steps, and after a Check or Next focus moves to the feedback or the next step.
 
 ## Authoring content
 

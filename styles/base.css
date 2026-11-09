@@ -12,6 +12,9 @@ html, body {
   overflow-x: hidden;
 }
 
+/* A kit modal is open (app.mjs syncScrollLock): the page behind does not scroll. */
+html.modal-open, html.modal-open body { overflow: hidden; }
+
 body {
   min-height: 100vh;
   background:

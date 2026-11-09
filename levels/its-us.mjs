@@ -150,7 +150,7 @@ export default {
     const stepNotConnected = () => {
       const why = tele.liveAvailable()
         ? 'Your own Dash0 needs a connection from level 9.3 first. Connect there, then come back.'
-        : 'Your own Dash0 needs a connection from level 9.3 first, and connecting to your own Dash0 is not open yet. Practice works the same way.';
+        : 'Your own Dash0 needs a connection from level 9.3 first, and connecting to your own Dash0 is not available in this browser. Practice works the same way.';
       ctx.renderStep(
         screen(
           ctx.speech(

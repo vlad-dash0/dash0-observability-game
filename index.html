@@ -23,7 +23,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 </head>
 <body>
-<div class="app" x-data="game" @keydown.escape.window="onEscape($event)">
+<div class="app" x-data="game" @keydown.escape.window="onEscape($event)" @keydown.tab.window="trapTab($event)" x-effect="syncScrollLock()">
 
   <!-- The hub: inert while the level, reward or About dialog is open, so Tab and Enter cannot
        reach the cards behind it. Alpine removes the attribute when the value is false. -->
@@ -117,6 +117,11 @@
         </div>
       </template>
     </section>
+    <section class="save-entry" aria-labelledby="save-entry-title" x-show="!debug" x-cloak>
+      <h2 id="save-entry-title" class="section-label">Your progress</h2>
+      <p class="save-entry-text">Copy it to another browser with a code.</p>
+      <button type="button" class="ui-btn ui-btn--ghost" id="save-open" @click="openSave()">Save code</button>
+    </section>
   </div>
 
   <!-- LEVEL OVERLAY. Levels render into ov-body / ov-actions (found by id) with
@@ -124,39 +129,51 @@
        the initial markup: Alpine still initialises nodes added later, so level markup
        must not use Alpine attributes (x-, @, :). -->
   <div class="overlay" :class="overlayOpen ? 'show' : ''" x-cloak
-       role="dialog" aria-modal="true" :aria-label="overlayTitle">
+       role="dialog" aria-modal="true" :aria-label="overlayTitle" :inert="howToOpen">
     <div class="lesson-top">
       <button type="button" class="ui-btn ui-btn--icon" id="ov-back" aria-label="Back to the map" @click="closeOverlay()"><span aria-hidden="true">&larr;</span></button>
-      <h2 x-text="overlayTitle"></h2>
+      <div class="lesson-heading">
+        <p class="ui-eyebrow" x-show="overlayNo" x-text="overlayNo"></p>
+        <h2 x-text="overlayTitle"></h2>
+      </div>
       <button type="button" class="ui-btn ui-btn--ghost" id="ov-howto-open" x-show="howTo.topics.length > 0" x-cloak
-              :aria-expanded="howToExpanded()" aria-controls="ov-howto" @click="toggleHowTo()">How to play</button>
-    </div>
-    <!-- HOW TO PLAY: Alpine markup in the overlay, never inside .level-host (a step rewrites
-         #ov-body and Alpine skips x-ignore). Not modal; the level stays usable behind it. -->
-    <div class="howto" x-show="howToOpen" x-cloak>
-      <section class="ui-panel" id="ov-howto" aria-labelledby="ov-howto-title">
-        <div class="ui-panel-head"><h3 id="ov-howto-title" tabindex="-1">How to play</h3></div>
-        <template x-for="topic in howTo.topics" :key="topic.key">
-          <div class="ui-panel-sec">
-            <h4 x-text="topic.title"></h4>
-            <p x-text="topic.play"></p>
-            <p x-show="topic.stars" x-text="topic.stars"></p>
-            <p x-text="topic.hints"></p>
-          </div>
-        </template>
-        <div class="ui-panel-sec">
-          <p x-show="howTo.footer" x-text="howTo.footer"></p>
-          <div class="howto-actions">
-            <button type="button" class="ui-btn ui-btn--ghost" id="ov-howto-close" @click="closeHowTo()">Close</button>
-            <button type="button" class="ui-btn ui-btn--ghost" id="ov-howto-hide" @click="hideHowTo()">Don't show again</button>
-          </div>
-        </div>
-      </section>
+              aria-haspopup="dialog" :aria-expanded="howToExpanded()" aria-controls="ov-howto" @click="toggleHowTo()">How to play</button>
     </div>
     <div class="level-host" x-ignore>
       <div class="lesson-scroll" id="ov-body"></div>
       <div class="lesson-actions" id="ov-actions"></div>
     </div>
+  </div>
+
+  <!-- HOW TO PLAY: a kit modal (docs/DESIGN-SYSTEM.md "Modal"), Alpine markup outside the overlay and
+       outside .level-host (a step rewrites #ov-body and Alpine skips x-ignore). While it is open the
+       overlay is inert (:inert on .overlay) and Tab stays inside it (trapTab). -->
+  <div class="ui-modal" id="howto-modal" x-show="howToOpen" x-cloak
+       role="dialog" aria-modal="true" aria-labelledby="ov-howto-title">
+    <section class="ui-modal-card" id="ov-howto">
+      <header class="ui-modal-head">
+        <div class="ui-modal-heading">
+          <p class="ui-eyebrow">Level guide</p>
+          <h2 id="ov-howto-title" tabindex="-1">How to play</h2>
+        </div>
+        <button type="button" class="ui-btn ui-btn--icon" id="ov-howto-x" aria-label="Close how to play" @click="closeHowTo()"><span aria-hidden="true">&times;</span></button>
+      </header>
+      <div class="ui-modal-body">
+        <template x-for="topic in howTo.topics" :key="topic.key">
+          <section class="ui-modal-topic">
+            <h3 x-text="topic.title"></h3>
+            <p x-text="topic.play"></p>
+            <p x-show="topic.stars" x-text="topic.stars"></p>
+            <p x-text="topic.hints"></p>
+          </section>
+        </template>
+        <p class="ui-modal-note" x-show="howTo.footer" x-text="howTo.footer"></p>
+      </div>
+      <footer class="ui-modal-foot">
+        <button type="button" class="ui-btn ui-btn--ghost" id="ov-howto-close" @click="closeHowTo()">Close</button>
+        <button type="button" class="ui-btn ui-btn--ghost" id="ov-howto-hide" @click="hideHowTo()">Don't show again</button>
+      </footer>
+    </section>
   </div>
 
   <!-- REWARD -->
@@ -179,23 +196,49 @@
   </div>
 
   <!-- ABOUT: the game summary and each act, from act data (hub/about.mjs, createGame.aboutActs). -->
-  <div class="about" :class="aboutOpen ? 'open' : ''" x-cloak
+  <div class="ui-modal" id="about-modal" x-show="aboutOpen" x-cloak
        role="dialog" aria-modal="true" aria-labelledby="about-title">
-    <div class="about-card">
-      <h2 id="about-title" tabindex="-1">How this game works</h2>
-      <p x-text="aboutSummary"></p>
-      <ol class="about-acts">
-        <template x-for="act in aboutActs()" :key="act.id">
-          <li>
-            <h3 x-text="act.title"></h3>
-            <p class="about-sub" x-show="act.sub" x-text="act.sub"></p>
-            <p x-show="act.teaser" x-text="act.teaser"></p>
-            <p class="act-badges" x-show="act.badges.length > 0"><template x-for="b in act.badges" :key="b.id"><span class="ui-chip" :data-tone="b.tone" x-text="b.label"></span></template></p>
-            <p x-show="act.soon"><span class="ui-chip" data-tone="neutral">Coming soon</span></p>
-          </li>
-        </template>
-      </ol>
-      <button type="button" class="ui-btn ui-btn--primary" id="about-close" @click="closeAbout()">Close</button>
+    <div class="ui-modal-card">
+      <header class="ui-modal-head">
+        <div class="ui-modal-heading">
+          <p class="ui-eyebrow">On Call by Dash0</p>
+          <h2 id="about-title" tabindex="-1">How this game works</h2>
+        </div>
+        <button type="button" class="ui-btn ui-btn--icon" id="about-x" aria-label="Close how this game works" @click="closeAbout()"><span aria-hidden="true">&times;</span></button>
+      </header>
+      <div class="ui-modal-body">
+        <p x-text="aboutSummary"></p>
+        <ol class="about-acts">
+          <template x-for="act in aboutActs()" :key="act.id">
+            <li>
+              <h3 x-text="act.title"></h3>
+              <p class="about-sub" x-show="act.sub" x-text="act.sub"></p>
+              <p x-show="act.teaser" x-text="act.teaser"></p>
+              <p class="act-badges" x-show="act.badges.length > 0"><template x-for="b in act.badges" :key="b.id"><span class="ui-chip" :data-tone="b.tone" x-text="b.label"></span></template></p>
+              <p x-show="act.soon"><span class="ui-chip" data-tone="neutral">Coming soon</span></p>
+            </li>
+          </template>
+        </ol>
+      </div>
+      <footer class="ui-modal-foot">
+        <button type="button" class="ui-btn ui-btn--primary" id="about-close" @click="closeAbout()">Close</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- SAVE CODE: its body is kit markup that lib/save-dialog.mjs draws and wires, so it has no
+       Alpine attributes. Outside #hub, like About. -->
+  <div class="ui-modal" id="save-modal" x-show="saveOpen" x-cloak
+       role="dialog" aria-modal="true" aria-labelledby="save-title">
+    <div class="ui-modal-card">
+      <header class="ui-modal-head">
+        <div class="ui-modal-heading">
+          <p class="ui-eyebrow">Your progress</p>
+          <h2 id="save-title" tabindex="-1">Save code</h2>
+        </div>
+        <button type="button" class="ui-btn ui-btn--icon" id="save-x" aria-label="Close save code" @click="closeSave()"><span aria-hidden="true">&times;</span></button>
+      </header>
+      <div class="ui-modal-body" id="save-body" x-ignore></div>
     </div>
   </div>
 

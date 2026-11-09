@@ -28,10 +28,11 @@
 .ui-actions--wide { max-inline-size: var(--layout-wide); }
 
 /* ---------- Lesson glow card (text.mjs) ---------- */
-/* Borderless, an amber glow top left and a dot top right over the surface; the eyebrow is
+/* A hairline edge, an amber glow top left and a dot top right over the surface; the eyebrow is
    decoration (empty alt text), so screen readers read the lesson only. */
 .ui-lesson {
-  position: relative; overflow: hidden; border-radius: 16px; padding: 18px 18px 20px;
+  position: relative; overflow: hidden; border-radius: var(--radius); padding: var(--space-5) var(--space-5) 22px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
   font-size: var(--text-lesson); line-height: 1.6; font-weight: var(--weight-regular); color: var(--color-lesson);
   background:
     radial-gradient(circle at 1.5px 1.5px, var(--color-lesson-dot) 1px, transparent 1.5px) right 14px top 14px / 14px 14px no-repeat,
@@ -102,6 +103,68 @@
 .ui-panel--drop { border-style: dashed; }
 @media (max-width: 520px) {
   .ui-panel-sec { padding: 14px var(--space-3); }
+}
+
+/* ---------- Modal (docs/DESIGN-SYSTEM.md "Modal"; static markup in index.html, which Alpine opens) ---------- */
+/* One dialog shell for How to play, About and Save code: a dimmed, blurred backdrop, a card that is
+   head (mono eyebrow, title, close), a body that scrolls inside the card, and an optional foot. The
+   page behind is inert and Tab is trapped (lib/modal-focus.mjs). Layered surfaces, a hairline top
+   accent and the lesson's glow in the head; no shadow. Motion is the global reduced-motion rule's. */
+.ui-modal {
+  position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center;
+  padding: var(--space-4); background: color-mix(in srgb, var(--color-bg) 72%, transparent);
+  backdrop-filter: blur(6px); animation: ui-modal-in .18s ease-out;
+}
+@keyframes ui-modal-in { from { opacity: 0; } to { opacity: 1; } }
+.ui-modal-card {
+  position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  inline-size: 100%; max-inline-size: 560px; max-block-size: 100%; min-width: 0; overflow: hidden;
+  background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  animation: slideUp .22s ease-out;
+}
+.ui-modal-card::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; block-size: 2px; pointer-events: none;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent) 35%, transparent 70%);
+}
+.ui-modal-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-4); border-bottom: 1px solid var(--color-border);
+  background: radial-gradient(110% 160% at 0% 0%, var(--color-lesson-glow), transparent 65%);
+}
+.ui-modal-heading { min-width: 0; display: grid; gap: var(--space-1); }
+.ui-modal-heading h2 { font-size: var(--text-title); font-weight: var(--weight-bold); line-height: 1.2; overflow-wrap: anywhere; }
+.ui-modal-heading h2:focus { outline: none; }
+.ui-modal-head .ui-btn { flex: none; }
+.ui-modal-body {
+  min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-content: start;
+  padding: var(--space-5); font-size: var(--text-md); line-height: 1.55; overflow-wrap: anywhere;
+}
+.ui-modal-body > p, .ui-modal-topic p { color: var(--color-text-muted); max-inline-size: var(--measure); }
+.ui-modal-topic { display: grid; gap: var(--space-2); }
+.ui-modal-topic + .ui-modal-topic { padding-block-start: var(--space-4); border-top: 1px solid var(--color-border); }
+.ui-modal-topic h3 { font-size: var(--text-base); font-weight: var(--weight-semibold); }
+.ui-modal-topic h3::before {
+  content: ""; display: inline-block; inline-size: 7px; block-size: 7px; margin-inline-end: var(--space-2);
+  border-radius: 2px; vertical-align: .08em; background: var(--color-primary);
+}
+.ui-modal-note { padding-block-start: var(--space-4); border-top: 1px solid var(--color-border); font-size: 13.5px; }
+.ui-modal-foot {
+  display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2);
+  padding: var(--space-3) var(--space-5); border-top: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-bg) 45%, var(--color-surface));
+}
+/* A dialog body built from panels (Save code) loses their box: the card is the box. */
+.ui-modal-body > .ui-panel { background: none; border: 0; border-radius: 0; overflow: visible; }
+.ui-modal-body > .ui-panel > .ui-panel-sec { padding-inline: 0; }
+.ui-modal-body > .ui-panel > .ui-panel-sec:first-child { padding-block-start: 0; }
+.ui-modal-body > .ui-panel > .ui-panel-sec:last-child { padding-block-end: 0; }
+@media (max-width: 520px) {
+  .ui-modal { padding: var(--space-2); }
+  .ui-modal-head { padding: var(--space-4) var(--space-4) var(--space-3); }
+  .ui-modal-heading h2 { font-size: var(--text-q); }
+  .ui-modal-body { padding: var(--space-4); }
+  .ui-modal-foot { padding: var(--space-3) var(--space-4); }
 }
 
 /* ---------- Chip (chip.mjs, side.mjs) ---------- */

@@ -120,6 +120,15 @@ entry). `CURRENT_VERSION = 1`; `MIGRATIONS = {}` where `MIGRATIONS[n]` maps v n 
 - With `levelIds`/`cardIds`: drop ids not in the set (the in-memory view). Without: keep
   every well-formed id (what gets persisted).
 
+**Save codes (#18)**: `lib/save-code.mjs` turns a registry-view record into `oc1.<base64url JSON>.<FNV-1a hex>`
+(`encodeProgress`) and reads one back (`decodeProgress` → `{ok, progress, dropped}` or `{ok: false, reason}`,
+reason one of `empty`, `format`, `version`, `checksum`, `shape`; whole or nothing, never throws; ids the
+registry lacks are dropped and counted; a completion time after year 9999 is refused as `shape`, and one before 1970 is written as no time). The checksum catches typos and cut-off copies, not edits. `previewImport`
+lists what a merge would add or improve and which levels keep better local stars; the merge itself is `mergeProgress`,
+so the F4 rules hold (best stars, earliest `at`, card union, never a downgrade). The hub's "Save code" dialog
+(`lib/save-view.mjs` markup, `lib/save-dialog.mjs` wiring, `createGame.openSave`) shows the preview before Import
+and saves through `saveProgress`. `?mode=debug` hides the entry and refuses to open it: nothing is exported or imported.
+
 ### 2.6 ctx (`createLevelContext({level, ovBody, ovActions, now, shuffle, reduceMotion, onFinish, signal, reportError?, telemetry?, guide?})`)
 
 ```
@@ -188,7 +197,9 @@ disposes it while a level covers the hub and on `pagehide`, and shows the text f
 three.js, the colours or WebGL are unavailable. Level `lights` stay level data, validated
 against `hub/map-data.mjs` `NODE_IDS`, and are no longer drawn.
 
-Act 9 (Oceania) uses its three countries: `filter-or-sampler` NZL, `the-34-percent-error-rate` AUS, `connect-to-dash0` PNG (docs/DASH0-LAB.md). `test/globe-data.test.mjs` `HOME` has a box for each. Its boss `its-us` (the lab) carries no country and pulses, then lights, the whole Oceania region like any boss.
+Island markers (#240). Fiji, Vanuatu and Samoa have no land dot on the 110m data, so `hub/globe-map.mjs` `ISLANDS` (hand-written, frozen: subregion and the capital's `[lat, lon]`) places each on its 3 nearest lattice points that are not land (`islandDots(k = 3)`, pure, deterministic, same `[lat, lon, iso3, subregion]` shape as `DOTS`). The one seam is `createGame`'s `dots` default in `app.mjs`, `[...DOTS, ...islandDots()]`; `dotStates`, `regionCentre` and ignite see them as ordinary dots, and `hub/globe-data.mjs` and its SHA pin are untouched. Polynesia is in `ACT_REGIONS['act-9']` so Samoa's markers belong to Oceania. A level PR for one of these countries adds it to `LEVEL_COUNTRY`; `test/globe-data.test.mjs` reads land plus island dots.
+
+Act 9 (Oceania) uses eight countries: `filter-or-sampler` NZL, `the-34-percent-error-rate` AUS, `connect-to-dash0` PNG (docs/DASH0-LAB.md), `the-trace-that-starts-in-the-middle` SLB, `lost-in-translation` NCL (2 dots each, `MIN_DOTS_EXCEPTIONS` entries) `the-alert-that-stayed-green` FJI, `two-vendors-one-weekend` VUT and `edge-of-the-platform` WSM (no land dot, lit by island markers, `MIN_DOTS_EXCEPTIONS` entries of 3 each). `test/globe-data.test.mjs` `HOME` has a box for each. Its boss `its-us` (the lab) carries no country and pulses, then lights, the whole Oceania region like any boss.
 
 Coming soon (#177 P7): `hub/coming-soon.mjs` `COMING_SOON` lists announced acts (`{id, no, name,
 sub, teaser}`, frozen); it is empty now, since Acts 7 and 8 left it for `ACTS` with levels 7.1 and 8.2. It is never passed to `buildRegistry`, so unlock, progress, stars, cards
@@ -325,6 +336,7 @@ builds run side by side, only the current build's registry is protected at the c
 | `scoreStars`, `MAX_STARS` | `lib/scoring.mjs` |
 | `createLevelContext` | `lib/level-context.mjs` |
 | `emptyProgress`, `sanitizeProgress`, `registryIds(registry)` → `{levelIds, cardIds}` (the `keep` ids), `migrate(raw, {current, migrations})` → migrated record, `raw` if at/past `current`, or `null` (corrupt), `mergeProgress(a, b, {keep}?)`, `recordCompletion(progress, levelId, {stars, cards, at}, registry)` → `{progress, firstCompletion, newBest, newCards}`, `starTotals` → `{earned, max}`, `cardTotals` → `{earned, max}` | `lib/progress.mjs` |
+| `encodeProgress`, `decodeProgress`, `previewImport`, `REFUSALS` (save codes, #18) | `lib/save-code.mjs` |
 | `isCompleted`, `isActComplete`, `isActUnlocked`, `levelState`, `lockReason` | `lib/unlock.mjs` |
 | `loadProgress(storageGetter, registry)` → `{status, progress}` (`TypeError` before any read without a registry), `saveProgress(storageGetter, progress, registry)` → `{saved, reason?, progress}` (`progress` is always the registry view; `TypeError` before any storage access without a registry) | `lib/storage.mjs` |
 | `resolveTheme`, `readTheme(getter)`, `writeTheme(getter, t)` | `lib/theme.mjs` |

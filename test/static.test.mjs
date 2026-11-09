@@ -20,7 +20,7 @@ const JS_YAML = 'js-yaml-5.5.0.mjs';
 // version is in the directory.
 const THREE = ['three-0.180.0/three.module.min.js', 'three-0.180.0/three.core.min.js'];
 
-// docs/FOUNDATION.md §7, verbatim while INGRESS_HOSTS is empty. connect-src is 'self' plus one
+// docs/FOUNDATION.md §7, the base policy, with connect-src 'self' only. The shipped connect-src is 'self' plus one
 // https origin per INGRESS_HOSTS entry (lib/dash0/ingress.mjs is the one source of truth,
 // docs/DASH0-LAB.md), so the validator's allowlist and vercel.json cannot drift.
 const M0_CSP =
@@ -476,14 +476,3 @@ test('no test passes a DOM node or a level ctx to an equality assertion', () => 
   }
 });
 
-test('How to play card flows between the overlay header and the level (never over the board)', () => {
-  const { document } = parseHTML(read('index.html'));
-  const kids = [...document.querySelector('.overlay').children].map((c) => c.getAttribute('class'));
-  const howto = kids.indexOf('howto');
-  assert.ok(howto > kids.indexOf('lesson-top'), 'card sits after the header');
-  assert.ok(howto < kids.indexOf('level-host'), 'card sits before the level');
-  const css = read('styles/hub.css');
-  const rule = css.slice(css.indexOf('.howto {'), css.indexOf('}', css.indexOf('.howto {')));
-  assert.doesNotMatch(rule, /position:\s*(fixed|absolute|sticky)/, 'the card stays in the flow');
-  assert.match(rule, /max-height:\s*\d+vh/, 'the card is capped so the level keeps room at 320px');
-});
