@@ -299,6 +299,138 @@ the reply as escaped text; one request at a time; `ctx.askedGuide()` runs once, 
 its per-step `AbortController` (aborted by Next and close) has not fired; every other outcome is free. `?mode=debug`
 shows the panel like any other mode. `MAX_QUESTION` in the client mirrors the server's limit (a test checks both).
 
+### 2.9 Sign-in, saved progress, leaderboard (#273)
+
+Optional, dormant until its env is set, and never required to play. Sign-in is for @dash0.com Google accounts only,
+verified on the server. Rank is total stars (the sum of the best stars per level); a tie goes to whoever reached the
+total first. Anonymous play (signed out or unconfigured) writes nothing new to storage, never touches
+`oncall.progress` through sync, and leaves level play unchanged; the only addition is one `GET /api/account` per page.
+The full email and the Google name are never stored, shown or logged. Phases: P1 `lib/auth/` (this section's auth
+parts), P2 score, nickname, merge and store, P3 auth and account endpoints, P4 progress and leaderboard endpoints,
+P5 dev server, P6 client and markup.
+
+**Auth is a plain OIDC redirect handled by `api/`** (no Google Identity Services, so no CSP change: sign-in is a
+top-level navigation from `<a href="/api/auth-start">`, sign-out is a same-origin fetch POST, no avatar is shown, and
+`vercel.json` stays byte-for-byte with no "google" in it).
+- `GET /api/auth-start`: makes a state, a nonce and a PKCE verifier (32 random bytes each), keeps them in the signed
+  cookie `__Host-oc-auth` (HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600) and 302s to Google's authorization
+  endpoint with `client_id`, `redirect_uri` (AUTH_ORIGIN + `/api/auth-callback`), `response_type=code`,
+  `scope=openid email`, an S256 `code_challenge`, `state`, `nonce`, `hd=dash0.com` (a hint only) and
+  `prompt=select_account`. Unconfigured, or a request host that is not AUTH_ORIGIN's host: 302 to `/?signin=unavailable`.
+- `GET /api/auth-callback`: checks the auth cookie's signature and age and compares state in constant time, POSTs the
+  code, verifier and secret to Google's token endpoint (8 s timeout), verifies the ID token, creates or loads the
+  profile, sets the session cookie, clears the auth cookie and 302s to `/?signin=ok`. Failures go to `/?signin=` with
+  `domain`, `cancelled` (Google's `access_denied`), `failed` or `unavailable`. The email is read once, to make the
+  default nickname.
+- `lib/auth/jwt.mjs`: `createJwksCache({fetch, now})` and `verifyIdToken(token, {jwks, clientId, nonce, now})`
+  (`jwks` is the cache object, not raw keys; an unexpected exception maps to `format`), which
+  resolves `{ok, claims}` or `{ok:false, reason}` and never throws. Reasons: `format` (not three base64url parts),
+  `alg` (only RS256; `none` and HS256 refused), `jwks` (fetch failed or odd body), `kid`, `signature`, `iss`
+  (`https://accounts.google.com` or `accounts.google.com`), `aud` (equal to the client id, or an array that includes it
+  with `azp` equal to it), `expired` (`exp*1000 > now - 60 s`), `iat` (`iat*1000 <= now + 60 s`), `nonce`, `email`
+  (`email_verified` must be the boolean `true`), `domain` (`hd === 'dash0.com'` exactly and a lowercased email ending
+  `@dash0.com`) and `sub` (a non-empty string). The JWKS comes from `https://www.googleapis.com/oauth2/v3/certs`, is
+  cached in memory for its Cache-Control max-age (never less than a minute), and an unknown kid refetches once, at most
+  once a minute. Concurrent misses share one in-flight fetch, and the fetch times out after 8 s. A `crit` header is
+  refused (`format`), and an unset or empty client id refuses every token (`aud`). Only
+  WebCrypto (`RSASSA-PKCS1-v1_5` / SHA-256) is used.
+- `lib/auth/session.mjs`: the cookie `__Host-oc-session` holds `v1.<b64url {pid, gen, exp}>.<b64url HMAC-SHA256>`
+  with HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000 (30 days, not sliding); `exp` is epoch ms.
+  `verifySession` checks version, HMAC and exp and returns the payload or null; the endpoint then loads the profile
+  and requires `gen` to match. Sign-out clears the cookie (Max-Age=0); delete removes the profile, so a kept copy gets
+  401. A SESSION_SECRET shorter than 32 bytes counts as not configured (`sessionSecret` returns null; `signSession`
+  throws). The secret is measured in UTF-8 bytes of the env string (not base64-decoded). The short-lived
+  `__Host-oc-auth` cookie is built in P3, reusing the same HMAC primitive, but it MUST be signed apart from the
+  session cookie: its own version tag (`a1`, so a session value never verifies as an auth value or the reverse) and a
+  key derived from SESSION_SECRET with HKDF or a fixed label, never the raw secret shared with sessions.
+- CSRF: every POST needs an Origin whose host equals AUTH_ORIGIN's host (a missing Origin is 403) and
+  `Content-Type: application/json` (else 415); no CORS headers are ever sent.
+- Env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET, AUTH_ORIGIN (for now the current production
+  vercel.app URL, so preview deploys cannot sign in); the store is UPSTASH_REDIS_REST_URL/_TOKEN,
+  else KV_REST_API_URL/KV_REST_API_TOKEN (a URL without a token is not configured; the read-only token and custom
+  prefixes are unsupported).
+
+**Store (Upstash Redis over REST with fetch, no dependency).** Keys are prefixed `oc:v1:`: `sub:<sub>` (pid),
+`profile:<pid>` (HASH: nick, nickKey, listed 0/1, gen, created; never an email or name), `progress:<pid>`
+(HASH: rev, json, total, reachedAt, score), `nick:<nickKey>` (pid, the uniqueness claim), `board` (ZSET of listed pids)
+and `rl:<pid>:<route>:<window>` (INCR plus EXPIRE). The pid is a random 16-byte base64url id; Google's sub never
+reaches a client. `lib/account/score.mjs` encodes `score = total * 2^31 + (2^31 - 1 - s)`, s being the server's
+seconds since 2026-01-01 when the current total was reached, so a descending range gives most stars, then earliest;
+`reachedAt` changes only when the recomputed total changes and always comes from the server clock. Writes that must be
+atomic are Lua scripts (`cas-progress`, `claim-nick`, `set-listing`, `delete-account`) that only compare and write
+values computed in JS (`set-listing` does an HSET of `listed`, then ZADD with the stored score or ZREM; with no stored score it only sets
+`listed`, and the ZADD happens at the next progress write because `cas-progress` reads `listed` inside the script
+before its ZADD); first sign-in uses `SET sub NX` and the loser re-reads. Nicknames match
+`^[A-Za-z0-9][A-Za-z0-9_-]{2,19}$`, are unique on the lowercase key, with reserved names and a small blocked-word list
+(matched on a leet-folded form). The default nickname (`lib/account/nickname.mjs`) is a fun, deterministic name made from the first name token
+of the email local part: the same email always gives the same nickname. The base is that token lowercased, with any
+`+tag` dropped and only `[a-z0-9]` kept, capped at 10 characters; a base shorter than 3 characters, reserved or blocked
+is replaced by `player` as the base (`player` itself is reserved, so the result is for example playerster). Five rules
+build the fun names: `ster` (append), `er` (double the final consonant, only for a consonant-vowel-consonant ending),
+`oton` (drop a final vowel, only when there is one), `inator` and `zilla` (append). A rule that does not apply is
+skipped. An FNV-1a hash of the salt `s28` plus the base picks the starting rule, and the applicable rules are tried in
+their fixed order cycling from there; a result that fails nickname validation or the blocked-word filter is dropped.
+The owner's examples come out exactly: vlad gives vladster, bob gives bobber, kyle gives kyloton. The candidate list,
+always the same for the same email, is: the fun names in that order, then `<first>-2` to `<first>-99`, then eight
+`<first>-<4 hex>` tails, where `<first>` is the first fun name and the head is cut so the whole stays within 20
+characters. `pickNick(email, isTaken)` returns the first candidate whose lowercase key is not taken, or null when every
+candidate is taken (the caller must treat null as a failure, never invent a name). The player can override the nickname at any time. A new profile is listed by default
+(`listed=1`) and joins the board on its first progress write; the account modal has a "Show me on the leaderboard"
+toggle to hide. There is no confirm-once step. After first sign-in a notice says "You're on the leaderboard as <nick>.
+Change your nickname or hide yourself in Account."
+
+
+**Merge.** `mergeStored(storedRaw, incoming, registry)` in `lib/progress.mjs` is the one merge expression (unknown ids
+survive, best stars per level, earliest `at`, union of cards); `lib/storage.mjs` and the server both call it.
+`PUT /api/progress` takes exactly `{v:1, progress}` (any other field, such as a sent total, is 400), sanitizes, reads
+rev, merges, computes `total = starTotals(merged, liveRegistry()).earned`, and runs `cas-progress`, retrying up to
+3 times on conflict. The client PUTs on sign-in, page load while signed in, each completion and a save-code import,
+saves the merged response locally, and never syncs in debug mode.
+
+**Endpoints** (single path segments, all in `api/`):
+- `GET /api/account`: `{v:1, configured:false}` when unconfigured; `{v:1, configured:true, signedIn:false}` with no
+  store call when there is no cookie; `{signedIn:true, nick, listed}` when signed in; a bad or stale cookie gives
+  signedIn:false and clears the cookie; store down is 502 `store-unavailable`.
+- `POST /api/account` `{v:1, action}`: `signout`, `nickname {nick}` (409 `nick-taken`, or 400 with field `nick`),
+  `listing {listed}`, `delete {confirm:'delete'}`.
+- `GET/PUT /api/progress`: 200 `{v:1, progress, stars, rank|null}`; errors 401, 400, 413 (over 16 KB), 429, 502.
+- `GET /api/leaderboard` (anonymous allowed): 200 `{v:1, ok:true, size, top:[{rank, nick, stars}] x10,
+  me:{stars, rank|null, listed}|null}`, never a pid; rank and size are over the listed set; an empty board is ok with
+  `top:[]`; 503 `not-configured`, 502 `store-unavailable`.
+- Rate limits: signed in, a Redis fixed window per pid (30 progress writes per 10 minutes, 10 nickname changes per
+  hour); anonymous routes use `createLimiter` per IP with their own instance.
+- Logs: one line per request `{msg, outcome, status, ms}`; never a pid, sub, nick, email or cookie.
+- `reply`, `sameOrigin` and the cookie helpers move to `lib/http.mjs`; `api/guide.mjs` imports them.
+
+**Three outcomes.** Every read gives ok, unavailable or not configured. A failed store operation returns
+`{ok:false, reason:'store'}`, never `[]` or 0. The client maps 502, 503, network errors and odd bodies to
+unavailable ("Leaderboard unavailable"; "Account unavailable; your progress is still saved in this browser") and says
+"No one on the board yet" only for an ok empty board.
+
+**Threat model.** Progress is client-asserted. The server enforces real Dash0 identities, totals computed on the server
+over registered scored levels only, stars capped at MAX_STARS, server-clock tie-breaks and rate limits. Plausibility is
+logged, never blocked (`{msg:'board', outcome:'implausible'}` when one write raises the total by more than 50% of the
+maximum, or the maximum is reached within 30 minutes of account creation). The remedy is for the owner to unlist the
+player in the Upstash console. Accepted: signing in on a shared browser merges that browser's progress into the account.
+
+**UI.** Shown only when configured and not in debug mode. The hub's "Your progress" section gets a Leaderboard button and
+either an anchor "Sign in with Google (@dash0.com)" or "Signed in as <nick>" with an Account button. The board modal
+(`#board-modal`) lists the top 10 then "You: N stars, #r" or "You're not on the board". The account modal has a
+nickname field, a listing toggle, Sign out and Delete with a two-step confirm. The nudge, in the reward card, is
+dismissible, shown at most once per page session and not when `signin-nudge` is hidden through `hideHelp`, with
+buttons Sign in, Not now and Don't ask again. `?signin=` is read once in `main.mjs`, shown as a notice, then stripped
+with `history.replaceState`. Privacy copy: "Optional, @dash0.com Google accounts only. We keep your Google account id,
+a nickname and your level stars and cards, nothing else. We never store or show your name or email. Signed-in players
+are listed on the leaderboard by default and can hide themselves in Account. Your default nickname is a fun name made
+from your email; change it any time. Delete your account to remove everything we hold; this browser
+keeps its own copy."
+
+**Local dev.** `tools/serve.mjs` forwards several Set-Cookie headers and passes a 302 Location through.
+`AUTH_STUB=1` gives a stub sign-in (dev@dash0.com, nickname dev) whose auth-start redirects straight to the callback;
+`tools/fake-redis.mjs` is an in-memory store speaking the REST and pipeline protocol with a JS twin per Lua script
+(Lua itself is covered by an opt-in `REDIS_IT=1` test). `__Host-` cookies over http://localhost work in Chrome and
+Firefox, not Safari.
+
 ## 3. Invariants
 
 Registry (`validateRegistry` reports all at once): act and level ids unique across all acts
