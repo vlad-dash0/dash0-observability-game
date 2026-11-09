@@ -1,3 +1,6 @@
+import { DOTS, LATTICE_POINTS } from './globe-data.mjs';
+import { latticePoint } from '../lib/globe-lattice.mjs';
+
 // Hand-written globe map (docs/FOUNDATION.md §2.7): which world region an act is, and which
 // country a level is. Pure data plus one lookup; hub/globe-data.mjs holds the generated dots.
 //
@@ -28,7 +31,7 @@ export const ACT_REGIONS = Object.freeze({
   'act-6': { region: 'South Asia', subregions: ['Southern Asia'] },
   'act-7': { region: 'East Asia', subregions: ['Eastern Asia'] },
   'act-8': { region: 'Southeast Asia', subregions: ['South-Eastern Asia'] },
-  'act-9': { region: 'Oceania', subregions: ['Australia and New Zealand', 'Melanesia'] },
+  'act-9': { region: 'Oceania', subregions: ['Australia and New Zealand', 'Melanesia', 'Polynesia'] },
 });
 
 // Countries whose region is not their SUBREGION's: Natural Earth files Russia under Eastern
@@ -93,6 +96,47 @@ export const LEVEL_COUNTRY = Object.freeze({
   'the-34-percent-error-rate': 'AUS',
   'connect-to-dash0': 'PNG',
 });
+
+// Countries with no land dot on the 110m data, so they get hand-placed island markers (docs/FOUNDATION.md §2.7;
+// owner decision 2026-11-08, #240). Natural Earth subregion and [lat, lon] degrees of the capital (Suva, Port Vila,
+// Apia), which sit on the main island of each country. WSM needs 'Polynesia' in ACT_REGIONS['act-9'].subregions,
+// or its markers would belong to no region (no boss pulse, and the country-in-act test fails).
+export const ISLANDS = Object.freeze({
+  FJI: Object.freeze({ sub: 'Melanesia', at: Object.freeze([-18.14, 178.44]) }),
+  VUT: Object.freeze({ sub: 'Melanesia', at: Object.freeze([-17.73, 168.32]) }),
+  WSM: Object.freeze({ sub: 'Polynesia', at: Object.freeze([-13.83, -171.76]) }),
+});
+
+const RAD = Math.PI / 180;
+function arcRad(a, b) {
+  const [la1, lo1, la2, lo2] = [a[0] * RAD, a[1] * RAD, b[0] * RAD, b[1] * RAD];
+  const h = Math.sin((la2 - la1) / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin((lo2 - lo1) / 2) ** 2;
+  return 2 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/**
+ * Dots in the shape of hub/globe-data.mjs DOTS ([lat, lon, iso3, subregion]): each ISLANDS entry on its `k` nearest
+ * lattice points (the globe's own lattice) that are not land dots, nearest first, ties by lattice index. Pure and
+ * deterministic. `land` and `islands` are injectable for tests.
+ */
+export function islandDots(k = 3, land = DOTS, islands = ISLANDS) {
+  const taken = new Set(land.map((d) => `${d[0]},${d[1]}`));
+  const out = [];
+  for (const [iso, { sub, at }] of Object.entries(islands)) {
+    const near = [];
+    for (let i = 0; i < LATTICE_POINTS; i++) {
+      const p = latticePoint(i, LATTICE_POINTS);
+      const d = arcRad(p, at);
+      if (d < 0.2 && !taken.has(`${p[0]},${p[1]}`)) near.push({ p, d, i });
+    }
+    near.sort((a, b) => a.d - b.d || a.i - b.i);
+    for (const { p } of near.slice(0, k)) {
+      taken.add(`${p[0]},${p[1]}`);
+      out.push([p[0], p[1], iso, sub]);
+    }
+  }
+  return out;
+}
 
 // ADM0_A3 code -> display name, for every country in LEVEL_COUNTRY (the ignite announcement,
 // "Germany is now lit: ..."; test/globe-ignite.test.mjs checks each one has a name).

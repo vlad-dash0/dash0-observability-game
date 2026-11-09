@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { DOTS, COUNTRIES, LATTICE_POINTS } from '../hub/globe-data.mjs';
-import { ACT_REGIONS, LEVEL_COUNTRY, MIN_DOTS, MIN_DOTS_EXCEPTIONS, COUNTRY_ACT, actOfCountry } from '../hub/globe-map.mjs';
+import { ACT_REGIONS, ISLANDS, islandDots, LEVEL_COUNTRY, MIN_DOTS, MIN_DOTS_EXCEPTIONS, COUNTRY_ACT, actOfCountry } from '../hub/globe-map.mjs';
 import { liveRegistry } from '../app.mjs';
 import { globeState } from '../lib/globe.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
@@ -16,8 +16,11 @@ import {
 
 const REG = liveRegistry();
 const levelIds = REG.order.filter((id) => REG.levels[id].kind === 'level');
-const dotsOf = (iso) => DOTS.filter((d) => d[2] === iso);
-const subregionOf = Object.fromEntries(COUNTRIES);
+// Land dots plus the hand-placed island markers (hub/globe-map.mjs ISLANDS): what the globe draws, so a level
+// country with no land dot (FJI, VUT, WSM) is found, counted and boxed like any other.
+const ALL_DOTS = [...DOTS, ...islandDots()];
+const dotsOf = (iso) => ALL_DOTS.filter((d) => d[2] === iso);
+const subregionOf = { ...Object.fromEntries(COUNTRIES), ...Object.fromEntries(Object.entries(ISLANDS).map(([iso, { sub }]) => [iso, sub])) };
 
 test('every registry level has exactly one country, and no key is stale', () => {
   const missing = levelIds.filter((id) => !Object.hasOwn(LEVEL_COUNTRY, id));
@@ -104,6 +107,60 @@ test('dots sit where the countries are', () => {
   assert.ok(inBox('BRA', [-34, 6, -75, -34]));
   assert.ok(inBox('AUS', [-44, -10, 112, 154]));
   assert.ok(inBox('IND', [6, 36, 67, 98]));
+});
+
+const GREAT_CIRCLE_DEG = (a, b) => {
+  const r = Math.PI / 180;
+  const c = Math.sin(a[0] * r) * Math.sin(b[0] * r) + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.cos((a[1] - b[1]) * r);
+  return (Math.acos(Math.min(1, Math.max(-1, c))) * 180) / Math.PI;
+};
+
+test('islandDots: deterministic, k points per island, none on land, each near its coordinate', () => {
+  assert.deepEqual(islandDots(), islandDots());
+  const landKeys = new Set(DOTS.map((d) => `${d[0]},${d[1]}`));
+  for (const k of [1, 3, 5]) {
+    const dots = islandDots(k);
+    assert.equal(dots.length, k * Object.keys(ISLANDS).length);
+    for (const [iso, { sub, at }] of Object.entries(ISLANDS)) {
+      const mine = dots.filter((d) => d[2] === iso);
+      assert.equal(mine.length, k, `${iso} has ${k} markers`);
+      for (const d of mine) {
+        assert.equal(d[3], sub);
+        assert.ok(GREAT_CIRCLE_DEG([d[0], d[1]], at) < 3, `${iso} marker ${d[0]},${d[1]} is within 3 degrees of ${at}`);
+      }
+    }
+  }
+  const all = islandDots();
+  for (const d of all) assert.ok(!landKeys.has(`${d[0]},${d[1]}`), `${d[0]},${d[1]} is a land dot`);
+  assert.equal(new Set(all.map((d) => `${d[0]},${d[1]}`)).size, all.length, 'no two markers share a position');
+  const onLattice = new Set(Array.from({ length: LATTICE_POINTS }, (_, i) => latticePoint(i, LATTICE_POINTS).join(',')));
+  assert.ok(all.every((d) => onLattice.has(`${d[0]},${d[1]}`)), 'every marker is a lattice point');
+});
+
+test('islandDots: skips lattice points that are land, taking the next nearest', () => {
+  const at = ISLANDS.FJI.at;
+  const first = islandDots(1)[0];
+  const blocked = islandDots(1, [...DOTS, [first[0], first[1], 'FJI', 'Melanesia']], { FJI: ISLANDS.FJI })[0];
+  assert.notDeepEqual(blocked.slice(0, 2), first.slice(0, 2));
+  assert.ok(GREAT_CIRCLE_DEG(first, at) <= GREAT_CIRCLE_DEG(blocked, at));
+});
+
+test('ISLANDS pins the capitals (Suva, Port Vila, Apia) and their subregions', () => {
+  const plain = Object.fromEntries(Object.entries(ISLANDS).map(([k, v]) => [k, { sub: v.sub, at: [...v.at] }]));
+  assert.deepEqual(plain, {
+    FJI: { sub: 'Melanesia', at: [-18.14, 178.44] },
+    VUT: { sub: 'Melanesia', at: [-17.73, 168.32] },
+    WSM: { sub: 'Polynesia', at: [-13.83, -171.76] },
+  });
+  assert.ok(Object.isFrozen(ISLANDS) && Object.isFrozen(ISLANDS.FJI) && Object.isFrozen(ISLANDS.FJI.at));
+});
+
+test('every island country has no land dot, a lit-able subregion in an act, and the data stays as generated', () => {
+  for (const [iso, { sub, at }] of Object.entries(ISLANDS)) {
+    assert.equal(DOTS.filter((d) => d[2] === iso).length, 0, `${iso} has land dots now: drop it from ISLANDS`);
+    assert.equal(actOfCountry(iso, sub), 'act-9', `${iso} (${sub}) is not in Oceania`);
+    assert.ok(Math.abs(at[0]) <= 90 && Math.abs(at[1]) <= 180);
+  }
 });
 
 test('lattice points are the documented Fibonacci sphere, 2 decimals', () => {
