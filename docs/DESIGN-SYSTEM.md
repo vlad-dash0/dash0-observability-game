@@ -74,7 +74,7 @@ each function's JSDoc for the exact markup.
 | `panel({id, variant, headHtml, sections})` | panel | Card with sections; `inset`, `alert`, `drop` (dashed means drop zone only; Sort it no longer uses it, #261: it categorises with choice options and plain groups, no boxes). |
 | `chip({text, tone, dot, swatch, dashed})` | chip | Mono pill; `data-tone` neutral, success, error, hint, attention. |
 | `button({id, label, variant, disabled, finish, type, icon, describedBy})`, `nextButton(id)`, `finishButton(id)` | button | Pill; `primary` (red, D2), `ghost`, `hint`, `icon`; `describedBy` (an id) points a disabled button at its reason; Finish has `data-finish`. |
-| `option({attr, value, labelHtml, metaHtml, kind, pressed, state, disabled, hinted, name})`, `options({id, labelledBy, layout, itemsHtml})` | option | Selectable card and its group (list, grid, wrap). The `radio` kind is a label around a real `<input type="radio" name>`: the dot, the label, then the meta line beneath; a picked card carries `data-picked`. |
+| `option({attr, value, labelHtml, metaHtml, kind, pressed, state, disabled, hinted, drop, name})`, `options({id, labelledBy, layout, itemsHtml})` | option | Selectable card and its group (list, grid, wrap, drops). `drop` (choice kind only) makes a category target: dashed, centred, legible while disabled (muted text, no fade); `drops` lays targets out as an equal-width row that wraps. Sort it's category row uses both. The `radio` kind is a label around a real `<input type="radio" name>`: the dot, the label, then the meta line beneath; a picked card carries `data-picked`. |
 | `feedback({id, bar})`, `setFeedback(el, tone, bodyHtml)`, `clearFeedback(el)` | feedback | The one feedback region; tones neutral, success, error (D7). |
 | `meter({id, label, value, max, cells, unit, previewCells, over})` | meter | Cells (20 by default) plus a text line that is the accessible value (en-US grouping, so 4800 reads 4,800). |
 | `fold({value, titleHtml, metaHtml, bodyHtml, open, fresh})` | fold | Evidence card that folds to one line: a native `<details>` (caret, an h4 title that takes focus by script, optional meta chips) around its body. `open` starts it open, `fresh` marks the newest (`data-fresh`). Approved by the owner for #143 (2026-11-05); its look awaits the owner's D5 sign-off from that PR's screenshots. |
@@ -94,8 +94,7 @@ feeds every template, and each template is only kit helpers.
 
 States are attributes, never extra classes: `aria-pressed` (selected; `data-picked` on a radio card), `data-state` (`correct`,
 `wrong`, `locked`, `opened`), `data-hinted`, `data-tone`, `disabled`, `hidden`. Hover, focus and
-disabled each have one rule in `kit.css`; besides it, a disabled toggle option, and a disabled choice option with no `data-state`, fades (its only cue;
-Sort it's category row), while an answered choice card (it has a `data-state`) stays legible.
+disabled each have one rule in `kit.css`; besides it, a disabled toggle option, and a disabled choice option with no `data-state`, fades (its only cue), except a `drop` target, which goes muted and transparent instead, while an answered choice card (it has a `data-state`) stays legible.
 
 ## Layout
 

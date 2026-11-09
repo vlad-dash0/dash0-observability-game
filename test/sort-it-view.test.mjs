@@ -129,6 +129,16 @@ const INSTR = 'Pick an item, then its category, or drag an item onto a category.
 
 // ---- S1, S2 sortView: the board as data -------------------------------------------------
 
+test('S0 category targets are kit drop options in an equal-width drops row, enabled or not; items are not', () => {
+  const spec = fixture();
+  makeDom(`<div data-sort>${renderSort(spec, newSortState(spec))}</div>`);
+  const targets = qa('[data-bucket]');
+  assert.equal(targets.length, spec.buckets.length);
+  for (const b of targets) assert.ok(b.classList.contains('ui-option--drop'), b.dataset.bucket);
+  assert.ok(q('.ui-options--drops [data-bucket]'));
+  for (const it of qa('[data-item]')) assert.equal(it.classList.contains('ui-option--drop'), false);
+});
+
 test('S1 sortView: the pool is the remaining items in display order, the buckets in spec order with their placed items; placed plus left is total', () => {
   const spec = fixture();
   let { state } = place(spec, newSortState(spec), 'i1', 'metric');
