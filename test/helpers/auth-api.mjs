@@ -66,9 +66,15 @@ export function rig({ env = ENV, registryOver = registry } = {}) {
       if (google.tokenThrows) throw new Error('network');
       if (google.tokenHangs) {
         // A stalled Google: it answers only when the request is aborted. Without a signal it would answer after 300 ms (a success).
+        // The timer is ref'd and outlives the 20 ms timeout, so the event loop stays alive while we wait (AbortSignal.timeout's own timer is unref'd, which ends the process early on Node 22).
         await new Promise((resolve, reject) => {
-          if (init.signal) init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'TimeoutError')));
-          else setTimeout(resolve, 300);
+          const hold = setTimeout(resolve, 300);
+          if (init.signal) {
+            init.signal.addEventListener('abort', () => {
+              clearTimeout(hold);
+              reject(new DOMException('aborted', 'TimeoutError'));
+            });
+          }
         });
       }
       if (google.tokenStatus !== 200) return new Response('{}', { status: google.tokenStatus });
