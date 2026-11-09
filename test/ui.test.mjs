@@ -255,6 +255,11 @@ test('side: help chips say on or off in words; stars; the column keeps the help-
   assert.ok(none.includes('<p class="ui-hints-tier" id="s1-hint-tier">No hints on this level.</p>'));
   assert.equal(none.includes('id="s1-hint"'), false);
   assert.equal(none.includes('ui-score-rule'), false);
+  // The guide panel's slot (#17): one empty div, last in the column, with or without hints; no id, class or style.
+  for (const c of [col, none]) {
+    assert.equal(c.split('<div data-guide-slot></div>').length - 1, 1);
+    assert.ok(c.endsWith('<div data-guide-slot></div></aside>'));
+  }
 });
 
 // ---- T10 the contract across every helper --------------------------------------------

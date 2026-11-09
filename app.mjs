@@ -22,6 +22,7 @@ import { freshlyLit, igniteView, litText } from './lib/globe-ignite.mjs';
 import { dotStates, globeLabel, globeLines, globeTarget } from './lib/globe-view.mjs';
 import { hideHelp, readHiddenHelp } from './lib/help-prefs.mjs';
 import { howToView } from './lib/how-to-play.mjs';
+import { createGuideClient } from './lib/guide/client.mjs';
 import { trapTab } from './lib/modal-focus.mjs';
 import { createLevelContext } from './lib/level-context.mjs';
 import { cardTotals, mergeProgress, recordCompletion, registryIds, starTotals } from './lib/progress.mjs';
@@ -84,7 +85,7 @@ const FOCUS_FRAMES = 10; // focusSoon waits at most this many frames for its tar
  * Storage), document, window?, deck?, globe? ((host, view) → Promise of a globe handle or
  * null; lib/globe-render.mjs mountGlobe in the browser), globeMap? ({ACT_REGIONS,
  * LEVEL_COUNTRY, COUNTRY_NAMES, actOf}), dots?, comingSoon? (acts shown but not playable, hub/coming-soon.mjs), now?, rand?, reduceMotion? (() → boolean), reportError?,
- * telemetry? (lib/telemetry.mjs facade; completions emit a level.complete span), setTimeout?, clearTimeout?, debug? (boolean, ?mode=debug: every level opens, nothing is saved) }. Without `globe` the hub shows the globe's text fallback.
+ * fetch? (the page's fetch: asks GET /api/guide once at init whether the guide is on; without it there is no guide), telemetry? (lib/telemetry.mjs facade; completions emit a level.complete span), setTimeout?, clearTimeout?, debug? (boolean, ?mode=debug: every level opens, nothing is saved) }. Without `globe` the hub shows the globe's text fallback.
  */
 export function createGame(deps) {
   const {
@@ -109,6 +110,7 @@ export function createGame(deps) {
     rendered = (el) => typeof el.getClientRects !== 'function' || el.getClientRects().length > 0,
     debug = false,
     telemetry = null,
+    fetch: request = null,
   } = deps;
   const report = (e) => {
     try {
@@ -118,6 +120,9 @@ export function createGame(deps) {
     }
   };
   const cardFront = Object.fromEntries(deck.map((c) => [c.id, c.front]));
+  // Ask the guide (#17): the status is fetched once, at init; a level opened before it arrives, or when it
+  // failed, has no panel. ?mode=debug is no exception, so the panel can be tried locally.
+  const guideClient = typeof request === 'function' ? createGuideClient({ fetch: request }) : null;
   const loaded = loadProgress(storage, registry);
   // The open level's AbortController; aborting it makes that ctx's finish a no-op.
   let session = null;
@@ -193,6 +198,7 @@ export function createGame(deps) {
         if (e?.persisted) this.showGlobe();
       });
       this.showGlobe();
+      guideClient?.status();
     },
     // Alpine calls this when the component is torn down.
     destroy() {
@@ -435,6 +441,7 @@ export function createGame(deps) {
           signal: controller.signal,
           reportError: report,
           telemetry,
+          guide: guideClient && { configured: guideClient.configured, ask: guideClient.ask },
         });
         level.run(ctx);
       } catch (e) {

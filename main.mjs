@@ -28,6 +28,7 @@ function browserDeps() {
       reportError: (e) => console.error(e),
       allowLocal: debug,
     }),
+    fetch: window.fetch.bind(window),
     now: Date.now,
     rand: Math.random,
     reduceMotion: () => prefersReducedMotion(window),

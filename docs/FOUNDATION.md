@@ -141,7 +141,7 @@ ctx = {
   hint(): void             // hintsUsed += 1
   askedGuide(): void       // one answered guide question: hintsUsed += 1 (as hint()), then onGuideHint listeners run
   onGuideHint(fn): off     // listen for answered guide questions; listeners are dropped when signal aborts
-  guide: object | null     // the optional guide status the app passes (#17); unused until the panel
+  guide: object | null     // {configured, ask} from the app (§2.8), or null: the Ask the guide panel reads it
   finish({text = '', cards = []}): {stars, cards, text} | null
   reduceMotion: boolean
   ovBody, ovActions: Element
@@ -287,6 +287,17 @@ no client telemetry for the guide.
 Local: `tools/serve.mjs` runs `api/<name>.mjs` at `/api/<name>` (GET and POST) and never serves `api/` source as a
 file. `GUIDE_STUB=1 npm run dev` answers the guide with a canned reply and no key; the stub exists only in the dev
 server.
+
+The panel (#17 P4). `lib/guide/client.mjs` asks `GET /api/guide` once per page through the injected `fetch`
+(`createGame` dep `fetch`, from `main.mjs`) and caches it; unknown, failed or `v` other than 1 means off, and a level
+opened before the answer arrives has no panel. `ask(levelId, stepId, question, signal)` never throws and resolves to
+`{kind}`: `ok` (hint), `withheld`, `rate-limited` (retryAfterS), `unavailable` (404, 503), `upstream` (502), `rejected`
+(400, 413), `failed`, `aborted`. `ctx.guide` is `{configured, ask}` or null. When `ctx.guide.configured` and
+`guideAllowed(type, spec)`, `runPlay` mounts `lib/guide/panel.mjs` after `type.mount`: into the side column's empty
+`[data-guide-slot]` on a board, at the end of the step on a choice step. The panel is built from the kit only and shows
+the reply as escaped text; one request at a time; `ctx.askedGuide()` runs once, on `ok`, while the step is unsolved and
+its per-step `AbortController` (aborted by Next and close) has not fired; every other outcome is free. `?mode=debug`
+shows the panel like any other mode. `MAX_QUESTION` in the client mirrors the server's limit (a test checks both).
 
 ## 3. Invariants
 

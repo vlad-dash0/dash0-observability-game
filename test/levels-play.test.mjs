@@ -507,13 +507,24 @@ function driverGaps(order, drivers) {
 let current = null;
 // While a level plays (playLevel), every class on the page after each click (T8).
 let seenClasses = null;
+// Likewise the attributes the CSP and Alpine rules forbid (style=, on*=, x-, @, :), by element.
+let seenAttrs = null;
+const FORBIDDEN_ATTR = /^(x-|@|:|on|style$)/;
 
-/** Add the class names of every element in the document to `into`. */
+/** Add the class names of every element in the document to `into`; and the forbidden attributes to the run's set. */
 function pageClasses(into) {
   for (const el of globalThis.document.querySelectorAll('[class]')) {
     for (const c of el.getAttribute('class').split(/\s+/)) if (c) into.add(c);
   }
+  if (!seenAttrs) return;
+  for (const el of globalThis.document.querySelectorAll('*')) {
+    for (const n of el.getAttributeNames()) if (FORBIDDEN_ATTR.test(n)) seenAttrs.add(`<${el.localName} ${n}>`);
+  }
 }
+
+// A configured guide (#17 P4): every play step with a panel shows it, so the class, CSP and Alpine
+// checks below cover the panel on every step. It is never asked here (test/guide-panel.test.mjs does).
+const FAKE_GUIDE = Object.freeze({ configured: true, ask: async () => ({ kind: 'failed' }) });
 
 /** dom.mjs click, recording for its duration whether it hit the Finish button. */
 function click(elOrSel) {
@@ -555,6 +566,7 @@ function openLevel(level, { telemetry = null } = {}) {
       throw e;
     },
     telemetry,
+    guide: FAKE_GUIDE,
   });
   const render = ctx.renderStep;
   ctx.renderStep = (body, actions) => {
@@ -563,6 +575,8 @@ function openLevel(level, { telemetry = null } = {}) {
   };
   const classes = new Set();
   seenClasses = classes;
+  const attrs = new Set();
+  seenAttrs = attrs;
   let first;
   const injected = [];
   try {
@@ -578,6 +592,7 @@ function openLevel(level, { telemetry = null } = {}) {
     injected.push(...liveAlpineAttrs(dom.body, dom.actions));
   } catch (e) {
     seenClasses = null;
+    seenAttrs = null;
     throw e;
   }
   return {
@@ -586,7 +601,7 @@ function openLevel(level, { telemetry = null } = {}) {
     end() {
       injected.push(...liveAlpineAttrs(dom.body, dom.actions));
       pageClasses(classes);
-      return { calls, steps, first, injected, classes };
+      return { calls, steps, first, injected, classes, attrs: [...attrs] };
     },
   };
 }
@@ -599,6 +614,7 @@ function playLevel(level, play, opts) {
     return session.end();
   } finally {
     seenClasses = null;
+    seenAttrs = null;
   }
 }
 
@@ -610,6 +626,7 @@ async function playLevelAsync(level, play, opts) {
     return session.end();
   } finally {
     seenClasses = null;
+    seenAttrs = null;
   }
 }
 
@@ -675,8 +692,9 @@ async function checkRunAsync(level, run) {
   return assertRun(level, run, await playLevelAsync(level, run.play, { telemetry: run.telemetry?.() }));
 }
 
-function assertRun(level, run, { calls, steps, first, injected, classes }) {
+function assertRun(level, run, { calls, steps, first, injected, classes, attrs }) {
   assert.deepEqual(injected, [], 'the overlay holds an Alpine attribute (set outside renderStep)');
+  assert.deepEqual(attrs, [], 'the page shows an Alpine attribute, style= or on*= on some step (CSP)');
   const missing = undefinedClasses(steps, classes);
   assert.deepEqual(missing.filter((c) => !UNDEFINED_ALLOW.includes(c)), [], 'rendered classes with no CSS rule (T8)');
   assert.ok(first.rendered >= 1, 'run() renders a first step');

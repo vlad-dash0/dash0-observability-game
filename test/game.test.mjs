@@ -97,7 +97,7 @@ function fakeGlobe(result = 'handle') {
   return { mount, log };
 }
 
-function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true, globe, window, debug, comingSoon = [], dots = DOTS, telemetry } = {}) {
+function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true, globe, window, debug, comingSoon = [], dots = DOTS, telemetry, fetch } = {}) {
   const dom = makeDom(read('index.html'));
   const store = fakeStorage({ initial, throwOn });
   const timers = [];
@@ -121,6 +121,7 @@ function setup({ initial, throwOn, storage, registry = REG, reduceMotion = true,
     window,
     debug,
     telemetry,
+    fetch,
   });
   return { game, store, dom, timers, errors };
 }
@@ -186,6 +187,44 @@ test('openLevel runs the level into the x-ignore overlay elements, fetched by id
   assert.ok(dom.document.querySelector('[x-ignore] #ov-body #step-x'), 'step rendered in #ov-body');
   assert.ok(dom.document.querySelector('[x-ignore] #ov-actions [data-finish]'));
   assert.equal(ctxs.x.reduceMotion, true);
+});
+
+const status = (body, ok = true) => async () => ({ ok, status: ok ? 200 : 500, json: async () => body });
+
+test('the guide status is fetched once at init and the level ctx carries it (debug included)', async () => {
+  for (const debug of [false, true]) {
+    const calls = [];
+    const fetch = async (url, init) => {
+      calls.push([url, init.method]);
+      return status({ v: 1, configured: true })();
+    };
+    const { game } = setup({ fetch, debug });
+    game.init();
+    await new Promise((r) => setImmediate(r));
+    game.openLevel('x');
+    game.closeOverlay();
+    game.openLevel('x');
+    assert.deepEqual(calls, [['/api/guide', 'GET']], 'one status request per page');
+    assert.equal(ctxs.x.guide.configured, true);
+    assert.equal(typeof ctxs.x.guide.ask, 'function');
+  }
+});
+
+test('the guide is off when the status fails, says no, is not valid, or there is no fetch', async () => {
+  const cases = [
+    ['network error', async () => { throw new Error('offline'); }],
+    ['http 500', status({ v: 1, configured: true }, false)],
+    ['not configured', status({ v: 1, configured: false })],
+    ['wrong version', status({ v: 2, configured: true })],
+    ['no fetch', undefined],
+  ];
+  for (const [name, fetch] of cases) {
+    const { game } = setup({ fetch });
+    game.init();
+    await new Promise((r) => setImmediate(r));
+    game.openLevel('x');
+    assert.ok(ctxs.x.guide === null || ctxs.x.guide.configured === false, name);
+  }
 });
 
 test('a level that throws in run() is reported and the overlay still closes', () => {
