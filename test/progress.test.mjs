@@ -444,13 +444,19 @@ test('reads award nothing: sanitize and totals leave stars and cards as stored',
 
 // ---- mergeStored ----
 
-test('mergeStored: unknown stored ids survive, best stars and earliest at win', () => {
+test('mergeStored: unknown stored ids survive, other levels and cards are unioned', () => {
   const stored = raw({ 'zz-future': { stars: 3, at: null }, a: { stars: 2, at: T2 } }, ['c1']);
-  const incoming = raw({ a: { stars: 3, at: T1 }, b: { stars: 1, at: T3 } }, ['c2']);
+  const incoming = raw({ b: { stars: 1, at: T3 } }, ['c2']);
   const merged = mergeStored(stored, incoming, REG);
-  assert.deepEqual(stars(merged), { a: 3, b: 1, 'zz-future': 3 });
-  assert.equal(merged.levels.a.at, T1);
+  assert.deepEqual(stars(merged), { a: 2, b: 1, 'zz-future': 3 });
   assert.deepEqual(merged.cards, ['c1', 'c2']);
+});
+
+test('mergeStored: the stored side has more stars and a later at, the incoming side an earlier at', () => {
+  const merged = mergeStored(raw({ a: { stars: 3, at: T2 } }), raw({ a: { stars: 2, at: T1 } }), REG);
+  assert.deepEqual(plain(merged.levels.a), { stars: 3, at: T1 });
+  const flipped = mergeStored(raw({ a: { stars: 2, at: T1 } }), raw({ a: { stars: 3, at: T2 } }), REG);
+  assert.deepEqual(plain(flipped.levels.a), { stars: 3, at: T1 });
 });
 
 test('mergeStored: nothing stored (null) merges onto an empty record; inputs are not mutated', () => {
