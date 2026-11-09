@@ -71,6 +71,7 @@ const EXPECTED_ORDER = [
   'connect-to-dash0',
   'the-trace-that-starts-in-the-middle',
   'lost-in-translation',
+  'the-alert-that-stayed-green',
   'its-us',
 ];
 
@@ -160,7 +161,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
       no: 9,
       name: 'Live Demo',
       sub: 'Does that answer hold?',
-      levelIds: ['filter-or-sampler', 'the-34-percent-error-rate', 'connect-to-dash0', 'the-trace-that-starts-in-the-middle', 'lost-in-translation'],
+      levelIds: ['filter-or-sampler', 'the-34-percent-error-rate', 'connect-to-dash0', 'the-trace-that-starts-in-the-middle', 'lost-in-translation', 'the-alert-that-stayed-green'],
       bossId: 'its-us',
     },
   ]);
@@ -244,6 +245,7 @@ const HINTLESS = {
   'lost-in-translation': ['spot'], // a live-demo question: no helps on its Spot (#240)
   'the-34-percent-error-rate': ['tradeoff'], // a live-demo question: no helps on its Trade-off (#160)
   'the-trace-that-starts-in-the-middle': ['build'], // Act 9 has no helps (#240)
+  'the-alert-that-stayed-green': ['query'], // a live-demo question: no helps on its Query it
 };
 
 test('which widgets have no hints on each live level is pinned, and the how-to-play help says so', () => {

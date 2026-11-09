@@ -52,8 +52,8 @@ test('9.4 fields: in act-9 after 9.3 and before 9.5 and the boss, scored with no
   assert.deepEqual([...level.cards], []);
   assert.equal(Object.values(LIVE.levels).filter((l) => l.rewardTitle === level.rewardTitle).length, 1, 'the reward title is unique');
   const act = LIVE.acts.find((a) => a.id === 'act-9');
-  assert.deepEqual([...act.levelIds], ['filter-or-sampler', 'the-34-percent-error-rate', 'connect-to-dash0', ID, 'lost-in-translation']);
-  assert.equal(LIVE.order[LIVE.order.indexOf(ID) + 1], 'lost-in-translation', '9.5 follows 9.4, then the boss');
+  assert.deepEqual([...act.levelIds], ['filter-or-sampler', 'the-34-percent-error-rate', 'connect-to-dash0', ID, 'lost-in-translation', 'the-alert-that-stayed-green']);
+  assert.equal(LIVE.order[LIVE.order.indexOf(ID) + 1], 'lost-in-translation', '9.5 follows 9.4, then 9.6 and the boss');
 });
 
 test('globe: 9.4 is on the Solomon Islands, two dots, allowed by exactly its own MIN_DOTS_EXCEPTIONS entry', () => {

@@ -15,7 +15,8 @@ export const MIN_DOTS = 6;
 // has 2. The Solomon Islands and New Caledonia have 2 dots each, and Act 9 has run out of Oceania countries with 6 or more (owner
 // decision 2026-11-08, #240: 2-dot countries count as visible). A code listed here needs at least its own minimum instead of
 // MIN_DOTS (test/globe-data.test.mjs checks each entry is used by a level, equals the country's dot count and is below MIN_DOTS).
-export const MIN_DOTS_EXCEPTIONS = Object.freeze({ KOR: 5, SLB: 2, NCL: 2 });
+// Fiji has no land dot, so its 3 island markers (ISLANDS, islandDots) are what is lit.
+export const MIN_DOTS_EXCEPTIONS = Object.freeze({ KOR: 5, SLB: 2, NCL: 2, FJI: 3 });
 
 // act id -> region name and the Natural Earth SUBREGION values it covers. Owner defaults
 // (2026-11-04): Southern Europe counts as Western Europe, Central America and the Caribbean
@@ -99,6 +100,7 @@ export const LEVEL_COUNTRY = Object.freeze({
   'connect-to-dash0': 'PNG',
   'the-trace-that-starts-in-the-middle': 'SLB',
   'lost-in-translation': 'NCL',
+  'the-alert-that-stayed-green': 'FJI',
 });
 
 // Countries with no land dot on the 110m data, so they get hand-placed island markers (docs/FOUNDATION.md §2.7;
@@ -154,7 +156,7 @@ export const COUNTRY_NAMES = Object.freeze({
   IND: 'India', IRN: 'Iran', PAK: 'Pakistan',
   JPN: 'Japan', CHN: 'China', MNG: 'Mongolia', KOR: 'South Korea',
   THA: 'Thailand', VNM: 'Vietnam', IDN: 'Indonesia', MYS: 'Malaysia', PHL: 'the Philippines',
-  AUS: 'Australia', NZL: 'New Zealand', PNG: 'Papua New Guinea', SLB: 'the Solomon Islands', NCL: 'New Caledonia',
+  AUS: 'Australia', NZL: 'New Zealand', PNG: 'Papua New Guinea', SLB: 'the Solomon Islands', NCL: 'New Caledonia', FJI: 'Fiji',
 });
 
 /** The act id whose region a country (ADM0_A3 code, Natural Earth SUBREGION) is in, else null. */
