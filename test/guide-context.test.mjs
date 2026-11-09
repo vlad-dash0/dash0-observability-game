@@ -658,6 +658,18 @@ const REVIEW2_REPLIES = [
   ['eto-ratio', 'Forty errors over three hundred twenty-eight kept requests is 12.2 percent.'],
 ];
 
+/** The replies the third review (of 12c43c3) found passing: the right label nearly verbatim, a clause dropped or a word swapped. */
+const REVIEW3_REPLIES = [
+  ['silence', 'The exporter was renamed, but the pipelines still list the old id.'],
+  ['pipe-extension', 'It is defined under extensions but never listed under service.extensions.'],
+  // Not here on purpose: pipe-extension "health_check is there but service.extensions does not list it." The step's own text already says
+  // "not listed under service.extensions", so only a reply built from the right label's other words can be caught; accepted.
+  ['det-when', 'Once, when the SDK starts: the resource is detected then and does not change.'],
+  ['ga-fix', 'Alert on increase() over 10 minutes.'],
+  // Not here on purpose: otlp-signal "Send to the root of the collector endpoint." It keeps one content word of the label ("root") and the
+  // number 4318 is in the step's text, so no clause of two words is whole; accepted.
+];
+
 /** The step of the live registry with this widget id, among the steps the guide may speak on. */
 const allowedStep = (stepId) => {
   const found = ALLOWED.filter(({ type, spec }) => type.idOf(spec) === stepId);
@@ -671,6 +683,34 @@ test('every reply the second review found passing is withheld on its live step',
     assert.equal(withholds(reply, answerTokens(type, spec, step)), true, `${stepId}: ${reply}`);
     assert.equal(withholds(reply, answerTokens(type, spec)), true, `${stepId} without the step text: ${reply}`);
   }
+});
+
+test('every reply the third review found passing is withheld, with the step passed (finding 1)', () => {
+  for (const [stepId, reply] of REVIEW3_REPLIES) {
+    const { type, spec, step } = allowedStep(stepId);
+    assert.equal(withholds(reply, answerTokens(type, spec, step)), true, `${stepId}: ${reply}`);
+  }
+});
+
+test('live sweep: any clause of the right choice or hypothesis with two content words is withheld alone, with the step passed (finding 1)', () => {
+  // Content words here: 7+ letters that a hint uses freely ("pipeline", "requests", "collector") do not count.
+  const everyday = /^(?:services?|requests?|signals?|pipelines?|traces?|metrics?|collector|errors?|attributes?|components?|settings?|engineer|question|distribution)$/;
+  const skeleton = (t) => plainText(t).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  let swept = 0;
+  for (const { level, type, spec, step } of ALLOWED) {
+    if (type.key !== 'choice' && type.key !== 'incident') continue;
+    const list = type.key === 'choice' ? spec.choices : spec.hypotheses;
+    const rivals = list.filter((c) => !c.right).map((c) => skeleton(c.label));
+    const own = skeleton([step.intro, step.show, step.code, step.question].filter((v) => typeof v === 'string').join(' '));
+    const tokens = answerTokens(type, spec, step);
+    for (const clause of plainText(list.find((c) => c.right).label).split(/[,:;.]| so | but | then | and /i)) {
+      const words = skeleton(clause).split(' ').filter((w) => w.length >= 7 && !everyday.test(w));
+      if (words.length < 2 || rivals.some((r) => r.includes(skeleton(clause))) || own.includes(skeleton(clause))) continue;
+      swept++;
+      assert.equal(withholds(`${clause.trim()}.`, tokens), true, `${level.id} ${type.idOf(spec)}: ${clause}`);
+    }
+  }
+  assert.ok(swept > 30, `${swept} clauses swept`);
 });
 
 /** Realistic mentor hints on real steps: none gives the answer, so none may be withheld (the second review's finding 2). */
@@ -772,6 +812,20 @@ test('answerTokens: a sort item is stated by its key, a bucket by the word only 
   assert.equal(withholds('order.id is in the spans.', tokens), true);
   assert.equal(withholds('orders.count = 5 is a trace.', tokens), false, 'the other bucket');
   assert.equal(withholds('Think about metric versus trace.', tokens), false, 'no item in it');
+});
+
+test('answerTokens: each clause of the right label with two content words stands alone, unless a rival or the step text has it (finding 1)', () => {
+  const choice = { id: 'fx-clauses', choices: [
+    { key: 'a', label: 'Rotate keys quickly, then restart gateway workers, so wait', why: 'x', right: true },
+    { key: 'b', label: 'Restart gateway workers only', why: 'x' },
+    { key: 'c', label: 'Do nothing at all', why: 'x' },
+  ] };
+  const tokens = answerTokens(STEP_TYPES.choice, choice);
+  assert.equal(withholds('Rotate keys quickly.', tokens), true, 'a clause of the label, the rest dropped');
+  assert.equal(withholds('Restart gateway workers.', tokens), false, 'a rival label says that clause too');
+  assert.equal(withholds('Please wait.', tokens), false, 'one content word is not a statement');
+  const told = answerTokens(STEP_TYPES.choice, choice, { question: 'Should you rotate keys quickly?' });
+  assert.equal(withholds('Rotate keys quickly.', told), false, 'the question already says the clause');
 });
 
 test('answerTokens: a configure fixture with a short value stays filterable, and "Set level to 10." is withheld (finding 9)', () => {
