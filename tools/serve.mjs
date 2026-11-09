@@ -2,13 +2,16 @@
 // headers vercel.json declares (so the CSP bites locally) and refuses whatever
 // .vercelignore keeps out of the deployment (node_modules/ included), plus dotfiles.
 // It also runs `api/<name>.mjs` at `/api/<name>` (GET and POST) through a Node-to-Web Request adapter, as
-// Vercel does (every Set-Cookie and any 3xx with its Location pass through unchanged); `GUIDE_STUB=1` swaps the guide's model call for a canned reply (local dev only, no key needed).
+// Vercel does (every Set-Cookie and any 3xx with its Location pass through unchanged); `GUIDE_STUB=1` swaps the guide's model call for a canned reply (local dev only, no key needed); `AUTH_STUB=1` gives the sign-in and account functions a stub Google user (dev@dash0.com) and an in-memory Redis (tools/fake-redis.mjs), data gone on restart.
 // Usage: npm run dev   (PORT=8080 npm run dev to change the port)
 import { createServer } from 'node:http';
 import { readFile, realpath, stat } from 'node:fs/promises';
 import { readFileSync, realpathSync } from 'node:fs';
 import { extname, join, relative, resolve, sep } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createRedis } from '../lib/account/redis.mjs';
+import { createFakeRedis } from './fake-redis.mjs';
 
 const REPO = resolve(fileURLToPath(new URL('..', import.meta.url)));
 
@@ -31,6 +34,9 @@ const API_METHODS = ['GET', 'POST'];
 const API_MAX_BODY = 16 * 1024;
 /** What the stubbed model says: neutral, so it passes the answer filter. */
 export const STUB_REPLY = 'Re-read what the question asks, then look at what each option says about it.';
+
+/** The functions that take an auth-stub env and a Redis client, by file name: the factory each module exports. */
+const AUTH_FACTORIES = { 'auth-start': 'createAuthStart', 'auth-callback': 'createAuthCallback', account: 'createAccount' };
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
@@ -139,7 +145,7 @@ async function resolveFile(root, ignored, decoded) {
   return file;
 }
 
-export function startServer({ root = REPO, port = 3000, host = '127.0.0.1', log = console.log, stub = process.env.GUIDE_STUB === '1' } = {}) {
+export function startServer({ root = REPO, port = 3000, host = '127.0.0.1', log = console.log, stub = process.env.GUIDE_STUB === '1', authStub = process.env.AUTH_STUB === '1' } = {}) {
   const realRoot = realpathSync(root);
   const config = JSON.parse(readFileSync(join(realRoot, 'vercel.json'), 'utf8'));
   config.headers?.forEach((rule) => sourceRegExp(rule.source)); // fail at startup
@@ -152,14 +158,25 @@ export function startServer({ root = REPO, port = 3000, host = '127.0.0.1', log 
   const ignored = ignoreMatcher(ignoreText);
 
   if (stub) log('GUIDE_STUB=1: /api/guide answers with a canned reply, no model is called');
+  if (authStub) log('AUTH_STUB=1: sign-in is a stub (dev@dash0.com) over an in-memory Redis; use http://localhost, not 127.0.0.1');
   const modules = new Map();
+  let authEnv = null; // built on first use: the port is known once listening
+  let fakeRedis = null;
   // `api/<name>.mjs` loaded once. The guide under the stub is built here with a fake key and the canned fetch.
   const handlersFor = async (name) => {
     if (!modules.has(name)) {
       modules.set(name, (async () => {
         const file = join(realRoot, 'api', `${name}.mjs`);
         const mod = await import(pathToFileURL(file).href);
-        return stub && name === 'guide' ? mod.createGuide({ env: { ANTHROPIC_API_KEY: 'stub' }, fetch: stubFetch }) : mod;
+        if (stub && name === 'guide') return mod.createGuide({ env: { ANTHROPIC_API_KEY: 'stub' }, fetch: stubFetch });
+        if (authStub && Object.hasOwn(AUTH_FACTORIES, name)) {
+          // One fake store and one secret for every auth function; AUTH_ORIGIN is http://localhost, the only origin the stub accepts.
+          fakeRedis ??= createFakeRedis();
+          authEnv ??= { AUTH_STUB: '1', AUTH_ORIGIN: `http://localhost:${server.address().port}`, SESSION_SECRET: randomBytes(32).toString('hex') };
+          const redis = createRedis({ url: fakeRedis.url, token: fakeRedis.token, fetch: fakeRedis.fetch });
+          return mod[AUTH_FACTORIES[name]]({ env: authEnv, redis });
+        }
+        return mod;
       })());
     }
     return modules.get(name);
