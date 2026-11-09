@@ -101,6 +101,23 @@ before(async () => {
        return new Response(JSON.stringify({ got, type: req.headers.get('content-type'), path: new URL(req.url).pathname }), { status: 201, headers: { 'x-hello': 'yes' } });
      }`,
   );
+  writeFileSync(
+    join(root, 'api', 'cookies.mjs'),
+    `export async function GET() {
+       const headers = new Headers();
+       headers.append('Set-Cookie', 'a=1; Path=/; HttpOnly');
+       headers.append('Set-Cookie', 'b=2; Path=/; Secure');
+       return new Response('ok', { status: 200, headers });
+     }`,
+  );
+  writeFileSync(
+    join(root, 'api', 'bounce.mjs'),
+    `export async function GET() {
+       const headers = new Headers({ Location: '/api/cookies?from=bounce' });
+       headers.append('Set-Cookie', 'state=xyz; Path=/');
+       return new Response(null, { status: 302, headers });
+     }`,
+  );
   site = await listen({ root });
 });
 after(() => {
@@ -212,6 +229,19 @@ test('POST /api/<name> reaches api/<name>.mjs as a Web Request, and the vercel.j
   assert.deepEqual(JSON.parse(res.body), { got: 'ping', type: 'text/x', path: '/api/hello' });
   const real = await send(repo.port, 'GET', '/api/guide');
   assertHeaders(real, rule('/(.*)'));
+});
+
+test('every Set-Cookie the function sets reaches the client, not just the last', async () => {
+  const res = await send(site.port, 'GET', '/api/cookies');
+  assert.deepEqual(res.headers['set-cookie'], ['a=1; Path=/; HttpOnly', 'b=2; Path=/; Secure']);
+});
+
+test('a 302 keeps its status, Location and cookie, and is not followed', async () => {
+  const res = await send(site.port, 'GET', '/api/bounce');
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.location, '/api/cookies?from=bounce');
+  assert.deepEqual(res.headers['set-cookie'], ['state=xyz; Path=/']);
+  assert.equal(res.body, '', 'the redirect body is not the target');
 });
 
 test('a method the function does not export, or a name with no function, is refused', async () => {
