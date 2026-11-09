@@ -685,6 +685,38 @@ test('every reply the second review found passing is withheld on its live step',
   }
 });
 
+/** tvw-config (two vendors, one weekend): the starting config already shows `exporters: [otlp_grpc/dash0]` and `exporters: [otlp_grpc/oldvendor]`. */
+const TVW_ANSWERS = [
+  'In metrics and logs, set exporters to [otlp_grpc/oldvendor, otlp_grpc/dash0].',
+  'Every pipeline should list both exporters: otlp_grpc/oldvendor and otlp_grpc/dash0.',
+  'Metrics should export to otlp_grpc/dash0.',
+  'Traces needs otlp_grpc/oldvendor too.',
+  'Add otlp_grpc/dash0 to the logs pipeline.',
+];
+const TVW_VISIBLE = [
+  'exporters: [otlp_grpc/dash0]',
+  'The traces pipeline has exporters: [otlp_grpc/dash0].',
+  'The metrics pipeline has exporters: [otlp_grpc/oldvendor].',
+  'Look at which exporter each pipeline sends to.',
+];
+
+test('a pipeline-wiring answer is withheld on a Configure step whose starting config shows the key and value (tvw-config)', () => {
+  const { type, spec, step } = allowedStep('tvw-config');
+  const tokens = answerTokens(type, spec, step);
+  for (const reply of TVW_ANSWERS) assert.equal(withholds(reply, tokens), true, reply);
+  for (const reply of TVW_VISIBLE) assert.equal(withholds(reply, tokens), false, reply);
+  assert.deepEqual(tokens, answerTokens(type, spec), 'the step text excuses nothing here');
+});
+
+test('a pair of ids that a starting line already lists together is not a token (tvw-config variant)', () => {
+  const { type, spec, step } = allowedStep('tvw-config');
+  const shown = { ...spec, given: spec.given.replace('exporters: [otlp_grpc/oldvendor]\n    logs', 'exporters: [otlp_grpc/oldvendor, otlp_grpc/dash0]\n    logs') };
+  assert.notEqual(shown.given, spec.given);
+  const tokens = answerTokens(type, shown, step);
+  assert.equal(withholds('exporters: [otlp_grpc/oldvendor, otlp_grpc/dash0]', tokens), false, 'the player already sees it');
+  assert.equal(withholds('Add otlp_grpc/dash0 to the logs pipeline.', tokens), true);
+});
+
 test('every reply the third review found passing is withheld, with the step passed (finding 1)', () => {
   for (const [stepId, reply] of REVIEW3_REPLIES) {
     const { type, spec, step } = allowedStep(stepId);
