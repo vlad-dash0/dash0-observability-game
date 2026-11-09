@@ -330,7 +330,9 @@ top-level navigation from `<a href="/api/auth-start">`, sign-out is a same-origi
   with `azp` equal to it), `expired` (`exp*1000 > now - 60 s`), `iat` (`iat*1000 <= now + 60 s`), `nonce`, `email`
   (`email_verified` must be the boolean `true`), `domain` (`hd === 'dash0.com'` exactly and a lowercased email ending
   `@dash0.com`) and `sub` (a non-empty string). The JWKS comes from `https://www.googleapis.com/oauth2/v3/certs`, is
-  cached in memory for its Cache-Control max-age, and an unknown kid refetches once, at most once a minute. Only
+  cached in memory for its Cache-Control max-age (never less than a minute), and an unknown kid refetches once, at most
+  once a minute. Concurrent misses share one in-flight fetch, and the fetch times out after 8 s. A `crit` header is
+  refused (`format`), and an unset or empty client id refuses every token (`aud`). Only
   WebCrypto (`RSASSA-PKCS1-v1_5` / SHA-256) is used.
 - `lib/auth/session.mjs`: the cookie `__Host-oc-session` holds `v1.<b64url {pid, gen, exp}>.<b64url HMAC-SHA256>`
   with HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000 (30 days, not sliding); `exp` is epoch ms.
@@ -338,7 +340,9 @@ top-level navigation from `<a href="/api/auth-start">`, sign-out is a same-origi
   and requires `gen` to match. Sign-out clears the cookie (Max-Age=0); delete removes the profile, so a kept copy gets
   401. A SESSION_SECRET shorter than 32 bytes counts as not configured (`sessionSecret` returns null; `signSession`
   throws). The secret is measured in UTF-8 bytes of the env string (not base64-decoded). The short-lived
-  `__Host-oc-auth` cookie is built in P3, reusing the same HMAC primitive.
+  `__Host-oc-auth` cookie is built in P3, reusing the same HMAC primitive, but it MUST be signed apart from the
+  session cookie: its own version tag (`a1`, so a session value never verifies as an auth value or the reverse) and a
+  key derived from SESSION_SECRET with HKDF or a fixed label, never the raw secret shared with sessions.
 - CSRF: every POST needs an Origin whose host equals AUTH_ORIGIN's host (a missing Origin is 403) and
   `Content-Type: application/json` (else 415); no CORS headers are ever sent.
 - Env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET, AUTH_ORIGIN (for now the current production
@@ -354,14 +358,18 @@ reaches a client. `lib/account/score.mjs` encodes `score = total * 2^31 + (2^31 
 seconds since 2026-01-01 when the current total was reached, so a descending range gives most stars, then earliest;
 `reachedAt` changes only when the recomputed total changes and always comes from the server clock. Writes that must be
 atomic are Lua scripts (`cas-progress`, `claim-nick`, `set-listing`, `delete-account`) that only compare and write
-values computed in JS (`set-listing` does an HSET of `listed` only, then ZADD with the stored score or ZREM); first sign-in uses `SET sub NX` and the loser re-reads. Nicknames match
+values computed in JS (`set-listing` does an HSET of `listed`, then ZADD with the stored score or ZREM; with no stored score it only sets
+`listed`, and the ZADD happens at the next progress write because `cas-progress` reads `listed` inside the script
+before its ZADD); first sign-in uses `SET sub NX` and the loser re-reads. Nicknames match
 `^[A-Za-z0-9][A-Za-z0-9_-]{2,19}$`, are unique on the lowercase key, with reserved names and a small blocked-word list
 (matched on a leet-folded form). The default nickname (`lib/account/nickname.mjs`) is a fun, deterministic name made from the first name token
 of the email local part (tidied to `[a-z0-9]`): the same email always gives the same nickname. A stable hash of the base
 picks among a small set of suffix rules (`-ster`; double the final consonant then `-er`; drop a final vowel then
 `-oton`; optionally `-inator` and `-zilla`). The owner's examples come out exactly: vlad gives vladster, bob gives
 bobber, kyle gives kyloton. A result that fails nickname validation or the blocked-word filter tries the next rule; on
-collision it tries the next rule, then base plus rule plus `-2` and up. A base shorter than 3 characters or blocked falls
+collision the candidates are tried in this order: the rules in a fixed cycle starting at the hash-picked rule (each
+applied to the base), then, for n from 2 to 99, the same cycle again with `-<n>` appended; the first candidate that is
+valid, not blocked and not taken wins, and if none is left the name is `player` plus 4 random hex characters. A base shorter than 3 characters or blocked falls
 back to `player`. The player can override the nickname at any time. A new profile is listed by default
 (`listed=1`) and joins the board on its first progress write; the account modal has a "Show me on the leaderboard"
 toggle to hide. There is no confirm-once step. After first sign-in a notice says "You're on the leaderboard as <nick>.
