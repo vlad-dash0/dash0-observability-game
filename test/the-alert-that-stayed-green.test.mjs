@@ -154,6 +154,25 @@ test('step 1: the intro and table state what the whyNots rely on, and the number
   assert.equal(by.selector.includes('"200" and "500"'), true);
 });
 
+test('step 2: the intro gives plain figures and no diagnosis, and the show repeats the status values, labels and per-route figures', () => {
+  const intro = plain(RULE_STEP.intro);
+  for (const w of ['whole', 'averaged', 'group', 'by (route)', 'hides', 'healthy']) assert.equal(intro.toLowerCase().includes(w), false, `the intro must not say "${w}"`);
+  assert.equal(intro.includes('0.1'), true);
+  const text = plain(RULE_STEP.show);
+  assert.equal(text.includes('The only values the status label takes are "200" and "500"'), true);
+  assert.equal(text.includes('service, route and status'), true);
+  assert.equal(/<td>\/pay<\/td><td>60<\/td><td>15<\/td>/.test(RULE_STEP.show), true);
+  assert.equal(/<td>\/quote<\/td><td>120<\/td><td>0<\/td>/.test(RULE_STEP.show), true);
+  assert.equal(RULE_STEP.show, WHY_STEP.show, 'the same table on both steps, built once');
+});
+
+test('known pass, not the concept: min by (route) over sum by (route) passes with no status matcher (the 500 series is the smaller one on every route)', () => {
+  const by = ' by (route) ';
+  const min = `min${by}(rate(${M}{service="checkout"}[5m])) / sum${by}(rate(${M}{service="checkout"}[5m])) > 0.1`;
+  assert.equal(grade(min).ok, true, 'accepted: no learner is likely to type it, and the dataset stays as it is');
+  assert.equal(grade(min.replace('min by', 'max by')).ok, false, 'max picks the 200 series: 0.75, wrong value');
+});
+
 // ---- sources -------------------------------------------------------------------------------
 
 test('sources: Spec lines name the three Prometheus pages, the quoted sentences are in the header, no em dash', () => {

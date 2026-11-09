@@ -38,6 +38,14 @@ const REFERENCE =
   `sum by (route) (rate(${M}{service="checkout"}[5m])) > ${THRESHOLD}`;
 
 // Step 1: why is the alert green? `why` follows "Right." or "Not quite.". Labels are close in length; the right one is the third.
+// The per-route figures and the label values, shown on both steps (a step replaces the screen, so step 2 repeats them).
+const counterTable = () =>
+  '<table><caption>Checkout, per scrape (every 15 seconds), since the deploy</caption>' +
+  '<thead><tr><th scope="col">Route</th><th scope="col">Requests</th><th scope="col">With status 500</th></tr></thead><tbody>' +
+  `<tr><td>/pay</td><td>${PAY_REQUESTS}</td><td>${PAY_FAILED}</td></tr>` +
+  `<tr><td>/quote</td><td>${QUOTE_REQUESTS}</td><td>0</td></tr></tbody></table>` +
+  '<p>The only values the <code>status</code> label takes are "200" and "500". The labels are <code>service</code>, <code>route</code> and <code>status</code>.</p>';
+
 const WHY = [
   {
     key: 'sampling',
@@ -83,20 +91,15 @@ export default {
           'In a review, a presenter says: "The checkout error alert has been green all afternoon, so checkout is healthy." Checkout deployed 20 minutes ago. ' +
           'The counter <code>http_server_requests_total</code> is incremented by the server for every request it handles (it is not made from spans), and has the labels <code>service</code>, <code>route</code> and <code>status</code>. ' +
           `The alert expression is <code>${RULE}</code>, and it fires when that returns anything.`,
-        show:
-          '<table><caption>Checkout, per scrape (every 15 seconds), since the deploy</caption>' +
-          '<thead><tr><th scope="col">Route</th><th scope="col">Requests</th><th scope="col">With status 500</th></tr></thead><tbody>' +
-          `<tr><td>/pay</td><td>${PAY_REQUESTS}</td><td>${PAY_FAILED}</td></tr>` +
-          `<tr><td>/quote</td><td>${QUOTE_REQUESTS}</td><td>0</td></tr></tbody></table>` +
-          '<p>The only values the <code>status</code> label takes are "200" and "500".</p>',
+        show: counterTable(),
         question: 'Why has the alert stayed green?',
         qid: 'asg-q-why',
         choice: { id: 'asg-why', choices: WHY },
       },
       {
         intro:
-          `A selector that matches nothing is not the only problem. Even with the right status, the rule asks about the whole checkout service: /pay fails ${PAY_FAILED} of ${PAY_REQUESTS} requests, ` +
-          `but /quote takes ${QUOTE_REQUESTS} healthy ones with it, and the rule only fires above ${THRESHOLD}.`,
+          `The rule fires when its expression returns anything, and it compares a share of failed requests with ${THRESHOLD}. The figures are the same as before.`,
+        show: counterTable(),
         question:
           `Fix the rule so it returns one series per route, labelled route only, for each route whose share of failed requests over the last 5 minutes is above ${THRESHOLD}.`,
         qid: 'asg-q-rule',
