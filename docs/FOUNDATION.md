@@ -383,9 +383,9 @@ Change your nickname or hide yourself in Account."
 
 **Merge.** `mergeStored(storedRaw, incoming, registry)` in `lib/progress.mjs` is the one merge expression (unknown ids
 survive, best stars per level, earliest `at`, union of cards); `lib/storage.mjs` and the server both call it.
-`PUT /api/progress` takes exactly `{v:1, progress}` (any other field, such as a sent total, is 400), sanitizes, reads
+`POST /api/progress` takes exactly `{v:1, progress}` (any other field, such as a sent total, is 400), sanitizes, reads
 rev, merges, computes `total = starTotals(merged, liveRegistry()).earned`, and runs `cas-progress`, retrying up to
-3 times on conflict. The client PUTs on sign-in, page load while signed in, each completion and a save-code import,
+3 times on conflict. The client POSTs on sign-in, page load while signed in, each completion and a save-code import,
 saves the merged response locally, and never syncs in debug mode.
 
 **Endpoints** (single path segments, all in `api/`):
@@ -394,10 +394,17 @@ saves the merged response locally, and never syncs in debug mode.
   signedIn:false and clears the cookie; store down is 502 `store-unavailable`.
 - `POST /api/account` `{v:1, action}`: `signout`, `nickname {nick}` (409 `nick-taken`, or 400 with field `nick`),
   `listing {listed}`, `delete {confirm:'delete'}`.
-- `GET/PUT /api/progress`: 200 `{v:1, progress, stars, rank|null}`; errors 401, 400, 413 (over 16 KB), 429, 502.
+- `GET/POST /api/progress`: 200 `{v:1, progress, stars|null, rank|null}` (stars is null until a first write, never 0); errors 401,
+  400, 413 (over 16 KB), 429, 502; 503 when unconfigured. POST needs the AUTH_ORIGIN Origin and JSON like the account POSTs, checks
+  the session, then the size and body, then the Redis rate limit (a refused body does not use the quota). The response stars come
+  from the server's total, never the body. P4 decisions: the body must be exactly `{v:1, progress}` with `progress.levels` an
+  object (field `body` for an extra key, `progress` for a bad progress); the plausibility check reads the stored total just
+  before the write (a failed read skips the check) and logs a second line `{msg:'board', outcome:'implausible', why:'jump'|'fast'}`
+  (`fast` only when the total first reaches the maximum, at most 30 minutes after `profile.created`, which the store now returns).
 - `GET /api/leaderboard` (anonymous allowed): 200 `{v:1, ok:true, size, top:[{rank, nick, stars}] x10,
   me:{stars, rank|null, listed}|null}`, never a pid; rank and size are over the listed set; an empty board is ok with
-  `top:[]`; 503 `not-configured`, 502 `store-unavailable`.
+  `top:[]`; 503 `not-configured`, 502 `store-unavailable`, 429 `rate-limited` (30 reads a minute per IP, in
+  memory). A signed-in reader gets `me:{stars|null, rank|null, listed}`; a bad cookie reads as anonymous; a 0-star player is not on the board.
 - Rate limits: signed in, a Redis fixed window per pid (30 progress writes per 10 minutes, 10 nickname changes per
   hour); anonymous routes use `createLimiter` per IP with their own instance.
 - Logs: one line per request `{msg, outcome, status, ms}`; never a pid, sub, nick, email or cookie.
