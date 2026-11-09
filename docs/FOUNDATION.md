@@ -347,14 +347,14 @@ top-level navigation from `<a href="/api/auth-start">`, sign-out is a same-origi
   prefixes are unsupported).
 
 **Store (Upstash Redis over REST with fetch, no dependency).** Keys are prefixed `oc:v1:`: `sub:<sub>` (pid),
-`profile:<pid>` (HASH: nick, nickKey, listed 0/1, asked 0/1, gen, created; never an email or name), `progress:<pid>`
+`profile:<pid>` (HASH: nick, nickKey, listed 0/1, gen, created; never an email or name), `progress:<pid>`
 (HASH: rev, json, total, reachedAt, score), `nick:<nickKey>` (pid, the uniqueness claim), `board` (ZSET of listed pids)
 and `rl:<pid>:<route>:<window>` (INCR plus EXPIRE). The pid is a random 16-byte base64url id; Google's sub never
 reaches a client. `lib/account/score.mjs` encodes `score = total * 2^31 + (2^31 - 1 - s)`, s being the server's
 seconds since 2026-01-01 when the current total was reached, so a descending range gives most stars, then earliest;
 `reachedAt` changes only when the recomputed total changes and always comes from the server clock. Writes that must be
 atomic are Lua scripts (`cas-progress`, `claim-nick`, `set-listing`, `delete-account`) that only compare and write
-values computed in JS; first sign-in uses `SET sub NX` and the loser re-reads. Nicknames match
+values computed in JS (`set-listing` does an HSET of `listed` only, then ZADD with the stored score or ZREM); first sign-in uses `SET sub NX` and the loser re-reads. Nicknames match
 `^[A-Za-z0-9][A-Za-z0-9_-]{2,19}$`, are unique on the lowercase key, with reserved names and a small blocked-word list
 (matched on a leet-folded form). The default nickname (`lib/account/nickname.mjs`) is a fun, deterministic name made from the first name token
 of the email local part (tidied to `[a-z0-9]`): the same email always gives the same nickname. A stable hash of the base
@@ -377,7 +377,7 @@ saves the merged response locally, and never syncs in debug mode.
 
 **Endpoints** (single path segments, all in `api/`):
 - `GET /api/account`: `{v:1, configured:false}` when unconfigured; `{v:1, configured:true, signedIn:false}` with no
-  store call when there is no cookie; `{signedIn:true, nick, listed, asked}` when signed in; a bad or stale cookie gives
+  store call when there is no cookie; `{signedIn:true, nick, listed}` when signed in; a bad or stale cookie gives
   signedIn:false and clears the cookie; store down is 502 `store-unavailable`.
 - `POST /api/account` `{v:1, action}`: `signout`, `nickname {nick}` (409 `nick-taken`, or 400 with field `nick`),
   `listing {listed}`, `delete {confirm:'delete'}`.
