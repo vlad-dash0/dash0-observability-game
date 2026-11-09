@@ -5,6 +5,7 @@
 // ladder: hints in early acts only).
 // Spec: https://prometheus.io/docs/prometheus/latest/querying/functions/ , https://prometheus.io/docs/practices/histograms/ , https://opentelemetry.io/docs/specs/otel/metrics/sdk/#explicit-bucket-histogram-aggregation
 // Dash0 docs: https://www.dash0.com/docs/dash0/dashboards/import-dashboards
+// Owner: DART naming confirmed by the owner 2026-11-09 (#263); no public page
 //
 // Facts used (each read on the page named, 2026-11-07). Prometheus functions page: `predict_linear(v range-vector, t scalar)` predicts the value of a
 // series t seconds from now using simple linear regression, and should only be used with gauges; `increase` is "extrapolated to cover the
@@ -20,9 +21,10 @@
 //
 // Stated as reasoning, with no source: the four buckets are the game's plain generic labels (translated, approximated, manual, skipped), not
 // the statuses of any named migration tool. The old tool, its functions and what it computes are invented, so each sort item says in its
-// label what the old tool does; no claim is made about any real vendor, and none about whether Dash0 offers a migration tool beyond the
-// Grafana import above. A big-number "exact count" is placed in "approximated" because `increase` extrapolates; that is a property of
-// PromQL's `increase` as the functions page states it, not of any tool.
+// label what the old tool does; no claim is made about any real vendor. DART is named from the owner line above only: its name and that
+// it brings dashboards, alerts and rules over to Dash0 as Terraform, nothing about how it works; the four buckets are not its statuses.
+// A big-number "exact count" is placed in "approximated" because `increase` extrapolates; that is a property of PromQL's `increase` as
+// the functions page states it, not of any tool.
 //
 // Invented for the game: the company, the old tool, the twelve constructs, and every number in step 2 (1,000 requests in 5 minutes, 900 at
 // or under 0.5 s, 985 at or under 1 s, 1,000 at or under 2.5 s, the 15 slowest between 1.0 and 1.1 s, a 1.2 s threshold). The estimate
@@ -197,6 +199,7 @@ export default {
     ],
     finish:
       'Moving off a proprietary tool is part translation, with several places where the meaning shifts: a percentile becomes an estimate from buckets, an exact count becomes an extrapolated one, and what has no counterpart is rebuilt or left behind. ' +
-      'Check each converted query against the old one on the same data before you switch it off.',
+      'Check each converted query against the old one on the same data before you switch it off. ' +
+      'When the move is to Dash0, DART (Dashboards, Alerts &amp; Rules to Terraform) brings dashboards, alerts and rules over as Terraform, and the sorting still matters: some of them need a person, whatever the tool.',
   },
 };
