@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { makeDom, q, qa } from './helpers/dom.mjs';
 import { recordFocus } from './helpers/focus.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
+import { withGuide } from './helpers/guide-ctx.mjs';
 import { helpChips, sideColumn } from '../lib/ui/index.mjs';
 import * as ladder from '../lib/widgets/help-ladder.mjs';
 import { hintCost, ladderText, LADDER, mountHintLadder, mountSide, PENALTY, RULE, ruleText, starsLabel, validateHelps } from '../lib/widgets/help-ladder.mjs';
@@ -205,4 +206,55 @@ test('mountHintLadder: succeed() alone leaves the Hint button disabled and the s
   assert.equal(lad.done, true);
   assert.equal(q('#s3-hint').disabled, true);
   assert.equal(q('#s3-stars').getAttribute('aria-label'), '5 of 5 stars');
+});
+
+test('#17 P3 mountSide counts a guide ask in the hints shown, the stars and the hint cost, and keeps it across score()', () => {
+  const { ctx, side } = sideSetup();
+  ctx.hint = () => {};
+  withGuide(ctx);
+  const side2 = mountSide(ctx, q('#box'), 's1', {});
+  side2.score({ wrong: 2, wrongLabel: 'wrong drops', hints: 0, done: false });
+  side2.hintUi({ label: 'Hint 1 of 3', disabled: false, tierHtml: '' });
+  assert.equal(q('#s1-hint-cost').textContent, 'costs 1 star', 'two penalties: 3 stars, one more gives 2');
+  ctx.askedGuide();
+  assert.equal(q('#s1-hints').textContent, '1', 'the card shows the ask at once');
+  assert.equal(q('#s1-stars').getAttribute('aria-label'), '2 of 5 stars still possible');
+  assert.equal(q('#s1-hint-cost').textContent, 'costs no star now', 'three penalties: 2 stars, a fourth still gives 2');
+  assert.equal(side2.hintsShown(2), 3);
+  side2.score({ wrong: 2, wrongLabel: 'wrong drops', hints: 0, done: false });
+  side2.hintUi({ label: 'Hint 1 of 3', disabled: false, tierHtml: '' });
+  assert.equal(q('#s1-hint-cost').textContent, 'costs no star now', 'the ask survives a later score() and hintUi()');
+  const n = side2.score({ wrong: 1, wrongLabel: 'wrong drops', hints: 1, done: false });
+  assert.equal(n, 2, 'one wrong, one hint and one ask: three penalties');
+  assert.equal(q('#s1-hints').textContent, '2', 'the ask survives a later score()');
+  assert.equal(side2.hintsShown(1), 2);
+  assert.equal(side.hintsShown(0), 0, 'a column that was never asked adds nothing');
+});
+
+test('#17 P3 mountHintLadder (Query it, Configure it) states the asks in its success line', () => {
+  const dom = makeDom();
+  recordFocus(dom.window);
+  dom.body.innerHTML = `<div id="box">${sideHtml('s4', { hints: true, title: 'Done' })}</div>`;
+  const ctx = withGuide({ ovBody: dom.body, escapeHtml, mistake() {}, hint() {} });
+  const lad = mountHintLadder(ctx, q('#box'), 's4', { wrongNouns: ['failed Check', 'failed Checks'], hint: () => ({ html: '' }), fill() {} });
+  ctx.askedGuide();
+  lad.succeed();
+  assert.equal(q('#s4-win-stars').textContent, '4 of 5 stars: 0 failed Checks, 1 hint.');
+});
+
+test('#17 P3 a solved board ignores later asks, and an earlier step\'s board never reacts to the next step\'s asks', () => {
+  const dom = makeDom();
+  recordFocus(dom.window);
+  dom.body.innerHTML = `<div id="b1">${sideHtml('one', { hints: true, title: 'A' })}</div><div id="b2">${sideHtml('two', { hints: true, title: 'B' })}</div>`;
+  const ctx = withGuide({ ovBody: dom.body, escapeHtml, mistake() {}, hint() {} });
+  const first = mountSide(ctx, q('#b1'), 'one', {});
+  first.score({ wrong: 0, wrongLabel: 'wrong', hints: 0, done: false });
+  first.succeed({ line: 'done' });
+  first.score({ wrong: 0, wrongLabel: 'wrong', hints: 0, done: true });
+  const second = mountSide(ctx, q('#b2'), 'two', {});
+  second.score({ wrong: 0, wrongLabel: 'wrong', hints: 0, done: false });
+  ctx.askedGuide();
+  assert.equal(q('#one-hints').textContent, '0', 'the solved board did not repaint');
+  assert.equal(first.hintsShown(0), 0, 'and did not count the ask');
+  assert.equal(q('#two-hints').textContent, '1', 'the live board did');
 });

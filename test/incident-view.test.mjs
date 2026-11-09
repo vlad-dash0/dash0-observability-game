@@ -16,6 +16,7 @@ import { frac, incidentScenario, rightLast, slow, threeClues, tight, zero } from
 import { budgetLeft, newIncident, openView } from '../lib/widgets/incident.mjs';
 import { boardStars, starsLabel } from '../lib/widgets/help-ladder.mjs';
 import { incidentOrder, mountIncident, renderIncident } from '../lib/widgets/incident-view.mjs';
+import { withGuide } from './helpers/guide-ctx.mjs';
 
 const ID = 'checkout-slow';
 
@@ -635,4 +636,24 @@ test('Escape on the hint after the last tier (button spent) falls back to a caus
   assert.equal(e.defaultPrevented, true);
   assert.equal(focus.last().startsWith('hypothesis:'), true, focus.last());
   assert.deepEqual(focus.unfocusable(), []);
+});
+
+test('#17 P3 the win card counts a guide question as a hint, in the stars too', () => {
+  const s = incidentScenario();
+  const dom = makeDom();
+  const hints = [];
+  const ctx = withGuide({
+    ovBody: dom.body, ovActions: dom.actions, escapeHtml, reduceMotion: true, signal: new AbortController().signal,
+    shuffle: (a) => [...a], mistake() {}, hint() { hints.push(1); },
+  });
+  dom.body.innerHTML = renderIncident(s, newIncident(s), {});
+  dom.actions.innerHTML = '<button id="next" disabled>Next</button>';
+  mountIncident(ctx, s, { onComplete() {}, swirl: () => {} });
+  ctx.askedGuide();
+  assert.equal(text(`[id="${ID}-hints"]`), '1');
+  open('traces');
+  open('db-metrics');
+  pick('slow-query');
+  assert.equal(hints.length, 1);
+  assert.equal(winLine(), '4 of 5 stars: 0 wrong picks, 0 misleading views, 1 hint. 7 min used.');
 });

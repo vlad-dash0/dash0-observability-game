@@ -16,6 +16,7 @@ import { checkBuild } from '../lib/widgets/build-it.mjs';
 import { noteFor } from '../lib/widgets/build-it-help.mjs';
 import { A, B, C, D, E, b1Spec } from './fixtures/build-b1.mjs';
 import { S1, S2, S3, S4, T2, logsSpec } from './fixtures/build-logs.mjs';
+import { withGuide } from './helpers/guide-ctx.mjs';
 
 const ALL = { queue: true, tint: true, guide: true, instant: true, hints: true };
 const CHECK = { hints: true }; // context-propagation's ladder: Check button, hints on
@@ -1175,4 +1176,15 @@ test('twins get distinct screen-reader row labels, waiting and arrived; a unique
   ]);
   assert.equal(q('[data-arriving]').getAttribute('aria-label').startsWith('solo, api, INTERNAL, '), true, 'a unique span keeps its label');
   assert.equal(q('[data-span]:not([data-arriving])').getAttribute('aria-label'), 'retry, api, trace 1111aaaa, span id \u2026a1b2, INTERNAL, UNSET, 0 to 3 ms, trace 1111aaaa, root');
+});
+
+test('#17 P3 the success line counts a guide question as a hint; its stars are the side card stars, not a recount', () => {
+  const { ctx, counts, mount } = setup(withHelps(ALL));
+  withGuide(ctx);
+  mount();
+  ctx.askedGuide();
+  assert.equal(q('#b1-hints').textContent, '1');
+  solveQueue();
+  assert.equal(counts.hints, 1);
+  assert.equal(q('#b1-win-stars').textContent, '4 of 5 stars: 0 wrong drops, 1 hint.');
 });

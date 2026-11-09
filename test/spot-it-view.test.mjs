@@ -9,6 +9,7 @@ import { recordFocus } from './helpers/focus.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { newSpotState } from '../lib/widgets/spot-it.mjs';
 import { mountSpot, renderSpot, spotView } from '../lib/widgets/spot-it-view.mjs';
+import { withGuide } from './helpers/guide-ctx.mjs';
 import { SPOT_RULE } from '../lib/widgets/spot-it-help.mjs';
 
 // Deliberately not fault-first: s1 is a decoy before the fault s2.
@@ -537,4 +538,16 @@ test('Escape on a shown hint is handled, focuses the hint button and leaves the 
   q('#bomb-hint-text').onkeydown(e);
   assert.equal(e.defaultPrevented, true);
   assert.equal(focus.last(), '#bomb-hint');
+});
+
+test('#17 P3 the success line counts a guide question as a hint, in the stars too', () => {
+  const { ctx, counts, mount } = setup(withHints());
+  withGuide(ctx);
+  mount();
+  ctx.askedGuide();
+  assert.equal(text('#bomb-hints'), '1');
+  pickAll('s2', 's4');
+  check();
+  assert.equal(counts.hints, 1);
+  assert.equal(text('#bomb-win-stars'), '4 of 5 stars: 0 failed Checks, 1 hint.');
 });

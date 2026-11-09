@@ -13,6 +13,7 @@ import { decls, read, rules } from './helpers/css.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { newSortState, place } from '../lib/widgets/sort-it.mjs';
 import { mountSort, renderSort, sortView } from '../lib/widgets/sort-it-view.mjs';
+import { withGuide } from './helpers/guide-ctx.mjs';
 
 // The core's fixture: i1 -> metric, i2 -> log, i3 -> trace, i4 -> metric.
 function fixture() {
@@ -1016,4 +1017,18 @@ test('Escape on the hint with no tier left (button spent) falls back to the untr
   q('#signals-hint-text').onkeydown(e);
   assert.equal(e.defaultPrevented, true);
   assert.equal(focus.last(), 'bucket:log');
+});
+
+test('#17 P3 the success line counts a guide question as a hint, in the stars too', () => {
+  const { ctx, counts, mount } = setup();
+  withGuide(ctx);
+  mount();
+  ctx.askedGuide();
+  assert.equal(text('#signals-hints'), '1');
+  sortTo('i1', 'metric');
+  sortTo('i2', 'log');
+  sortTo('i3', 'trace');
+  sortTo('i4', 'metric');
+  assert.equal(counts.hints, 1);
+  assert.equal(text('#signals-win-stars'), '4 of 5 stars: 0 wrong placements, 1 hint.');
 });

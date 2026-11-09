@@ -5,6 +5,9 @@ import assert from 'node:assert/strict';
 import { makeDom } from './helpers/dom.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
 import { lesson } from '../lib/ui/index.mjs';
+import { mountSide } from '../lib/widgets/help-ladder.mjs';
+import { escapeHtml } from '../lib/lesson-kit.mjs';
+import { sideColumn } from '../lib/ui/index.mjs';
 
 const NOW = 1767225600000; // 2026-01-01T00:00:00.000Z
 const LEVEL_A = { id: 'lvl-a', scored: true, scoring: { parMs: null } };
@@ -285,4 +288,66 @@ test('ctx.telemetry is the injected facade, null when absent', () => {
   assert.equal(createLevelContext({ ...base, telemetry: facade }).telemetry, facade);
   assert.equal(createLevelContext(base).telemetry, null);
   assert.equal(createLevelContext({ ...base, telemetry: undefined }).telemetry, null);
+});
+
+test('#17 P3 askedGuide costs one hint at finish and notifies once; off and abort stop it', () => {
+  const { ctx, controller } = setup();
+  let heard = 0;
+  const off = ctx.onGuideHint(() => { heard += 1; });
+  ctx.askedGuide();
+  assert.equal(heard, 1);
+  off();
+  ctx.askedGuide();
+  assert.equal(heard, 1, 'off stops the listener');
+  assert.equal(ctx.finish().stars, 3, 'two answered questions are two hints');
+  const second = setup();
+  let late = 0;
+  second.ctx.onGuideHint(() => { late += 1; });
+  second.controller.abort();
+  second.ctx.askedGuide();
+  assert.equal(late, 0, 'abort drops the listeners');
+  assert.equal(controller.signal.aborted, false);
+});
+
+test('#17 P3 a listener that throws is reported and does not stop the ask', () => {
+  const { ctx, reported } = setup();
+  let heard = 0;
+  ctx.onGuideHint(() => { throw new Error('boom'); });
+  ctx.onGuideHint(() => { heard += 1; });
+  ctx.askedGuide();
+  assert.equal(reported.length, 1);
+  assert.equal(heard, 1);
+  assert.equal(ctx.finish().stars, 4);
+});
+
+test('#17 P3 the optional guide dep is passed through, null when absent', () => {
+  assert.equal(setup().ctx.guide, null);
+  const guide = { configured: true };
+  const dom = makeDom();
+  const ctx = createLevelContext({ level: LEVEL_A, ovBody: dom.body, ovActions: dom.actions, onFinish() {}, signal: new AbortController().signal, guide });
+  assert.equal(ctx.guide, guide);
+});
+
+test('#17 P3 board stars equal level stars after one guide ask and one hint', () => {
+  const { ctx, dom } = setup();
+  dom.body.innerHTML = `<div id="box">${sideColumn({ id: 'g1', titleHtml: 'Done', counts: [{ key: 'wrong', label: '' }], hints: true, ruleHtml: '' })}</div>`;
+  const side = mountSide(ctx, dom.body.querySelector('#box'), 'g1', {});
+  const draw = (hints) => side.score({ wrong: 0, wrongLabel: 'wrong', hints, done: false });
+  draw(0);
+  ctx.askedGuide();
+  ctx.hint();
+  const board = draw(1);
+  assert.equal(board, ctx.finish().stars);
+  assert.equal(board, 3);
+});
+
+test('#17 P3 an ask after finish is no charge and tells nobody', () => {
+  const { ctx, calls } = setup();
+  let heard = 0;
+  ctx.onGuideHint(() => { heard += 1; });
+  const result = ctx.finish();
+  ctx.askedGuide();
+  assert.equal(heard, 0);
+  assert.equal(result.stars, 5);
+  assert.equal(calls.length, 1);
 });
