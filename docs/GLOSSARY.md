@@ -19,6 +19,7 @@ links level text to these anchors. "(Act N)" is where it's taught.
   Opening one costs a star.
 - **MTTD / MTTR**: mean time to detect / to resolve an incident.
 - **Par time**: the time a level sets as its target. Finishing slower costs one penalty.
+- **Save code**: a short text code for your progress. Copy it from the hub and paste it into the game in another browser to import it; the import merges, so nothing you already have is lowered.
 
 ## OpenTelemetry
 
@@ -49,6 +50,10 @@ links level text to these anchors. "(Act N)" is where it's taught.
 - **Span**: one timed operation with a name, kind, start/end, attributes, status,
   events and links.
 - **Root span**: a span with no parent.
+- **Orphan span**: a span whose parent ID names a span that was never received, so the trace
+  shows it as a root although it has a parent. (Act 9)
+- **Mesh sidecar**: a proxy that a service mesh runs next to each service and that forwards its
+  calls; not the same thing as a Collector run as a sidecar (see Agent / gateway). (Act 9)
 - **Span kind**: SERVER, CLIENT, PRODUCER, CONSUMER or INTERNAL.
 - **Span status**: Unset, Error or Ok.
 - **Span event**: a timestamped note inside a span, for example an exception.
