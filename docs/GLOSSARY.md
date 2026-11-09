@@ -136,8 +136,6 @@ links level text to these anchors. "(Act N)" is where it's taught.
   find what's different. (Act 2)
 - **Log AI**: pattern and severity extraction for unstructured logs. (Act 4)
 - **Dash0 MCP server / Agent0**: AI access to your telemetry. (Act 8)
-- **DART**: Dashboards, Alerts & Rules to Terraform; migrates assets from other vendors
-  into Dash0. (Act 8)
 
 Dash0 product names and descriptions to be checked with the product team before
 release.

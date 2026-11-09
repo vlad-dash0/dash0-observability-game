@@ -275,7 +275,7 @@ test('sources: Prometheus and OpenTelemetry pages on the Spec line, the Dash0 im
 
 test('claims: no DART, no named vendor, no migration-tool or automatic-translation claim, no pricing', () => {
   const copy = plain(JSON.stringify(level.play));
-  assert.doesNotMatch(copy, /\bDART\b/i, 'DART is not named: no allowed source documents it (owner question)');
+  assert.doesNotMatch(copy, /\bDART\b/i, 'DART is not named until it launches (owner decision 2026-11-09)');
   assert.doesNotMatch(copy, /Datadog|Sentry|New Relic|Splunk|Dynatrace/i, 'the old tool is invented and never named');
   assert.doesNotMatch(copy, /migration tool|automatic(ally)?|one click|\$|per month|pricing/i);
   assert.doesNotMatch(SRC.split('\n').filter((l) => !/^\/\//.test(l)).join('\n'), /\bDART\b/);
