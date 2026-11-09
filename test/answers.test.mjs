@@ -161,6 +161,7 @@ const ANSWERS = {
   ],
   'filter-or-sampler': ['choice fos-verdict: wrong', 'sort fos-sort: errors-whole=tail healthz=filter slow-no-cache=both slow=tail debug-logs=filter many-spans=tail production-only=filter via-payments=tail errors-no-keepalive=both'],
   'the-34-percent-error-rate': ['choice ser-verdict: wrong', 'tradeoff ser-plan: sampler=errors-10pct rate=red-before'],
+  'the-trace-that-starts-in-the-middle': ['choice ttsm-verdict: rewritten', 'build ttsm-tree: 4b9e2c6a0d8f1573.parent=9c3e1a7d4b6f2085 a5f1b9d3c7e20468.parent=e0a4c8f2b6d19375'],
   'lost-in-translation': ['choice lit-verdict: wrong', 'spot lit-spot: orders-placed,cpu-time,checkout-duration'],
   'the-alert-that-stayed-green': [
     'choice asg-why: selector',
