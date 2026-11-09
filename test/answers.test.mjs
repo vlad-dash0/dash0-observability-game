@@ -161,6 +161,10 @@ const ANSWERS = {
   ],
   'filter-or-sampler': ['choice fos-verdict: wrong', 'sort fos-sort: errors-whole=tail healthz=filter slow-no-cache=both slow=tail debug-logs=filter many-spans=tail production-only=filter via-payments=tail errors-no-keepalive=both'],
   'the-34-percent-error-rate': ['choice ser-verdict: wrong', 'tradeoff ser-plan: sampler=errors-10pct rate=red-before'],
+  'the-alert-that-stayed-green': [
+    'choice asg-why: selector',
+    'query asg-rule: checkout-http@3600 sum by (route) (rate(http_server_requests_total{service="checkout", status="500"}[5m])) / sum by (route) (rate(http_server_requests_total{service="checkout"}[5m])) > 0.1',
+  ],
   'errors-tripled': [
     'incident errors-tripled: rate-vs-lb,error-count,collector-diff > metrics-after-sampling',
     'choice eto-ratio: counted-after-sampling',
