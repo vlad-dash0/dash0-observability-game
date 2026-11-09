@@ -266,17 +266,21 @@ test('sources: Prometheus and OpenTelemetry pages on the Spec line, the Dash0 im
   assert.match(SRC, /Facts used/);
   assert.match(SRC, /Invented for the game/);
   const copy = plain(JSON.stringify(level.play));
-  const dash0 = copy.match(/[^.]*Dash0[^.]*\./g) ?? [];
-  assert.equal(dash0.length, 1, 'one Dash0 sentence, backed by the import page');
+  const dash0 = (copy.match(/[^.]*Dash0[^.]*\./g) ?? []).filter((s) => !/\bDART\b/.test(s));
+  assert.equal(dash0.length, 1, 'one Dash0 sentence besides the DART one, backed by the import page');
   assert.match(dash0[0], /Dash0's import of Grafana dashboards/);
   for (const fact of ['Prometheus queries only', 'common panel types', 'placeholder for a panel it cannot convert', 'may omit some panel options']) assert.equal(dash0[0].includes(fact), true, fact);
   assert.equal(SRC.includes('\u2014'), false, 'no em dash');
 });
 
-test('claims: no DART, no named vendor, no migration-tool or automatic-translation claim, no pricing', () => {
+test('claims: DART named once with its expansion and an owner line, not as in development, no bucket attributed to it; no named vendor, no migration-tool or automatic-translation claim, no pricing', () => {
   const copy = plain(JSON.stringify(level.play));
-  assert.doesNotMatch(copy, /\bDART\b/i, 'DART is not named: no allowed source documents it (owner question)');
+  assert.match(SRC, /^\/\/ Owner: DART naming confirmed by the owner 2026-11-09 \(#263\); no public page$/m);
+  assert.equal(copy.match(/\bDART\b/g)?.length, 1, 'DART is named exactly once');
+  assert.equal(copy.split('DART (Dashboards, Alerts & Rules to Terraform)').length - 1, 1, 'DART appears with its expansion');
+  const dart = copy.match(/[^.]*\bDART\b[^.]*\./)[0];
+  assert.doesNotMatch(dart, /in development|being built|coming soon|upcoming|beta|new tool/i, 'DART is not presented as new or in development');
+  assert.doesNotMatch(dart, /translated|approximated|manual|skipped/i, 'the four buckets are the game\'s labels, not attributed to DART');
   assert.doesNotMatch(copy, /Datadog|Sentry|New Relic|Splunk|Dynatrace/i, 'the old tool is invented and never named');
   assert.doesNotMatch(copy, /migration tool|automatic(ally)?|one click|\$|per month|pricing/i);
-  assert.doesNotMatch(SRC.split('\n').filter((l) => !/^\/\//.test(l)).join('\n'), /\bDART\b/);
 });
