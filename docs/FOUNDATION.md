@@ -120,7 +120,7 @@ entry). `CURRENT_VERSION = 1`; `MIGRATIONS = {}` where `MIGRATIONS[n]` maps v n 
 - With `levelIds`/`cardIds`: drop ids not in the set (the in-memory view). Without: keep
   every well-formed id (what gets persisted).
 
-### 2.6 ctx (`createLevelContext({level, ovBody, ovActions, now, shuffle, reduceMotion, onFinish, signal, reportError?, telemetry?})`)
+### 2.6 ctx (`createLevelContext({level, ovBody, ovActions, now, shuffle, reduceMotion, onFinish, signal, reportError?, telemetry?, guide?})`)
 
 ```
 ctx = {
@@ -130,6 +130,9 @@ ctx = {
   shuffle(arr): any[]      // NEW array; app passes Math.random-based, harness identity
   mistake(): void          // mistakes += 1
   hint(): void             // hintsUsed += 1
+  askedGuide(): void       // one answered guide question: hintsUsed += 1 (as hint()), then onGuideHint listeners run
+  onGuideHint(fn): off     // listen for answered guide questions; listeners are dropped when signal aborts
+  guide: object | null     // the optional guide status the app passes (#17); unused until the panel
   finish({text = '', cards = []}): {stars, cards, text} | null
   reduceMotion: boolean
   ovBody, ovActions: Element
@@ -144,6 +147,12 @@ nothing), `sendTest(opts?: {signal}) -> Promise<Outcome>` (single-flight), `emit
 connected, never throws), `flush(opts?) -> Promise<Outcome|null>`, `sendBatch(drafts, opts?)`,
 `incident()` (the seeded lab incident, built once per session: docs/DASH0-LAB.md §Incident), `disconnect()`. Contract: docs/DASH0-LAB.md §Telemetry session.
 Levels wire buttons by assigning `el.onclick = …` after `renderStep` (CSP-safe), as in R.
+
+Guide questions (#17): one answered question costs one hint (owner choice, provisional).
+`askedGuide()` does `hintsUsed += 1` like `hint()` and notifies `onGuideHint` listeners; `mountSide`
+(`lib/widgets/help-ladder.mjs`) listens, keeps a `guided` count, adds it to its penalties and
+exposes `hintsShown(h) = h + guided`, which every board's success line reads, so the board's
+stars equal the level's. A board never asked is unchanged.
 
 `finish` computes `stars = scoreStars({mistakes, hintsUsed, elapsedMs: now() - startedAt}, level)`
 and calls `onFinish(level.id, {stars, cards, text, at: new Date(now()).toISOString()})`.
