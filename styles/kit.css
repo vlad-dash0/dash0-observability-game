@@ -215,6 +215,7 @@
 .ui-options { display: flex; gap: 10px; min-width: 0; }
 .ui-options--list { flex-direction: column; }
 .ui-options--grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.ui-options--drops { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: var(--space-2); }
 .ui-options--wrap { flex-wrap: wrap; gap: var(--space-2); }
 /* The right padding reserves the marker's room, so marking never rewraps the text; a state
    never changes the border width, so nothing moves. */
@@ -267,7 +268,12 @@
 /* An answered card stays legible (no fade); a toggle that cannot be picked yet fades, its only
    cue (palette rule 7). */
 .ui-option:disabled { cursor: default; }
-.ui-option--toggle:disabled, .ui-option--choice:disabled:not([data-state]) { opacity: var(--opacity-disabled); cursor: not-allowed; }
+.ui-option--toggle:disabled, .ui-option--choice:disabled:not([data-state], .ui-option--drop) { opacity: var(--opacity-disabled); cursor: not-allowed; }
+/* A drop target (dashed means a drop zone): centred, and legible while inactive. Inactive is muted text on
+   a transparent card, not a fade; active is full-strength text with a full-strength dashed border. */
+.ui-option--drop { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; padding: var(--space-3); border-style: dashed; border-width: 2px; border-color: var(--color-text-muted); }
+.ui-option--drop:enabled:not([data-state]) { border-color: var(--color-text); }
+.ui-option--drop:disabled:not([data-state]) { color: var(--color-text-muted); background: transparent; }
 
 /* ---------- Feedback (feedback.mjs) ---------- */
 /* One live region, three tones: the icon and its alt text say the tone, the border echoes it. */

@@ -105,6 +105,10 @@ test('option and options: kinds as modifiers, states as attributes, radio as a l
   assert.equal(options({ labelledBy: 'q1', itemsHtml: 'I' }), '<div class="ui-options ui-options--list" role="group" aria-labelledby="q1">I</div>');
   assert.equal(options({ id: 'views', layout: 'grid', itemsHtml: 'I' }), '<div class="ui-options ui-options--grid" id="views">I</div>');
   assert.match(options({ layout: 'wrap', itemsHtml: '' }), /ui-options--wrap/);
+  assert.match(options({ layout: 'drops', itemsHtml: '' }), /ui-options--drops/);
+  assert.match(option({ attr: 'x', value: 'v', labelHtml: 'l', drop: true }), /class="ui-option ui-option--choice ui-option--drop"/);
+  assert.doesNotMatch(option({ attr: 'x', value: 'v', labelHtml: 'l' }), /ui-option--drop/);
+  assert.throws(() => option({ attr: 'x', value: 'v', labelHtml: 'l', kind: 'toggle', drop: true }), /drop is only for the choice kind/);
 });
 
 test('feedback: a hidden live region with an icon and a text slot; bar variant', () => {
