@@ -266,8 +266,8 @@ test('GUIDE_STUB: the guide answers with a canned reply, no key and no network',
 const IMPORT = /^\s*(?:import|export)\b[^'"]*?from\s*['"](\.[^'"]+)['"]|^\s*import\s*['"](\.[^'"]+)['"]/gm;
 
 test('the import walk reads multi-line imports', () => {
-  const found = [...`import {\n  a,\n  b,\n} from './multi.mjs';\nimport './side.mjs';\nexport { c } from './re.mjs';`.matchAll(IMPORT)].map((m) => m[1] ?? m[2]);
-  assert.deepEqual(found, ['./multi.mjs', './side.mjs', './re.mjs']);
+  const found = [...`import {\n  a,\n  b,\n} from './guide-api.test.mjs';\nimport './static.test.mjs';\nexport { c } from './game.test.mjs';`.matchAll(IMPORT)].map((m) => m[1] ?? m[2]);
+  assert.deepEqual(found, ['./guide-api.test.mjs', './static.test.mjs', './game.test.mjs']);
 });
 
 test('the real .vercelignore keeps api/ and everything the guide imports in the deployment', () => {
