@@ -11,7 +11,7 @@ Every Dash0 fact not yet confirmed is marked `VERIFY (#195)` in code and listed 
 - Each phase is one PR against main, never stacked.
 
 ## Hosts and CSP
-`INGRESS_HOSTS` in `lib/dash0/ingress.mjs` is the single authority: the validator's allowlist and, enforced by `test/static.test.mjs`, the `vercel.json` `connect-src` origins minus `'self'`. It ships `[]` (CSP unchanged, live mode "not open yet"). `PRACTICE_HOSTS` (a reserved `.invalid` host) belongs to the simulated ingress and is never a CSP origin.
+`INGRESS_HOSTS` in `lib/dash0/ingress.mjs` is the single authority: the validator's allowlist and, enforced by `test/static.test.mjs`, the `vercel.json` `connect-src` origins minus `'self'`. It ships the four regional hosts (inferred, see Sources for the P6 facts), so `connect-src` is `'self'` plus those four `https://` origins and live mode is open wherever `fetch` exists. `PRACTICE_HOSTS` (a reserved `.invalid` host) belongs to the simulated ingress and is never a CSP origin.
 
 ## Endpoint check: `parseEndpoint(raw, {hosts, ports, allowLocal})`
 Returns `{ok:true, base, tracesUrl, host}` or `{ok:false, reason}`. Reasons, in check order: `empty`, `grpc-port` (scheme-less `host:4317`, or port 4317), `no-scheme` (scheme-less input: a host with a dot, or any host with a port other than 4317, optionally with a path; a word with no dot and no port stays `malformed`), `malformed`, `not-https`, `credentials`, `query`, `fragment`, `unknown-host` (exact match, lookalikes fail), `unexpected-port` (the effective port, `443` when none is written, must be in `ports`; `cspOrigin(host, port)` renders a non-443 port as `https://host:port`), `signal-path` (already ends in `/v1/traces`, case-insensitive, repeated slashes collapsed; the field is the base and the game appends the path), `unexpected-path` (any other path). A trailing slash is normalised and never yields `//v1`. `allowLocal` (debug mode only) also accepts `http://localhost:<port>`.
@@ -65,7 +65,7 @@ A hand-written level (`widgets: []`, scored, no par). Screens: mode (practice, o
 | P4 | `lib/incident-lab.mjs`: seeded incident, `answersFrom`, `gradeAnswer` | in review (#210) |
 | P3 | Act 9 level 9.3 "Connect the game to Dash0" (PNG), secret field kind, connect form, practice mode | in review |
 | P5 | the lab boss "It's us" (`levels/its-us.mjs`) | in review (merges after #210 and #212) |
-| P6 | fill `INGRESS_HOSTS`, `vercel.json`, cite Dash0 docs; relay only if CORS is refused | needs owner inputs |
+| P6 | fill `INGRESS_HOSTS`, `vercel.json`, cite Dash0 docs; relay only if CORS is refused | hosts open, relay not needed; the live run (checklist below) is still open |
 
 Merge order: P1, P2, P4, P3, P5, P6.
 
@@ -76,14 +76,48 @@ Merge order: P1, P2, P4, P3, P5, P6.
 - The incident is sent once per Dash0 host per page, tracked by the cached incident object and the host that took it; reconnecting to a different host offers the send again, and the same host never sends twice.
 
 ## The boss: `levels/its-us.mjs` (Act 9 boss, no country)
-A hand-written level (`widgets: []`, `mechanics: ['spot']`, scored, no par, no hints). It opens once every level of Act 9 is done (9.1, 9.2, 9.3 and 9.7 on this branch; the ordinary boss rule), and Oceania is complete only when it is. It never receives or touches a token: it reads `ctx.telemetry.status()`, builds the incident with `ctx.telemetry.incident()`, and sends with `sendBatch`.
+A hand-written level (`widgets: []`, `mechanics: ['spot']`, scored, no par, no hints). It opens once every Act 9 level (9.1 to 9.7) is done (the ordinary boss rule), and Oceania is complete only when it is. It never receives or touches a token: it reads `ctx.telemetry.status()`, builds the incident with `ctx.telemetry.incident()`, and sends with `sendBatch`.
 - **Connected live** (`status()` is `connected` and `live`): one screen to send ("Send the incident to Dash0"), once; accepted goes to the questions. `rejected` with `auth` says only that Dash0 refused the token, never the status, offers practice and no retry; `rejected` otherwise shows the status and a retry; every `unreachable` cause explains itself, offers a retry and practice, and warns that an earlier attempt may have got through. None costs a mistake: the faults are the network's, not the player's. Live shows no trace view at all: the page holds the session id to filter by and the steps in Dash0 (Trace Explorer, a `session.id` filter, Trace View, Span Sidebar), so no answer is on the page.
-- **Not connected** (never connected, or reloaded): the boss explains and offers practice; "Use my own Dash0" is a disabled button with `describedBy` (it needs 9.3 first, and live is not open until P6). **Connected to practice**: straight to the practice view. Practice sends nothing and never calls the real fetch.
+- **Not connected** (never connected, or reloaded): the boss explains and offers practice; "Use my own Dash0" is a disabled button with `describedBy` (it needs 9.3 first, and live needs `fetch` and a host in `INGRESS_HOSTS`, both true since P6). **Connected to practice**: straight to the practice view. Practice sends nothing and never calls the real fetch.
 - **Practice view**: practice is a search across sessions, not one trace with its answers. A labelled simulated Trace Explorer lists six traces (`buildTraceList`): the player's among traces of five other sessions. Each row shows its number, root operation, start (UTC), duration, span count and status; nothing says which is the player's, no trace id is on the list, and the order is shuffled (the player's trace is not always first, nor the latest). The screen gives "Your session id" the way live does. The filter is a key (radio group: `service.name`, `session.id`, `span.name`), an operator (`is`, `is not`) and a text value; the kit has no select, so the key and operator are kit radio groups. Filtering `session.id` `is` the player's id narrows the list to their trace; a wrong value shows "No traces match", which is free, an empty value is a free nudge, "Clear filter" restores the list. Opening a trace without filtering is allowed (a real explorer): the trace id is shown only inside the opened Trace View, and the span detail shows that trace's own `session.id`, so a blind reader has to compare it. Every trace has a different trace id, fault code and session id, so answers read from a decoy are wrong (a mistake each). Inside a trace, a span table (span, parent, start, duration, status; the span cell holds only the name, with no tree glyph, so copying it works) and one "Open <span>" button per span; opening a span shows only that span's attributes and events. The fault code is in the attributes of the failing span and nowhere else (I5; it leaves the page when another span is open). Grading is `gradeAnswer(incident.spans, ...)` on the player's own spans whatever trace is open. The Finish text says whether the player filtered by their session id or found the trace without the filter.
 - **Questions** (`QUESTION`, graded by `gradeAnswer(incident.spans, ...)`): operation, fault code, retry count, trace id, typed into four fields and checked together. A pass locks its field; an empty or malformed value (`inconclusive`) is a free nudge; a well-formed wrong value costs one mistake, once per distinct value per question. Feedback never repeats an answer. Finish (`data-finish`) is enabled only when all four pass. Practice scores like live (full stars).
 - The result text names the mode ("a simulated Dash0" or "your own Dash0"), and in practice whether the player filtered by their session id.
 - Send-once, per page: the accepted send is recorded against the host that took it (`SENT`, a WeakMap on the cached incident). Reconnecting to a different Dash0 offers the send screen again, naming the first host. A separate `ATTEMPTED` WeakSet records that a send was ever started; a send screen opened after an earlier attempt (for example the level was closed with the request out) drops "has not been sent yet" and shows the duplicate note. After any failed outcome (401, 403 and every other) `#its-send` is disabled; the way on is the retry, where one is offered, or practice.
 - A level with no telemetry session (this boss and 9.3) shows a plain note, "Use Back to return to the map.", and no button.
+
+## Sources for the P6 facts (2026-11-08)
+Public sources and a token-free CORS probe; no account and no token were used. Three kinds of evidence, kept apart.
+
+Documented (a public page says it):
+| Fact | Source |
+|---|---|
+| The four storage regions: eu-west-1, europe-west4, us-east-1, us-west-2. No `ingress.` host, port or path is on this page. | https://www.dash0.com/docs/dash0/get-started |
+| The host form `ingress.<region>.<cloud>.dash0.com` (`ingress.eu-west-1.aws` and `ingress.us-west-2.aws`). | the dash0-cli README (https://github.com/dash0hq/dash0-cli) |
+| Host `ingress.eu-west-1.aws.dash0.com`, port 443, `/v1/traces`, `Authorization Bearer` with the auth token. | the Fluent Bit Dash0 output page (https://docs.fluentbit.io/manual/pipeline/outputs/dash0) |
+| The `/v1/traces` signal path of OTLP/HTTP. | https://opentelemetry.io/docs/specs/otlp/ |
+| Tokens: form `auth_...`, scope "Ingesting" (only sends telemetry), dataset-limited, created in Settings, Auth Tokens. When a request names no dataset, Dash0 writes to the token's default ingestion dataset. Whether a wrong-scope token gets 401 or 403 is not documented. | https://www.dash0.com/docs/dash0/miscellaneous/glossary/auth-tokens |
+| The `Dash0-Dataset` header exists as spelled; omitting it writes to the token's default ingestion dataset. | https://www.dash0.com/docs/dash0/miscellaneous/glossary/datasets |
+
+Probed (a curl on 2026-11-08, no token):
+| Fact | Evidence |
+|---|---|
+| CORS: a preflight from `Origin: https://example.vercel.app` asking for `authorization,content-type,dash0-dataset` returns 204 with `access-control-allow-origin: *`, those three headers and `allow-methods: POST`. An unauthenticated `POST /v1/traces` returns 401 `{"code":16,"message":"no authorization header found"}` with `access-control-allow-origin: *`, so the browser can read the failure. Same on all four hosts. The probe shows each host exists and answers CORS; it does not show that it is an organization's ingress. 403 and 2xx response headers are untested (no token). | curl, 2026-11-08 |
+
+Reasoned (inferred, not verified against a real token):
+| Fact | Reasoning |
+|---|---|
+| All four hosts. `ingress.eu-west-1.aws` and `ingress.us-west-2.aws` appear in the dash0-cli README, eu-west-1 in the Fluent Bit page. `ingress.us-east-1.aws.dash0.com` and `ingress.europe-west4.gcp.dash0.com` apply the same form to documented regions. | documented regions plus the documented host form |
+| OTLP JSON over `fetch` with `Content-Type: application/json`, `Authorization: Bearer` and `Dash0-Dataset` is accepted. | the `dash0hq/dash0-sdk-web` transport code sends this (reasoning only, not a game citation); never sent with a real token |
+
+Result: the browser can talk to the ingress directly, so the relay (P6-alt) is not needed. The connect level's copy already matched these facts and is unchanged.
+
+## Live run checklist (owner; needs a test org and an ingest-only token, Q10)
+- [ ] Create a test organization and an Ingesting-only token limited to one dataset (Settings, Auth Tokens). Never commit it.
+- [ ] Connect live from a deployed preview on each host you can reach, and confirm the test span is accepted (a 2xx response, readable by the browser).
+- [ ] Confirm the two pattern-inferred hosts (`us-east-1`, `europe-west4`) against an organization's endpoint reference, or drop them.
+- [ ] Send a wrong token and a Reading token; record the status each returns (401 or 403) and that the browser can read it.
+- [ ] Send the boss incident and find it in the Trace Explorer by `session.id`; check the filter key is offered.
+- [ ] Run the P6 live QA list below.
 
 ## P6 live QA list
 - In a real browser (Chrome, Firefox, Safari), connect live and check that no password-manager save prompt appears when the token field disappears on success. If one does, the opt-out attributes of the secret field are not enough.
@@ -91,8 +125,8 @@ A hand-written level (`widgets: []`, `mechanics: ['spot']`, scored, no par, no h
 - The boss, live: send the incident, then follow the on-screen steps in a real Dash0: filter the Trace Explorer by `session.id` (is the key offered for a span attribute?), open the trace, find the span in error and its events (the span events in the Span Sidebar), and check that all four answers can be read there and match. Check whether a re-send lists each span of the trace twice with the same ids (the copy says to read one copy), and that the Time Picker's default range finds a fresh incident.
 
 ## Owner inputs (VERIFY)
-1. Does the OTLP/HTTP ingress answer browser CORS preflights for `Authorization`, `Content-Type` and `Dash0-Dataset`, including on 401/403? If not, the relay is needed.
+1. Answered 2026-11-08 for the preflight and the 401 (see Sources for the P6 facts): CORS is open, no relay. Still untested: 403 and 2xx response headers.
 2. Scope names (ingest-only, dataset-limited), where tokens are created (the `auth_` prefix and `Dash0-Dataset` header are confirmed in the Dash0 docs), whether 401/403 mean what the game teaches.
-3. Region and ingress host list, OTLP/HTTP port (443 or 4318), JSON body acceptance, the dataset identifier rules (the game's regex is its own check).
+3. Partly answered 2026-11-08: the hosts (inferred from the documented regions and host form) and port 443 (Fluent Bit example) are reasoned and untested with a token. Still open: JSON body acceptance and the dataset identifier rules (the game's regex is its own check).
 4. Trace explorer view name, how to filter by `session.id`, deep-link format. The boss copy cites the Dash0 docs for the Trace Explorer, its Filter and Time Picker, the Trace View waterfall and the Span Sidebar (tracing/about-tracing, view, span-sidebar, span-events, glossary/filtering). Still VERIFY (#195): that a sender-set `session.id` span attribute is offered as a filter key (`session.id` itself: https://opentelemetry.io/docs/specs/semconv/registry/attributes/session/). The span events in the Span Sidebar are confirmed by tracing/span-events and tracing/view.
 5. A test org with an ingest-only token for the live QA run (never committed).

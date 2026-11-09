@@ -161,6 +161,12 @@ const ANSWERS = {
   ],
   'filter-or-sampler': ['choice fos-verdict: wrong', 'sort fos-sort: errors-whole=tail healthz=filter slow-no-cache=both slow=tail debug-logs=filter many-spans=tail production-only=filter via-payments=tail errors-no-keepalive=both'],
   'the-34-percent-error-rate': ['choice ser-verdict: wrong', 'tradeoff ser-plan: sampler=errors-10pct rate=red-before'],
+  'the-trace-that-starts-in-the-middle': ['choice ttsm-verdict: rewritten', 'build ttsm-tree: 4b9e2c6a0d8f1573.parent=9c3e1a7d4b6f2085 a5f1b9d3c7e20468.parent=e0a4c8f2b6d19375'],
+  'lost-in-translation': ['choice lit-verdict: wrong', 'spot lit-spot: orders-placed,cpu-time,checkout-duration'],
+  'the-alert-that-stayed-green': [
+    'choice asg-why: selector',
+    'query asg-rule: checkout-http@3600 sum by (route) (rate(http_server_requests_total{service="checkout", status="500"}[5m])) / sum by (route) (rate(http_server_requests_total{service="checkout"}[5m])) > 0.1',
+  ],
   'two-vendors-one-weekend': [
     'choice tvw-verdict: copy',
     'configure tvw-config: receivers: otlp: protocols: grpc: endpoint: 0.0.0.0:4317 http: endpoint: 0.0.0.0:4318 processors: memory_limiter: check_interval: 1s limit_mib: 400 batch: exporters: otlp_grpc/oldvendor: endpoint: otlp.oldvendor.example:4317 otlp_grpc/dash0: endpoint: ${env:DASH0_ENDPOINT} headers: Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}" service: pipelines: traces: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp_grpc/oldvendor, otlp_grpc/dash0] metrics: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp_grpc/oldvendor, otlp_grpc/dash0] logs: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp_grpc/oldvendor, otlp_grpc/dash0]',

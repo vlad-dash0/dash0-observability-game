@@ -305,7 +305,7 @@ const DYNAMIC_ALLOW = {
     // lib/globe-render.mjs `globe-probe ${role}` over COLOR_ROLES (lit and pulse are literal in index.html)
     body: ['globe-probe'], dim: ['globe-probe'], rim: ['globe-probe'], sky: ['globe-probe'],
     // index.html Alpine :class (overlayOpen, rewardOpen, notice, aboutOpen)
-    open: ['about'], show: ['notice', 'overlay', 'reward'],
+    open: ['about', 'save-dialog'], show: ['notice', 'overlay', 'reward'],
   },
 };
 

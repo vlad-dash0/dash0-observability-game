@@ -60,13 +60,13 @@ test(`every mapped country has at least ${MIN_DOTS} dots (K)`, () => {
   }
 });
 
-test('the dot-count exceptions are exactly South Korea at 5 and Vanuatu at 3: each used by a level, a real shortfall, and exactly its dot count', () => {
-  assert.deepEqual({ ...MIN_DOTS_EXCEPTIONS }, { KOR: 5, VUT: 3 });
-  for (const [iso, count] of Object.entries(MIN_DOTS_EXCEPTIONS)) {
-    assert.equal(Object.values(LEVEL_COUNTRY).includes(iso), true, `${iso} is used by a level`);
-    assert.equal(dotsOf(iso).length, count, `${iso} has the ${count} dots the exception allows (a change means the exception is stale)`);
-    assert.equal(count < MIN_DOTS, true, `without the exception ${iso} would fail`);
+test('every dot-count exception is used by a level, equals its real dot count, and is a real shortfall', () => {
+  for (const [iso, need] of Object.entries(MIN_DOTS_EXCEPTIONS)) {
+    assert.equal(Object.values(LEVEL_COUNTRY).includes(iso), true, `${iso} is in the table but no level uses it`);
+    assert.equal(dotsOf(iso).length, need, `${iso} has ${dotsOf(iso).length} dots, the exception allows ${need} (a change means the exception is stale)`);
+    assert.equal(dotsOf(iso).length < MIN_DOTS, true, `${iso} reaches MIN_DOTS, so it needs no exception`);
   }
+  assert.deepEqual({ ...MIN_DOTS_EXCEPTIONS }, { KOR: 5, SLB: 2, NCL: 2, FJI: 3, VUT: 3 }, 'the table lists exactly these five countries');
 });
 
 test('region lookup: Russia goes to act-5, Antarctica to nothing, unknown subregion to nothing', () => {
@@ -221,7 +221,7 @@ test('the committed module names the pinned source and hash', () => {
 // outline (overseas parts dropped) plus half a degree. Overseas parts that stay on purpose (Alaska, Hawaii, Svalbard) are
 // inside their box.
 const HOME = {
-  FRA: [40, 52, -6, 11], DEU: [46, 56, 5, 16], ESP: [35, 45, -10, 4], NOR: [57, 82, 4, 32], SWE: [54, 70, 10, 25], FIN: [59, 71, 20, 33], USA: [18, 72, -173, -66], CAN: [41, 84, -142, -52], MEX: [14, 34, -118, -86], GRL: [59, 85, -74, -11], CUB: [19, 24, -86, -73], GTM: [13, 19, -93, -87], HND: [12, 17, -90, -82], BRA: [-35, 6, -75, -34], ARG: [-56, -21, -74, -53], PER: [-19, 1, -82, -68], COL: [-5, 13, -80, -66], BOL: [-24, -9, -71, -56], VEN: [0, 13, -74, -59], CHL: [-57, -17, -77, -66], DZA: [18, 38, -10, 13], COD: [-14, 6, 11, 32], ZAF: [-36, -21, 15, 34], KAZ: [40, 56, 45, 88], SAU: [15, 33, 34, 57], TUR: [35, 43, 25, 46], UZB: [36, 47, 55, 74], TKM: [34, 44, 52, 68], IRQ: [28, 38, 38, 50], IND: [7, 36, 67, 98], IRN: [24, 41, 43, 64], PAK: [23, 38, 60, 79], JPN: [30, 46, 128, 146], CHN: [18, 54, 73, 135], MNG: [41, 52, 87, 121], KOR: [33, 39, 125, 130], AUS: [-44, -10, 112, 154], NZL: [-48, -34, 166, 179], THA: [5, 21, 97, 106], VNM: [7.5, 24, 101.5, 110], IDN: [-11.5, 6.5, 94.5, 141.5], MYS: [0.3, 7.9, 99, 119.8], PHL: [4.5, 21.5, 116.5, 127], PNG: [-12.5, 0, 140.5, 158], VUT: [-20.5, -13, 166, 170.5],
+  FRA: [40, 52, -6, 11], DEU: [46, 56, 5, 16], ESP: [35, 45, -10, 4], NOR: [57, 82, 4, 32], SWE: [54, 70, 10, 25], FIN: [59, 71, 20, 33], USA: [18, 72, -173, -66], CAN: [41, 84, -142, -52], MEX: [14, 34, -118, -86], GRL: [59, 85, -74, -11], CUB: [19, 24, -86, -73], GTM: [13, 19, -93, -87], HND: [12, 17, -90, -82], BRA: [-35, 6, -75, -34], ARG: [-56, -21, -74, -53], PER: [-19, 1, -82, -68], COL: [-5, 13, -80, -66], BOL: [-24, -9, -71, -56], VEN: [0, 13, -74, -59], CHL: [-57, -17, -77, -66], DZA: [18, 38, -10, 13], COD: [-14, 6, 11, 32], ZAF: [-36, -21, 15, 34], KAZ: [40, 56, 45, 88], SAU: [15, 33, 34, 57], TUR: [35, 43, 25, 46], UZB: [36, 47, 55, 74], TKM: [34, 44, 52, 68], IRQ: [28, 38, 38, 50], IND: [7, 36, 67, 98], IRN: [24, 41, 43, 64], PAK: [23, 38, 60, 79], JPN: [30, 46, 128, 146], CHN: [18, 54, 73, 135], MNG: [41, 52, 87, 121], KOR: [33, 39, 125, 130], AUS: [-44, -10, 112, 154], NZL: [-48, -34, 166, 179], THA: [5, 21, 97, 106], VNM: [7.5, 24, 101.5, 110], IDN: [-11.5, 6.5, 94.5, 141.5], MYS: [0.3, 7.9, 99, 119.8], PHL: [4.5, 21.5, 116.5, 127], PNG: [-12.5, 0, 140.5, 158], SLB: [-11.5, -6, 155.5, 162.5], FJI: [-20, -16, 176, 180], VUT: [-20.5, -13, 166, 170.5], NCL: [-23, -19.5, 163.5, 168.5],
 };
 
 test('every mapped country has a home box, and all its dots lie inside it', () => {
