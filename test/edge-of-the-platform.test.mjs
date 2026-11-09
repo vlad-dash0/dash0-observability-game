@@ -23,7 +23,7 @@ const spec = BATCH_STEP.build;
 const { P1, P2, P3, P4, REQ_A, PROC } = CONTENT.ids;
 const ANSWER = [P1, P2, P3];
 
-test('9.8 fields: in act-9 after 9.3, unscored-par, a choice then a build, lights orders, awards no card, hints off on the build', () => {
+test('9.8 fields: in act-9 last, after 9.7, unscored-par, a choice then a build, lights orders, awards no card, hints off on the build', () => {
   assert.deepEqual(
     { no: level.no, name: level.name, sub: level.sub, rewardTitle: level.rewardTitle, kind: level.kind, actId: level.actId, parMs: level.scoring.parMs, prefix: level.play.prefix },
     { no: '9.8', name: 'Edge of the platform', sub: 'Before the function freezes', rewardTitle: 'Flush keeper', kind: 'level', actId: 'act-9', parMs: null, prefix: 'eop' },
@@ -34,7 +34,8 @@ test('9.8 fields: in act-9 after 9.3, unscored-par, a choice then a build, light
   assert.deepEqual([...level.lights], ['orders']);
   assert.deepEqual([...level.cards], []);
   assert.equal(Object.values(LIVE.levels).filter((l) => l.rewardTitle === 'Flush keeper').length, 1, 'the reward title is unique');
-  assert.equal(LIVE.order[LIVE.order.indexOf('connect-to-dash0') + 1], ID, 'plays after 9.3, before the boss');
+  assert.equal(LIVE.order[LIVE.order.indexOf('two-vendors-one-weekend') + 1], ID, 'plays after 9.7');
+  assert.equal(LIVE.order[LIVE.order.indexOf(ID) + 1], 'its-us', 'the boss follows 9.8');
 });
 
 // ---- step 1: the Choice ---------------------------------------------------------------------
