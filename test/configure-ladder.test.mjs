@@ -75,7 +75,7 @@ const textOf = (html) => html.replace(/<[^>]*>/g, ' ').replace(/&#39;/g, "'");
 const has = (text, word) => new RegExp(`(^|[^\\w])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\w])`, 'i').test(text);
 
 test('the registry has configure steps to check', () => {
-  assert.equal(STEPS.length, 6, STEPS.map((s) => s.level).join());
+  assert.equal(STEPS.length, 7, STEPS.map((s) => s.level).join());
 });
 
 test('every configure step declares helps.hints and has an authored hint', () => {

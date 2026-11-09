@@ -161,6 +161,10 @@ const ANSWERS = {
   ],
   'filter-or-sampler': ['choice fos-verdict: wrong', 'sort fos-sort: errors-whole=tail healthz=filter slow-no-cache=both slow=tail debug-logs=filter many-spans=tail production-only=filter via-payments=tail errors-no-keepalive=both'],
   'the-34-percent-error-rate': ['choice ser-verdict: wrong', 'tradeoff ser-plan: sampler=errors-10pct rate=red-before'],
+  'two-vendors-one-weekend': [
+    'choice tvw-verdict: copy',
+    'configure tvw-config: receivers: otlp: protocols: grpc: endpoint: 0.0.0.0:4317 http: endpoint: 0.0.0.0:4318 processors: memory_limiter: check_interval: 1s limit_mib: 400 batch: exporters: otlp_grpc/oldvendor: endpoint: otlp.oldvendor.example:4317 otlp_grpc/dash0: endpoint: ${env:DASH0_ENDPOINT} headers: Authorization: "Bearer ${env:DASH0_AUTH_TOKEN}" service: pipelines: traces: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp_grpc/oldvendor, otlp_grpc/dash0] metrics: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp_grpc/oldvendor, otlp_grpc/dash0] logs: receivers: [otlp] processors: [memory_limiter, batch] exporters: [otlp_grpc/oldvendor, otlp_grpc/dash0]',
+  ],
   'errors-tripled': [
     'incident errors-tripled: rate-vs-lb,error-count,collector-diff > metrics-after-sampling',
     'choice eto-ratio: counted-after-sampling',

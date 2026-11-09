@@ -69,6 +69,7 @@ const EXPECTED_ORDER = [
   'filter-or-sampler',
   'the-34-percent-error-rate',
   'connect-to-dash0',
+  'two-vendors-one-weekend',
   'its-us',
 ];
 
@@ -158,7 +159,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
       no: 9,
       name: 'Live Demo',
       sub: 'Does that answer hold?',
-      levelIds: ['filter-or-sampler', 'the-34-percent-error-rate', 'connect-to-dash0'],
+      levelIds: ['filter-or-sampler', 'the-34-percent-error-rate', 'connect-to-dash0', 'two-vendors-one-weekend'],
       bossId: 'its-us',
     },
   ]);
