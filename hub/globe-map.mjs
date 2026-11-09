@@ -10,10 +10,12 @@ import { latticePoint } from '../lib/globe-lattice.mjs';
 // Every country in LEVEL_COUNTRY has at least this many land dots (bar MIN_DOTS_EXCEPTIONS), so it is visible lit.
 export const MIN_DOTS = 6;
 
-// The one narrow exception: South Korea has 5 dots on the 110m data (it is small), and the only other unused East Asia
-// country with 6 or more dots is North Korea (6), passed over for a demo-friendlier pick; Taiwan has 2. A code
-// listed here needs at least its own minimum instead of MIN_DOTS (test/globe-data.test.mjs pins this table).
-export const MIN_DOTS_EXCEPTIONS = Object.freeze({ KOR: 5 });
+// The narrow exceptions: a code listed here needs at least its own minimum instead of MIN_DOTS (test/globe-data.test.mjs
+// pins this table and checks each entry against the dots the globe draws). South Korea has 5 land dots on the 110m data (it
+// is small), and the only other unused East Asia country with 6 or more is North Korea (6), passed over for a demo-friendlier
+// pick; Taiwan has 2. Samoa has no land dot at all: its 3 markers are the island markers (ISLANDS, below), placed on the 3
+// nearest lattice points.
+export const MIN_DOTS_EXCEPTIONS = Object.freeze({ KOR: 5, WSM: 3 });
 
 // act id -> region name and the Natural Earth SUBREGION values it covers. Owner defaults
 // (2026-11-04): Southern Europe counts as Western Europe, Central America and the Caribbean
@@ -95,6 +97,7 @@ export const LEVEL_COUNTRY = Object.freeze({
   'filter-or-sampler': 'NZL',
   'the-34-percent-error-rate': 'AUS',
   'connect-to-dash0': 'PNG',
+  'edge-of-the-platform': 'WSM',
 });
 
 // Countries with no land dot on the 110m data, so they get hand-placed island markers (docs/FOUNDATION.md §2.7;
@@ -150,7 +153,7 @@ export const COUNTRY_NAMES = Object.freeze({
   IND: 'India', IRN: 'Iran', PAK: 'Pakistan',
   JPN: 'Japan', CHN: 'China', MNG: 'Mongolia', KOR: 'South Korea',
   THA: 'Thailand', VNM: 'Vietnam', IDN: 'Indonesia', MYS: 'Malaysia', PHL: 'the Philippines',
-  AUS: 'Australia', NZL: 'New Zealand', PNG: 'Papua New Guinea',
+  AUS: 'Australia', NZL: 'New Zealand', PNG: 'Papua New Guinea', WSM: 'Samoa',
 });
 
 /** The act id whose region a country (ADM0_A3 code, Natural Earth SUBREGION) is in, else null. */

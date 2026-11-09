@@ -160,6 +160,7 @@ const ANSWERS = {
     'choice mv-fix: boundary',
   ],
   'filter-or-sampler': ['choice fos-verdict: wrong', 'sort fos-sort: errors-whole=tail healthz=filter slow-no-cache=both slow=tail debug-logs=filter many-spans=tail production-only=filter via-payments=tail errors-no-keepalive=both'],
+  'edge-of-the-platform': ['choice eop-fix: force-flush', 'build eop-batch: d09a4e7b2c5f1863.links=4a7d2c9e1f3b8065+c81e3a5d7f092b46+e2b5094a6c1d7f38'],
   'the-34-percent-error-rate': ['choice ser-verdict: wrong', 'tradeoff ser-plan: sampler=errors-10pct rate=red-before'],
   'errors-tripled': [
     'incident errors-tripled: rate-vs-lb,error-count,collector-diff > metrics-after-sampling',
