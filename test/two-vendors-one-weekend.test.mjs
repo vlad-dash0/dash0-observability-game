@@ -68,6 +68,7 @@ test('step 1 Choice: three answers, exactly one right ("copy"), labels of simila
 
 test('step 1 whys: the right one quotes the architecture page, each wrong one says why it fails', () => {
   const by = Object.fromEntries(choices.map((c) => [c.key, plain(c.why)]));
+  assert.equal(choices.filter((c) => plain(c.label).startsWith('It ')).length, 0, 'no opener shared by two answers, no "It holds" against "It is wrong"');
   assert.match(by.copy, /each exporter gets a copy of each data element/);
   assert.match(by.replaces, /list, not a single slot/);
   assert.match(by.sdk, /apps send OTLP only to the Collector/);
@@ -79,7 +80,9 @@ test('the given does not start: the player is told which exporter is listed but 
   const r = run(GIVEN);
   assert.deepEqual([r.outcome, r.reason], ['wrong', 'invalid']);
   const lines = r.result.errors.map(describeError);
-  assert.deepEqual(lines, ['service.pipelines.traces.exporters[1]: "otlp_grpc/dash0" is not defined under exporters or connectors']);
+  assert.deepEqual(lines, ['service.pipelines.traces.exporters[0]: "otlp_grpc/dash0" is not defined under exporters or connectors']);
+  assert.equal(GIVEN.includes('traces:\n      receivers: [otlp]\n      processors: [memory_limiter, batch]\n      exporters: [otlp_grpc/dash0]'), true, 'the teammate\'s change: traces lists Dash0 alone');
+  assert.equal(GIVEN.split(OLD_ONLY).length - 1, 2, 'metrics and logs stay on the old vendor');
 });
 
 test('the reference lists both exporters in all three pipelines and defines the second from the environment', () => {
@@ -91,15 +94,21 @@ test('the reference lists both exporters in all three pipelines and defines the 
   assert.deepEqual({ ...spec.uses }, { traces: [OLD, NEW], metrics: [OLD, NEW], logs: [OLD, NEW] });
 });
 
-test('traces only: the Collector starts, and metrics and logs are still unmet', () => {
+test('defining Dash0 and nothing else: the config is valid, and every pipeline still lacks a vendor', () => {
   const r = run(DEFINED);
+  assert.equal(r.result.ok, true);
+  assert.deepEqual([r.outcome, r.reason, r.unmet], ['wrong', 'uses', ['traces', 'metrics', 'logs']]);
+});
+
+test('traces only: restoring the old vendor beside Dash0 in traces leaves metrics and logs unmet', () => {
+  const r = run(withPipelines(DEFINED, [OLD, NEW], [OLD], [OLD]));
   assert.deepEqual([r.outcome, r.reason, r.unmet], ['wrong', 'uses', ['metrics', 'logs']]);
 });
 
 test('a single signal missing is caught on its own: each of traces, metrics and logs is required', () => {
   const all = [OLD, NEW];
   assert.deepEqual(verdict(withPipelines(DEFINED, all, all, all)), ['right', null, null]);
-  assert.deepEqual(verdict(withPipelines(DEFINED, [OLD], all, all)), ['wrong', 'uses', ['traces']]);
+  assert.deepEqual(verdict(withPipelines(DEFINED, [NEW], all, all)), ['wrong', 'uses', ['traces']]);
   assert.deepEqual(verdict(withPipelines(DEFINED, all, [OLD], all)), ['wrong', 'uses', ['metrics']]);
   assert.deepEqual(verdict(withPipelines(DEFINED, all, all, [OLD])), ['wrong', 'uses', ['logs']]);
 });
@@ -125,6 +134,34 @@ test('a new pipeline for Dash0 is valid but wrong here: it starts, and the exist
   assert.match(plain(spec.explain), /traces\/dash0.*valid in a real Collector/);
 });
 
+// Review of 095ae4b, finding 1: `uses` once accepted the id in any stage and any section, so Dash0 defined and listed in
+// the wrong place graded right while no exporter list ever named it.
+const OLD_LISTS = REF.replace(DEFINE_NEW, '').replace(/exporters: \[otlp_grpc\/oldvendor, otlp_grpc\/dash0\]/g, OLD_ONLY);
+const asSection = (section) => OLD_LISTS.replace('service:', `${section}:\n  ${NEW}:\nservice:`);
+
+test('Dash0 defined and listed as a processor, every exporters list left on the old vendor: wrong, and the reference is still right', () => {
+  const text = OLD_LISTS.replace('  batch:\n', `  batch:\n  ${NEW}:\n`).replace(/(processors: \[memory_limiter, batch)\]/g, `$1, ${NEW}]`);
+  assert.equal(text.split(`batch, ${NEW}]`).length - 1, 3);
+  const r = run(text);
+  assert.equal(r.result.ok, true, 'a valid config that never sends to Dash0');
+  assert.deepEqual([r.outcome, r.reason, r.unmet], ['wrong', 'uses', ['traces', 'metrics', 'logs']]);
+  assert.equal(run(REF).outcome, 'right');
+});
+
+test('Dash0 defined under connectors and listed as a receiver: wrong', () => {
+  const text = asSection('connectors').replace(/receivers: \[otlp\]/g, `receivers: [otlp, ${NEW}]`);
+  const r = run(text);
+  assert.equal(r.result.ok, true);
+  assert.deepEqual([r.outcome, r.reason, r.unmet], ['wrong', 'uses', ['traces', 'metrics', 'logs']]);
+});
+
+test('Dash0 defined under connectors and listed as an exporter beside the old vendor: wrong, it must be defined under exporters', () => {
+  const text = asSection('connectors').replace(/exporters: \[otlp_grpc\/oldvendor\]/g, `exporters: [${OLD}, ${NEW}]`);
+  const r = run(text);
+  assert.equal(r.result.ok, true);
+  assert.deepEqual([r.outcome, r.reason, r.unmet], ['wrong', 'uses', ['traces', 'metrics', 'logs']]);
+});
+
 test('listing a name that is not defined under exactly that id fails to start: the wrong exporter id is invalid', () => {
   const r = run(REF.replace(`${NEW}:`, 'otlp_grpc/dash:'));
   assert.deepEqual([r.outcome, r.reason], ['wrong', 'invalid']);
@@ -141,6 +178,9 @@ test('the header form is not graded (the schema holds no component settings): th
 
 test('the question asks for the existing pipelines, the explain says why a separate one fails here', () => {
   assert.match(plain(CONFIG_STEP.question), /in the existing pipelines/);
+  assert.equal(/will not start|would not start/.test(SRC), false, 'no claim that is on neither cited page');
+  assert.match(SRC, /blob\/v0\.164\.0\/exporter\/otlpexporter\/metadata\.yaml/);
+  assert.match(SRC, /blob\/v0\.164\.0\/CHANGELOG\.md/);
   assert.match(plain(CONFIG_STEP.intro), /DASH0_ENDPOINT/);
   assert.match(plain(CONFIG_STEP.intro), /DASH0_AUTH_TOKEN/);
 });
