@@ -69,6 +69,7 @@ import the3amErrors from './the-3am-errors.mjs';
 import theBill from './the-bill.mjs';
 import thePager from './the-pager.mjs';
 import theSignals from './the-signals.mjs';
+import theTraceThatStartsInTheMiddle from './the-trace-that-starts-in-the-middle.mjs';
 import whatCostsMoney from './what-costs-money.mjs';
 import whoIsTalking from './who-is-talking.mjs';
 import whyOpentelemetry from './why-opentelemetry.mjs';
@@ -165,7 +166,7 @@ export const ACTS = [
     sub: 'Does that answer hold?',
     badges: ['customer-calls'],
     teaser: 'Judge confident answers about filters and error rates, connect the game to a Dash0 (practice works without an account), then find its incident in a trace view.',
-    levels: [filterOrSampler, the34PercentErrorRate, connectToDash0, lostInTranslation],
+    levels: [filterOrSampler, the34PercentErrorRate, connectToDash0, theTraceThatStartsInTheMiddle, lostInTranslation],
     boss: itsUs,
   },
 ];
