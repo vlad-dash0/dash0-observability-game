@@ -169,15 +169,33 @@ test('Open trace: focus lands on the trace view heading', () => {
 
 // ---- not connected ----
 
-test('not connected: the boss says so, offers practice, and the live button is disabled with its reason', () => {
-  const { tele, sent } = session({ live: false });
+test('not connected, live available: the boss says to connect in 9.3, offers practice, and the live button is disabled with that reason', () => {
+  const { tele, sent } = session({ live: true });
+  assert.equal(tele.liveAvailable(), true);
   const h = open(tele);
   assert.ok(h.text().includes('not connected'), 'it explains');
   assert.ok(q('#its-practice') && !q('#its-practice').disabled);
   const live = q('#its-live');
-  assert.ok(live.disabled, 'live stays closed until P6');
+  assert.ok(live.disabled, 'live needs the 9.3 connection first');
   const why = live.getAttribute('aria-describedby');
-  assert.ok(why && q(`#${why}`) && q(`#${why}`).textContent.length > 10, 'a disabled button points at its reason');
+  assert.ok(why && q(`#${why}`), 'a disabled button points at its reason');
+  assert.match(q(`#${why}`).textContent, /Connect there, then come back\./);
+  assert.doesNotMatch(q(`#${why}`).textContent, /not available in this browser/);
+  assert.equal(qa('[data-finish]').filter((b) => !b.disabled).length, 0);
+  assert.equal(sent.length, 0);
+});
+
+test('not connected, no live in this browser (the no-fetch fallback): the disabled live button says it is not available', () => {
+  const { tele, sent } = session({ live: false });
+  assert.equal(tele.liveAvailable(), false);
+  const h = open(tele);
+  assert.ok(h.text().includes('not connected'), 'it explains');
+  assert.ok(q('#its-practice') && !q('#its-practice').disabled);
+  const live = q('#its-live');
+  assert.ok(live.disabled);
+  const why = live.getAttribute('aria-describedby');
+  assert.ok(why && q(`#${why}`), 'a disabled button points at its reason');
+  assert.match(q(`#${why}`).textContent, /not available in this browser/);
   assert.equal(qa('[data-finish]').filter((b) => !b.disabled).length, 0);
   assert.equal(sent.length, 0);
 });

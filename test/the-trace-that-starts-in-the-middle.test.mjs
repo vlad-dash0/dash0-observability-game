@@ -40,7 +40,7 @@ function tableRows(html, caption) {
   return [...m[1].matchAll(/<tr>(.*?)<\/tr>/g)].map((r) => [...r[1].matchAll(/<td>(.*?)<\/td>/g)].map((c) => plain(c[1])));
 }
 
-test('9.4 fields: in act-9 after 9.3 and before the boss, scored with no par time, a choice then a build, hints off, no card', () => {
+test('9.4 fields: in act-9 after 9.3 and before 9.5 and the boss, scored with no par time, a choice then a build, hints off, no card', () => {
   assert.deepEqual(
     { no: level.no, name: level.name, sub: level.sub, rewardTitle: level.rewardTitle, kind: level.kind, actId: level.actId, parMs: level.scoring.parMs, prefix: level.play.prefix, scored: level.scored },
     { no: '9.4', name: 'The trace that starts in the middle', sub: 'Does that answer hold?', rewardTitle: 'Parent finder', kind: 'level', actId: 'act-9', parMs: null, prefix: 'ttsm', scored: true },
@@ -52,8 +52,8 @@ test('9.4 fields: in act-9 after 9.3 and before the boss, scored with no par tim
   assert.deepEqual([...level.cards], []);
   assert.equal(Object.values(LIVE.levels).filter((l) => l.rewardTitle === level.rewardTitle).length, 1, 'the reward title is unique');
   const act = LIVE.acts.find((a) => a.id === 'act-9');
-  assert.deepEqual([...act.levelIds], ['filter-or-sampler', 'the-34-percent-error-rate', 'connect-to-dash0', ID]);
-  assert.equal(LIVE.order[LIVE.order.indexOf(ID) + 1], 'its-us', 'the boss follows 9.4');
+  assert.deepEqual([...act.levelIds], ['filter-or-sampler', 'the-34-percent-error-rate', 'connect-to-dash0', ID, 'lost-in-translation']);
+  assert.equal(LIVE.order[LIVE.order.indexOf(ID) + 1], 'lost-in-translation', '9.5 follows 9.4, then the boss');
 });
 
 test('globe: 9.4 is on the Solomon Islands, two dots, allowed by exactly its own MIN_DOTS_EXCEPTIONS entry', () => {
