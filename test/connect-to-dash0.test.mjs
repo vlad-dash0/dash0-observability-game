@@ -9,6 +9,7 @@ import { makeDom, q, qa } from './helpers/dom.mjs';
 import { createLevelContext } from '../lib/level-context.mjs';
 import { createTelemetry } from '../lib/telemetry.mjs';
 import { recordFocus } from './helpers/focus.mjs';
+import { INGRESS_HOSTS } from '../lib/dash0/ingress.mjs';
 import level, { breakableAddress } from '../levels/connect-to-dash0.mjs';
 
 const HOST = 'ingress.eu-west-1.aws.dash0.com';
@@ -119,11 +120,11 @@ async function connectLive(h, { endpoint = ENDPOINT, token = SECRET, dataset = '
   press('#ctd-connect');
 }
 
-test('the first screen offers practice, labels it, and disables live while it is not open', () => {
-  const h = open(practiceTelemetry().tele); // no hosts: liveAvailable() is false
+test('the first screen offers practice, labels it, and disables live when it is not available in this browser', () => {
+  const h = open(practiceTelemetry({ hosts: [] }).tele); // no allowed host (the no-fetch fallback): liveAvailable() is false
   assert.ok(h.text().includes(PRACTICE_BANNER));
   assert.equal(q('#ctd-live').disabled, true);
-  assert.match(h.text(), /Your own Dash0 is not open yet/);
+  assert.match(h.text(), /Your own Dash0 is not available in this browser/);
   assert.equal(qa('[data-finish]').length, 0);
 });
 
@@ -131,6 +132,22 @@ test('with live open, the first screen enables it and says what is sent', () => 
   const h = open(liveTelemetry([ok()]).tele);
   assert.equal(q('#ctd-live').disabled, false);
   assert.match(h.text(), /level-complete span/);
+});
+
+test('with the shipped hosts and a fetch, live is open on the first screen and reaches a shipped host', async () => {
+  const { tele, sent } = practiceTelemetry(); // no injected hosts: INGRESS_HOSTS
+  assert.equal(tele.liveAvailable(), true);
+  const h = open(tele);
+  assert.equal(q('#ctd-live').disabled, false);
+  assert.doesNotMatch(h.text(), /not available in this browser/);
+  press('#ctd-live');
+  press('#ctd-scope-ingest');
+  fill('#ctd-endpoint', `https://${INGRESS_HOSTS[0]}`);
+  fill('#ctd-token', SECRET);
+  press('#ctd-connect');
+  await settle('#ctd-finish');
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0][0], `https://${INGRESS_HOSTS[0]}/v1/traces`);
 });
 
 test('without a telemetry session the level says so and offers no Finish', () => {
@@ -704,10 +721,10 @@ test('the endpoint table is a labelled scroll region', () => {
 });
 
 test('a disabled live button points at the paragraph that says why', () => {
-  open(practiceTelemetry().tele);
+  open(practiceTelemetry({ hosts: [] }).tele);
   const why = q('#ctd-live').getAttribute('aria-describedby');
   assert.equal(why, 'ctd-live-why');
-  assert.match(q(`#${why}`).textContent, /not open yet/);
+  assert.match(q(`#${why}`).textContent, /not available in this browser/);
   open(liveTelemetry([ok()]).tele);
   assert.equal(q('#ctd-live').hasAttribute('aria-describedby'), false, 'enabled: nothing to explain');
 });

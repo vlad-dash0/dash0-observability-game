@@ -64,6 +64,7 @@ import tailSampling from './tail-sampling.mjs';
 import temporality from './temporality.mjs';
 import filterOrSampler from './filter-or-sampler.mjs';
 import the34PercentErrorRate from './the-34-percent-error-rate.mjs';
+import lostInTranslation from './lost-in-translation.mjs';
 import the3amErrors from './the-3am-errors.mjs';
 import theBill from './the-bill.mjs';
 import thePager from './the-pager.mjs';
@@ -164,7 +165,7 @@ export const ACTS = [
     sub: 'Does that answer hold?',
     badges: ['customer-calls'],
     teaser: 'Judge confident answers about filters and error rates, connect the game to a Dash0 (practice works without an account), then find its incident in a trace view.',
-    levels: [filterOrSampler, the34PercentErrorRate, connectToDash0],
+    levels: [filterOrSampler, the34PercentErrorRate, connectToDash0, lostInTranslation],
     boss: itsUs,
   },
 ];

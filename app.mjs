@@ -12,7 +12,7 @@ import { DOTS } from './hub/globe-data.mjs';
 import { GAME_SUMMARY } from './hub/about.mjs';
 import { badgeViews } from './hub/badges.mjs';
 import { COMING_SOON } from './hub/coming-soon.mjs';
-import { ACT_REGIONS, actOfCountry, COUNTRY_NAMES, LEVEL_COUNTRY } from './hub/globe-map.mjs';
+import { ACT_REGIONS, actOfCountry, COUNTRY_NAMES, islandDots, LEVEL_COUNTRY } from './hub/globe-map.mjs';
 import { NODE_IDS } from './hub/map-data.mjs';
 import { ACTS } from './levels/index.mjs';
 import { shuffle as kitShuffle } from './lib/lesson-kit.mjs';
@@ -27,6 +27,7 @@ import { cardTotals, mergeProgress, recordCompletion, registryIds, starTotals } 
 import { MAX_STARS } from './lib/scoring.mjs';
 import { runPlay, validatePlay } from './lib/play.mjs';
 import { buildRegistry } from './lib/registry.mjs';
+import { createSaveDialog } from './lib/save-dialog.mjs';
 import { loadProgress, saveProgress, STORAGE_KEY } from './lib/storage.mjs';
 import { readTheme, writeTheme } from './lib/theme.mjs';
 import { levelState, lockReason } from './lib/unlock.mjs';
@@ -93,7 +94,7 @@ export function createGame(deps) {
     deck = DECK,
     globe: mountGlobe = null,
     globeMap = { ACT_REGIONS, LEVEL_COUNTRY, COUNTRY_NAMES, actOf: actOfCountry },
-    dots = DOTS,
+    dots = [...DOTS, ...islandDots()],
     comingSoon = COMING_SOON,
     now = Date.now,
     rand = Math.random,
@@ -120,6 +121,7 @@ export function createGame(deps) {
   // The open level's AbortController; aborting it makes that ctx's finish a no-op.
   let session = null;
   let nudgeTimer = null;
+  let saveDialog = null;
   // The drawn globe's handle, outside the component so Alpine never proxies three.js objects;
   // `mounts` counts mount requests, so a mount that resolves after a newer one (or after the
   // hub was hidden) is disposed instead of kept.
@@ -170,6 +172,7 @@ export function createGame(deps) {
     nudgeId: null,
     rewardOpen: false,
     aboutOpen: false,
+    saveOpen: false,
     aboutSummary: GAME_SUMMARY,
     howTo: NO_HOW_TO,
     howToOpen: false,
@@ -330,7 +333,7 @@ export function createGame(deps) {
     // The one answer to "is a dialog open": the hub goes inert and openLevel / openAbout
     // refuse while it is true.
     dialogOpen() {
-      return this.overlayOpen || this.rewardOpen || this.aboutOpen;
+      return this.overlayOpen || this.rewardOpen || this.aboutOpen || this.saveOpen;
     },
     hubInert() {
       return this.dialogOpen();
@@ -349,6 +352,45 @@ export function createGame(deps) {
       if (!this.aboutOpen) return;
       this.aboutOpen = false;
       this.focusSoon('#about-open');
+    },
+
+    // ---------- save codes (#18) ----------
+    // The Save code dialog: lib/save-dialog.mjs draws into #save-body (kit markup, wired with
+    // el.onclick). Debug mode refuses to open it, so nothing is exported or imported.
+    openSave() {
+      if (this.debug || this.dialogOpen()) return false;
+      saveDialog ??= createSaveDialog({
+        registry,
+        host: doc.getElementById('save-body'),
+        doc,
+        debug: this.debug,
+        getProgress: () => this.progress,
+        commit: (merged) => this.commitImport(merged),
+        copy: (text) => {
+          const clip = win?.navigator?.clipboard;
+          return clip?.writeText ? clip.writeText(text).then(() => true, () => false) : false;
+        },
+        close: () => this.closeSave(),
+      });
+      saveDialog.open();
+      this.saveOpen = true;
+      this.focusSoon('#save-title');
+      return true;
+    },
+    closeSave() {
+      if (!this.saveOpen) return;
+      this.saveOpen = false;
+      saveDialog?.reset();
+      this.focusSoon('#save-open');
+    },
+    // An import's merged record: saved like a completion (merged with what storage holds), and the
+    // hub shows it. A refused save keeps it in memory for this visit, as a completion does.
+    commitImport(merged) {
+      const saved = saveProgress(storage, merged, registry);
+      this.progress = saved.progress;
+      this.notice = saved.saved ? null : saved.reason;
+      this.refreshGlobe();
+      return saved;
     },
 
     // ---------- levels ----------
@@ -553,7 +595,7 @@ export function createGame(deps) {
       this.refreshGlobe();
     },
 
-    // One window-level Escape handler: closes the reward, else the About dialog, else the How to play card, else the level, but never the
+    // One window-level Escape handler: closes the reward, else the About dialog, else Save code, else the How to play card, else the level, but never the
     // level while the player is typing in it. A widget that handled the Escape (it called
     // preventDefault, e.g. Build it cancelling a pick) owns it.
     onEscape(e) {
@@ -564,6 +606,10 @@ export function createGame(deps) {
       }
       if (this.aboutOpen) {
         this.closeAbout();
+        return;
+      }
+      if (this.saveOpen) {
+        this.closeSave();
         return;
       }
       if (!this.overlayOpen) return;

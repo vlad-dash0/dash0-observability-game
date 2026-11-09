@@ -2,10 +2,10 @@
 // player's Dash0 (or the practice ingress), the span buffer and the facade ctx.telemetry is.
 // Spec: docs/DASH0-LAB.md and the #195 plan §4 (invariants I1-I3, I8, concurrency).
 // Fake fetch, fixed bytes, fixed clock and fake timers; nothing touches the network.
-// INGRESS_HOSTS ships empty, so live mode injects its host list.
+// Live mode here injects its own host list; the shipped INGRESS_HOSTS are checked in test/dash0-ingress.test.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PRACTICE_HOSTS } from '../lib/dash0/ingress.mjs';
+import { INGRESS_HOSTS, PRACTICE_HOSTS } from '../lib/dash0/ingress.mjs';
 import { BUFFER_CAP, createTelemetry } from '../lib/telemetry.mjs';
 
 const HOST = 'ingress.eu-west-1.aws.dash0.com';
@@ -395,7 +395,36 @@ test('live mode is unavailable without hosts or without fetch', () => {
   assert.equal(make({ hosts: [] }).telemetry.liveAvailable(), false);
   assert.equal(make({ fetch: null }).telemetry.liveAvailable(), false);
   const { telemetry } = make({ hosts: [] });
-  assert.equal(telemetry.connect(live()).ok, false, 'no live host can be configured while the list is empty');
+  assert.equal(telemetry.connect(live()).ok, false, 'no host allowed (the no-fetch fallback): live cannot be configured');
+});
+
+test('with the shipped INGRESS_HOSTS, live sends the test span to each host and a lookalike never reaches fetch', async () => {
+  for (const host of INGRESS_HOSTS) {
+    const f = instantFetch();
+    const timers = fakeTimers();
+    const telemetry = createTelemetry({
+      fetch: f.fetch,
+      randomBytes: counterBytes().randomBytes,
+      now: () => NOW,
+      setTimeout: timers.setTimeout,
+      clearTimeout: timers.clearTimeout,
+      reportError: () => {},
+    });
+    assert.equal(telemetry.liveAvailable(), true);
+    assert.deepEqual(telemetry.connect(live(TOKEN, { endpoint: `https://${host}` })), { ok: true });
+    assert.equal((await telemetry.sendTest()).kind, 'accepted');
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.calls[0].url, `https://${host}/v1/traces`);
+    assert.equal(f.calls[0].init.headers.Authorization, `Bearer ${TOKEN}`, 'the token travels only in the header');
+    assert.equal(f.calls[0].url.includes(TOKEN), false);
+    assert.equal(f.calls[0].init.body.includes(TOKEN), false);
+  }
+  const f = instantFetch();
+  const telemetry = createTelemetry({ fetch: f.fetch, randomBytes: counterBytes().randomBytes, setTimeout, clearTimeout, reportError: () => {} });
+  const lookalike = `https://${INGRESS_HOSTS[0]}.evil.example`;
+  assert.deepEqual(telemetry.connect(live(TOKEN, { endpoint: lookalike })), { ok: false, field: 'endpoint', reason: 'unknown-host' });
+  assert.deepEqual(telemetry.connect(live(TOKEN, { endpoint: `https://${INGRESS_HOSTS[0]}:4318` })), { ok: false, field: 'endpoint', reason: 'unexpected-port' });
+  assert.equal(f.calls.length, 0);
 });
 
 // ---- reportError --------------------------------------------------------------------

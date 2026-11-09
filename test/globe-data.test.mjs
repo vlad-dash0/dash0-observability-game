@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { DOTS, COUNTRIES, LATTICE_POINTS } from '../hub/globe-data.mjs';
-import { ACT_REGIONS, LEVEL_COUNTRY, MIN_DOTS, MIN_DOTS_EXCEPTIONS, COUNTRY_ACT, actOfCountry } from '../hub/globe-map.mjs';
+import { ACT_REGIONS, ISLANDS, islandDots, LEVEL_COUNTRY, MIN_DOTS, MIN_DOTS_EXCEPTIONS, COUNTRY_ACT, actOfCountry } from '../hub/globe-map.mjs';
 import { liveRegistry } from '../app.mjs';
 import { globeState } from '../lib/globe.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
@@ -16,8 +16,11 @@ import {
 
 const REG = liveRegistry();
 const levelIds = REG.order.filter((id) => REG.levels[id].kind === 'level');
-const dotsOf = (iso) => DOTS.filter((d) => d[2] === iso);
-const subregionOf = Object.fromEntries(COUNTRIES);
+// Land dots plus the hand-placed island markers (hub/globe-map.mjs ISLANDS): what the globe draws, so a level
+// country with no land dot (FJI, VUT, WSM) is found, counted and boxed like any other.
+const ALL_DOTS = [...DOTS, ...islandDots()];
+const dotsOf = (iso) => ALL_DOTS.filter((d) => d[2] === iso);
+const subregionOf = { ...Object.fromEntries(COUNTRIES), ...Object.fromEntries(Object.entries(ISLANDS).map(([iso, { sub }]) => [iso, sub])) };
 
 test('every registry level has exactly one country, and no key is stale', () => {
   const missing = levelIds.filter((id) => !Object.hasOwn(LEVEL_COUNTRY, id));
@@ -57,11 +60,14 @@ test(`every mapped country has at least ${MIN_DOTS} dots (K)`, () => {
   }
 });
 
-test('the dot-count exception is exactly South Korea at 5, used by a level, and is a real shortfall', () => {
-  assert.deepEqual({ ...MIN_DOTS_EXCEPTIONS }, { KOR: 5 });
-  assert.equal(Object.values(LEVEL_COUNTRY).includes('KOR'), true);
-  assert.equal(dotsOf('KOR').length, 5, 'KOR has the 5 dots the exception allows (a change means the exception is stale)');
-  assert.equal(dotsOf('KOR').length < MIN_DOTS, true, 'without the exception it would fail');
+test('every dot-count exception is used by a level, equals its real dot count, and is a real shortfall', () => {
+  assert.equal(Object.keys(MIN_DOTS_EXCEPTIONS).length > 0, true);
+  for (const [iso, need] of Object.entries(MIN_DOTS_EXCEPTIONS)) {
+    assert.equal(Object.values(LEVEL_COUNTRY).includes(iso), true, `${iso} is in the table but no level uses it`);
+    assert.equal(dotsOf(iso).length, need, `${iso} has ${dotsOf(iso).length} dots, the exception allows ${need} (a change means the exception is stale)`);
+    assert.equal(dotsOf(iso).length < MIN_DOTS, true, `${iso} reaches MIN_DOTS, so it needs no exception`);
+  }
+  assert.equal(MIN_DOTS_EXCEPTIONS.NCL, 2, 'New Caledonia is the 2-dot country of level 9.5');
 });
 
 test('region lookup: Russia goes to act-5, Antarctica to nothing, unknown subregion to nothing', () => {
@@ -104,6 +110,60 @@ test('dots sit where the countries are', () => {
   assert.ok(inBox('BRA', [-34, 6, -75, -34]));
   assert.ok(inBox('AUS', [-44, -10, 112, 154]));
   assert.ok(inBox('IND', [6, 36, 67, 98]));
+});
+
+const GREAT_CIRCLE_DEG = (a, b) => {
+  const r = Math.PI / 180;
+  const c = Math.sin(a[0] * r) * Math.sin(b[0] * r) + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.cos((a[1] - b[1]) * r);
+  return (Math.acos(Math.min(1, Math.max(-1, c))) * 180) / Math.PI;
+};
+
+test('islandDots: deterministic, k points per island, none on land, each near its coordinate', () => {
+  assert.deepEqual(islandDots(), islandDots());
+  const landKeys = new Set(DOTS.map((d) => `${d[0]},${d[1]}`));
+  for (const k of [1, 3, 5]) {
+    const dots = islandDots(k);
+    assert.equal(dots.length, k * Object.keys(ISLANDS).length);
+    for (const [iso, { sub, at }] of Object.entries(ISLANDS)) {
+      const mine = dots.filter((d) => d[2] === iso);
+      assert.equal(mine.length, k, `${iso} has ${k} markers`);
+      for (const d of mine) {
+        assert.equal(d[3], sub);
+        assert.ok(GREAT_CIRCLE_DEG([d[0], d[1]], at) < 3, `${iso} marker ${d[0]},${d[1]} is within 3 degrees of ${at}`);
+      }
+    }
+  }
+  const all = islandDots();
+  for (const d of all) assert.ok(!landKeys.has(`${d[0]},${d[1]}`), `${d[0]},${d[1]} is a land dot`);
+  assert.equal(new Set(all.map((d) => `${d[0]},${d[1]}`)).size, all.length, 'no two markers share a position');
+  const onLattice = new Set(Array.from({ length: LATTICE_POINTS }, (_, i) => latticePoint(i, LATTICE_POINTS).join(',')));
+  assert.ok(all.every((d) => onLattice.has(`${d[0]},${d[1]}`)), 'every marker is a lattice point');
+});
+
+test('islandDots: skips lattice points that are land, taking the next nearest', () => {
+  const at = ISLANDS.FJI.at;
+  const first = islandDots(1)[0];
+  const blocked = islandDots(1, [...DOTS, [first[0], first[1], 'FJI', 'Melanesia']], { FJI: ISLANDS.FJI })[0];
+  assert.notDeepEqual(blocked.slice(0, 2), first.slice(0, 2));
+  assert.ok(GREAT_CIRCLE_DEG(first, at) <= GREAT_CIRCLE_DEG(blocked, at));
+});
+
+test('ISLANDS pins the capitals (Suva, Port Vila, Apia) and their subregions', () => {
+  const plain = Object.fromEntries(Object.entries(ISLANDS).map(([k, v]) => [k, { sub: v.sub, at: [...v.at] }]));
+  assert.deepEqual(plain, {
+    FJI: { sub: 'Melanesia', at: [-18.14, 178.44] },
+    VUT: { sub: 'Melanesia', at: [-17.73, 168.32] },
+    WSM: { sub: 'Polynesia', at: [-13.83, -171.76] },
+  });
+  assert.ok(Object.isFrozen(ISLANDS) && Object.isFrozen(ISLANDS.FJI) && Object.isFrozen(ISLANDS.FJI.at));
+});
+
+test('every island country has no land dot, a lit-able subregion in an act, and the data stays as generated', () => {
+  for (const [iso, { sub, at }] of Object.entries(ISLANDS)) {
+    assert.equal(DOTS.filter((d) => d[2] === iso).length, 0, `${iso} has land dots now: drop it from ISLANDS`);
+    assert.equal(actOfCountry(iso, sub), 'act-9', `${iso} (${sub}) is not in Oceania`);
+    assert.ok(Math.abs(at[0]) <= 90 && Math.abs(at[1]) <= 180);
+  }
 });
 
 test('lattice points are the documented Fibonacci sphere, 2 decimals', () => {
@@ -162,7 +222,7 @@ test('the committed module names the pinned source and hash', () => {
 // outline (overseas parts dropped) plus half a degree. Overseas parts that stay on purpose (Alaska, Hawaii, Svalbard) are
 // inside their box.
 const HOME = {
-  FRA: [40, 52, -6, 11], DEU: [46, 56, 5, 16], ESP: [35, 45, -10, 4], NOR: [57, 82, 4, 32], SWE: [54, 70, 10, 25], FIN: [59, 71, 20, 33], USA: [18, 72, -173, -66], CAN: [41, 84, -142, -52], MEX: [14, 34, -118, -86], GRL: [59, 85, -74, -11], CUB: [19, 24, -86, -73], GTM: [13, 19, -93, -87], HND: [12, 17, -90, -82], BRA: [-35, 6, -75, -34], ARG: [-56, -21, -74, -53], PER: [-19, 1, -82, -68], COL: [-5, 13, -80, -66], BOL: [-24, -9, -71, -56], VEN: [0, 13, -74, -59], CHL: [-57, -17, -77, -66], DZA: [18, 38, -10, 13], COD: [-14, 6, 11, 32], ZAF: [-36, -21, 15, 34], KAZ: [40, 56, 45, 88], SAU: [15, 33, 34, 57], TUR: [35, 43, 25, 46], UZB: [36, 47, 55, 74], TKM: [34, 44, 52, 68], IRQ: [28, 38, 38, 50], IND: [7, 36, 67, 98], IRN: [24, 41, 43, 64], PAK: [23, 38, 60, 79], JPN: [30, 46, 128, 146], CHN: [18, 54, 73, 135], MNG: [41, 52, 87, 121], KOR: [33, 39, 125, 130], AUS: [-44, -10, 112, 154], NZL: [-48, -34, 166, 179], THA: [5, 21, 97, 106], VNM: [7.5, 24, 101.5, 110], IDN: [-11.5, 6.5, 94.5, 141.5], MYS: [0.3, 7.9, 99, 119.8], PHL: [4.5, 21.5, 116.5, 127], PNG: [-12.5, 0, 140.5, 158],
+  FRA: [40, 52, -6, 11], DEU: [46, 56, 5, 16], ESP: [35, 45, -10, 4], NOR: [57, 82, 4, 32], SWE: [54, 70, 10, 25], FIN: [59, 71, 20, 33], USA: [18, 72, -173, -66], CAN: [41, 84, -142, -52], MEX: [14, 34, -118, -86], GRL: [59, 85, -74, -11], CUB: [19, 24, -86, -73], GTM: [13, 19, -93, -87], HND: [12, 17, -90, -82], BRA: [-35, 6, -75, -34], ARG: [-56, -21, -74, -53], PER: [-19, 1, -82, -68], COL: [-5, 13, -80, -66], BOL: [-24, -9, -71, -56], VEN: [0, 13, -74, -59], CHL: [-57, -17, -77, -66], DZA: [18, 38, -10, 13], COD: [-14, 6, 11, 32], ZAF: [-36, -21, 15, 34], KAZ: [40, 56, 45, 88], SAU: [15, 33, 34, 57], TUR: [35, 43, 25, 46], UZB: [36, 47, 55, 74], TKM: [34, 44, 52, 68], IRQ: [28, 38, 38, 50], IND: [7, 36, 67, 98], IRN: [24, 41, 43, 64], PAK: [23, 38, 60, 79], JPN: [30, 46, 128, 146], CHN: [18, 54, 73, 135], MNG: [41, 52, 87, 121], KOR: [33, 39, 125, 130], AUS: [-44, -10, 112, 154], NZL: [-48, -34, 166, 179], THA: [5, 21, 97, 106], VNM: [7.5, 24, 101.5, 110], IDN: [-11.5, 6.5, 94.5, 141.5], MYS: [0.3, 7.9, 99, 119.8], PHL: [4.5, 21.5, 116.5, 127], PNG: [-12.5, 0, 140.5, 158], NCL: [-23, -19.5, 163.5, 168.5],
 };
 
 test('every mapped country has a home box, and all its dots lie inside it', () => {
