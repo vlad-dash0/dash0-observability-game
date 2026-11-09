@@ -363,14 +363,18 @@ values computed in JS (`set-listing` does an HSET of `listed`, then ZADD with th
 before its ZADD); first sign-in uses `SET sub NX` and the loser re-reads. Nicknames match
 `^[A-Za-z0-9][A-Za-z0-9_-]{2,19}$`, are unique on the lowercase key, with reserved names and a small blocked-word list
 (matched on a leet-folded form). The default nickname (`lib/account/nickname.mjs`) is a fun, deterministic name made from the first name token
-of the email local part (tidied to `[a-z0-9]`): the same email always gives the same nickname. A stable hash of the base
-picks among a small set of suffix rules (`-ster`; double the final consonant then `-er`; drop a final vowel then
-`-oton`; optionally `-inator` and `-zilla`). The owner's examples come out exactly: vlad gives vladster, bob gives
-bobber, kyle gives kyloton. A result that fails nickname validation or the blocked-word filter tries the next rule; on
-collision the candidates are tried in this order: the rules in a fixed cycle starting at the hash-picked rule (each
-applied to the base), then, for n from 2 to 99, the same cycle again with `-<n>` appended; the first candidate that is
-valid, not blocked and not taken wins, and if none is left the name is `player` plus 4 random hex characters. A base shorter than 3 characters or blocked falls
-back to `player`. The player can override the nickname at any time. A new profile is listed by default
+of the email local part: the same email always gives the same nickname. The base is that token lowercased, with any
+`+tag` dropped and only `[a-z0-9]` kept, capped at 10 characters; a base shorter than 3 characters, reserved or blocked
+is replaced by `player` as the base (`player` itself is reserved, so the result is for example playerster). Five rules
+build the fun names: `ster` (append), `er` (double the final consonant, only for a consonant-vowel-consonant ending),
+`oton` (drop a final vowel, only when there is one), `inator` and `zilla` (append). A rule that does not apply is
+skipped. An FNV-1a hash of the salt `s28` plus the base picks the starting rule, and the applicable rules are tried in
+their fixed order cycling from there; a result that fails nickname validation or the blocked-word filter is dropped.
+The owner's examples come out exactly: vlad gives vladster, bob gives bobber, kyle gives kyloton. The candidate list,
+always the same for the same email, is: the fun names in that order, then `<first>-2` to `<first>-99`, then eight
+`<first>-<4 hex>` tails, where `<first>` is the first fun name and the head is cut so the whole stays within 20
+characters. `pickNick(email, isTaken)` returns the first candidate whose lowercase key is not taken, or null when every
+candidate is taken (the caller must treat null as a failure, never invent a name). The player can override the nickname at any time. A new profile is listed by default
 (`listed=1`) and joins the board on its first progress write; the account modal has a "Show me on the leaderboard"
 toggle to hide. There is no confirm-once step. After first sign-in a notice says "You're on the leaderboard as <nick>.
 Change your nickname or hide yourself in Account."
