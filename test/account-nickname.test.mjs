@@ -15,7 +15,8 @@ test('the three owner examples, exactly', () => {
 test('base: first token, case and +tag folded, deterministic', () => {
   assert.equal(first('Vlad.Smith+news@dash0.com'), 'vladster');
   assert.equal(first('vlad_k@dash0.com'), 'vladster');
-  assert.deepEqual(defaultNickCandidates('bob@dash0.com'), defaultNickCandidates('BOB@other.org'));
+  assert.deepEqual(defaultNickCandidates('bob@dash0.com'), defaultNickCandidates('BOB@Dash0.com'));
+  assert.deepEqual(defaultNickCandidates('bob@dash0.com').slice(0, 100), defaultNickCandidates('BOB@other.org').slice(0, 100));
 });
 
 test('a short, reserved or blocked base falls back to player', () => {
@@ -25,9 +26,33 @@ test('a short, reserved or blocked base falls back to player', () => {
 });
 
 test('never leaks the domain or the rest of the local part', () => {
-  for (const nick of defaultNickCandidates('vlad.korobov@dash0.com')) {
-    assert.ok(!/dash0|korobov|@/.test(nick), nick);
+  for (const nick of defaultNickCandidates('ada.lovelace@dash0.com')) {
+    assert.ok(!/lovel|dash0|@/.test(nick), nick);
   }
+});
+
+test('the er rule never doubles a final w, x or y, nor follows a vowel pair', () => {
+  for (const email of ['jay@dash0.com', 'alex@dash0.com', 'drew@dash0.com']) {
+    for (const nick of defaultNickCandidates(email)) assert.ok(!/yy|xx|ww/.test(nick), nick);
+  }
+  assert.ok(!defaultNickCandidates('joan@dash0.com').includes('joanner'));
+});
+
+test('accents are stripped, and the local part ends at the first @', () => {
+  assert.equal(first('émile@dash0.com'), defaultNickCandidates('emile@dash0.com')[0]);
+  assert.ok(first('émile@dash0.com').startsWith('emile'));
+  assert.equal(first('vlad@evil@dash0.com'), 'vladster');
+  assert.equal(first('bob@x@y'), 'bobber');
+});
+
+test('fallback emails get their own hex tails: deterministic, no email text', () => {
+  const tails = (email) => defaultNickCandidates(email).filter((n) => /-[0-9a-f]{4}$/.test(n) && !/-\d+$/.test(n));
+  const a = tails('jo@dash0.com');
+  const b = tails('al@dash0.com');
+  assert.ok(a.length > 0);
+  assert.notDeepEqual(a, b);
+  assert.deepEqual(a, tails('JO@dash0.com'));
+  for (const n of a) assert.ok(!/dash0|@/.test(n), n);
 });
 
 test('candidates are finite, unique, valid and not blocked', () => {
@@ -65,11 +90,18 @@ test('validation: charset, reserved and blocked (leet folded)', () => {
   for (const bad of ['-abc', '_abc', 'a b c', 'ab@c', 'café', '', null, 5]) {
     assert.deepEqual(validateNick(bad), { ok: false, reason: 'format' }, String(bad));
   }
-  for (const r of ['admin', 'ADMIN', 'Dash0', 'o11y-king', 'player']) {
+  for (const r of ['admin', 'ADMIN', 'Dash0', 'o11y-king', 'player', 'adm1n', 'ADM1N', 'dasho', 'pl4yer']) {
     assert.deepEqual(validateNick(r), { ok: false, reason: 'reserved' }, r);
   }
   for (const b of ['shit', 'xx-sh1t-xx', 'Sh1t99', 'F-u-c-k', 'fu_ck']) {
     assert.deepEqual(validateNick(b), { ok: false, reason: 'blocked' }, b);
   }
   assert.deepEqual(validateNick('a-b_c'), { ok: true });
+});
+
+test('short blocked words count only as a whole token; long ones as a substring', () => {
+  for (const ok of ['Kshitij', 'Draper', 'grape', 'Essex-fan']) assert.deepEqual(validateNick(ok), { ok: true }, ok);
+  for (const bad of ['shit', 'rape_x', 'x-rape', 'sh1t', 'bigfuckers', 'a-whore-x']) {
+    assert.deepEqual(validateNick(bad), { ok: false, reason: 'blocked' }, bad);
+  }
 });
