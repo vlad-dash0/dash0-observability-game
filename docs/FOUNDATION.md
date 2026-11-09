@@ -322,7 +322,8 @@ top-level navigation from `<a href="/api/auth-start">`, sign-out is a same-origi
   profile, sets the session cookie, clears the auth cookie and 302s to `/?signin=ok`. Failures go to `/?signin=` with
   `domain`, `cancelled` (Google's `access_denied`), `failed` or `unavailable`. The email is read once, to make the
   default nickname.
-- `lib/auth/jwt.mjs`: `createJwksCache({fetch, now})` and `verifyIdToken(token, {jwks, clientId, nonce, now})`, which
+- `lib/auth/jwt.mjs`: `createJwksCache({fetch, now})` and `verifyIdToken(token, {jwks, clientId, nonce, now})`
+  (`jwks` is the cache object, not raw keys; an unexpected exception maps to `format`), which
   resolves `{ok, claims}` or `{ok:false, reason}` and never throws. Reasons: `format` (not three base64url parts),
   `alg` (only RS256; `none` and HS256 refused), `jwks` (fetch failed or odd body), `kid`, `signature`, `iss`
   (`https://accounts.google.com` or `accounts.google.com`), `aud` (equal to the client id, or an array that includes it
@@ -336,10 +337,12 @@ top-level navigation from `<a href="/api/auth-start">`, sign-out is a same-origi
   `verifySession` checks version, HMAC and exp and returns the payload or null; the endpoint then loads the profile
   and requires `gen` to match. Sign-out clears the cookie (Max-Age=0); delete removes the profile, so a kept copy gets
   401. A SESSION_SECRET shorter than 32 bytes counts as not configured (`sessionSecret` returns null; `signSession`
-  throws).
+  throws). The secret is measured in UTF-8 bytes of the env string (not base64-decoded). The short-lived
+  `__Host-oc-auth` cookie is built in P3, reusing the same HMAC primitive.
 - CSRF: every POST needs an Origin whose host equals AUTH_ORIGIN's host (a missing Origin is 403) and
   `Content-Type: application/json` (else 415); no CORS headers are ever sent.
-- Env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET, AUTH_ORIGIN; the store is UPSTASH_REDIS_REST_URL/_TOKEN,
+- Env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET, AUTH_ORIGIN (for now the current production
+  vercel.app URL, so preview deploys cannot sign in); the store is UPSTASH_REDIS_REST_URL/_TOKEN,
   else KV_REST_API_URL/KV_REST_API_TOKEN (a URL without a token is not configured; the read-only token and custom
   prefixes are unsupported).
 
@@ -353,10 +356,17 @@ seconds since 2026-01-01 when the current total was reached, so a descending ran
 atomic are Lua scripts (`cas-progress`, `claim-nick`, `set-listing`, `delete-account`) that only compare and write
 values computed in JS; first sign-in uses `SET sub NX` and the loser re-reads. Nicknames match
 `^[A-Za-z0-9][A-Za-z0-9_-]{2,19}$`, are unique on the lowercase key, with reserved names and a small blocked-word list
-(matched on a leet-folded form). The default nickname (`lib/account/nickname.mjs`) is tidied to `[a-z0-9-]`, becomes
-`player` if shorter than 3 or blocked, is cut to 16 characters, and on collision tries base, base-2 to base-99, then
-base-<4 hex>. A player is unlisted until they confirm once; the account modal opens after first sign-in with the
-default nickname filled in and two buttons, either of which sets `asked`; progress saves either way.
+(matched on a leet-folded form). The default nickname (`lib/account/nickname.mjs`) is a fun, deterministic name made from the first name token
+of the email local part (tidied to `[a-z0-9]`): the same email always gives the same nickname. A stable hash of the base
+picks among a small set of suffix rules (`-ster`; double the final consonant then `-er`; drop a final vowel then
+`-oton`; optionally `-inator` and `-zilla`). The owner's examples come out exactly: vlad gives vladster, bob gives
+bobber, kyle gives kyloton. A result that fails nickname validation or the blocked-word filter tries the next rule; on
+collision it tries the next rule, then base plus rule plus `-2` and up. A base shorter than 3 characters or blocked falls
+back to `player`. The player can override the nickname at any time. A new profile is listed by default
+(`listed=1`) and joins the board on its first progress write; the account modal has a "Show me on the leaderboard"
+toggle to hide. There is no confirm-once step. After first sign-in a notice says "You're on the leaderboard as <nick>.
+Change your nickname or hide yourself in Account."
+
 
 **Merge.** `mergeStored(storedRaw, incoming, registry)` in `lib/progress.mjs` is the one merge expression (unknown ids
 survive, best stars per level, earliest `at`, union of cards); `lib/storage.mjs` and the server both call it.
@@ -398,8 +408,9 @@ nickname field, a listing toggle, Sign out and Delete with a two-step confirm. T
 dismissible, shown at most once per page session and not when `signin-nudge` is hidden through `hideHelp`, with
 buttons Sign in, Not now and Don't ask again. `?signin=` is read once in `main.mjs`, shown as a notice, then stripped
 with `history.replaceState`. Privacy copy: "Optional, @dash0.com Google accounts only. We keep your Google account id,
-a nickname and your level stars and cards, nothing else. We never store or show your name or email. Your default
-nickname comes from your email; change it any time. Delete your account to remove everything we hold; this browser
+a nickname and your level stars and cards, nothing else. We never store or show your name or email. Signed-in players
+are listed on the leaderboard by default and can hide themselves in Account. Your default nickname is a fun name made
+from your email; change it any time. Delete your account to remove everything we hold; this browser
 keeps its own copy."
 
 **Local dev.** `tools/serve.mjs` forwards several Set-Cookie headers and passes a 302 Location through.
