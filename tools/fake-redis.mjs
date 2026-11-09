@@ -12,6 +12,7 @@ export function createFakeRedis({ token = 'fake-token', url = 'https://fake-redi
   const db = new Map(); // key -> string | Map (hash) | {z: Map} (sorted set)
   const known = new Set(); // shas loaded by EVAL, as on a real server
   const calls = [];
+  const ttl = new Map(); // key -> seconds, as set by EX or EXPIRE
   const state = { beforeScript: null, fail: null };
 
   const str = (k) => (typeof db.get(k) === 'string' ? db.get(k) : null);
@@ -42,6 +43,8 @@ export function createFakeRedis({ token = 'fake-token', url = 'https://fake-redi
     SET: ([k, v, ...opts]) => {
       if (opts.includes('NX') && db.has(k)) return null;
       db.set(k, String(v));
+      const ex = opts.indexOf('EX');
+      if (ex >= 0) ttl.set(k, Number(opts[ex + 1]));
       return 'OK';
     },
     DEL: (ks) => ks.filter((k) => db.delete(k)).length,
@@ -51,7 +54,11 @@ export function createFakeRedis({ token = 'fake-token', url = 'https://fake-redi
       db.set(k, String(n));
       return n;
     },
-    EXPIRE: ([k]) => (db.has(k) ? 1 : 0),
+    EXPIRE: ([k, s]) => {
+      if (!db.has(k)) return 0;
+      ttl.set(k, Number(s));
+      return 1;
+    },
     HGET: ([k, f]) => hash(k)?.get(f) ?? null,
     HGETALL: ([k]) => [...(hash(k)?.entries() ?? [])].flat(),
     HSET: ([k, ...kv]) => {
@@ -97,7 +104,10 @@ export function createFakeRedis({ token = 'fake-token', url = 'https://fake-redi
       const rev = hash(progress)?.get('rev') ?? '0';
       if (rev !== expected) return 'conflict';
       commands.HSET([progress, 'rev', String(Number(rev) + 1), 'json', json, 'total', total, 'reachedAt', reachedAt, 'score', score]);
-      if (hash(profile)?.get('listed') === '1') commands.ZADD([board, score, pid]);
+      if (hash(profile)?.get('listed') === '1') {
+        if (Number(total) >= 1) commands.ZADD([board, score, pid]);
+        else commands.ZREM([board, pid]);
+      }
       return 'ok';
     },
     'claim-nick': ([profile], [pid, nick, nickKey, prefix]) => {
@@ -114,7 +124,9 @@ export function createFakeRedis({ token = 'fake-token', url = 'https://fake-redi
       commands.HSET([profile, 'listed', listed]);
       if (listed === '1') {
         const score = hash(progress)?.get('score');
-        if (score !== undefined) commands.ZADD([board, score, pid]);
+        const total = hash(progress)?.get('total');
+        if (score !== undefined && total !== undefined && Number(total) >= 1) commands.ZADD([board, score, pid]);
+        else commands.ZREM([board, pid]);
       } else {
         commands.ZREM([board, pid]);
       }
@@ -191,6 +203,7 @@ export function createFakeRedis({ token = 'fake-token', url = 'https://fake-redi
     fetch,
     db,
     calls,
+    ttl,
     get beforeScript() {
       return state.beforeScript;
     },

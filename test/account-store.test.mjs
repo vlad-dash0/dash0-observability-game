@@ -293,3 +293,41 @@ test('env: UPSTASH alone, KV alone, a URL without a token, and UPSTASH wins', ()
   assert.deepEqual(redisConfigFromEnv({ ...kv, ...up }), { url: 'https://up.test', token: 'ut' });
   assert.equal(redisConfigFromEnv({}), null);
 });
+
+test('a listed player joins the board only from one star, and leaves it at zero', async () => {
+  const { store, fake } = setup();
+  const pid = await join(store, 'a', 'aaa@dash0.com');
+  await store.putProgress(pid, prog({ s1: 0 }));
+  assert.equal(fake.db.get(keys.progress(pid)).get('total'), '0');
+  assert.equal((await store.leaderboard()).size, 0); // total 0 is not on the board
+  await store.setListing(pid, false);
+  await store.setListing(pid, true);
+  assert.equal((await store.leaderboard()).size, 0); // listing does not add a zero either
+  await store.putProgress(pid, prog({ s1: 1 }));
+  assert.equal((await store.leaderboard()).size, 1);
+  fake.db.get(keys.progress(pid)).set('total', '0'); // the total can drop (a level became unscored)
+  await store.setListing(pid, true);
+  assert.equal((await store.leaderboard()).size, 0);
+  fake.db.get(keys.progress(pid)).set('total', '1');
+  await store.setListing(pid, true);
+  assert.equal((await store.leaderboard()).size, 1);
+  fake.db.get(keys.progress(pid)).set('rev', '0');
+  fake.db.get(keys.progress(pid)).set('json', JSON.stringify(prog({})));
+  fake.db.get(keys.progress(pid)).set('total', '1');
+  await store.putProgress(pid, prog({})); // recomputed total 0 removes the entry
+  assert.equal((await store.leaderboard()).size, 0);
+});
+
+test('the rate-limit window key is created with its TTL in the same pipeline, then incremented', async () => {
+  const { store, fake } = setup();
+  await store.rateLimit('p', 'progress', { max: 5, windowS: 600 });
+  const [first, second] = fake.calls.slice(-2);
+  assert.deepEqual(first.slice(0, 1).concat(first.slice(2)), ['SET', 0, 'EX', 600, 'NX']);
+  assert.equal(second[0], 'INCR');
+  const key = first[1];
+  assert.equal(fake.ttl.get(key), 600);
+  await store.rateLimit('p', 'progress', { max: 5, windowS: 600 });
+  assert.equal(fake.db.get(key), '2');
+  assert.equal(fake.ttl.get(key), 600);
+  assert.equal(fake.calls.some((c) => c[0] === 'EXPIRE'), false);
+});
