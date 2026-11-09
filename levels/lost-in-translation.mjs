@@ -72,7 +72,7 @@ const SPOT = {
     'Those three arrive as delta: the Counter and the Histogram are synchronous instruments the delta preference turns, and so is the Asynchronous Counter, ' +
     'the one that is easy to miss (the LowMemory value would have kept it cumulative). The UpDownCounters stay cumulative and the gauge has no temporality. ' +
     'Payments is a Counter too, but it did not change its preference. The OpenTelemetry mapping to Prometheus lets a delta sum be converted to cumulative, or not, and ' +
-    'the remote write exporter in the Collector contrib at v0.164.0 drops non-cumulative monotonic sums and histograms. Where the series have to be translated is a decision for 3.2.',
+    'the remote write exporter in the Collector contrib at v0.164.0 drops non-cumulative monotonic sums and histograms. How to convert the delta series for a cumulative-only backend, for example with a Collector processor, is not part of this level.',
 };
 
 export default {
@@ -100,7 +100,8 @@ export default {
       {
         intro:
           'Only <b>orders</b> and <b>checkout</b> changed the preference to delta. <b>payments</b> did not. A debug view lists seven series with the instrument that makes each, and ' +
-          'the backend stores cumulative totals only.',
+          'the backend stores cumulative totals only. The board uses SDK class names: ObservableCounter, ObservableUpDownCounter and ObservableGauge are the spec\'s Asynchronous Counter, Asynchronous UpDownCounter and Gauge. ' +
+          'With the preference at delta, Counter, ObservableCounter and Histogram export delta; UpDownCounter and ObservableUpDownCounter stay cumulative; a gauge has no temporality.',
         question: 'Spot the series that now arrive as delta.',
         qid: 'lit-q-spot',
         spot: SPOT,

@@ -645,6 +645,9 @@ test('9.5 step 2 every non-fault explains itself, naming its own reason, and the
   assert.match(spot95.whyNot['queue-depth'], /no aggregation temporality/);
   assert.match(spot95.whyNot['payments-declined'], /payments did not change its preference/);
   assert.match(plain(S95_STEP.intro), /orders.*checkout.*changed the preference to delta.*payments.*did not/);
+  // the decisive rule is restated on the board's own screen, in the board's names, and says what those names are
+  assert.match(plain(S95_STEP.intro), /Counter, ObservableCounter and Histogram export delta; UpDownCounter and ObservableUpDownCounter stay cumulative; a gauge has no temporality/);
+  assert.match(plain(S95_STEP.intro), /SDK class names.*Asynchronous Counter/);
 });
 
 test('9.5 sources: Spec lines on allowed hosts, a Docs line for the README, Facts and Invented notes, no em dash, no pricing, no Dash0 claim', () => {
