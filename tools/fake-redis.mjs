@@ -4,6 +4,7 @@
 // the Lua itself is only exercised against a real database. Test hooks:
 //   fake.beforeScript = (name, keys, args) => {}   runs right before a script executes, so a
 //                                                  test can inject a write between read and EVAL
+//   fake.beforeCommand = (args) => {}              runs before every command (not the commands inside a script)
 //   fake.fail = 'throw' | 'http500' | 'error' | null   what every request does instead
 //   fake.calls                                      every command received, in order
 import { SCRIPTS, scriptSha } from '../lib/account/redis.mjs';
@@ -13,7 +14,7 @@ export function createFakeRedis({ token = 'fake-token', url = 'https://fake-redi
   const known = new Set(); // shas loaded by EVAL, as on a real server
   const calls = [];
   const ttl = new Map(); // key -> seconds, as set by EX or EXPIRE
-  const state = { beforeScript: null, fail: null };
+  const state = { beforeScript: null, beforeCommand: null, fail: null };
 
   const str = (k) => (typeof db.get(k) === 'string' ? db.get(k) : null);
   const hash = (k, make) => {
@@ -105,18 +106,17 @@ export function createFakeRedis({ token = 'fake-token', url = 'https://fake-redi
       if (rev !== expected) return 'conflict';
       commands.HSET([progress, 'rev', String(Number(rev) + 1), 'json', json, 'total', total, 'reachedAt', reachedAt, 'score', score]);
       if (hash(profile)?.get('listed') === '1') {
-        if (Number(total) >= 1) commands.ZADD([board, score, pid]);
+        if ((Number(total) || 0) >= 1) commands.ZADD([board, score, pid]);
         else commands.ZREM([board, pid]);
       }
       return 'ok';
     },
-    'claim-nick': ([profile], [pid, nick, nickKey, prefix]) => {
+    'claim-nick': ([profile, next, old], [pid, nick, nickKey, expectedOld]) => {
       if (!db.has(profile)) return 'gone';
-      const next = prefix + nickKey;
+      if ((hash(profile)?.get('nickKey') ?? '') !== expectedOld) return 'conflict';
       if (commands.SET([next, pid, 'NX']) === null && str(next) !== pid) return 'taken';
-      const old = hash(profile)?.get('nickKey') ?? null;
       commands.HSET([profile, 'nick', nick, 'nickKey', nickKey]);
-      if (old !== null && old !== nickKey && str(prefix + old) === pid) db.delete(prefix + old);
+      if (old !== next && str(old) === pid) db.delete(old);
       return 'ok';
     },
     'set-listing': ([profile, progress, board], [listed, pid]) => {
@@ -125,18 +125,19 @@ export function createFakeRedis({ token = 'fake-token', url = 'https://fake-redi
       if (listed === '1') {
         const score = hash(progress)?.get('score');
         const total = hash(progress)?.get('total');
-        if (score !== undefined && total !== undefined && Number(total) >= 1) commands.ZADD([board, score, pid]);
+        if (score !== undefined && (Number(total) || 0) >= 1) commands.ZADD([board, score, pid]);
         else commands.ZREM([board, pid]);
       } else {
         commands.ZREM([board, pid]);
       }
       return 'ok';
     },
-    'delete-account': ([profile, progress, board], [pid, prefix]) => {
-      const nickKey = hash(profile)?.get('nickKey');
-      const sub = hash(profile)?.get('sub');
-      if (nickKey && str(`${prefix}nick:${nickKey}`) === pid) db.delete(`${prefix}nick:${nickKey}`);
-      if (sub && str(`${prefix}sub:${sub}`) === pid) db.delete(`${prefix}sub:${sub}`);
+    'delete-account': ([profile, progress, board, subKey, nickKeyKey], [pid, expectedSub, expectedNickKey]) => {
+      if ((hash(profile)?.get('sub') ?? '') !== expectedSub || (hash(profile)?.get('nickKey') ?? '') !== expectedNickKey) {
+        return 'conflict';
+      }
+      if (str(subKey) === pid) db.delete(subKey);
+      if (str(nickKeyKey) === pid) db.delete(nickKeyKey);
       commands.ZREM([board, pid]);
       db.delete(profile);
       db.delete(progress);
@@ -158,6 +159,7 @@ export function createFakeRedis({ token = 'fake-token', url = 'https://fake-redi
     const [name, ...rest] = args;
     const cmd = String(name).toUpperCase();
     calls.push(args);
+    state.beforeCommand?.(args);
     if (cmd === 'EVALSHA') {
       const script = byShaName.get(rest[0]);
       if (!script || !known.has(rest[0])) throw new Error('NOSCRIPT No matching script. Please use EVAL.');
@@ -193,7 +195,10 @@ export function createFakeRedis({ token = 'fake-token', url = 'https://fake-redi
     const body = JSON.parse(init.body);
     const path = target.slice(url.length);
     if (path === '/pipeline') return json(body.map(answer));
-    if (path === '' || path === '/') return json(answer(body));
+    if (path === '' || path === '/') {
+      const out = answer(body);
+      return json(out, 'error' in out ? 400 : 200); // as Upstash: a failed command is HTTP 400
+    }
     return json({ error: 'not found' }, 404);
   }
 
@@ -209,6 +214,12 @@ export function createFakeRedis({ token = 'fake-token', url = 'https://fake-redi
     },
     set beforeScript(fn) {
       state.beforeScript = fn;
+    },
+    get beforeCommand() {
+      return state.beforeCommand;
+    },
+    set beforeCommand(fn) {
+      state.beforeCommand = fn;
     },
     get fail() {
       return state.fail;
