@@ -2,7 +2,7 @@
 // headers vercel.json declares (so the CSP bites locally) and refuses whatever
 // .vercelignore keeps out of the deployment (node_modules/ included), plus dotfiles.
 // It also runs `api/<name>.mjs` at `/api/<name>` (GET and POST) through a Node-to-Web Request adapter, as
-// Vercel does; `GUIDE_STUB=1` swaps the guide's model call for a canned reply (local dev only, no key needed).
+// Vercel does (every Set-Cookie and any 3xx with its Location pass through unchanged); `GUIDE_STUB=1` swaps the guide's model call for a canned reply (local dev only, no key needed).
 // Usage: npm run dev   (PORT=8080 npm run dev to change the port)
 import { createServer } from 'node:http';
 import { readFile, realpath, stat } from 'node:fs/promises';
@@ -191,7 +191,10 @@ export function startServer({ root = REPO, port = 3000, host = '127.0.0.1', log 
         const handler = (await handlersFor(api[1]))[req.method];
         if (typeof handler !== 'function') return send(404, 'Not Found\n', headers);
         const out = await handler(toWebRequest(req, body));
+        // Object.fromEntries would keep only the last Set-Cookie; Node takes an array for repeated headers.
         const outHeaders = { ...headers, ...Object.fromEntries(out.headers) };
+        const cookies = out.headers.getSetCookie();
+        if (cookies.length) outHeaders['set-cookie'] = cookies;
         res.writeHead(out.status, outHeaders);
         return res.end(Buffer.from(await out.arrayBuffer()));
       } catch (err) {
