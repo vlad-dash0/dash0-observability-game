@@ -24,7 +24,7 @@ const run = (q) => referenceResult(query.dataset, query.at, q);
 
 // ---- the level -----------------------------------------------------------------------------
 
-test('9.6 fields: last level of act-9, scored with no par time, a choice then a query, no helps, lights checkout, no card', () => {
+test('9.6 fields: in act-9 right before 9.7 and the boss, scored with no par time, a choice then a query, no helps, lights checkout, no card', () => {
   assert.deepEqual(
     { no: level.no, name: level.name, sub: level.sub, icon: level.icon, rewardTitle: level.rewardTitle, kind: level.kind, actId: level.actId, scored: level.scored, parMs: level.scoring.parMs, prefix: level.play.prefix },
     { no: '9.6', name: 'The alert that stayed green', sub: 'Does that answer hold?', icon: '\u{1F7E2}', rewardTitle: 'Green doubter', kind: 'level', actId: 'act-9', scored: true, parMs: null, prefix: 'asg' },
@@ -35,7 +35,7 @@ test('9.6 fields: last level of act-9, scored with no par time, a choice then a 
   assert.deepEqual([...level.cards], []);
   assert.deepEqual([...level.hintless], ['query']);
   assert.equal(Object.values(LIVE.levels).filter((l) => l.rewardTitle === 'Green doubter').length, 1, 'the reward title is unique');
-  assert.equal(LIVE.acts.find((a) => a.id === 'act-9').levelIds.at(-1), ID);
+  assert.deepEqual(LIVE.acts.find((a) => a.id === 'act-9').levelIds.slice(-2), [ID, 'two-vendors-one-weekend']);
 });
 
 test('9.6 globe: Fiji, lit by this level, named, in Oceania', () => {

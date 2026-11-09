@@ -72,6 +72,7 @@ const EXPECTED_ORDER = [
   'the-trace-that-starts-in-the-middle',
   'lost-in-translation',
   'the-alert-that-stayed-green',
+  'two-vendors-one-weekend',
   'its-us',
 ];
 
@@ -161,7 +162,7 @@ test('acts in unlock order: Act 0 "Orientation" (M1-DESIGN §6), Act 1, Act 2 "T
       no: 9,
       name: 'Live Demo',
       sub: 'Does that answer hold?',
-      levelIds: ['filter-or-sampler', 'the-34-percent-error-rate', 'connect-to-dash0', 'the-trace-that-starts-in-the-middle', 'lost-in-translation', 'the-alert-that-stayed-green'],
+      levelIds: ['filter-or-sampler', 'the-34-percent-error-rate', 'connect-to-dash0', 'the-trace-that-starts-in-the-middle', 'lost-in-translation', 'the-alert-that-stayed-green', 'two-vendors-one-weekend'],
       bossId: 'its-us',
     },
   ]);

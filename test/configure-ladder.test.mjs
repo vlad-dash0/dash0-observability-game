@@ -75,7 +75,7 @@ const textOf = (html) => html.replace(/<[^>]*>/g, ' ').replace(/&#39;/g, "'");
 const has = (text, word) => new RegExp(`(^|[^\\w])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\w])`, 'i').test(text);
 
 test('the registry has configure steps to check', () => {
-  assert.equal(STEPS.length, 6, STEPS.map((s) => s.level).join());
+  assert.equal(STEPS.length, 7, STEPS.map((s) => s.level).join());
 });
 
 test('every configure step declares helps.hints and has an authored hint', () => {
@@ -136,4 +136,38 @@ test('agent-vs-gateway: traces listing load_balancing and the gateway Service is
   assert.notEqual(both, spec.reference);
   const r = runConfigure(spec, newConfigureState(), both);
   assert.deepEqual([r.outcome, r.reason, r.unmet], ['wrong', 'forbids', ['traces']]);
+});
+
+// ---- tier 2 and a component defined in the wrong top-level section (review of dfaadc0) ----------------------------
+
+/** The reference with the definition of `id` moved to `connectors` (JSON is YAML), the listings left alone. */
+function definedAsConnector(spec, id) {
+  const doc = loadDoc(spec.reference);
+  const section = ['receivers', 'processors', 'exporters'].find((s) => doc[s] && Object.hasOwn(doc[s], id));
+  assert.ok(section, `${id} is defined in the reference`);
+  doc.connectors = { ...(doc.connectors ?? {}), [id]: doc[section][id] };
+  delete doc[section][id];
+  return JSON.stringify(doc);
+}
+
+for (const [level, pipeline, id] of [['two-vendors-one-weekend', 'traces', 'otlp_grpc/dash0'], ['otlp-endpoints', 'traces', 'otlp_grpc/dash0'], ['collecting-logs', 'logs', 'filelog/shipping']]) {
+  test(`${level}: ${id} listed in its stage but defined under connectors: wrong, and tier 2 names the section, not a stage and not the id`, () => {
+    const spec = STEPS.find((s) => s.level === level).spec;
+    assert.ok(Object.values(spec.uses).flat().includes(id), `${id} is a uses id of ${level}`);
+    const text = definedAsConnector(spec, id);
+    const run = runConfigure(spec, newConfigureState(), text);
+    assert.deepEqual([run.outcome, run.reason], ['wrong', 'uses']);
+    const hint = textOf(hintFor(spec, newConfigureState(), text, 2, { e: escapeHtml }).html);
+    assert.match(hint, /listed in the right place but defined in the wrong top-level section/);
+    assert.ok(!/belongs under/.test(hint), hint);
+    assert.ok(!hint.includes(id), hint);
+  });
+}
+
+test('two-vendors-one-weekend: Dash0 not listed in traces still gets the stage hint, not the section one', () => {
+  const spec = specOf('two-vendors-one-weekend');
+  const text = spec.reference.replace('exporters: [otlp_grpc/oldvendor, otlp_grpc/dash0]', 'exporters: [otlp_grpc/oldvendor]');
+  const hint = textOf(hintFor(spec, newConfigureState(), text, 2, { e: escapeHtml }).html);
+  assert.match(hint, /belongs under exporters/);
+  assert.ok(!/wrong top-level section/.test(hint), hint);
 });
