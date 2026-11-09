@@ -100,7 +100,7 @@ export default {
       {
         intro:
           'Only <b>orders</b> and <b>checkout</b> changed the preference to delta. <b>payments</b> did not. A debug view lists seven series with the instrument that makes each, and ' +
-          'the backend stores cumulative totals only. The board uses SDK class names: ObservableCounter, ObservableUpDownCounter and ObservableGauge are the spec\'s Asynchronous Counter, Asynchronous UpDownCounter and Gauge. ' +
+          'the backend stores cumulative totals only. The board uses SDK class names: ObservableCounter, ObservableUpDownCounter and ObservableGauge are the spec\'s Asynchronous Counter, Asynchronous UpDownCounter and Asynchronous Gauge. ' +
           'With the preference at delta, Counter, ObservableCounter and Histogram export delta; UpDownCounter and ObservableUpDownCounter stay cumulative; a gauge has no temporality.',
         question: 'Spot the series that now arrive as delta.',
         qid: 'lit-q-spot',
