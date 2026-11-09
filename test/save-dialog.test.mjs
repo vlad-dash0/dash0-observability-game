@@ -69,7 +69,7 @@ test('index.html: a kit entry on the hub, hidden in debug, and a dialog outside 
   assert.equal(open.getAttribute('type'), 'button');
   assert.equal(open.getAttribute('@click'), 'openSave()');
   assert.equal(open.closest('section').getAttribute('x-show'), '!debug');
-  const dlg = shell.querySelector('.save-dialog');
+  const dlg = shell.querySelector('#save-modal.ui-modal');
   assert.equal(dlg.getAttribute('role'), 'dialog');
   assert.equal(dlg.getAttribute('aria-modal'), 'true');
   assert.equal(dlg.getAttribute('aria-labelledby'), 'save-title');

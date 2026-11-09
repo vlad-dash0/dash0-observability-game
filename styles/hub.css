@@ -179,21 +179,17 @@
 /* As wide as the widest step; each step caps itself (kit .ui-step, narrow or wide by its
    type, #158), so the overlay never needs to know what it holds. */
 .lesson-top {
-  flex: 0 0 auto; z-index: 5; display: flex; align-items: center; gap: 12px;
-  padding: 16px 18px; background: var(--color-surface); border-bottom: 1px solid var(--color-border);
+  flex: 0 0 auto; z-index: 5; display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border);
+  background: radial-gradient(90% 220% at 0% 0%, var(--color-lesson-glow), transparent 60%), var(--color-surface);
 }
-.lesson-top h2 { font-weight: 700; font-size: 17px; flex: 1 1 auto; min-width: 0; }
-/* The How to play card: between the header and the level, so a step never wipes it. It keeps
-   to the step's width and scrolls inside itself, so the level stays visible at 320px. */
-.howto {
-  flex: 0 0 auto; max-height: 35vh; overflow-y: auto;
-  width: 100%; max-width: var(--layout-narrow); margin: 0 auto;
-  padding: var(--space-3) 20px 0;
+.lesson-heading { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+.lesson-top h2 { font-weight: 700; font-size: 18px; line-height: 1.25; overflow-wrap: anywhere; }
+@media (max-width: 520px) {
+  .lesson-top { padding: var(--space-3) var(--space-4); gap: var(--space-2); }
+  .lesson-top h2 { font-size: 16px; }
+  #ov-howto-open { padding-inline: var(--space-3); }
 }
-.howto h3:focus { outline: none; }
-.howto h4 { font-size: var(--text-base); font-weight: var(--weight-semibold); }
-.howto p { color: var(--color-text-muted); line-height: 1.5; }
-.howto-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 /* The x-ignore wrapper: takes the rest of the overlay and stacks body over actions. */
 .level-host { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .lesson-scroll {
@@ -228,44 +224,18 @@
   border-radius: var(--radius-sm); padding: 10px 12px;
 }
 
-/* ---------- About dialog: hub chrome that mirrors the reward card ---------- */
-.about {
-  position: fixed; inset: 0; z-index: 80; display: none;
-  background: color-mix(in srgb, var(--color-bg) 80%, transparent);
-  align-items: center; justify-content: center; padding: 16px;
+/* ---------- About dialog list and the Your progress entry (#18); the dialogs are kit modals ---------- */
+.about-acts { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
+.about-acts li {
+  padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); background: color-mix(in srgb, var(--color-bg) 35%, var(--color-surface));
 }
-.about.open { display: flex; }
-.about-card {
-  background: var(--color-surface); border: 1px solid var(--color-accent);
-  border-radius: 26px; padding: 26px 22px; max-width: 520px; width: 100%;
-  max-height: 100%; overflow: auto;
-}
-.about-card h2 { font-weight: 800; font-size: 24px; margin-bottom: 8px; }
-.about-card h2:focus { outline: none; }
-.about-card p { font-size: 14.5px; color: var(--color-text-muted); line-height: 1.5; margin-bottom: 8px; }
-.about-acts { list-style: none; margin: 12px 0 16px; padding: 0; }
-.about-acts li { padding: 10px 0; border-top: 1px solid var(--color-border); }
 .about-acts h3 { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
-.about-acts p { margin-bottom: 4px; }
+.about-acts p { color: var(--color-text-muted); margin-bottom: 4px; }
 .about-acts .act-badges { margin-left: 0; margin-right: 0; }
 .about-sub { font-weight: 600; }
-
-/* ---------- Your progress entry and the Save code dialog (#18): same shell as About ---------- */
 .save-entry { padding: 0 16px 32px; }
 .save-entry-text { margin: 0 6px 10px; font-size: 13px; color: var(--color-text-muted); }
-.save-dialog {
-  position: fixed; inset: 0; z-index: 80; display: none;
-  background: color-mix(in srgb, var(--color-bg) 80%, transparent);
-  align-items: center; justify-content: center; padding: 16px;
-}
-.save-dialog.open { display: flex; }
-.save-card {
-  background: var(--color-surface); border: 1px solid var(--color-accent);
-  border-radius: 26px; padding: 26px 22px; max-width: 520px; width: 100%;
-  max-height: 100%; overflow: auto;
-}
-.save-card h2 { font-weight: 800; font-size: 24px; margin-bottom: 12px; }
-.save-card h2:focus { outline: none; }
 
 /* ---------- Confetti: colour by class, motion by the Web Animations API ---------- */
 .confetti {

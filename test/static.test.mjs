@@ -476,14 +476,3 @@ test('no test passes a DOM node or a level ctx to an equality assertion', () => 
   }
 });
 
-test('How to play card flows between the overlay header and the level (never over the board)', () => {
-  const { document } = parseHTML(read('index.html'));
-  const kids = [...document.querySelector('.overlay').children].map((c) => c.getAttribute('class'));
-  const howto = kids.indexOf('howto');
-  assert.ok(howto > kids.indexOf('lesson-top'), 'card sits after the header');
-  assert.ok(howto < kids.indexOf('level-host'), 'card sits before the level');
-  const css = read('styles/hub.css');
-  const rule = css.slice(css.indexOf('.howto {'), css.indexOf('}', css.indexOf('.howto {')));
-  assert.doesNotMatch(rule, /position:\s*(fixed|absolute|sticky)/, 'the card stays in the flow');
-  assert.match(rule, /max-height:\s*\d+vh/, 'the card is capped so the level keeps room at 320px');
-});
