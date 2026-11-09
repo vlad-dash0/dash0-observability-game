@@ -344,7 +344,7 @@ top-level navigation from `<a href="/api/auth-start">`, sign-out is a same-origi
   signed apart from the session cookie: its own version tag (`a1`, so a session value never verifies as an auth value
   or the reverse) and a key derived from SESSION_SECRET with HKDF (SHA-256, empty salt, info `oc-auth-cookie-v1`), never
   the raw secret shared with sessions. Both directions are tested.
-- CSRF: every POST needs an Origin whose host equals AUTH_ORIGIN's host (a missing Origin is 403) and
+- CSRF: every POST needs an Origin that equals AUTH_ORIGIN (scheme, host and port; a missing Origin is 403) and
   `Content-Type: application/json` (else 415); no CORS headers are ever sent.
 - Env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET, AUTH_ORIGIN (for now the current production
   vercel.app URL, so preview deploys cannot sign in); the store is UPSTASH_REDIS_REST_URL/_TOKEN,

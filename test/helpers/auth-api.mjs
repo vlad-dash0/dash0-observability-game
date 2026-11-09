@@ -54,7 +54,7 @@ export function rig({ env = ENV, registryOver = registry } = {}) {
   let n = 0;
   const random = (len) => new Uint8Array(len).fill(++n % 250);
   const redis = createRedis({ url: fake.url, token: fake.token, fetch: fake.fetch });
-  const google = { calls: [], claims: {}, token: null, tokenStatus: 200, tokenThrows: false, jwksThrows: false, nonce: null, bodies: [] };
+  const google = { calls: [], claims: {}, token: null, tokenStatus: 200, tokenThrows: false, jwksThrows: false, tokenHangs: false, nonce: null, bodies: [] };
   async function fetch(url, init = {}) {
     google.calls.push(String(url));
     if (String(url) === JWKS_URL) {
@@ -64,13 +64,20 @@ export function rig({ env = ENV, registryOver = registry } = {}) {
     if (String(url) === TOKEN_URL) {
       google.bodies.push(String(init.body));
       if (google.tokenThrows) throw new Error('network');
+      if (google.tokenHangs) {
+        // A stalled Google: it answers only when the request is aborted. Without a signal it would answer after 300 ms (a success).
+        await new Promise((resolve, reject) => {
+          if (init.signal) init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'TimeoutError')));
+          else setTimeout(resolve, 300);
+        });
+      }
       if (google.tokenStatus !== 200) return new Response('{}', { status: google.tokenStatus });
       const nonce = google.nonce ?? 'n';
       return Response.json({ id_token: google.token ?? (await mint(google.claims, nonce)) });
     }
     throw new Error(`unexpected fetch ${url}`);
   }
-  const deps = { env, fetch, redis, now: () => clock.t, random, registry: registryOver, log: (l) => logs.push(l) };
+  const deps = { env, fetch, redis, now: () => clock.t, random, registry: registryOver, log: (l) => logs.push(l), tokenTimeoutMs: 20 };
   const store = createStore({ redis, registry: registryOver, now: deps.now, random });
   return {
     fake, clock, logs, google, store, deps,

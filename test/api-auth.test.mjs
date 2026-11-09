@@ -243,9 +243,43 @@ test('callback: the token endpoint refusing is failed; unreachable, timing out o
     return (await signInFlow(r)).res.headers.get('location');
   };
   assert.equal(await run((g) => { g.tokenStatus = 400; }), '/?signin=failed');
+  assert.equal(await run((g) => { g.tokenStatus = 500; }), '/?signin=unavailable', 'exactly 500');
+  assert.equal(await run((g) => { g.tokenStatus = 499; }), '/?signin=failed');
   assert.equal(await run((g) => { g.tokenStatus = 503; }), '/?signin=unavailable');
   assert.equal(await run((g) => { g.tokenThrows = true; }), '/?signin=unavailable');
   assert.equal(await run((g) => { g.token = 'not-a-jwt'; }), '/?signin=failed');
+});
+
+test('callback: a token request that stalls is aborted at the timeout and is unavailable', async () => {
+  const r = rig();
+  r.google.tokenHangs = true;
+  const started = Date.now();
+  const { res } = await signInFlow(r);
+  assert.equal(res.headers.get('location'), '/?signin=unavailable');
+  assert.ok(Date.now() - started < 2000, 'it did not wait for Google');
+  assert.equal(setCookie(res, SESSION), null);
+});
+
+test('callback: the unconfigured, foreign-host and 405 exits clear the auth cookie too', async () => {
+  const off = createAuthCallback({ env: {}, now: () => NOW, log: () => {} });
+  const r = rig();
+  const exits = [
+    await off.GET(get(`${ORIGIN}/api/auth-callback?code=c&state=s`)),
+    await r.callback.GET(get('https://preview.vercel.app/api/auth-callback?code=c&state=s')),
+    await r.callback.GET(new Request(`${ORIGIN}/api/auth-callback`, { method: 'POST' })),
+  ];
+  for (const res of exits) assert.ok(setCookie(res, AUTH).endsWith('Max-Age=0'), String(res.status));
+});
+
+test('callback: the stub code is "stub" only; another code with the stub env is failed', async () => {
+  const r = rig({ env: STUB_ENV });
+  const startRes = await r.start.GET(get(`${LOCAL}/api/auth-start`));
+  const state = new URL(startRes.headers.get('location')).searchParams.get('state');
+  const cookie = `${AUTH}=${cookieValue(startRes, AUTH)}`;
+  const res = await r.callback.GET(get(`${LOCAL}/api/auth-callback?code=other&state=${state}`, { cookie }));
+  assert.equal(res.headers.get('location'), '/?signin=failed');
+  assert.equal(setCookie(res, SESSION), null);
+  assert.equal(r.fake.keys().length, 0);
 });
 
 test('callback: an ID token the verifier refuses is failed (wrong nonce, wrong audience, unverified email); no keys is unavailable', async () => {
@@ -356,9 +390,14 @@ test('the dev server under AUTH_STUB signs in end to end over HTTP, and refuses 
   });
   const jar = (res) => (res.headers['set-cookie'] ?? []).map((c) => c.split(';')[0]).filter((c) => !c.endsWith('=')).join('; ');
   const on = startServer({ port: 0, log: () => {}, authStub: true });
-  const off = startServer({ port: 0, log: () => {}, authStub: false });
-  await Promise.all([once(on, 'listening'), once(off, 'listening')]);
-  const prior = process.env.AUTH_ORIGIN;
+  const off = startServer({ port: 0, log: () => {}, authStub: false, env: {} }); // the real functions over an empty env
+  let customPort = 0;
+  const custom = startServer({ // the real functions over a chosen env: only an honoured `env` option can make this configured
+    port: 0, log: () => {}, authStub: false,
+    env: { ...ENV, KV_REST_API_URL: 'https://kv.test', KV_REST_API_TOKEN: 't', get AUTH_ORIGIN() { return `http://localhost:${customPort}`; } },
+  });
+  await Promise.all([once(on, 'listening'), once(off, 'listening'), once(custom, 'listening')]);
+  customPort = custom.address().port;
   try {
     const port = on.address().port;
     assert.deepEqual(JSON.parse((await call(port, '/api/account')).body), { v: 1, configured: true, signedIn: false });
@@ -373,13 +412,13 @@ test('the dev server under AUTH_STUB signs in end to end over HTTP, and refuses 
     assert.equal(me.signedIn, true);
     assert.match(me.nick, /^[A-Za-z0-9][\w-]{2,19}$/);
     // nothing is configured without the stub
-    delete process.env.AUTH_ORIGIN;
     const dead = await call(off.address().port, '/api/account');
     assert.deepEqual(JSON.parse(dead.body), { v: 1, configured: false });
     assert.equal((await call(off.address().port, '/api/auth-start')).headers.location, '/?signin=unavailable');
+    assert.deepEqual(JSON.parse((await call(customPort, '/api/account')).body), { v: 1, configured: true, signedIn: false });
   } finally {
-    if (prior !== undefined) process.env.AUTH_ORIGIN = prior;
     on.close();
     off.close();
+    custom.close();
   }
 });

@@ -71,8 +71,10 @@ export function createAccount({
     if (request.method !== 'POST') return done(405, { error: 'method-not-allowed' }, 'method', { allow: 'POST' });
     const cfg = auth.config;
     if (cfg === null) return done(503, { error: 'not-configured' }, 'not-configured');
-    if (!originMatches(request, cfg.host)) return done(403, { error: 'forbidden' }, 'forbidden');
+    if (!originMatches(request, cfg.origin)) return done(403, { error: 'forbidden' }, 'forbidden');
     if (!isJson(request)) return done(415, { error: 'unsupported-media-type' }, 'media-type');
+    const declared = Number(request.headers.get('content-length'));
+    if (declared > MAX_BODY_BYTES) return done(413, { error: 'too-large' }, 'too-large');
     const text = await request.text();
     if (new TextEncoder().encode(text).length > MAX_BODY_BYTES) return done(413, { error: 'too-large' }, 'too-large');
     const body = parse(text);

@@ -145,7 +145,7 @@ async function resolveFile(root, ignored, decoded) {
   return file;
 }
 
-export function startServer({ root = REPO, port = 3000, host = '127.0.0.1', log = console.log, stub = process.env.GUIDE_STUB === '1', authStub = process.env.AUTH_STUB === '1' } = {}) {
+export function startServer({ root = REPO, port = 3000, host = '127.0.0.1', log = console.log, stub = process.env.GUIDE_STUB === '1', authStub = process.env.AUTH_STUB === '1', env = null } = {}) {
   const realRoot = realpathSync(root);
   const config = JSON.parse(readFileSync(join(realRoot, 'vercel.json'), 'utf8'));
   config.headers?.forEach((rule) => sourceRegExp(rule.source)); // fail at startup
@@ -176,6 +176,8 @@ export function startServer({ root = REPO, port = 3000, host = '127.0.0.1', log 
           const redis = createRedis({ url: fakeRedis.url, token: fakeRedis.token, fetch: fakeRedis.fetch });
           return mod[AUTH_FACTORIES[name]]({ env: authEnv, redis });
         }
+        // A test passes `env` to run the real auth functions over a chosen environment instead of process.env.
+        if (env !== null && Object.hasOwn(AUTH_FACTORIES, name)) return mod[AUTH_FACTORIES[name]]({ env });
         return mod;
       })());
     }

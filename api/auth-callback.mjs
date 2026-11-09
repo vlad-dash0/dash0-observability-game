@@ -27,6 +27,7 @@ export function createAuthCallback({
   random = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n)),
   registry = null,
   log = (line) => console.log(JSON.stringify(line)),
+  tokenTimeoutMs = TOKEN_TIMEOUT_MS,
 } = {}) {
   const auth = createAuthContext({ env, redis, now, random, registry });
   const jwks = createJwksCache({ fetch, now });
@@ -42,7 +43,7 @@ export function createAuthCallback({
           code, client_id: cfg.clientId, client_secret: cfg.clientSecret,
           redirect_uri: `${cfg.origin}${CALLBACK_PATH}`, grant_type: 'authorization_code', code_verifier: verifier,
         }),
-        signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
+        signal: AbortSignal.timeout(tokenTimeoutMs),
       });
     } catch {
       return { ok: false, outcome: 'unavailable' };
@@ -64,10 +65,12 @@ export function createAuthCallback({
     };
     const stop = (outcome, signin) => done(outcome, redirect(to(signin), [clearAuthCookie()]));
     try {
-      if (request.method !== 'GET') return done('method', reply(405, { error: 'method-not-allowed' }, { allow: 'GET' }));
+      if (request.method !== 'GET') {
+        return done('method', reply(405, { error: 'method-not-allowed' }, { allow: 'GET', 'set-cookie': [clearAuthCookie()] }));
+      }
       const cfg = auth.config;
-      if (cfg === null) return done('unconfigured', redirect(to('unavailable')));
-      if (requestHost(request) !== cfg.host) return done('host', redirect(to('unavailable')));
+      if (cfg === null) return done('unconfigured', redirect(to('unavailable'), [clearAuthCookie()]));
+      if (requestHost(request) !== cfg.host) return done('host', redirect(to('unavailable'), [clearAuthCookie()]));
 
       const params = new URL(request.url).searchParams;
       const saved = await verifyAuth(readCookie(request.headers.get('cookie'), AUTH_COOKIE), cfg.secret, now());
