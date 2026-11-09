@@ -20,7 +20,7 @@ const JS_YAML = 'js-yaml-5.5.0.mjs';
 // version is in the directory.
 const THREE = ['three-0.180.0/three.module.min.js', 'three-0.180.0/three.core.min.js'];
 
-// docs/FOUNDATION.md §7, verbatim while INGRESS_HOSTS is empty. connect-src is 'self' plus one
+// docs/FOUNDATION.md §7, the base policy, with connect-src 'self' only. The shipped connect-src is 'self' plus one
 // https origin per INGRESS_HOSTS entry (lib/dash0/ingress.mjs is the one source of truth,
 // docs/DASH0-LAB.md), so the validator's allowlist and vercel.json cannot drift.
 const M0_CSP =

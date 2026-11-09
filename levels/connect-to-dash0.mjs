@@ -1,7 +1,7 @@
 // Level 9.3: Connect the game to Dash0. The player works out the two things a sender needs, the
 // endpoint of an organization (the one a browser can use) and an auth token that may only ingest, enters
 // them in a connect form, and sends one test span. The game connects to the player's own Dash0
-// (live, not open until INGRESS_HOSTS is filled) or to a simulated one (practice, scored the same:
+// (live, to the INGRESS_HOSTS of lib/dash0/ingress.mjs) or to a simulated one (practice, scored the same:
 // a wrong permission, a bad form and a rejected token each cost one mistake, once per distinct cause).
 // The token is typed into a secret field, handed to ctx.telemetry.connect and cleared from the
 // DOM in the same click; it is never kept, shown or logged by this file (docs/DASH0-LAB.md).
@@ -64,7 +64,7 @@ const UNREACHABLE_FALLBACK = 'The game is not connected, so the test span was no
 function connectProblem(e, { field: which, reason }) {
   if (which === 'mode') {
     return reason === 'unavailable'
-      ? 'Live mode is not open yet. Use practice: it works the same way.'
+      ? 'Your own Dash0 is not available in this browser. Use practice: it works the same way.'
       : 'That mode is not known.';
   }
   const why = REASONS[reason] ?? 'That could not be checked.';
@@ -156,7 +156,7 @@ export default {
               (live
                 ? '<p>Your own Dash0: the game sends one test span, and a level-complete span for each level you finish ' +
                   'until you reload the page, to the endpoint you enter. Nothing goes to the game\'s servers.</p>'
-                : '<p id="ctd-live-why">Your own Dash0 is not open yet. Practice works the same way.</p>'),
+                : '<p id="ctd-live-why">Your own Dash0 is not available in this browser. Practice works the same way.</p>'),
           ),
         ),
         bar(
