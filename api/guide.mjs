@@ -84,8 +84,9 @@ export function createGuide({
 
       const answer = await askModel(systemPrompt(stepContext(level, found)), userMessage(question));
       if (answer === null) return done(502, { error: 'upstream' }, 'upstream');
-      if (withholds(answer, tokens)) return done(200, { ok: false, error: 'withheld' }, 'withheld');
-      return done(200, { ok: true, hint: answer.slice(0, MAX_REPLY) }, 'answered');
+      const sent = answer.slice(0, MAX_REPLY); // cut first: the filter must see exactly what goes out, a cut can end on an answer's digits
+      if (withholds(sent, tokens)) return done(200, { ok: false, error: 'withheld' }, 'withheld');
+      return done(200, { ok: true, hint: sent }, 'answered');
     } catch {
       return done(500, { error: 'internal' }, 'error'); // never the error: it could carry the key or the text
     }

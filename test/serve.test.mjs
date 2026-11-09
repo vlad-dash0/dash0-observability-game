@@ -262,6 +262,14 @@ test('GUIDE_STUB: the guide answers with a canned reply, no key and no network',
   }
 });
 
+// A static import or re-export with a relative path, on one line or several (`import {\n a,\n b\n} from './x.mjs'`).
+const IMPORT = /^\s*(?:import|export)\b[^'"]*?from\s*['"](\.[^'"]+)['"]|^\s*import\s*['"](\.[^'"]+)['"]/gm;
+
+test('the import walk reads multi-line imports', () => {
+  const found = [...`import {\n  a,\n  b,\n} from './multi.mjs';\nimport './side.mjs';\nexport { c } from './re.mjs';`.matchAll(IMPORT)].map((m) => m[1] ?? m[2]);
+  assert.deepEqual(found, ['./multi.mjs', './side.mjs', './re.mjs']);
+});
+
 test('the real .vercelignore keeps api/ and everything the guide imports in the deployment', () => {
   const ignored = ignoreMatcher(readFileSync(join(ROOT, '.vercelignore'), 'utf8'));
   assert.ok(!ignored('api/guide.mjs'), 'api/ deploys');
@@ -272,7 +280,7 @@ test('the real .vercelignore keeps api/ and everything the guide imports in the 
     seen.add(rel);
     assert.ok(!ignored(rel), `${rel} is imported by the guide but .vercelignore keeps it out`);
     const src = readFileSync(join(ROOT, rel), 'utf8');
-    for (const [, a, b] of src.matchAll(/^\s*(?:import|export)\b[^'"\n]*?from\s*['"](\.[^'"]+)['"]|^\s*import\s*['"](\.[^'"]+)['"]/gm)) {
+    for (const [, a, b] of src.matchAll(IMPORT)) {
       walk(join(dirname(rel), a ?? b));
     }
   };

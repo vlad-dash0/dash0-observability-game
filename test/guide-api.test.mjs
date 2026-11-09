@@ -242,3 +242,42 @@ test('no response and no log line carries the key, the question or the address',
   for (const secret of [KEY, QUESTION, IP]) assert.ok(!seen.includes(secret), `leaked ${secret.slice(0, 8)}`);
   for (const line of logs) assert.deepEqual(Object.keys(line), ['msg', 'levelId', 'stepId', 'outcome', 'status', 'ms']);
 });
+
+test('the filter sees the reply as cut: a number cut short at 600 characters is still the answer', async () => {
+  // cardinality / cdn-combos has the token 630; "6309" is not it, but the cut after "630" is.
+  const reply = `${'a '.repeat(298)} 6309 more words here.`;
+  assert.equal(reply.indexOf('6309') + 3, 600, 'the cut falls after 630');
+  const { guide } = setup({ fetch: fakeFetch(textReply(reply)) });
+  const res = await read(await guide.POST(post(body({ levelId: 'cardinality', stepId: 'cdn-combos' }))));
+  assert.deepEqual(res.json, { ok: false, error: 'withheld' });
+  const tail = setup({ fetch: fakeFetch(textReply(`${'a '.repeat(100)} 6309 more words here.`)) });
+  assert.equal((await read(await tail.guide.POST(post(body({ levelId: 'cardinality', stepId: 'cdn-combos' }))))).json.ok, true, 'uncut, 6309 passes');
+});
+
+test('an unexpected throw is 500 internal and carries neither the key nor the error text', async () => {
+  const boom = new Error(`boom ${KEY} zq-secret-question-text`);
+  const brokenRegistry = { get levels() { throw boom; } };
+  const logs = [];
+  const log = (line) => logs.push(line);
+  const a = createGuide({ env: { ANTHROPIC_API_KEY: KEY }, fetch: fakeFetch(textReply(NEUTRAL)), now: () => 1, log, registry: brokenRegistry });
+  const b = createGuide({ env: { ANTHROPIC_API_KEY: KEY }, fetch: fakeFetch(textReply(NEUTRAL)), now: () => 1, log, registry: REG, limiter: { take() { throw boom; } } });
+  for (const guide of [a, b]) {
+    const res = await guide.POST(post(body({ question: 'zq-secret-question-text' })));
+    const text = await res.text();
+    assert.equal(res.status, 500);
+    assert.deepEqual(JSON.parse(text), { error: 'internal' });
+    assert.ok(!text.includes(KEY) && !text.includes('boom'));
+  }
+  assert.equal(logs.length, 2);
+  assert.ok(logs.every((l) => l.outcome === 'error' && l.status === 500));
+  assert.ok(!JSON.stringify(logs).includes(KEY) && !JSON.stringify(logs).includes('boom'));
+});
+
+test('the answer filter is given the step: a word the step itself uses is not withheld', async () => {
+  // histograms / hist-buckets: the question says this sentence, so it tells the player nothing new; the filter
+  // would block it as an option's words if it were not told the step's own text.
+  const own = 'These service buckets stop at 2.5 seconds, narrower than the semantic conventions advise for HTTP durations.';
+  const { guide } = setup({ fetch: fakeFetch(textReply(own)) });
+  const res = await read(await guide.POST(post(body({ levelId: 'histograms', stepId: 'hist-buckets' }))));
+  assert.deepEqual(res.json, { ok: true, hint: own });
+});

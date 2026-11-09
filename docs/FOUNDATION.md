@@ -215,9 +215,16 @@ disposes the globe, which cancels the effect.
 (vercel.com/docs/functions/functions-api-reference shows `api/hello.js` with `export function GET(request)`).
 Not yet proven on a deployment: confirm on a preview deploy that `GET /api/guide` answers `{configured:false}` and
 that tracing `../app.mjs` bundles `levels/`, `lib/` and `vendor/js-yaml-5.5.0.mjs`. If `.mjs` is not picked up,
-fall back to `api/guide.js` (same code; `package.json` has `"type": "module"`). The module also exports
-`createGuide({env, fetch, now, log, limiter, registry})`, which `GET` and `POST` are bound from (to `process.env`,
-`globalThis.fetch`, `Date.now`, a JSON `console.log` and a module-level limiter); tests and the dev stub use it.
+the fallback is `api/guide.js` with the same code, but then `package.json` (with `"type": "module"`) must also
+deploy: `.vercelignore` excludes it today, and without it Vercel compiles the file as CommonJS and it fails. The
+module also exports `createGuide({env, fetch, now, log, limiter, registry})`, which `GET` and `POST` are bound from
+(to `process.env`, `globalThis.fetch`, `Date.now`, a JSON `console.log` and a module-level limiter); tests and the
+dev stub use it.
+
+Spend cap (setup step, the real limit): the in-memory limiter below does not bound spend, because a request without
+an `Origin` header (plain curl) is served and every instance has its own counters, so many client addresses get 60
+calls a minute on each instance. Create the key in its own Anthropic workspace with a monthly spend limit set, so
+the cap is the provider's, not the function's.
 
 The function reads no docs at runtime (`/docs/` is in `.vercelignore`). It builds the step context only from the
 registry (`liveRegistry()` from `app.mjs`, the one construction site; importing it has no side effect) through
@@ -231,8 +238,8 @@ field, such as the player's current pick, is `400 body`: a pick would make the g
 must be a `play` step the guide may speak on (`guideAllowed`) with a trustworthy token set (`answerTokens(type,
 spec, step)` not null); otherwise it is refused before any model call. One call to
 `POST https://api.anthropic.com/v1/messages` (model `claude-haiku-5-5`, `max_tokens` 300, 8 s timeout,
-`x-api-key`, `anthropic-version: 2023-06-01`); the reply is the joined text blocks, withheld when `withholds`
-says it states the answer, else trimmed and cut at 600 characters.
+`x-api-key`, `anthropic-version: 2023-06-01`); the reply is the joined text blocks, trimmed and cut at 600 characters, then withheld when `withholds`
+says that text states the answer (cut first, so the filter sees exactly what would be sent).
 
 | status | body | when |
 |---|---|---|
