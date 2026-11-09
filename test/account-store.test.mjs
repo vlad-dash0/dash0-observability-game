@@ -331,3 +331,113 @@ test('the rate-limit window key is created with its TTL in the same pipeline, th
   assert.equal(fake.ttl.get(key), 600);
   assert.equal(fake.calls.some((c) => c[0] === 'EXPIRE'), false);
 });
+
+test('a failed command is HTTP 400 with the error text, and NOSCRIPT over 400 falls back to EVAL', async () => {
+  const seen = [];
+  const answer = (command) => {
+    seen.push(command[0]);
+    if (command[0] === 'EVALSHA') return new Response(JSON.stringify({ error: 'NOSCRIPT No matching script' }), { status: 400 });
+    if (command[0] === 'EVAL') return new Response(JSON.stringify({ result: 'ok' }));
+    return new Response(JSON.stringify({ error: 'ERR syntax' }), { status: 400 });
+  };
+  const redis = createRedis({ url: 'https://x.test', token: 't', fetch: async (_u, init) => answer(JSON.parse(init.body)) });
+  assert.equal(await redis.script('set-listing', ['p', 'q', 'b'], ['1', 'pid']), 'ok');
+  assert.deepEqual(seen, ['EVALSHA', 'EVAL']);
+  await assert.rejects(redis.command(['BOGUS']), /ERR syntax/);
+  const other = createRedis({
+    url: 'https://x.test',
+    token: 't',
+    fetch: async () => new Response(JSON.stringify({ error: 'ERR boom' }), { status: 400 }),
+  });
+  await assert.rejects(other.script('set-listing', ['p', 'q', 'b'], ['1', 'pid']), /ERR boom/); // no fallback
+});
+
+test('a pipeline with one failing entry fails as a whole', async () => {
+  const { redis } = setup();
+  await assert.rejects(redis.pipeline([['GET', 'k'], ['BOGUS']]), RedisError);
+});
+
+test('the second of two listed players is rank 2 in getProgress, putProgress and leaderboard().me', async () => {
+  const { store, clock } = setup();
+  const a = await join(store, 'a', 'aaa@dash0.com');
+  const b = await join(store, 'b', 'bbb@dash0.com');
+  await store.putProgress(a, prog({ s1: 3, s2: 3 }));
+  clock.t += 1000;
+  const put = await store.putProgress(b, prog({ s1: 1 }));
+  assert.equal(put.rank, 2);
+  assert.equal((await store.getProgress(b)).rank, 2);
+  assert.equal((await store.leaderboard({ pid: b })).me.rank, 2);
+  assert.equal((await store.getProgress(a)).rank, 1);
+});
+
+test('signIn with an empty or non-string sub is a format refusal, not a rejection', async () => {
+  const { store } = setup();
+  assert.deepEqual(await store.signIn('', 'a@dash0.com'), { ok: false, reason: 'format' });
+  assert.deepEqual(await store.signIn(null, 'a@dash0.com'), { ok: false, reason: 'format' });
+});
+
+test('top is clamped to 1..10: 11 listed players give 10 rows and size 11', async () => {
+  const { store } = setup();
+  for (let i = 0; i < 11; i++) {
+    const pid = await join(store, `s${i}`, `person${i}@dash0.com`);
+    await store.putProgress(pid, prog({ s1: 1 }));
+  }
+  for (const top of [100, Infinity, NaN, undefined]) {
+    const board = await store.leaderboard({ top });
+    assert.equal(board.top.length, 10);
+    assert.equal(board.size, 11);
+  }
+  assert.equal((await store.leaderboard({ top: 0 })).top.length, 1);
+  assert.equal((await store.leaderboard({ top: -5 })).top.length, 1);
+  assert.equal((await store.leaderboard({ top: 3.9 })).top.length, 3);
+});
+
+test('claim-nick and delete-account get their nick and sub keys as KEYS, not ARGV', async () => {
+  const { store, fake } = setup();
+  const pid = await join(store, 'sub-x', 'aaa@dash0.com');
+  await store.setNickname(pid, 'Ada');
+  await store.deleteAccount(pid);
+  const evals = fake.calls.filter((c) => c[0] === 'EVALSHA' || c[0] === 'EVAL');
+  const keysOf = (c) => c.slice(3, 3 + Number(c[2]));
+  const claim = keysOf(evals[0]);
+  assert.ok(claim.includes(keys.nick('ada')) && claim.length === 3);
+  const del = keysOf(evals.at(-1));
+  assert.ok(del.includes(keys.sub('sub-x')) && del.includes(keys.nick('ada')) && del.length === 5);
+});
+
+test('a nickname change racing another one re-reads the old key and releases the right claim', async () => {
+  const { store, fake } = setup();
+  const pid = await join(store, 'a', 'aaa@dash0.com');
+  await store.setNickname(pid, 'Ada');
+  let raced = false;
+  fake.beforeScript = (name) => {
+    if (name !== 'claim-nick' || raced) return;
+    raced = true; // another tab moved the nick to Bea between our read and the script
+    fake.db.delete(keys.nick('ada'));
+    fake.db.set(keys.nick('bea'), pid);
+    fake.db.get(keys.profile(pid)).set('nickKey', 'bea');
+    fake.db.get(keys.profile(pid)).set('nick', 'Bea');
+  };
+  assert.deepEqual(await store.setNickname(pid, 'Cleo'), { ok: true, nick: 'Cleo' });
+  assert.equal(fake.db.has(keys.nick('bea')), false);
+  assert.equal(fake.db.get(keys.nick('cleo')), pid);
+});
+
+test('a delete between the sub read and the profile write leaves nothing behind', async () => {
+  const { store, fake } = setup();
+  const first = await store.signIn('s', 'vlad@dash0.com');
+  fake.db.delete(keys.profile(first.profile.pid)); // crash: sub without profile
+  fake.beforeCommand = (args) => {
+    if (args[0] === 'HSET' && String(args[1]).includes(':profile:')) fake.db.delete(keys.sub('s'));
+  };
+  assert.deepEqual(await store.signIn('s', 'vlad@dash0.com'), { ok: false, reason: 'store' });
+  assert.deepEqual(fake.keys(), []);
+});
+
+test('setListing and getProgress on a deleted profile say gone', async () => {
+  const { store } = setup();
+  const pid = await join(store, 'a', 'aaa@dash0.com');
+  await store.deleteAccount(pid);
+  assert.deepEqual(await store.setListing(pid, true), { ok: false, reason: 'gone' });
+  assert.deepEqual(await store.getProgress(pid), { ok: false, reason: 'gone' });
+});

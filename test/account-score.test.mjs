@@ -15,6 +15,11 @@ test('same total: the earlier time ranks higher', () => {
   assert.ok(encodeScore(10, T1) > encodeScore(10, T2));
 });
 
+test('the time is whole seconds: 999 ms into a second ranks as the second itself', () => {
+  assert.equal(encodeScore(7, EPOCH_MS + 999), encodeScore(7, EPOCH_MS));
+  assert.notEqual(encodeScore(7, EPOCH_MS + 1000), encodeScore(7, EPOCH_MS));
+});
+
 test('decode round-trips, and total 0 works', () => {
   assert.deepEqual(decodeScore(encodeScore(42, T1)), { total: 42, reachedAtMs: T1 });
   assert.deepEqual(decodeScore(encodeScore(0, T2)), { total: 0, reachedAtMs: T2 });
