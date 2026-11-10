@@ -97,7 +97,7 @@ export function createFakeRedis({ token = 'fake-token', url = 'https://fake-redi
       const all = ranked(zset(k) ?? new Map());
       // As Redis: a negative index counts from the end, a start below 0 clamps to 0.
       const at = (i) => (Number(i) < 0 ? all.length + Number(i) : Number(i));
-      const rows = all.slice(Math.max(0, at(a)), at(b) + 1);
+      const rows = all.slice(Math.max(0, at(a)), Math.max(0, at(b) + 1));
       return rows.flatMap(([m, s]) => (withScores === 'WITHSCORES' ? [m, String(s)] : [m]));
     },
   };

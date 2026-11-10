@@ -217,6 +217,9 @@ describe('the comparison harness', () => {
     assert.deepEqual(await range(-10, 0), ['c']);
     assert.deepEqual(await range(1, -2), ['b']);
     assert.deepEqual(await range(2, 1), []);
+    assert.deepEqual(await range(0, -10), []); // a stop before the start of the set is empty
+    assert.deepEqual(await range(0, -5), []); // -(len+2): slice(0, -1) would wrongly give two rows
+    assert.deepEqual(await range(1, -5), []);
     assert.deepEqual(await redis.command(['ZREVRANGE', 'none', 0, -1]), []);
   });
 
