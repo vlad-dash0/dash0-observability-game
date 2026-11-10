@@ -319,3 +319,13 @@ test('step 1: the intro is short paragraphs, one idea each, and the board shows 
   assert.match(plain(paras[3]), /end of their span id/);
   assert.match(plain(paras[4]), /9d8c7b6a/);
 });
+
+test('step 1: only the two same-trace POST /checkout calls show a span id pill (#324)', async () => {
+  const { renderBuild } = await import('../lib/widgets/build-it-view.mjs');
+  const { escapeHtml } = await import('../lib/lesson-kit.mjs');
+  const html = renderBuild(tree, newBuildState(tree), { escapeHtml });
+  const pills = [...html.matchAll(/data-sid title="span id (\w+)">span id ([^<]+)</g)].map((m) => `${m[1]} ${m[2]}`).sort();
+  const calls = tree.spans.filter((s) => s.kind === 'CLIENT' && s.name === 'POST /checkout' && s.traceId.startsWith('a3f1c9e2')).map((s) => `${s.spanId} …${s.spanId.slice(-4)}`).sort();
+  assert.equal(calls.length, 2);
+  assert.deepEqual(pills, calls);
+});

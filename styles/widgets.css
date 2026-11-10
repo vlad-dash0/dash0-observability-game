@@ -119,7 +119,6 @@
 /* The halo only on a label that ends left of its bar (build-it-view.mjs labelFlips): there it crosses the row
    connector, and the panel surface an idle row sits on, 8px wide to cover the 7.7px gap between words, hides it. */
 .wf-bar-label[text-anchor="end"] { stroke: var(--color-surface); stroke-width: 8px; stroke-linejoin: round; paint-order: stroke; }
-.wf-bar-label [data-cut="all"] { display: none; } /* no room even on the widest of the narrow tracks */
 .wf-dur { font-weight: 700; font-variant-numeric: tabular-nums; }
 .wf-row[data-waiting] .wf-bar-label { fill: var(--color-text-muted); }
 .wf-log { fill: var(--color-text); }

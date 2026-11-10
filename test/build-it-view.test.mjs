@@ -13,7 +13,7 @@ import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { newBuildState, setParent } from '../lib/widgets/build-it.mjs';
 import { labelFlips, mountBuild, renderBuild, tickPlan } from '../lib/widgets/build-it-view.mjs';
 import { checkBuild } from '../lib/widgets/build-it.mjs';
-import { ISSUE_LABELS, issueLabel, noteFor } from '../lib/widgets/build-it-help.mjs';
+import { BUILD_HELPS, ISSUE_LABELS, issueLabel, noteFor } from '../lib/widgets/build-it-help.mjs';
 import { A, B, C, D, E, b1Spec } from './fixtures/build-b1.mjs';
 import { S1, S2, S3, S4, T2, logsSpec } from './fixtures/build-logs.mjs';
 import { withGuide } from './helpers/guide-ctx.mjs';
@@ -1279,7 +1279,7 @@ test('a bar label that fits on neither side of a short bar drops its name and ke
   Object.assign(spec.spans[3], { name: 'POST provider/charges', startMs: 50, endMs: 62 }); // D at 50%, 5 + 21 chars
   setup(spec);
   assert.equal(q(`[data-span="${D}"] [data-bar-label]`).textContent, '12ms POST provider/charges', 'the text stays complete for readers');
-  assert.equal(q(`[data-span="${D}"] [data-bar-name]`).hasAttribute('data-cut'), true);
+  assert.equal(q(`[data-span="${D}"] [data-bar-name]`).getAttribute('data-cut'), 'narrow', 'only the stacked layout drops the name; a side-by-side track keeps it');
   assert.equal(q(`[data-span="${B}"] [data-bar-name]`).hasAttribute('data-cut'), false, 'a label that fits is whole');
   const css = sheet('widgets.css');
   assert.match(css, /\.wf-bar-label \[data-cut\][^{]*\{[^}]*display: none/);
@@ -1304,10 +1304,26 @@ test('the log records sit under their own heading (#321)', () => {
 });
 
 test('every issue code the board can show has a player word, none an internal code (#321)', () => {
-  assert.deepEqual(Object.keys(ISSUE_LABELS).sort(), [
-    'cross-trace-parent', 'extra-link', 'log-no-active-span', 'log-not-attached', 'log-other-service', 'log-outside-span',
-    'log-wrong-span', 'log-wrong-trace', 'missing-link', 'wrong-kind', 'wrong-parent', 'wrong-status',
-  ]);
+  // Every code checkBuild can emit: drive both modes into every failure, and read the codes off its issues.
+  const emitted = new Set();
+  const grade = (spec, mutate) => {
+    const st = newBuildState(spec);
+    mutate(st);
+    for (const i of checkBuild(spec, st).issues) emitted.add(i.code);
+  };
+  grade(b1Spec(), () => {}); // every span a root: wrong-parent
+  const logs = logsSpec();
+  for (const where of [S1, S2, S3, S4, null]) {
+    for (const l of logs.logs) {
+      const st = newBuildState(logs);
+      st.logs = { ...st.logs, [l.id]: where };
+      for (const i of checkBuild(logs, st).issues) emitted.add(i.code);
+    }
+  }
+  const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'lib', 'widgets', 'build-it.mjs'), 'utf8');
+  const declared = new Set([...src.matchAll(/\badd\('([a-z-]+)'/g)].map((m) => m[1]));
+  assert.deepEqual([...declared].sort(), Object.keys(ISSUE_LABELS).sort(), 'every code checkBuild raises has a player word, and none is unused');
+  for (const code of emitted) assert.equal(code in ISSUE_LABELS, true, `${code} has a player word`);
   assert.equal(new Set(Object.values(ISSUE_LABELS)).size, Object.values(ISSUE_LABELS).length, 'no two problems share a word');
   assert.equal(ISSUE_LABELS['cross-trace-parent'] === ISSUE_LABELS['log-wrong-trace'], false, 'a wrong parent trace and a record in another trace are different problems');
   assert.equal([ISSUE_LABELS['missing-link'], ISSUE_LABELS['extra-link']].join('|'), 'Missing link|Extra link');
@@ -1327,17 +1343,30 @@ test('a failed Check shows the player word for the issue, the code stays only in
   assert.equal(q('#b1-feedback').textContent.includes('wrong-parent'), false);
 });
 
-test('on a phone the helps chips drop their dot, put the title on its own line and fit two rows of 358px (#324)', () => {
+test('on a phone the helps chips lose their dot and the word on/off, keep the dashed off border, and fit two rows of 350px (#324)', () => {
   const kit = sheet('kit.css');
   const block = /@container level \(max-width: 600px\) \{([^@]*?help-chips[^@]*?)\n\}/.exec(kit)[1];
   assert.match(block, /\.ui-help-chips-title \{ flex-basis: 100%; \}/);
   assert.match(block, /\.ui-chip-dot \{ display: none; \}/);
+  assert.match(block, /\[data-state\] \{ position: absolute;/);
+  assert.match(kit, /\.ui-chip\[data-on="false"\] \{[^}]*border-style: dashed/, 'off is dashed, on is solid: not colour alone');
   const order = Object.fromEntries([...block.matchAll(/\[data-help="(\w+)"\] \{ order: (\d+); \}/g)].map((m) => [m[1], +m[2]]));
   assert.deepEqual(order, { hints: 1, guide: 2, instant: 3 });
-  // Rows in the resulting order (queue and tint stay 0): chip width = glyphs * 6.6 + 12.
-  const words = { queue: 'One span at a time off', tint: 'Trace tint off', hints: 'Hints off', guide: 'Time-window guide off', instant: 'Instant feedback off' };
-  const w = (k) => words[k].length * 6.6 + 12;
-  assert.equal(w('hints') + w('queue') + w('tint') + 2 * 4 <= 358, true, 'row one');
-  assert.equal(w('guide') + w('instant') + 4 <= 358, true, 'row two');
-  assert.equal(w('hints') + w('queue') + w('tint') + w('guide') + 3 * 4 > 358, true, 'a fourth chip would not fit, so exactly two rows');
+  setup(withHelps({ hints: true }));
+  assert.equal(qa('#b1-helps [data-state]').map((n) => n.textContent).join(','), 'off,off,off,off,on', 'the word stays in the markup for readers');
+  // Chip width on a phone: label glyphs * 8.5 (measured at 11px) + 10; the rows follow the order above.
+  const w = Object.fromEntries(BUILD_HELPS.map(([k, label]) => [k, label.length * 8.5 + 10]));
+  const row1 = w.hints + w.queue + w.tint + 2 * 4;
+  const row2 = w.guide + w.instant + 4;
+  assert.equal(row1 <= 350 - 16, true, `row one ${row1}px keeps 16px spare`);
+  assert.equal(row2 <= 350 - 16, true, `row two ${row2}px keeps 16px spare`);
+  assert.equal(row1 + w.guide + 4 > 350, true, 'guide cannot join row one: exactly two rows');
+});
+
+test('look-alike spans in two different traces show no span id pill: the naming rule needs a shared trace code (#324)', () => {
+  const [T, U] = ['1111aaaa1111aaaa1111aaaa1111aaaa', '2222bbbb2222bbbb2222bbbb2222bbbb'];
+  setup(twinSpec([twin('aaaaaaaaaaaaa1b2', T), twin('aaaaaaaaaaaaa3c4', U, 'retry', 4)]));
+  assert.equal(qa('[data-sid]').length, 0, 'the trace code already tells them apart');
+  setup(twinSpec([twin('aaaaaaaaaaaaa1b2', T), twin('aaaaaaaaaaaaa3c4', T, 'retry', 4), twin('aaaaaaaaaaaaa5d6', U, 'retry', 8)]));
+  assert.deepEqual(qa('[data-sid]').map((n) => n.textContent), ['span id …a1b2', 'span id …a3c4'], 'only the pair that shares a trace');
 });
