@@ -259,3 +259,34 @@ test('logs: one line per request with msg, outcome, status, ms and nothing about
     for (const leak of [profile.pid, 'g-1', 'Secret-Nick', profile.nick, 'lovelace', cookie.split('=')[1]]) assert.ok(!text.includes(leak), `${text} holds ${leak}`);
   }
 });
+
+test('POST: a lookalike, other-port or other-scheme Origin is 403; the exact origin passes', async () => {
+  const { r, cookie } = await signedIn();
+  for (const origin of [
+    'https://oncall.example.test.evil.test', 'https://evil-oncall.example.test',
+    'https://oncall.example.test:444', 'http://oncall.example.test',
+  ]) {
+    assert.equal((await act(r, cookie, { action: 'signout' }, { origin })).status, 403, origin);
+  }
+  assert.equal((await act(r, cookie, { action: 'signout' }, { origin: 'https://oncall.example.test' })).status, 200);
+});
+
+test('POST: a body of exactly 1024 bytes is read, 1025 is 413, and a declared length over 1024 is 413 before reading', async () => {
+  const { r, cookie } = await signedIn();
+  const base = '{"v":1,"action":"signout"}';
+  const send = (text, headers = {}) => r.account.POST(post(URL_, text, { cookie, ...headers }));
+  assert.equal((await send(base + ' '.repeat(1024 - base.length))).status, 200);
+  assert.equal((await send(base + ' '.repeat(1025 - base.length))).status, 413);
+  assert.equal((await send(base, { 'content-length': '1025' })).status, 413);
+});
+
+test('a store `gone` on an action is 401 unauthenticated with the cookie cleared; the session lookup already passed', async () => {
+  const { r, pid, cookie } = await signedIn();
+  r.fake.beforeScript = () => r.fake.db.delete(keys.profile(pid)); // the profile vanishes between lookup and write
+  for (const body of [{ action: 'listing', listed: false }, { action: 'nickname', nick: 'someone' }]) {
+    const res = await act(r, cookie, body);
+    assert.equal(res.status, 401, body.action);
+    assert.deepEqual(await json(res), { error: 'unauthenticated' });
+    assert.equal(setCookie(res, SESSION), CLEARED);
+  }
+});
