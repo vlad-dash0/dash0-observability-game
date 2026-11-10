@@ -20,7 +20,7 @@ test('C1 Start until anything is completed anywhere, then Continue with the numb
   assert.deepEqual(continueView(REG, P([])), { levelId: 'a', label: 'Start: 0.1 Name a' });
   assert.deepEqual(continueView(REG, P(['a'])), { levelId: 'b', label: 'Continue: 0.2 Name b' });
   assert.equal(continueView(REG, P(['d'])).label, 'Continue: 0.1 Name a', 'a completion in a later act counts as started');
-  // buildRegistry insists on a number, so a numberless level is a copy of the registry with one removed.
+  // buildRegistry insists on a number, so this copy sets one level's number to null.
   const NONO = { ...REG, levels: { ...REG.levels, a: { ...REG.levels.a, no: null } } };
   assert.equal(continueView(NONO, P([])).label, 'Start: Name a');
   assert.equal(continueView(NONO, P(['b'])).label, 'Continue: Name a');

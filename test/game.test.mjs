@@ -1815,6 +1815,7 @@ test('M1 .map-head holds the caption and the Continue button, outside the globe,
   assert.equal(caption.tagName, 'P');
   assert.equal(caption.classList.contains('globe-caption'), true);
   assert.equal(caption.getAttribute('x-text'), 'captionText()');
+  assert.equal(caption.getAttribute('x-show'), "captionText() !== ''");
   for (const a of ['role', 'aria-live', 'aria-atomic']) assert.equal(caption.hasAttribute(a), false, `the caption is not a live region (${a})`);
   const btn = shell.querySelector('#hub-continue');
   assert.ok(btn);

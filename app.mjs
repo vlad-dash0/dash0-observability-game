@@ -224,7 +224,7 @@ export function createGame(deps) {
     overlayTitle: '',
     overlayNo: '',
     currentLevelId: null,
-    openedFrom: 'card', // who opened the open level: 'card' or 'continue' (returnTarget)
+    openedFrom: 'card', // who opened the current level: 'card' or 'continue' (returnTarget)
     nudgeId: null,
     rewardOpen: false,
     aboutOpen: false,
