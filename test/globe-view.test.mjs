@@ -1,6 +1,7 @@
 // The globe view (lib/globe-view.mjs) and the renderer's fallbacks (lib/globe-render.mjs).
 // Spec: issue #150, docs/FOUNDATION.md §2.7. The WebGL drawing itself is checked in a
 // browser; these pin what it is told to draw.
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DOTS } from '../hub/globe-data.mjs';
@@ -58,10 +59,33 @@ test("while an act's boss is open its whole region pulses, countries without a l
   assert.deepEqual(countriesIn(s, DOT.LIT), [], 'the lit countries show the pulse instead');
 });
 
-test('once the boss is done the pulse stops and the completed countries stay lit', () => {
-  const s = statesFor([...ACT_0, 'the-pager']);
+test('a resolved region: every dot in it is RESOLVED, Italy included; other regions untouched', () => {
+  const s = statesFor([...ACT_0, 'the-pager', 'resources']);
   assert.deepEqual(countriesIn(s, DOT.PULSE), []);
-  assert.deepEqual(countriesIn(s, DOT.LIT), ['DEU', 'ESP', 'FRA']);
+  const inAct0 = DOTS.filter((d) => actOfCountry(d[2], d[3]) === 'act-0');
+  assert.ok(inAct0.length > 0);
+  assert.equal(inAct0.every((d) => s[DOTS.indexOf(d)] === DOT.RESOLVED), true, 'every Western Europe dot is resolved');
+  assert.ok(countriesIn(s, DOT.RESOLVED).includes('ITA'), 'Italy has no level and still resolves');
+  assert.equal(inAct0.some((d) => s[DOTS.indexOf(d)] === DOT.LIT), false, 'no lit dot left in the resolved region');
+  assert.deepEqual(countriesIn(s, DOT.LIT), ['NOR'], 'the next act shows its own lit country');
+});
+
+test('DOT.RESOLVED is a fifth state, 4, and values stay unique', () => {
+  assert.equal(DOT.RESOLVED, 4);
+  assert.equal(new Set(Object.values(DOT)).size, Object.values(DOT).length);
+});
+
+test('dotStates precedence: PULSE > SOON > RESOLVED > LIT > UNLIT', () => {
+  const dots = [[0, 0, 'AAA', 'x'], [1, 1, 'BBB', 'y'], [2, 2, 'CCC', 'z'], [3, 3, 'DDD', 'w'], [4, 4, 'EEE', 'v']];
+  const actOf = (iso) => ({ AAA: 'p', BBB: 's', CCC: 'r', DDD: 'l' })[iso] ?? null;
+  const countries = { AAA: { lit: true }, BBB: { lit: true }, CCC: { lit: true }, DDD: { lit: true } };
+  const regions = {
+    p: { pulse: true, resolved: true }, // an impossible mix: PULSE still wins
+    s: { pulse: false, resolved: true },
+    r: { pulse: false, resolved: true },
+    l: { pulse: false, resolved: false },
+  };
+  assert.deepEqual([...dotStates({ countries, regions, soon: { s: { region: 'S' } } }, dots, actOf)], [2, 3, 4, 1, 0]);
 });
 
 // ---- where the globe turns -----------------------------------------------------------
@@ -138,6 +162,11 @@ test('the text fallback lists each act with its region, done of total and an ope
     'Act 1, First (One): 0 of 1 done',
     'Act 2 (Two): 0 of 1 done',
   ]);
+  assert.deepEqual(globeLines(REG, globeState(REG, progressOf(['a', 'b', 'boss0', 'd']), MAP)), [
+    'Act 0, Zeroth (Zero): 3 of 3 done, resolved',
+    'Act 1, First (One): 0 of 1 done',
+    'Act 2 (Two): 1 of 1 done, resolved',
+  ]);
   const partial = { ACT_REGIONS: { g1: { region: 'One' } }, LEVEL_COUNTRY: {} };
   assert.deepEqual(globeLines(REG, globeState(REG, progressOf([]), partial)), ['Act 1, First (One): 0 of 1 done']);
 });
@@ -150,7 +179,11 @@ test('the accessible name counts levels done, names lit regions and the open inc
   );
   assert.equal(
     globeLabel(globeState(REG, progressOf(['a', 'b', 'boss0', 'd']), MAP)),
-    'World map: 4 of 5 levels done. Lit: Zero 3 of 3, Two 1 of 1.',
+    'World map: 4 of 5 levels done. Resolved: Zero, Two.',
+  );
+  assert.equal(
+    globeLabel(globeState(REG, progressOf(['a', 'c']), MAP)),
+    'World map: 2 of 5 levels done. Resolved: One. Lit: Zero 1 of 3.',
   );
 });
 
@@ -588,9 +621,9 @@ test('the text fallback lists soon acts in act order', () => {
 test('the accessible name names soon regions and leaves them out of the count', () => {
   assert.equal(
     globeLabel(globeState(REG3, progressOf(['a']), MAP3, [S7])),
-    'World map: 1 of 2 levels done. Lit: Zero 1 of 1. Coming soon: Seven.',
+    'World map: 1 of 2 levels done. Resolved: Zero. Coming soon: Seven.',
   );
-  assert.equal(globeLabel(globeState(REG3, progressOf(['a']), MAP3)), 'World map: 1 of 2 levels done. Lit: Zero 1 of 1.');
+  assert.equal(globeLabel(globeState(REG3, progressOf(['a']), MAP3)), 'World map: 1 of 2 levels done. Resolved: Zero.');
   // Given out of order, the soon regions are still named by act number.
   const map8 = { ...MAP3, ACT_REGIONS: { ...MAP3.ACT_REGIONS, s8: { region: 'Eight' } } };
   const S8 = { id: 's8', no: 8, name: 'Later still', sub: '', teaser: 't' };
@@ -600,11 +633,28 @@ test('the accessible name names soon regions and leaves them out of the count', 
   );
 });
 
-test('the dot shader draws SOON dim and static, outside the wave', () => {
+test('the dot shader draws SOON dim and static, RESOLVED calm and static, and the wave crosses RESOLVED', () => {
   // Structural only: the browser check is the real visual one.
-  const m = /else if \(aState > 2\.5\) \{([^}]*)\}/.exec(render.DOT_VS);
-  assert.ok(m, 'a branch for aState > 2.5');
-  assert.ok(m[1].includes('uDim'), 'drawn in the dim colour');
-  assert.equal(m[1].includes('uTime'), false, 'static: no time term');
-  assert.match(render.DOT_VS, /aState > 0\.5 && aState < 2\.5/, 'the wave skips SOON dots');
+  const soon = /else if \(aState < 3\.5\) \{([^}]*)\}/.exec(render.DOT_VS);
+  assert.ok(soon, 'a branch for aState < 3.5');
+  assert.ok(soon[1].includes('uDim'), 'SOON is drawn in the dim colour');
+  assert.equal(soon[1].includes('uTime'), false, 'SOON is static: no time term');
+  const resolved = /else \{([^}]*)\}\s*float wv/.exec(render.DOT_VS);
+  assert.ok(resolved, 'RESOLVED is the final else branch');
+  assert.ok(resolved[1].includes('uResolved'), 'RESOLVED is drawn in the resolved colour');
+  assert.equal(resolved[1].includes('uTime'), false, 'RESOLVED is static: no time term');
+  assert.match(render.DOT_VS, /uniform vec3 [^;]*uResolved/, 'uResolved is declared');
+  assert.match(render.DOT_VS, /\(aState > 0\.5 && aState < 2\.5\) \|\| aState > 3\.5/, 'the wave skips SOON dots and crosses RESOLVED ones');
+});
+
+test('every colour role has a probe rule and a token', () => {
+  const hub = readFileSync(new URL('../styles/hub.css', import.meta.url), 'utf8');
+  const tokens = readFileSync(new URL('../styles/tokens.css', import.meta.url), 'utf8');
+  assert.ok(COLOR_ROLES.includes('resolved'));
+  for (const role of COLOR_ROLES) {
+    assert.match(hub, new RegExp(`\\.globe-probe\\.${role}\\s*\\{\\s*color:\\s*var\\(--color-globe-${role}\\)`), `probe rule for ${role}`);
+    const def = new RegExp(`--color-globe-${role}:([^;]*);`).exec(tokens);
+    assert.ok(def, `token for ${role}`);
+    assert.doesNotMatch(def[1], /oklab|oklch/, `${role} must stay a colour parseColor reads`);
+  }
 });

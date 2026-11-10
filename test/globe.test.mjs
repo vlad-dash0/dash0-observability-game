@@ -33,19 +33,39 @@ test('a country is lit exactly when its level is completed (stars 0 counts)', ()
   assert.equal(s.countries.CCC.lit, false);
 });
 
-test('countries and the region pulse only while the act boss is open', () => {
+test('the region pulses only while the act boss is open; a country is just lit', () => {
   const before = state({ a: 1 });
   assert.equal(before.regions.g0.pulse, false, 'boss still locked');
-  assert.equal(before.countries.AAA.pulse, false);
+  assert.deepEqual(before.countries.AAA, { lit: true });
   const open = state({ a: 1, b: 1 });
   assert.equal(open.regions.g0.pulse, true, 'every level done, boss open');
-  assert.equal(open.countries.AAA.pulse, true);
-  assert.equal(open.countries.BBB.pulse, true);
+  // The per-country pulse was an unread duplicate of the region's; it is gone (#309).
+  assert.deepEqual(open.countries.AAA, { lit: true });
+  assert.deepEqual(open.countries.CCC, { lit: false });
   assert.equal(open.regions.g1.pulse, false, 'another act does not pulse');
-  assert.equal(open.countries.CCC.pulse, false);
   const done = state({ a: 1, b: 1, boss0: 2 });
   assert.equal(done.regions.g0.pulse, false, 'a completed boss stops pulsing');
-  assert.equal(done.countries.AAA.pulse, false);
+});
+
+test('a region is resolved exactly when its act is complete', () => {
+  const r = (levels, act) => state(levels).regions[act];
+  assert.equal(r({ a: 1, b: 1 }, 'g0').pulse, true);
+  assert.equal(r({ a: 1, b: 1 }, 'g0').resolved, false, 'boss open: an incident, not resolved');
+  assert.equal(r({ a: 1, b: 1, boss0: 1 }, 'g0').resolved, true);
+  assert.equal(r({ a: 1, boss0: 1 }, 'g0').resolved, false, 'a level is still missing');
+  assert.equal(r({ c: 1 }, 'g1').resolved, true, 'no boss: its levels are the whole act');
+  assert.equal(r({}, 'g1').resolved, false);
+  assert.equal(r({ d: 1 }, 'g2').resolved, false, 'the boss is not done');
+});
+
+test('no region is ever both pulsing and resolved', () => {
+  const ids = ['a', 'b', 'boss0', 'c', 'd', 'boss2'];
+  for (let mask = 0; mask < 1 << ids.length; mask++) {
+    const levels = Object.fromEntries(ids.filter((_, i) => mask & (1 << i)).map((id) => [id, 1]));
+    for (const [act, r] of Object.entries(state(levels).regions)) {
+      assert.equal(r.pulse && r.resolved, false, `${act} with ${Object.keys(levels)}`);
+    }
+  }
 });
 
 test('a boss in a locked act does not pulse', () => {
@@ -60,7 +80,7 @@ test('an act with no boss never pulses', () => {
 });
 
 test('region done and total count the act levels and its boss', () => {
-  assert.deepEqual(state({}).regions.g0, { region: 'Zero', done: 0, total: 3, pulse: false });
+  assert.deepEqual(state({}).regions.g0, { region: 'Zero', done: 0, total: 3, pulse: false, resolved: false });
   assert.equal(state({ a: 1 }).regions.g0.done, 1);
   assert.equal(state({ a: 1, boss0: 1 }).regions.g0.done, 2);
   assert.equal(state({ c: 1 }).regions.g1.total, 1, 'no boss: levels only');

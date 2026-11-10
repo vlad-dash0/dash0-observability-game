@@ -113,6 +113,10 @@
   background: var(--color-globe-pulse);
   box-shadow: 0 0 8px 2px color-mix(in srgb, var(--color-globe-pulse) 50%, transparent);
 }
+.globe-key.resolved {
+  background: var(--color-globe-resolved);
+  box-shadow: 0 0 8px 2px color-mix(in srgb, var(--color-globe-resolved) 55%, transparent);
+}
 .globe-key.soon { background: transparent; border: 1px dashed var(--color-globe-dim); }
 /* Colour probes: the renderer reads each role's computed colour once at mount. */
 .globe-probe { position: absolute; width: 0; height: 0; overflow: hidden; visibility: hidden; }
@@ -122,6 +126,7 @@
 .globe-probe.lit { color: var(--color-globe-lit); }
 .globe-probe.pulse { color: var(--color-globe-pulse); }
 .globe-probe.rim { color: var(--color-globe-rim); }
+.globe-probe.resolved { color: var(--color-globe-resolved); }
 /* No WebGL: the same progress as text. */
 .globe-fallback {
   list-style: none; margin: 0; padding: 6px 14px;

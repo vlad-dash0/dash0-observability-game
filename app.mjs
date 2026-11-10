@@ -30,7 +30,7 @@ import { setFeedback } from './lib/ui/index.mjs';
 import { escapeHtml } from './lib/lesson-kit.mjs';
 import { trapTab } from './lib/modal-focus.mjs';
 import { createLevelContext } from './lib/level-context.mjs';
-import { cardTotals, mergeProgress, recordCompletion, registryIds, starTotals } from './lib/progress.mjs';
+import { cardTotals, emptyProgress, mergeProgress, recordCompletion, registryIds, starTotals } from './lib/progress.mjs';
 import { MAX_STARS } from './lib/scoring.mjs';
 import { runPlay, validatePlay } from './lib/play.mjs';
 import { buildRegistry } from './lib/registry.mjs';
@@ -38,6 +38,13 @@ import { createSaveDialog } from './lib/save-dialog.mjs';
 import { loadProgress, saveProgress, STORAGE_KEY } from './lib/storage.mjs';
 import { readTheme, writeTheme } from './lib/theme.mjs';
 import { levelState, lockReason } from './lib/unlock.mjs';
+
+// ?mode=debug shows the globe with everything finished (#309): a progress where every level is done.
+function allDone(registry) {
+  const progress = { ...emptyProgress(), levels: {} };
+  for (const id of registry.order) progress.levels[id] = { stars: 0, at: null };
+  return progress;
+}
 
 // A star row always shows MAX_STARS glyphs: `n` filled, the rest empty.
 const starGlyphs = (n) => '★'.repeat(n) + '☆'.repeat(MAX_STARS - n);
@@ -581,8 +588,12 @@ export function createGame(deps) {
       return `${earned} of ${max} stars`;
     },
     // ---------- globe ----------
+    // The progress the globe reads: the real one, or in ?mode=debug every level done. Cards, stars and storage never see it.
+    globeProgress() {
+      return this.debug ? allDone(registry) : this.progress;
+    },
     mapState() {
-      return globeState(registry, this.progress, globeMap, comingSoon);
+      return globeState(registry, this.globeProgress(), globeMap, comingSoon);
     },
     // The globe's accessible name: levels done, regions lit, any open incident.
     mapLabel() {
@@ -597,7 +608,7 @@ export function createGame(deps) {
     globeView() {
       return {
         states: dotStates(this.mapState(), dots, globeMap.actOf),
-        target: globeTarget(registry, this.progress, dots, globeMap.actOf),
+        target: globeTarget(registry, this.globeProgress(), dots, globeMap.actOf),
       };
     },
     // Draw the globe into .globe-stage (once; the fallback stays once shown). Never while a

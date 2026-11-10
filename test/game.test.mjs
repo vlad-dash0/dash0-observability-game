@@ -964,6 +964,19 @@ test('Back to the map before the globe has loaded plays the ignite once it arriv
   assert.equal(log.ignites[0].view.target.key, 'country:XXX');
 });
 
+test('debug: the globe shows everything finished, and nothing else changes', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game, store } = setup({ globe: mount, debug: true });
+  game.init();
+  await tick();
+  assert.deepEqual(log.mounts[0].states, [4, 4, 4, 4, 4, 0], 'every mapped region is resolved; the unmapped dot stays unlit');
+  assert.equal(log.mounts[0].actId, 'a1', 'the globe turns to the last act, as when every act is complete');
+  assert.equal(game.mapLabel(), 'World map: 5 of 5 levels done. Resolved: Zero, One.');
+  assert.equal(game.levelState('x'), 'open', 'the card state is the real one');
+  assert.equal(game.progress.levels.x, undefined, 'progress itself is untouched');
+  assert.equal(store.data.size, 0, 'nothing is stored');
+});
+
 test('a debug run lights nothing: no ignite, no note, no scroll, and focus goes back to the card', async () => {
   const { mount, log } = fakeGlobe();
   const { game, dom } = setup({ globe: mount, debug: true, reduceMotion: false });
@@ -1438,7 +1451,7 @@ test('index.html: the globe stage is a named image, with a legend and a text fal
   assert.equal(stage.getAttribute(':aria-label'), 'mapLabel()');
   assert.equal(shell.querySelector('.globe').getAttribute('x-show'), '!globeFallback');
   const legend = shell.querySelector('.globe-legend').textContent.replace(/\s+/g, ' ').trim();
-  assert.equal(legend, 'Lit: level completed Pulsing: incident open Not reached Coming soon');
+  assert.equal(legend, 'Lit: level completed Pulsing: incident open Saved: all calm Not reached Coming soon');
   const fallback = shell.querySelector('ul.globe-fallback');
   assert.equal(fallback.getAttribute('x-show'), 'globeFallback');
   assert.equal(fallback.querySelector('template').getAttribute('x-for'), 'line in globeLines()');
@@ -1457,7 +1470,7 @@ test('index.html: a soon act shows the kit chip and teaser; the legend has a soo
   assert.ok(soon.querySelector('[x-text="act.teaser"]'), 'the teaser, escaped by x-text');
   assert.equal(deepQuery(shell, '.act').getAttribute(':class'), "act.soon ? 'soon' : ''");
   const legend = shell.querySelector('.globe-legend').textContent.replace(/\s+/g, ' ').trim();
-  assert.equal(legend, 'Lit: level completed Pulsing: incident open Not reached Coming soon');
+  assert.equal(legend, 'Lit: level completed Pulsing: incident open Saved: all calm Not reached Coming soon');
   assert.ok(shell.querySelector('.globe-legend .globe-key.soon'), 'the soon key has its swatch');
 });
 
