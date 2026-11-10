@@ -124,7 +124,7 @@ test('events encode name, time and attributes', () => {
   ]);
 });
 
-test('encodeResourceSpans: uses the given resource and scope and adds no session.id unless stamped', () => {
+test('encodeResourceSpans: uses the given resource and scope and adds no session.id by default', () => {
   const req = encodeResourceSpans([root], {
     resource: { 'service.name': 'svc-x', 'telemetry.sdk.language': 'nodejs' },
     scope: { name: 'svc-x', version: '9' },
@@ -148,4 +148,21 @@ test('encodeResourceSpans: a stamp beats a draft attribute', () => {
   });
   const ks = req.resourceSpans[0].scopeSpans[0].spans[0].attributes.filter((a) => a.key === 'k');
   assert.deepEqual(ks, [{ key: 'k', value: { stringValue: 'stamp' } }]);
+});
+
+test('encodeResourceSpans refuses an empty batch, a resource without service.name, a bad scope and a bad stamp', () => {
+  const ok = { resource: { 'service.name': 'svc-x' }, scope: { name: 'svc-x', version: '9' } };
+  assert.doesNotThrow(() => encodeResourceSpans([root], { ...ok, scope: { name: 'svc-x' } }));
+  assert.throws(() => encodeResourceSpans([], ok), RangeError);
+  assert.throws(() => encodeResourceSpans([root]), TypeError);
+  assert.throws(() => encodeResourceSpans([root], { ...ok, resource: undefined }), TypeError);
+  for (const resource of [null, 'svc', ['service.name'], {}, { 'service.name': '' }, { 'service.name': 5 }]) {
+    assert.throws(() => encodeResourceSpans([root], { ...ok, resource }), TypeError, JSON.stringify(resource));
+  }
+  for (const scope of [undefined, null, 'svc', {}, { name: '' }, { name: 5 }, { name: 'a', version: 9 }]) {
+    assert.throws(() => encodeResourceSpans([root], { ...ok, scope }), TypeError, JSON.stringify(scope));
+  }
+  for (const stamp of [null, 'abc', ['a'], 5]) {
+    assert.throws(() => encodeResourceSpans([root], { ...ok, stamp }), TypeError, JSON.stringify(stamp));
+  }
 });

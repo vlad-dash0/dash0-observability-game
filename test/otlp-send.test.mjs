@@ -1,5 +1,6 @@
 // The OTLP/HTTP sender and the one response classifier (lib/otlp/send.mjs).
-// Spec: docs/DASH0-LAB.md §Sender. Fake fetch and fake timers; nothing touches the network.
+// Spec: docs/DASH0-LAB.md §Sender. Fake fetch and fake timers, except the last two tests, which use Node's real fetch
+// against a server on loopback (127.0.0.1).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -386,7 +387,7 @@ test('a response over 64 KiB is never inspected: no message on an error status, 
 });
 
 // Node's own fetch (undici) against a real local server: the init options the sender passes
-// (credentials, referrerPolicy, cache, redirect) must be accepted outside a browser too.
+// (for example credentials, referrerPolicy, cache, redirect) must be accepted outside a browser too.
 async function withServer(handler, run) {
   const server = createServer(handler);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -430,7 +431,7 @@ test("sendTraces over Node's own fetch: accepted, with the headers on the wire",
   assert.equal(seen.body, '{"a":1}');
 });
 
-test("sendTraces over Node's fetch does not follow a redirect", async () => {
+test("sendTraces over Node's own fetch: a redirect fails the send", async () => {
   let hits = 0;
   await withServer(
     (req, resp) => {
