@@ -81,6 +81,23 @@
 /* A night panel in both themes: the lights need a dark sky. The stage is square and capped,
    so the hub keeps its levels near the top; the canvas fills it (no style attributes). */
 .map-panel { margin: 0 16px; }
+/* The map and the levels: stacked below 1024px; side by side from there (the map left, at 5fr
+   against 7fr, never narrower than 360px). The map stays in view only where the window is also
+   tall enough to hold it (min-height 640px). */
+.hub-body { display: block; }
+@media (min-width: 1024px) {
+  .app { max-width: var(--layout-wide); padding-inline: var(--space-6); }
+  .hub-body {
+    display: grid; grid-template-columns: minmax(360px, 5fr) minmax(0, 7fr);
+    gap: var(--space-8); align-items: start;
+  }
+  .hub-body .map-panel { margin: 0; }
+  .hub-body .levels { padding: 0; }
+  .globe-stage { width: min(100%, 520px, max(280px, calc(100dvh - 240px))); }
+}
+@media (min-width: 1024px) and (min-height: 640px) {
+  .map-panel { position: sticky; top: var(--space-4); }
+}
 .globe {
   position: relative; background: var(--color-globe-sky); color: var(--color-globe-text);
   border: 1px solid var(--color-border); border-radius: var(--radius-lg);
@@ -140,7 +157,7 @@
 .globe-fallback li + li { border-top: 1px solid var(--color-border); }
 
 /* ---------- Level cards, grouped by act ---------- */
-.levels { padding: 0 16px; }
+.levels { padding: 0 16px; container: levels / inline-size; }
 .empty-state {
   padding: 18px; border: 1px dashed var(--color-border); border-radius: var(--radius);
   color: var(--color-text-muted); text-align: center;
@@ -156,6 +173,9 @@
 .act-soon-chip, .act-soon-teaser { margin: 0; }
 .act-badges { margin: 0 6px 10px; display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .level-list { display: flex; flex-direction: column; gap: 12px; }
+@container levels (min-width: 640px) {
+  .level-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .level-card {
   display: flex; align-items: center; gap: 14px;
   background: var(--color-surface); border: 1px solid var(--color-border);
@@ -258,7 +278,7 @@
 .about-sub { font-weight: 600; }
 .about-map { margin: var(--space-3) 0; }
 .about-map h3 { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
-.save-entry { padding: 0 16px 32px; }
+.save-entry { padding: 0 16px 8px; }
 .save-entry-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 6px 10px; }
 .signin-notice {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3);
