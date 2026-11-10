@@ -37,6 +37,7 @@ import { buildRegistry } from './lib/registry.mjs';
 import { createSaveDialog } from './lib/save-dialog.mjs';
 import { loadProgress, saveProgress, STORAGE_KEY } from './lib/storage.mjs';
 import { readTheme, writeTheme } from './lib/theme.mjs';
+import { continueView, hubActs } from './lib/hub-view.mjs';
 import { levelState, lockReason } from './lib/unlock.mjs';
 
 // ?mode=debug shows the globe with everything finished (#309): a progress where every level is done.
@@ -223,6 +224,8 @@ export function createGame(deps) {
     overlayTitle: '',
     overlayNo: '',
     currentLevelId: null,
+    actOverrides: {}, // act id -> bool: the player's fold choice, memory only (never stored)
+    openedFrom: 'card', // who opened the current level: 'card' or 'continue' (returnTarget)
     nudgeId: null,
     rewardOpen: false,
     aboutOpen: false,
@@ -552,13 +555,30 @@ export function createGame(deps) {
     },
     // A class string, never a mixed :class array (Alpine renders "[object Object]").
     levelClasses(id) {
-      return this.levelState(id) + (this.nudgeId === id ? ' nudge' : '');
+      return this.levelState(id) + (this.isNextUp(id) ? ' next' : '') + (this.nudgeId === id ? ' nudge' : '');
+    },
+    // ---------- continue ----------
+    // The Continue button, read fresh each time (lib/hub-view.mjs): null in debug, when all is done, with no levels.
+    continueView() {
+      return continueView(registry, this.progress, { debug: this.debug });
+    },
+    continueLabel() {
+      return this.continueView()?.label ?? '';
+    },
+    // Recomputed on the click, never taken from what was drawn; refused behind a dialog like any card.
+    continueNext() {
+      const next = this.continueView();
+      return next !== null && this.openLevel(next.levelId, 'continue') !== false; // openLevel refuses behind a dialog
+    },
+    // The one card Continue would open (the Next up chip and class); none in debug.
+    isNextUp(id) {
+      return this.continueView()?.levelId === id;
     },
     levelLabel(id) {
       const l = registry.levels[id];
       const head = l.kind === 'boss' ? 'Incident' : l.no;
       const sub = l.sub ? ` ${endSentence(l.sub)}` : '';
-      return `${head}: ${endSentence(l.name)}${sub} ${STATE_LABELS[this.levelState(id)]}`;
+      return `${head}: ${endSentence(l.name)}${sub} ${STATE_LABELS[this.levelState(id)]}${this.isNextUp(id) ? ', next up' : ''}`;
     },
     // The card subtitle: the lock reason while nudged, else the level's sub.
     levelSub(id) {
@@ -684,6 +704,34 @@ export function createGame(deps) {
     hubInert() {
       return this.dialogOpen();
     },
+    // ---------- act folds (lib/hub-view.mjs hubActs) ----------
+    // The row of a registry act (real progress, also in debug), or undefined for a coming-soon or unknown id.
+    actRow(id) {
+      return hubActs(registry, this.progress, { debug: this.debug, overrides: this.actOverrides }).find((r) => r.id === id);
+    },
+    // Folded or not: a registry act by its row, a coming-soon act unfolded unless toggled, an unknown id never.
+    actExpanded(id) {
+      const row = this.actRow(id);
+      if (row !== undefined) return row.expanded;
+      if (!this.acts.some((a) => a.id === id)) return false;
+      return Object.hasOwn(this.actOverrides, id) ? this.actOverrides[id] === true : true;
+    },
+    // aria-expanded needs the string: Alpine drops an attribute bound to false.
+    actExpandedAttr(id) {
+      return this.actExpanded(id) ? 'true' : 'false';
+    },
+    // The act heading's one line: "Act 2: Traces, 2 of 8", "..., saved, 4 of 4", "Act 7: Later, coming soon".
+    actLine(act) {
+      if (act.soon) return `${act.title}, coming soon`;
+      return this.actRow(act.id)?.line ?? act.title;
+    },
+    // Fold or unfold one act (memory only, debug included); returns whether it is now expanded.
+    toggleAct(id) {
+      if (!this.acts.some((a) => a.id === id)) return false;
+      const next = !this.actExpanded(id);
+      this.actOverrides = { ...this.actOverrides, [id]: next };
+      return next;
+    },
     // The About dialog: the game summary and one entry per act (live and coming soon), from act data.
     aboutActs() {
       return this.acts.map((a) => ({ id: a.id, title: a.title, sub: a.sub, teaser: a.teaser, soon: a.soon, badges: a.badges }));
@@ -744,7 +792,8 @@ export function createGame(deps) {
     // A locked card wiggles and names what unlocks it (R's nudge) instead of doing nothing.
     // Refused while a level or the reward is open: the hub is inert then, and a stray
     // Enter must never abort a run. Close the level first (closeOverlay).
-    openLevel(id) {
+    // `from` is who opened it: 'card' or 'continue' (where focus goes back to, returnTarget).
+    openLevel(id, from = 'card') {
       if (this.dialogOpen()) return false;
       if (this.levelState(id) === 'locked') {
         if (Object.hasOwn(registry.levels, id)) this.nudge(id);
@@ -759,6 +808,7 @@ export function createGame(deps) {
       const controller = new AbortController();
       session = controller;
       this.currentLevelId = id;
+      this.openedFrom = from;
       this.overlayTitle = level.name;
       this.overlayNo = level.kind === 'boss' ? 'Incident' : level.no ? `Level ${level.no}` : '';
       this.overlayOpen = true;
@@ -1011,8 +1061,18 @@ export function createGame(deps) {
     // ---------- focus ----------
     // Put focus back on the card that opened the level (by id, not position).
     returnFocus() {
+      const target = this.returnTarget();
+      if (target) this.focusSoon(target);
+    },
+    // Where focus goes when the level closes: Continue if it opened the level and is still shown, else the card
+    // (its act's toggle when the act is folded and the card hidden).
+    returnTarget() {
       const id = this.currentLevelId;
-      if (id) this.focusSoon(`[data-level-id="${id}"]`);
+      if (!id) return null;
+      if (this.openedFrom === 'continue' && this.continueLabel() !== '') return '#hub-continue';
+      const actId = registry.levels[id]?.actId;
+      if (actId !== undefined && !this.actExpanded(actId)) return `#act-toggle-${actId}`; // the card is hidden in a folded act
+      return `[data-level-id="${id}"]`;
     },
     // Focus after Alpine has rendered (its $nextTick when running under Alpine), and only once the
     // target is shown: an x-show effect may not have flushed yet, and focus() on a display:none

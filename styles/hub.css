@@ -81,6 +81,24 @@
 /* A night panel in both themes: the lights need a dark sky. The stage is square and capped,
    so the hub keeps its levels near the top; the canvas fills it (no style attributes). */
 .map-panel { margin: 0 16px; }
+/* The map and the levels: stacked below 1024px; side by side from there (the map left, at 5fr
+   against 7fr, never narrower than 360px). The map stays in view only where the window is also
+   tall enough to hold it (min-height 640px). */
+.hub-body { display: block; }
+@media (min-width: 1024px) {
+  .app { max-width: var(--layout-wide); padding-inline: var(--space-6); }
+  .hub-body {
+    display: grid; grid-template-columns: minmax(360px, 5fr) minmax(0, 7fr);
+    gap: var(--space-8); align-items: start;
+  }
+  .hub-body { padding-inline: 20px; } /* the header's inset, so the map lines up with the header and strip */
+  .hub-body .map-panel { margin: 0; }
+  .hub-body .levels { padding: 0; }
+  .globe-stage { width: min(100%, 520px, max(280px, calc(100dvh - 240px))); }
+}
+@media (min-width: 1024px) and (min-height: 640px) {
+  .map-panel { position: sticky; top: var(--space-4); }
+}
 .globe {
   position: relative; background: var(--color-globe-sky); color: var(--color-globe-text);
   border: 1px solid var(--color-border); border-radius: var(--radius-lg);
@@ -101,9 +119,14 @@
   font-family: var(--font-mono); font-size: 11px; margin-top: 4px; list-style: none; padding: 0;
 }
 .globe-legend li { display: inline-flex; align-items: center; gap: 7px; }
+/* The caption and Continue sit above the globe, outside it, so both show without WebGL. */
+.map-head {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  margin-bottom: var(--space-3); text-align: center;
+}
 .globe-caption {
-  margin: 0; padding: 10px 14px 0; text-align: center;
-  font-size: var(--text-md); color: var(--color-globe-text);
+  margin: 0; padding: 0; text-align: center;
+  font-size: var(--text-md); color: var(--color-text);
 }
 .globe-key {
   width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block;
@@ -140,13 +163,28 @@
 .globe-fallback li + li { border-top: 1px solid var(--color-border); }
 
 /* ---------- Level cards, grouped by act ---------- */
-.levels { padding: 0 16px; }
+.levels { padding: 0 16px; container: levels / inline-size; }
 .empty-state {
   padding: 18px; border: 1px dashed var(--color-border); border-radius: var(--radius);
   color: var(--color-text-muted); text-align: center;
 }
 .act + .act { margin-top: 18px; }
-.act-title { font-size: 16px; font-weight: 700; margin: 0 6px 2px; }
+.act-title { font-size: 16px; font-weight: 700; margin: 0; }
+/* The act heading is one full-width button (a 44px target): the whole line folds and unfolds the act. */
+.act-toggle {
+  display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 44px;
+  margin: 0; padding: 0 6px; border: 0; background: none; color: inherit; font: inherit;
+  text-align: left; cursor: pointer;
+}
+.act-toggle::before {
+  content: ""; flex: none; width: 7px; height: 7px;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg); transition: transform .15s;
+}
+.act-toggle[aria-expanded="true"]::before { transform: rotate(45deg); }
+.act-toggle:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; border-radius: var(--radius); }
+@media (prefers-reduced-motion: reduce) { .act-toggle::before { transition: none; } }
+.act-body { padding-top: 2px; }
 .act-sub { font-size: 13px; color: var(--color-text-muted); margin: 0 6px 10px; }
 .act.soon .act-title, .act.soon .act-sub { color: var(--color-text-muted); }
 .act-soon {
@@ -156,6 +194,12 @@
 .act-soon-chip, .act-soon-teaser { margin: 0; }
 .act-badges { margin: 0 6px 10px; display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .level-list { display: flex; flex-direction: column; gap: 12px; }
+/* Two cards per row only from a 600px container: a card is then >= 294px, enough for the 50px icon,
+   the ~70px status column and a text column of ~110px. A 527 to 551px column (1024px window) stays one
+   per row; 768px (688px) and 1280px (~700px) are two-up. */
+@container levels (min-width: 600px) {
+  .level-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .level-card {
   display: flex; align-items: center; gap: 14px;
   background: var(--color-surface); border: 1px solid var(--color-border);
@@ -171,6 +215,7 @@
   content: ""; position: absolute; inset: 0; border-radius: var(--radius-lg); pointer-events: none;
   background: linear-gradient(90deg, color-mix(in srgb, var(--color-success) 10%, transparent), transparent 60%);
 }
+.level-card.next { border-color: var(--color-accent); box-shadow: 0 0 0 1px var(--color-accent); }
 .level-card.nudge { opacity: .9; animation: nudge .45s ease; }
 .level-card.nudge .level-sub { color: var(--color-accent-text); font-weight: 700; }
 @keyframes nudge { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
@@ -181,8 +226,8 @@
 }
 .level-body { flex: 1; min-width: 0; }
 .level-no { font-size: 11px; font-weight: 700; color: var(--color-accent-text); letter-spacing: .5px; font-family: var(--font-mono); }
-.level-name { font-weight: 700; font-size: 16px; line-height: 1.2; }
-.level-sub { font-size: 13px; color: var(--color-text-muted); margin-top: 2px; }
+.level-name { font-weight: 700; font-size: 16px; line-height: 1.2; overflow-wrap: break-word; }
+.level-sub { font-size: 13px; color: var(--color-text-muted); margin-top: 2px; overflow-wrap: break-word; }
 .level-status {
   flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
@@ -206,7 +251,7 @@
   background: radial-gradient(90% 220% at 0% 0%, var(--color-lesson-glow), transparent 60%), var(--color-surface);
 }
 .lesson-heading { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
-.lesson-top h2 { font-weight: 700; font-size: 18px; line-height: 1.25; overflow-wrap: anywhere; }
+.lesson-top h2 { font-weight: 700; font-size: 18px; line-height: 1.25; overflow-wrap: break-word; }
 @media (max-width: 520px) {
   .lesson-top { padding: var(--space-3) var(--space-4); gap: var(--space-2); }
   .lesson-top h2 { font-size: 16px; }
@@ -258,7 +303,7 @@
 .about-sub { font-weight: 600; }
 .about-map { margin: var(--space-3) 0; }
 .about-map h3 { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
-.save-entry { padding: 0 16px 32px; }
+.save-entry { padding: 0 16px 8px; }
 .save-entry-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 6px 10px; }
 .signin-notice {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3);

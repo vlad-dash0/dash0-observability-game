@@ -188,7 +188,7 @@ State: `lib/globe.mjs` `globeState` (country `{lit}`, lit when its level is comp
 View, pure (`lib/globe-view.mjs`): `dotStates` (per dot UNLIT / LIT / PULSE / SOON / RESOLVED, precedence PULSE > SOON > RESOLVED > LIT:
 a fixed incident leaves its whole region RESOLVED, a static calm mint (`--color-globe-resolved`, `uResolved`, no `uTime`),
 and `globeLines` adds ", saved", `globeLabel` "Saved: ..." and leaves saved regions out of "Lit:";
-a coming-soon region's dots are SOON, static and dim, and never lit), `currentActId` (lowest unlocked act not complete, else the last) and
+a coming-soon region's dots are SOON, static and dim, and never lit), `currentActId` (the act `nextUp` names, else the last act) and
 `globeTarget` (rotation facing that act's region centre), `globeLabel` (the accessible name)
 and `globeLines` (the no-WebGL text, one line per act), `readColors` (the `--color-globe-*`
 tokens via computed style), `createLoop` (rAF loop: stops while the tab is hidden or the
@@ -203,6 +203,10 @@ slot and period so there is no backlog after a hidden tab; each spark is a burst
 particles fanning outward from its dot; the seed is per mount; one lazy `THREE.Points` of
 `SLOTS * COUNT` vertices, never made under reduced motion, hidden while no region pulses). Level `lights` stay level data, validated
 against `hub/map-data.mjs` `NODE_IDS`, and are no longer drawn.
+
+Next up (#313): `lib/unlock.mjs` `nextUp(registry, progress)` is the one rule for what to play next: `{actId, levelId}` or `null`. The lowest act whose boss is `'open'` (an incident) wins; else the first incomplete act's first `'open'` id in play order (its `levelIds`, then `bossId`); `null` when every act is complete or there are no acts, never a default. `actCounts(act, progress)` is `{done, total}` over an act's levels plus its boss, and `globeState` regions use it. Invariant: Continue, Next up and the globe target name the same act (`currentActId` is `nextUp(...)?.actId`, else the last act, so the globe turns to an open incident in a later act); `test/next-up.test.mjs` pins it, and `globeCaption` agrees except in its `saved` phase, which names the act before.
+
+Act folds (#313): `lib/hub-view.mjs` `hubActs(registry, progress, {debug, overrides})` gives one row per act, `{id, status, done, total, line, expanded}`, counts from `actCounts`. Status: `saved` (complete, folded), `incident` (boss open, unfolded), `locked` (not unlocked, folded), `open` (unfolded); `overrides` (act id to boolean) beat that default, and debug unfolds every act by default while keeping the real statuses. The act heading is `h3.act-title > button.act-toggle` (`aria-expanded`, `aria-controls` the `div.act-body`), its text the line: `Act 0: Orientation, saved, 4 of 4`, `..., incident open, 3 of 4`, `..., locked, 0 of 8`, `Act 2: Traces, 2 of 8`, and `Act 7: Later, coming soon` for an act that is not in the registry (unfolded by default, with a toggle). The player's choice (`actOverrides`, set by `toggleAct`) lives in memory only: it is never stored, survives progress changes until reload, and an unknown id toggles to `false`. When a level closes in a folded act, focus goes to `#act-toggle-<actId>` (its card is hidden), after the Continue case.
 
 Story (#309): `globeCaption(registry, state)` is the one-line caption inside `.globe` (not a live region; `litNote` announces): the first phase that matches wins, tried in this order: incident (`Alert! {Region} is down. Tend to it now.`), allSaved, dark, saved (the current act is untouched and the one before it is saved) or building (`{done} of {total}`, levels plus boss, from `regions`; an untouched current act with no saved act before it reads dark); every live text is at most 60 characters, null without a mapped region. `globeLegend(states, dots, actOf)` is the map key (`<ul aria-label="Map key">`) of what is drawn now, in the order incident, resolved, lit, dark (an unlit dot with an act), soon; `app.mjs` `legendKeyClass` maps incident to the pulse swatch and dark to the plain one. The caption and the key are hidden with the globe in the text fallback, and the key is empty when there is no caption. The About dialog carries the loop as `hub/about.mjs` `GLOBE_LOOP`.
 
@@ -580,7 +584,7 @@ builds run side by side, only the current build's registry is protected at the c
 | `createLevelContext` | `lib/level-context.mjs` |
 | `emptyProgress`, `sanitizeProgress`, `registryIds(registry)` → `{levelIds, cardIds}` (the `keep` ids), `migrate(raw, {current, migrations})` → migrated record, `raw` if at/past `current`, or `null` (corrupt), `mergeProgress(a, b, {keep}?)`, `recordCompletion(progress, levelId, {stars, cards, at}, registry)` → `{progress, firstCompletion, newBest, newCards}`, `starTotals` → `{earned, max}`, `cardTotals` → `{earned, max}` | `lib/progress.mjs` |
 | `encodeProgress`, `decodeProgress`, `previewImport`, `REFUSALS` (save codes, #18) | `lib/save-code.mjs` |
-| `isCompleted`, `isActComplete`, `isActUnlocked`, `levelState`, `lockReason` | `lib/unlock.mjs` |
+| `isCompleted`, `isActComplete`, `isActUnlocked`, `levelState`, `lockReason`, `nextUp`, `actCounts` | `lib/unlock.mjs` |
 | `loadProgress(storageGetter, registry)` → `{status, progress}` (`TypeError` before any read without a registry), `saveProgress(storageGetter, progress, registry)` → `{saved, reason?, progress}` (`progress` is always the registry view; `TypeError` before any storage access without a registry) | `lib/storage.mjs` |
 | `resolveTheme`, `readTheme(getter)`, `writeTheme(getter, t)` | `lib/theme.mjs` |
 | `HELP_KEY` (`oncall.help`), `readHiddenHelp(getter)` → `{status, hidden: Set}`, `hideHelp(getter, keys)` → `{saved, reason?}` | `lib/help-prefs.mjs` |

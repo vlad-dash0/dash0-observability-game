@@ -133,8 +133,9 @@ test('T5 no :has() and no !important outside reduced motion and [x-cloak]', () =
 
 // ---- T12 the generic layout: one container, named by the kit ------------------------------
 
-// Empty since #158 P7: the kit step is the only `level` container.
-const CONTAINER_ALLOW = [];
+// The kit step is the only `level` container (#158 P7). The hub's .levels is the one other
+// container, named `levels` (#313 P4: two cards per row from 640px of its own width).
+const CONTAINER_ALLOW = { 'hub.css .levels': 'container: levels / inline-size' };
 
 test('T12 the split shows its side column from 960px of the level container: minmax(0, 1fr) and a 300px side', () => {
   const at = sheetRules('kit.css').filter((r) => r.at.includes('@container level (min-width: 960px)'));
@@ -164,28 +165,29 @@ test('T12 harness: a container is keyed only by a lone class, and its declaratio
   assert.deepEqual(decls(r.body).filter(([p]) => CONTAINER_PROP.test(p)), [['container', 'other / size']]);
 });
 
-test('T12 every container query names level; only the kit step declares a container, as level / inline-size', () => {
+test('T12 every container query names level (the hub: levels); only the kit step and the hub levels list declare a container', () => {
   const seen = new Set();
   let queries = 0;
   for (const f of SHEETS) {
     for (const r of sheetRules(f)) {
       for (const a of r.at.filter((x) => x.startsWith('@container'))) {
         queries++;
-        assert.match(a, /^@container level \(/, `styles/${f} "${a}": query the step's level container`);
+        const hub = f === 'hub.css' && /^@container levels \(/.test(a);
+        assert.ok(hub || /^@container level \(/.test(a), `styles/${f} "${a}": query the step's level container`);
       }
       for (const [prop, value] of decls(r.body)) {
         if (!CONTAINER_PROP.test(prop)) continue;
         const key = containerKey(f, r.selector) ?? `${f} ${r.selector}`;
-        assert.ok(key === 'kit.css .ui-step' || CONTAINER_ALLOW.includes(key),
+        assert.ok(key === 'kit.css .ui-step' || key in CONTAINER_ALLOW,
           `${key} declares a container; the step type decides the layout (STEP_TYPES[*].wide)`);
-        assert.equal(`${prop}: ${value}`, 'container: level / inline-size', `${key} must be the level container, by the container shorthand`);
+        assert.equal(`${prop}: ${value}`, CONTAINER_ALLOW[key] ?? 'container: level / inline-size', `${key} must be its container, by the container shorthand`);
         seen.add(key);
       }
     }
   }
   assert.ok(queries >= 2, 'kit.css and widgets.css query the level container');
   assert.ok(seen.has('kit.css .ui-step'), 'the kit step declares the container');
-  for (const key of CONTAINER_ALLOW) assert.ok(seen.has(key), `stale CONTAINER_ALLOW entry: ${key}`);
+  for (const key of Object.keys(CONTAINER_ALLOW)) assert.ok(seen.has(key), `stale CONTAINER_ALLOW entry: ${key}`);
 });
 
 test('a chip never overflows its container: capped at the container width, and its text may wrap', () => {
@@ -309,7 +311,7 @@ test('T7 LEGACY is empty and the retired CSS is gone: nothing on the pre-kit UI 
   const defined = definedClasses();
   // `show` is also the hub's open state for .overlay, .reward and .notice (hub.css), not feedback.
   for (const c of RETIRED.filter((x) => x !== 'show')) assert.ok(!defined.has(c), `a stylesheet defines the retired class .${c}; the kit replaced it`);
-  assert.deepEqual(CONTAINER_ALLOW, []);
+  assert.deepEqual(CONTAINER_ALLOW, { 'hub.css .levels': 'container: levels / inline-size' }, 'the hub levels list is the only exception');
 });
 
 // Every class a non-kit stylesheet styles is written by some app module or index.html. A rule
@@ -320,8 +322,8 @@ const DYNAMIC_ALLOW = {
   'hub.css': {
     // app.mjs `confetti c${(i % 6) + 1}`
     c1: ['confetti'], c2: ['confetti'], c3: ['confetti'], c4: ['confetti'], c5: ['confetti'], c6: ['confetti'],
-    // app.mjs levelClasses(): the level state plus ' nudge'
-    done: ['level-card'], locked: ['level-card'], nudge: ['level-card'],
+    // app.mjs levelClasses(): the level state plus ' next' and ' nudge'
+    done: ['level-card'], locked: ['level-card'], nudge: ['level-card'], next: ['level-card'],
     // lib/globe-render.mjs `globe-probe ${role}` over COLOR_ROLES
     body: ['globe-probe'], dim: ['globe-probe'], rim: ['globe-probe'], sky: ['globe-probe'],
     // app.mjs legendKeyClass(): `globe-key ${swatch}` (incident draws as pulse, dark as the plain key)
