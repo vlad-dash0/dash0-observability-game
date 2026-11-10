@@ -321,7 +321,7 @@ top-level navigation from `<a href="/api/auth-start">`, sign-out is a same-origi
   `prompt=select_account`. Unconfigured, or a request host that is not AUTH_ORIGIN's host: 302 to `/?signin=unavailable`.
 - `GET /api/auth-callback`: checks the auth cookie's signature and age and compares state in constant time, POSTs the
   code, verifier and secret to Google's token endpoint (8 s timeout), verifies the ID token, creates or loads the
-  profile, sets the session cookie, clears the auth cookie and 302s to `/?signin=ok`. Failures go to `/?signin=` with
+  profile, sets the session cookie, clears the auth cookie and 302s to `/?signin=new` when the profile was just created, `/?signin=ok` for a returning player. Failures go to `/?signin=` with
   `domain`, `cancelled` (Google's `access_denied`), `failed` or `unavailable`. The email is read once, to make the
   default nickname.
 - `lib/auth/jwt.mjs`: `createJwksCache({fetch, now})` and `verifyIdToken(token, {jwks, clientId, nonce, now})`
@@ -379,8 +379,11 @@ always the same for the same email, is: the fun names in that order, then `<firs
 characters. `pickNick(email, isTaken)` returns the first candidate whose lowercase key is not taken, or null when every
 candidate is taken (the caller must treat null as a failure, never invent a name). The player can override the nickname at any time. A new profile is listed by default
 (`listed=1`) and joins the board on its first progress write; the account modal has a "Show me on the leaderboard"
-toggle to hide. There is no confirm-once step. After first sign-in a notice says "You're on the leaderboard as <nick>.
-Change your nickname or hide yourself in Account."
+toggle to hide. There is no confirm-once step. The callback redirects to `/?signin=new` only when the profile was just created
+(`/?signin=ok` otherwise, which shows nothing). Then a notice says, by what the client knows: unlisted, "Signed in as <nick>.";
+count unknown (first sync in flight or failed), "Signed in as <nick>. Change your nickname or hide yourself in Account.";
+known with no stars, "You'll appear on the leaderboard as <nick> once you earn a star. Change your nickname or hide yourself
+in Account."; known with a star, "You're on the leaderboard as <nick>. Change your nickname or hide yourself in Account."
 
 
 **Merge.** `mergeStored(storedRaw, incoming, registry)` in `lib/progress.mjs` is the one merge expression (unknown ids
@@ -421,7 +424,7 @@ saves the merged response locally, and never syncs in debug mode.
 
 **Three outcomes.** Every read gives ok, unavailable or not configured. A failed store operation returns
 `{ok:false, reason:'store'}`, never `[]` or 0. The client maps 502, 503, network errors and odd bodies to
-unavailable ("Leaderboard unavailable"; "Account unavailable; your progress is still saved in this browser") and says
+unavailable ("Leaderboard unavailable"; a failed account read says "Sign-in and the leaderboard are unavailable right now; your progress is still saved in this browser."; a failed action or sync says "Account unavailable; your progress is still saved in this browser") and says
 "No one on the board yet" only for an ok empty board.
 
 **Threat model.** Progress is client-asserted. The server enforces real Dash0 identities, totals computed on the server
@@ -436,7 +439,7 @@ either an anchor "Sign in with Google (@dash0.com)" or "Signed in as <nick>" wit
 nickname field, a listing toggle, Sign out and Delete with a two-step confirm. The nudge, in the reward card, is
 dismissible, shown at most once per page session and not when `signin-nudge` is hidden through `hideHelp`, with
 buttons Sign in, Not now and Don't ask again. `?signin=` is read once in `main.mjs`, shown as a notice, then stripped
-with `history.replaceState`. Privacy copy: "Optional, @dash0.com Google accounts only. We keep your Google account id,
+with `history.replaceState`; `new` shows the welcome line (it promises a leaderboard place only once the player has a star), `ok` shows nothing. Privacy copy: "Optional, @dash0.com Google accounts only. We keep your Google account id,
 a nickname and your level stars and cards, nothing else. We never store or show your name or email. Signed-in players
 are listed on the leaderboard by default and can hide themselves in Account. Your default nickname is a fun name made
 from your email; change it any time. Delete your account to remove everything we hold; this browser

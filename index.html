@@ -137,9 +137,10 @@
       </div>
       <div id="account-entry" x-show="accountEnabled" x-cloak>
         <p class="save-entry-text" x-show="signedIn" x-text="signedInText()"></p>
-        <p class="save-entry-text" x-show="signedIn" x-text="accountSummary()"></p>
-        <p class="save-entry-text" x-show="accountNotice !== ''" x-text="accountNotice"></p>
+        <p class="save-entry-text" x-show="signedIn &amp;&amp; accountSummary() !== ''" x-cloak x-text="accountSummary()"></p>
       </div>
+      <!-- Outside #account-entry: when GET /api/account fails the entry is hidden and this is all the player sees. -->
+      <p class="save-entry-text" x-show="accountNotice !== ''" x-cloak x-text="accountNotice"></p>
     </section>
   </div>
 
@@ -210,6 +211,8 @@
           <p class="nuance-card" x-text="front"></p>
         </template>
       </div>
+      <!-- Same markup as lib/ui/text.mjs note(), with the sync hooks added by hand. Only for a signed-in player whose sync is failing. -->
+      <p class="ui-note" data-sync-note x-show="signedIn &amp;&amp; accountNotice !== ''" x-cloak>Your progress is saved in this browser; your account catches up on your next win or when you reload.</p>
       <div class="reward-nudge" x-show="signinNudgeOpen" x-cloak>
         <p x-text="signinNudgeText"></p>
         <div class="reward-nudge-actions">

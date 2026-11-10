@@ -92,7 +92,7 @@ test('every name the account markup binds exists on the game, with the right kin
   for (const k of ['accountEnabled', 'signedIn', 'signedInText', 'signinNoticeText', 'dismissSigninNotice', 'signinNudgeOpen', 'signinNudgeText', 'hideSigninNudge', 'accountSummary', 'openBoard', 'openAccount']) assert.ok(seen.has(k), `the markup binds ${k}`);
 });
 
-test('accountSummary: nothing signed out, "no stars yet" for null stars (never 0), stars and rank otherwise', () => {
+test('accountSummary: nothing signed out or before the server count is known, "no stars yet" for a known null (never 0), stars and rank otherwise', () => {
   const game = createGame({
     registry: buildRegistry([], { deck: [], nodeIds: [] }), deck: [], storage: () => fakeStorage({}), document: parseHTML('<!doctype html><body></body>').document,
     now: () => 1, rand: () => 0, reduceMotion: () => true, reportError: () => {}, setTimeout: () => 0, clearTimeout: () => {},
@@ -100,7 +100,11 @@ test('accountSummary: nothing signed out, "no stars yet" for null stars (never 0
   });
   assert.equal(game.accountSummary(), '');
   game.account = { state: 'signedIn', nick: 'grace', listed: true };
+  assert.equal(game.accountSummary(), '', 'unknown is not "no stars yet"');
+  game.accountKnown = true;
   assert.equal(game.accountSummary(), 'no stars yet');
   game.accountStars = 4; game.accountRank = 3;
   assert.equal(game.accountSummary(), '4 stars, #3');
+  game.accountKnown = false;
+  assert.equal(game.accountSummary(), '', 'a stale count is not shown');
 });

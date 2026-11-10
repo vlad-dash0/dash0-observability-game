@@ -165,11 +165,11 @@ test('start: an address over its limit stays refused after 2000+ other addresses
 
 // ---- auth-callback --------------------------------------------------------------------
 
-test('callback success: 302 to /?signin=ok with the session cookie and the auth cookie cleared', async () => {
+test('callback success: a new profile 302s to /?signin=new with the session cookie and the auth cookie cleared', async () => {
   const r = rig();
   const { res } = await signInFlow(r);
   assert.equal(res.status, 302);
-  assert.equal(res.headers.get('location'), '/?signin=ok');
+  assert.equal(res.headers.get('location'), '/?signin=new');
   const cookies = res.headers.getSetCookie();
   assert.equal(cookies.length, 2);
   assert.ok(setCookie(res, SESSION).endsWith('; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000'));
@@ -179,6 +179,15 @@ test('callback success: 302 to /?signin=ok with the session cookie and the auth 
   assert.equal(loaded.profile.nick, defaultNickCandidates('ada.lovelace@dash0.com')[0]);
   assert.equal(loaded.profile.listed, true, 'listed by default');
   assert.equal(session.gen, String(loaded.profile.gen));
+});
+
+test('callback success: a returning player 302s to /?signin=ok, not the welcome', async () => {
+  const r = rig();
+  await signInFlow(r);
+  r.google.nonce = undefined; // each start makes a new nonce
+  const again = await signInFlow(r);
+  assert.equal(again.res.status, 302);
+  assert.equal(again.res.headers.get('location'), '/?signin=ok');
 });
 
 test('callback success: the token request carries the code, the verifier, the secret and the redirect uri', async () => {
@@ -360,7 +369,7 @@ test('stub: start goes straight to the callback and sign-in makes dev@dash0.com,
   assert.equal(loc.searchParams.get('code'), 'stub');
   const cookie = `${AUTH}=${cookieValue(startRes, AUTH)}`;
   const res = await r.callback.GET(get(`${LOCAL}/api/auth-callback?${loc.searchParams}`, { cookie }));
-  assert.equal(res.headers.get('location'), '/?signin=ok');
+  assert.equal(res.headers.get('location'), '/?signin=new');
   const session = await verifySession(cookieValue(res, SESSION), SECRET, NOW);
   assert.equal((await r.store.loadProfile(session.pid)).profile.nick, defaultNickCandidates('dev@dash0.com')[0]);
   assert.ok(r.fake.dump().includes('stub-dev'));
@@ -425,7 +434,7 @@ test('the dev server under AUTH_STUB signs in end to end over HTTP, and refuses 
     const next = new URL(start.headers.location);
     assert.equal(next.origin, `http://localhost:${port}`);
     const back = await call(port, `${next.pathname}${next.search}`, { cookie: jar(start) });
-    assert.equal(back.headers.location, '/?signin=ok');
+    assert.equal(back.headers.location, '/?signin=new');
     assert.equal(back.headers['set-cookie'].length, 2, 'both cookies arrive');
     const me = JSON.parse((await call(port, '/api/account', { cookie: jar(back) })).body);
     assert.equal(me.signedIn, true);
