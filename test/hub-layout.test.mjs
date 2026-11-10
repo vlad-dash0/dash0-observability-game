@@ -28,10 +28,10 @@ test('L2: the map column is sticky only where it is wide and tall enough', () =>
   }
 });
 
-test('L3: the levels are a container and go two per row from a 520px container width', () => {
+test('L3: the levels are a container and go two per row from a 600px container width', () => {
   const c = prop(at('.levels'), 'container');
   assert.equal(c, 'levels / inline-size');
-  const two = at('.level-list', '@container levels (min-width: 520px)');
+  const two = at('.level-list', '@container levels (min-width: 600px)');
   assert.equal(prop(two, 'grid-template-columns'), 'repeat(2, minmax(0, 1fr))');
   assert.equal(prop(at('.level-list'), 'grid-template-columns'), undefined, 'one column by default');
 });
@@ -46,9 +46,10 @@ test('L4: every globe stage width is capped by min(100%, ...), so it never overf
   assert.ok(prop(stages, 'width'));
 });
 
-test('L5: a 551px column (a 1024px window) gets two cards per row', () => {
+test('L5: a 551px column (a 1024px window) stays one card per row; 688px (768) and 700px (1280) go two-up', () => {
   const m = /@container levels \(min-width: (\d+)px\)/.exec(R.find((r) => r.selector === '.level-list' && r.at[0]?.startsWith('@container'))?.at[0] ?? '');
-  assert.ok(m && Number(m[1]) <= 551);
+  assert.ok(m && Number(m[1]) > 551 && Number(m[1]) <= 688, m?.[1]);
+  assert.equal(R.filter((r) => r.selector === '.level-card' && r.at.length).length, 0, 'no tighter card inside a query: a two-up card is at least 294px');
 });
 
 test('L6: html and body never clip or scroll on the x axis, or the sticky map has no scroll parent to stick in', () => {
@@ -64,5 +65,5 @@ test('L6: html and body never clip or scroll on the x axis, or the sticky map ha
 test('L7: the map panel and the cards line up with the header inset, and long words wrap in a card', () => {
   assert.equal(prop(at('.hub-body', WIDE), 'padding-inline'), '20px');
   assert.equal(prop(at('.hub-header'), 'padding'), '18px 20px 12px');
-  for (const sel of ['.level-name', '.level-sub']) assert.equal(prop(at(sel), 'overflow-wrap'), 'anywhere');
+  for (const sel of ['.level-name', '.level-sub']) assert.equal(prop(at(sel), 'overflow-wrap'), 'break-word');
 });

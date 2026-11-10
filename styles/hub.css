@@ -174,11 +174,11 @@
 .act-soon-chip, .act-soon-teaser { margin: 0; }
 .act-badges { margin: 0 6px 10px; display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .level-list { display: flex; flex-direction: column; gap: 12px; }
-/* From 520px: a 551px column (1024px window) gets two cards of ~270px. A card keeps its 50px icon and
-   the ~70px status column, so the 2-up card tightens its gap and padding and leaves the body >= ~88px. */
-@container levels (min-width: 520px) {
+/* Two cards per row only from a 600px container: a card is then >= 294px, enough for the 50px icon,
+   the ~70px status column and a text column of ~110px. A 527 to 551px column (1024px window) stays one
+   per row; 768px (688px) and 1280px (~700px) are two-up. */
+@container levels (min-width: 600px) {
   .level-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .level-card { gap: 10px; padding: 12px; }
 }
 .level-card {
   display: flex; align-items: center; gap: 14px;
@@ -205,8 +205,8 @@
 }
 .level-body { flex: 1; min-width: 0; }
 .level-no { font-size: 11px; font-weight: 700; color: var(--color-accent); letter-spacing: .5px; font-family: var(--font-mono); }
-.level-name { font-weight: 700; font-size: 16px; line-height: 1.2; overflow-wrap: anywhere; }
-.level-sub { font-size: 13px; color: var(--color-text-muted); margin-top: 2px; overflow-wrap: anywhere; }
+.level-name { font-weight: 700; font-size: 16px; line-height: 1.2; overflow-wrap: break-word; }
+.level-sub { font-size: 13px; color: var(--color-text-muted); margin-top: 2px; overflow-wrap: break-word; }
 .level-status {
   flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
@@ -230,7 +230,7 @@
   background: radial-gradient(90% 220% at 0% 0%, var(--color-lesson-glow), transparent 60%), var(--color-surface);
 }
 .lesson-heading { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
-.lesson-top h2 { font-weight: 700; font-size: 18px; line-height: 1.25; overflow-wrap: anywhere; }
+.lesson-top h2 { font-weight: 700; font-size: 18px; line-height: 1.25; overflow-wrap: break-word; }
 @media (max-width: 520px) {
   .lesson-top { padding: var(--space-3) var(--space-4); gap: var(--space-2); }
   .lesson-top h2 { font-size: 16px; }
