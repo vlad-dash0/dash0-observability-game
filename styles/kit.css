@@ -198,8 +198,9 @@
 .ui-chip[data-tone="hint"] .ui-chip-dot { background: var(--color-hint); }
 .ui-chip[data-tone="attention"] { border-color: color-mix(in srgb, var(--color-parent) 50%, transparent); color: var(--color-text); }
 .ui-chip[data-tone="attention"] .ui-chip-dot { background: var(--color-parent); }
-/* A help that is off is struck through, in words as well ("off"). */
-.ui-chip[data-on="false"] { text-decoration: line-through; }
+/* A help that is off is muted, with a hollow dot (and a dashed border, 3:1 on the page: the cue on a phone), and says "off" in words; never struck through, which reads as deleted. */
+.ui-chip[data-on="false"] { color: var(--color-text-muted); border-color: var(--color-text-muted); border-style: dashed; background: transparent; }
+.ui-chip[data-on="false"] .ui-chip-dot { background: transparent; border: 1px solid var(--color-text-muted); }
 
 /* ---------- Buttons (button.mjs) ---------- */
 /* D2: the primary is a red pill, 14px/600, no glow, never full width. */
@@ -404,6 +405,20 @@
    and the hint tools. Stars are outlines until success, then the earned ones fill. */
 .ui-help-chips { display: flex; flex-wrap: wrap; gap: 6px var(--space-2); align-items: center; font-size: 12px; color: var(--color-text-muted); }
 .ui-help-chips-title { white-space: nowrap; }
+@container level (max-width: 600px) {
+  /* Two rows of chips under the title in a 350px box. Measured: 8.5px a glyph at 11px mono, so a chip is its
+     label * 8.5 + 10 (4px padding, 1px border). The word on/off leaves the screen (it stays for screen readers
+     and in the text) and the border says it: solid green on, dashed muted off. Hints is ordered third:
+     hints, queue, tint = 52 + 163 + 95 + 2 * 4 = 318px; guide, instant = 155 + 146 + 4 = 305px. */
+  .ui-help-chips { gap: 4px; font-size: 11px; }
+  .ui-help-chips-title { flex-basis: 100%; }
+  .ui-help-chips .ui-chip { padding: 1px 4px; font-size: 11px; }
+  .ui-help-chips .ui-chip-dot { display: none; }
+  .ui-help-chips [data-state] { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .ui-help-chips [data-help="hints"] { order: 1; }
+  .ui-help-chips [data-help="guide"] { order: 2; }
+  .ui-help-chips [data-help="instant"] { order: 3; }
+}
 .ui-side {
   display: grid; gap: 10px; align-content: start; min-width: 0; padding: 14px var(--space-4);
   background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius);
