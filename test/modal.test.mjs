@@ -103,7 +103,7 @@ test('Tab in the middle is left to the browser', () => {
   assert.equal(trapTab(key(false), modal, document), false, 'Tab from the title goes to the first control natively');
 });
 
-test('an inside element that Tab does not list (a scroller, the tail) still wraps at the edges, so focus never reaches body', () => {
+test('Tab from an element inside the dialog that is not a listed control still wraps at the edges, so focus never leaves the dialog', () => {
   const { document, modal, key, at } = fixture();
   at('tail');
   const e = key();
@@ -135,4 +135,25 @@ test('other keys, no modal and an empty modal', () => {
   const e = key();
   assert.equal(trapTab(e, d2.getElementById('e'), d2), true, 'nothing to focus: Tab stays put');
   assert.equal(e.prevented, true);
+});
+
+test('the real board modal: its scroller joins the Tab cycle, and Tab from it, the title or the close button stays in the dialog', () => {
+  const { document } = parseHTML(readFileSync(join(ROOT, 'index.html'), 'utf8'));
+  let current = null;
+  for (const el of document.querySelectorAll('*')) el.focus = () => { current = el; };
+  Object.defineProperty(document, 'activeElement', { get: () => current });
+  const m = document.getElementById('board-modal');
+  const key = (shiftKey) => ({ key: 'Tab', shiftKey, preventDefault() {} });
+  assert.deepEqual(focusables(m).map((e) => e.id), ['board-x', 'board-body']);
+  assert.ok(document.getElementById('board-body').getAttribute('aria-label'), 'the scroller has a name');
+  document.getElementById('board-body').focus();
+  assert.equal(trapTab(key(false), m, document), true);
+  assert.equal(current.id, 'board-x', 'Tab past the last control goes to the first');
+  assert.equal(trapTab(key(true), m, document), true);
+  assert.equal(current.id, 'board-body', 'Shift+Tab before the first goes to the last');
+  document.getElementById('board-title').focus();
+  assert.equal(trapTab(key(true), m, document), true);
+  assert.equal(current.id, 'board-body');
+  document.getElementById('board-title').focus();
+  assert.equal(trapTab(key(false), m, document), false, 'Tab from the title is native, to the close button');
 });
