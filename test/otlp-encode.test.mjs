@@ -2,7 +2,7 @@
 // https://opentelemetry.io/docs/specs/otlp/ (JSON Protobuf Encoding).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SERVICE_VERSION, encodeTraces, msToUnixNano } from '../lib/otlp/encode.mjs';
+import { SERVICE_VERSION, encodeResourceSpans, encodeTraces, msToUnixNano } from '../lib/otlp/encode.mjs';
 
 const SESSION = 's-7k2m9q';
 const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
@@ -122,4 +122,30 @@ test('events encode name, time and attributes', () => {
   assert.deepEqual(c.events, [
     { timeUnixNano: '1762300800250000000', name: 'retry', attributes: [{ key: 'attempt', value: { intValue: '2' } }] },
   ]);
+});
+
+test('encodeResourceSpans: uses the given resource and scope and adds no session.id unless stamped', () => {
+  const req = encodeResourceSpans([root], {
+    resource: { 'service.name': 'svc-x', 'telemetry.sdk.language': 'nodejs' },
+    scope: { name: 'svc-x', version: '9' },
+  });
+  const rs = req.resourceSpans[0];
+  assert.deepEqual(rs.resource.attributes, [
+    { key: 'service.name', value: { stringValue: 'svc-x' } },
+    { key: 'telemetry.sdk.language', value: { stringValue: 'nodejs' } },
+  ]);
+  assert.deepEqual(rs.scopeSpans[0].scope, { name: 'svc-x', version: '9' });
+  for (const span of rs.scopeSpans[0].spans) {
+    assert.equal(span.attributes.some((a) => a.key === 'session.id'), false);
+  }
+});
+
+test('encodeResourceSpans: a stamp beats a draft attribute', () => {
+  const req = encodeResourceSpans([{ ...root, attributes: { k: 'draft' } }], {
+    resource: { 'service.name': 'svc-x' },
+    scope: { name: 'svc-x', version: '9' },
+    stamp: { k: 'stamp' },
+  });
+  const ks = req.resourceSpans[0].scopeSpans[0].spans[0].attributes.filter((a) => a.key === 'k');
+  assert.deepEqual(ks, [{ key: 'k', value: { stringValue: 'stamp' } }]);
 });
