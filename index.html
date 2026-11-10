@@ -46,10 +46,6 @@
              place that writes ui- classes by hand): the markup lib/ui/button.mjs makes. -->
         <button type="button" class="ui-btn ui-btn--icon" id="about-open" aria-label="How this game works"
                 title="How this game works" @click="openAbout()"><span aria-hidden="true">?</span></button>
-        <button type="button" class="ui-btn ui-btn--icon" id="theme-toggle" @click="toggleTheme()" :aria-label="themeLabel()"
-                :title="themeLabel()">
-          <span aria-hidden="true" x-text="theme === 'light' ? '☾' : '☀'">&#9728;</span>
-        </button>
       </div>
     </header>
 

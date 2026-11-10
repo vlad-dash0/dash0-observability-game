@@ -13,7 +13,6 @@ import { recordFocus } from './helpers/focus.mjs';
 import { fakeStorage } from './helpers/fake-storage.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
 import { STORAGE_KEY } from '../lib/storage.mjs';
-import { THEME_KEY } from '../lib/theme.mjs';
 import { sideColumn } from '../lib/ui/index.mjs';
 import { mountSide } from '../lib/widgets/help-ladder.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
@@ -710,7 +709,7 @@ test('a successful save clears the corrupt and unavailable notices', () => {
 test('storage events for other keys are ignored; a corrupt write changes nothing', () => {
   const { game, store } = setup();
   store.data.set(STORAGE_KEY, v1({ y: { stars: 3, at: AT } }));
-  game.onStorage({ key: THEME_KEY });
+  game.onStorage({ key: 'oncall.other' });
   assert.equal(Object.hasOwn(game.progress.levels, 'y'), false);
   store.data.set(STORAGE_KEY, '{bad');
   game.onStorage({ key: STORAGE_KEY });
@@ -1221,15 +1220,12 @@ test('no renderer, no WebGL, a failed load or a lost context: the text fallback 
   assert.equal(log.mounts.length, 1, 'once on the fallback, the globe is not mounted again');
 });
 
-test('the theme toggle flips, applies and stores the theme', () => {
-  const { game, dom, store } = setup();
-  assert.equal(game.theme, 'dark');
-  game.toggleTheme();
-  assert.equal(game.theme, 'light');
-  assert.equal(dom.document.documentElement.dataset.theme, 'light');
-  assert.equal(store.data.get(THEME_KEY), 'light');
-  game.toggleTheme();
-  assert.equal(dom.document.documentElement.dataset.theme, 'dark');
+test('the game is dark only: no theme state or toggle, and a stored oncall.theme changes nothing (#322)', () => {
+  const { game, dom } = setup({ initial: { 'oncall.theme': 'light' } });
+  assert.equal('theme' in game, false);
+  assert.equal(typeof game.toggleTheme, 'undefined');
+  assert.equal(dom.document.documentElement.dataset.theme, undefined, 'no data-theme is applied');
+  assert.equal(/theme-toggle|toggleTheme/.test(read('index.html')), false, 'no toggle in the page');
 });
 
 test('confetti is skipped under reduced motion and uses class colours, never style', () => {
@@ -1831,13 +1827,8 @@ test('index.html: the notice and star live regions stay rendered and carry text'
   assert.match(read('styles/hub.css'), /\.notice:not\(\.show\)/);
 });
 
-test('main.mjs applies the stored theme before anything else runs', () => {
-  const statements = read('main.mjs')
-    .replace(/\/\/.*$/gm, '')
-    .split(/;\s*\n/)
-    .map((s) => s.trim())
-    .filter((s) => s && !s.startsWith('import '));
-  assert.match(statements[0], /^document\.documentElement\.dataset\.theme\s*=\s*readTheme\(/);
+test('main.mjs reads no theme: nothing is applied to the page before Alpine runs (#322)', () => {
+  assert.equal(/theme/i.test(read('main.mjs')), false);
 });
 
 test('every star display shows five: filled then empty, for each value 0 to 5 and an old 3', () => {

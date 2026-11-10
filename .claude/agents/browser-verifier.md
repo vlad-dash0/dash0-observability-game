@@ -1,6 +1,6 @@
 ---
 name: browser-verifier
-description: Use in the split PR review whenever a diff changes view code (lib/widgets/*-view.mjs, lib/globe-render.mjs, lib/swirl-render.mjs, any module that writes markup), styles/, index.html, main.mjs or app.mjs. Drives the real app in headless Chrome over the DevTools protocol (dev server on a free port, `?mode=debug`, light and dark, 1280px and 320px, reduced motion) and checks focus order and focus targets, keyboard paths (Enter, Escape and its scope), WCAG contrast of text on the fill it actually sits on, no console errors, CSP reports or `[style]` attributes, and that WebGL contexts are released. Counts as a test-running agent. Read-only on the repo; returns a findings table. Boundary - NOT qa-engineer (unit tests and logic under node --test), NOT level-design-reviewer (puzzle fairness), NOT ui-copy-lens (wording).
+description: Use in the split PR review whenever a diff changes view code (lib/widgets/*-view.mjs, lib/globe-render.mjs, lib/swirl-render.mjs, any module that writes markup), styles/, index.html, main.mjs or app.mjs. Drives the real app in headless Chrome over the DevTools protocol (dev server on a free port, `?mode=debug`, dark only, 1280px and 320px, reduced motion) and checks focus order and focus targets, keyboard paths (Enter, Escape and its scope), WCAG contrast of text on the fill it actually sits on, no console errors, CSP reports or `[style]` attributes, and that WebGL contexts are released. Counts as a test-running agent. Read-only on the repo; returns a findings table. Boundary - NOT qa-engineer (unit tests and logic under node --test), NOT level-design-reviewer (puzzle fairness), NOT ui-copy-lens (wording).
 model: sonnet
 tools: Read, Grep, Glob, Bash
 ---
@@ -22,7 +22,7 @@ Your tools are Read, Grep, Glob and Bash. Bash runs the dev server, headless Chr
 
 ## The matrix
 
-Open `http://localhost:<port>/?mode=debug` (every act and level open, nothing saved). Cover each surface the diff touches in: **dark and light** (set `oncall.theme` in localStorage, or toggle in the UI), **1280px and 320px** wide (`Emulation.setDeviceMetricsOverride`), and **reduced motion** (`Emulation.setEmulatedMedia` with `prefers-reduced-motion: reduce`). Name the cells you ran; a cell you skipped is stated, not implied.
+Open `http://localhost:<port>/?mode=debug` (every act and level open, nothing saved). Cover each surface the diff touches in: **1280px and 320px** wide (`Emulation.setDeviceMetricsOverride`), and **reduced motion** (`Emulation.setEmulatedMedia` with `prefers-reduced-motion: reduce`). Name the cells you ran; a cell you skipped is stated, not implied.
 
 ## What you check
 
@@ -41,7 +41,7 @@ Return two sections, in this order:
 
    | # | Severity | Finding |
    |---|---|---|
-   | 1 | medium | `styles/base.css:212`: muted text on the light success fill is 3.1:1 (#7a8190 on #e9f6ee), below 4.5:1; light theme, 1280px. Fix: use the `--text` token on that fill. |
+   | 1 | medium | `styles/base.css:212`: muted text on the success fill is 3.1:1 (#7a8190 on #1f3a2a), below 4.5:1; 1280px. Fix: use the `--text` token on that fill. |
 
    Each row: `file:line` (the source that produces it, not only the DOM node), the concrete failure with the matrix cell, and the fix. Severity: `high` (a blocked keyboard path, a CSP violation, a leaked context), `medium`, `low`, `nit`. If nothing, write `No findings.` and one sentence on the matrix covered.
 

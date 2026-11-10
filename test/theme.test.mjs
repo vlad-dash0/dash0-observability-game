@@ -1,11 +1,10 @@
-// Theme tokens, base styles and the theme helper. Spec: docs/FOUNDATION.md §6 F2.
+// Dark-only tokens and base styles (#322). Spec: docs/FOUNDATION.md §6 F2.
 // The CSS is read as text: the block parser, var() and color-mix() resolution and WCAG
 // contrast live in test/helpers/css.mjs (plain JS, no CSS engine dependency).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { readTheme, resolveTheme, writeTheme } from '../lib/theme.mjs';
 import {
   call, contrast, decls, luminance, read, resolveColor, ROOT, ROOT_DECLS, rules, splitTop, stripComments,
   tokenRules, tokensCss, VARS,
@@ -30,86 +29,61 @@ test('brand primitives are the exact dash0.com values', () => {
   }
 });
 
-test('every --color-* is light-dark(); dark by default, light by data-theme only', () => {
+test('every --color-* is one plain value: no light-dark() on :root, color-scheme is dark', () => {
   const colors = ROOT_DECLS.filter(([k]) => k.startsWith('--color-'));
   assert.ok(colors.length >= 17, `expected the semantic set, got ${colors.length}`);
   for (const [name, value] of colors) {
-    const inner = call('light-dark', value);
-    assert.ok(inner !== null, `${name} is not light-dark(): ${value}`);
-    assert.equal(splitTop(inner).length, 2, `${name} needs exactly <light>, <dark>`);
+    assert.equal(call('light-dark', value), null, `${name} is still light-dark(): ${value}`);
   }
   assert.deepEqual(ROOT_DECLS.filter(([k]) => k === 'color-scheme'), [['color-scheme', 'dark']]);
-  const light = tokenRules.filter((r) => r.selector.includes('[data-theme="light"]'));
-  assert.equal(light.length, 1, 'one [data-theme="light"] rule');
-  assert.deepEqual(decls(light[0].body), [['color-scheme', 'light']]);
 });
 
-test('primary is red on both sides, success mint, error purple (not red, not primary)', () => {
-  assert.equal(VARS['--color-primary'], 'light-dark(var(--d0-red), var(--d0-red))');
-  // Success is mint on dark; on light it is mint darkened for contrast, still from mint.
-  const [lightSuccess] = splitTop(call('light-dark', VARS['--color-success']));
-  assert.match(lightSuccess, /var\(--d0-mint\)/);
-  assert.equal(resolveColor('var(--color-success)', 'dark').join(), resolveColor('var(--d0-mint)', 'dark').join());
-  for (const theme of ['light', 'dark']) {
-    const at = (name) => resolveColor(`var(${name})`, theme).join();
-    assert.equal(at('--color-error'), resolveColor('var(--d0-purple)', theme).join(), theme);
-    assert.notEqual(at('--color-error'), at('--color-primary'), theme);
-    assert.notEqual(at('--color-error'), resolveColor('var(--d0-red)', theme).join(), theme);
-  }
+test('primary is red, success mint, error purple (not red, not primary)', () => {
+  assert.equal(VARS['--color-primary'], 'var(--d0-red)');
+  assert.equal(VARS['--color-success'], 'var(--d0-mint)');
+  assert.equal(VARS['--color-accent'], 'var(--d0-orange)');
+  const at = (name) => resolveColor(`var(${name})`).join();
+  assert.equal(at('--color-error'), resolveColor('var(--d0-purple)').join());
+  assert.notEqual(at('--color-error'), at('--color-primary'));
+  assert.notEqual(at('--color-error'), resolveColor('var(--d0-red)').join());
 });
 
 test('WCAG AA: text and muted text on bg and surfaces, button text on primary, focus ring', () => {
-  for (const theme of ['light', 'dark']) {
-    for (const bg of ['--color-bg', '--color-surface', '--color-surface-2', '--color-code-bg']) {
-      for (const fg of ['--color-text', '--color-text-muted']) {
-        const r = contrast(fg, bg, theme);
-        assert.ok(r >= 4.5, `${theme}: ${fg} on ${bg} is ${r.toFixed(2)}, needs 4.5`);
-      }
+  for (const bg of ['--color-bg', '--color-surface', '--color-surface-2', '--color-code-bg']) {
+    for (const fg of ['--color-text', '--color-text-muted']) {
+      const r = contrast(fg, bg);
+      assert.ok(r >= 4.5, `${fg} on ${bg} is ${r.toFixed(2)}, needs 4.5`);
     }
-    const btn = contrast('--color-primary-contrast', '--color-primary', theme);
-    assert.ok(btn >= 4.5, `${theme}: primary-contrast on primary is ${btn.toFixed(2)}`);
-    const ring = contrast('--color-focus', '--color-bg', theme);
-    assert.ok(ring >= 3, `${theme}: focus on bg is ${ring.toFixed(2)}, needs 3 (non-text)`);
   }
+  const btn = contrast('--color-primary-contrast', '--color-primary');
+  assert.ok(btn >= 4.5, `primary-contrast on primary is ${btn.toFixed(2)}`);
+  const ring = contrast('--color-focus', '--color-bg');
+  assert.ok(ring >= 3, `focus on bg is ${ring.toFixed(2)}, needs 3 (non-text)`);
 });
 
-test('accent text: --color-accent-text reaches 4.5:1 on the card and page fills, and the small-text rules use it (#318)', () => {
-  const [lightText, darkText] = splitTop(call('light-dark', VARS['--color-accent-text']));
-  assert.match(lightText, /var\(--d0-orange\)/, 'light is darkened brand orange');
-  assert.equal(darkText.trim(), 'var(--d0-orange)', 'dark stays the plain accent');
+test('accent and success as small text reach 4.5:1 on the page and card fills, and the hub rules use the plain tokens (#318, #322)', () => {
   for (const bg of ['--color-bg', '--color-surface', '--color-surface-2']) {
-    const r = contrast('--color-accent-text', bg, 'light');
-    assert.ok(r >= 4.5, `light: accent-text on ${bg} is ${r.toFixed(2)}, needs 4.5`);
+    for (const fg of ['--color-accent', '--color-success']) {
+      const r = contrast(fg, bg);
+      assert.ok(r >= 4.5, `${fg} on ${bg} is ${r.toFixed(2)}, needs 4.5`);
+    }
   }
-  assert.ok(contrast('--color-accent-text', '--color-surface', 'dark') >= 4.5, 'dark on surface');
+  assert.equal('--color-accent-text' in VARS || '--color-success-text' in VARS, false, 'no redundant text tokens');
   const hub = rules(read('styles/hub.css'));
-  for (const sel of ['.level-no', '.level-card.nudge .level-sub']) {
+  const colorOf = (sel) => {
     const rule = hub.find((r) => r.selector === sel);
     assert.ok(rule, sel);
-    assert.equal(decls(rule.body).find(([k]) => k === 'color')[1], 'var(--color-accent-text)', sel);
-  }
+    return decls(rule.body).find(([k]) => k === 'color')[1];
+  };
+  for (const sel of ['.level-no', '.level-card.nudge .level-sub']) assert.equal(colorOf(sel), 'var(--color-accent)', sel);
+  assert.equal(colorOf('.level-card.done .level-status'), 'var(--color-success)');
 });
 
-test('success text: --color-success-text reaches 4.5:1 on the page and card fills, and the done status uses it (#318)', () => {
-  const [lightText, darkText] = splitTop(call('light-dark', VARS['--color-success-text']));
-  assert.match(lightText, /var\(--d0-mint\)/, 'light is darkened mint');
-  assert.equal(darkText.trim(), 'var(--d0-mint)', 'dark stays the plain success');
-  for (const bg of ['--color-bg', '--color-surface', '--color-surface-2']) {
-    const r = contrast('--color-success-text', bg, 'light');
-    assert.ok(r >= 4.5, `light: success-text on ${bg} is ${r.toFixed(2)}, needs 4.5`);
-  }
-  const rule = rules(read('styles/hub.css')).find((r) => r.selector === '.level-card.done .level-status');
-  assert.ok(rule);
-  assert.equal(decls(rule.body).find(([k]) => k === 'color')[1], 'var(--color-success-text)');
-});
-
-test('WCAG 1.4.11: success and error borders reach 3:1 on bg and surface, both themes', () => {
-  for (const theme of ['light', 'dark']) {
-    for (const fg of ['--color-success', '--color-error']) {
-      for (const bg of ['--color-bg', '--color-surface']) {
-        const r = contrast(fg, bg, theme);
-        assert.ok(r >= 3, `${theme}: ${fg} on ${bg} is ${r.toFixed(2)}, needs 3`);
-      }
+test('WCAG 1.4.11: success and error borders reach 3:1 on bg and surface', () => {
+  for (const fg of ['--color-success', '--color-error']) {
+    for (const bg of ['--color-bg', '--color-surface']) {
+      const r = contrast(fg, bg);
+      assert.ok(r >= 3, `${fg} on ${bg} is ${r.toFixed(2)}, needs 3`);
     }
   }
 });
@@ -177,7 +151,7 @@ test('correct and wrong choices carry non-colour cues: a spoken marker, and a ri
   assert.equal(last(kitDecls('.ui-feedback[data-tone="error"] .ui-feedback-ico'), 'color'), 'var(--color-error)');
 });
 
-test('the markers are visible and reach 3:1 over the answered card, both themes', () => {
+test('the markers are visible and reach 3:1 over the answered card', () => {
   for (const [sel] of STATES) {
     const marker = kitDecls(`${sel}::after`);
     assert.notEqual(last(marker, 'display'), 'none', `${sel}::after is displayed`);
@@ -189,18 +163,16 @@ test('the markers are visible and reach 3:1 over the answered card, both themes'
     // The card keeps its surface (palette rule 4: no tint over 8%); the marker sits on it.
     const fill = last(kitDecls(...CARD, sel), 'background') ?? '';
     assert.match(fill, /^var\(--color-[\w-]+\)$/, `${sel} background is an opaque token`);
-    for (const theme of ['light', 'dark']) {
-      const a = luminance(resolveColor(color, theme));
-      const b = luminance(resolveColor(fill, theme));
-      const r = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-      assert.ok(r >= 3, `${theme}: ${sel} marker on its card is ${r.toFixed(2)}, needs 3`);
-    }
+    const a = luminance(resolveColor(color));
+    const b = luminance(resolveColor(fill));
+    const r = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    assert.ok(r >= 3, `${sel} marker on its card is ${r.toFixed(2)}, needs 3`);
   }
 });
 
-test('tokens live only in tokens.css: one :root rule plus the light rule', () => {
+test('tokens live only in tokens.css: one :root rule', () => {
   const selectors = tokenRules.map((r) => r.selector).filter((s) => s !== '@font-face');
-  assert.deepEqual(selectors, [':root', ':root[data-theme="light"]']);
+  assert.deepEqual(selectors, [':root']);
   for (const f of readdirSync(join(ROOT, 'styles')).filter((n) => n.endsWith('.css'))) {
     if (f === 'tokens.css') continue;
     const hits = stripComments(read(`styles/${f}`)).match(/--(color|d0)-[\w-]+\s*:/g) ?? [];
@@ -263,121 +235,87 @@ test('code, pre, kbd use Martian Mono, served from local /fonts/ files', () => {
   }
 });
 
-test('resolveTheme: only "light" is light; anything else is dark', () => {
-  assert.equal(resolveTheme('light'), 'light');
-  assert.equal(resolveTheme('dark'), 'dark');
-  for (const v of [null, 'blue', undefined, 'LIGHT', 1]) assert.equal(resolveTheme(v), 'dark');
-});
-
-test('readTheme / writeTheme: storage round trip, and safe when storage fails', () => {
-  const store = new Map();
-  const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
-  assert.equal(readTheme(() => storage), 'dark');
-  assert.equal(writeTheme(() => storage, 'light'), true);
-  assert.equal(readTheme(() => storage), 'light');
-  assert.equal(writeTheme(() => storage, 'blue'), true);
-  assert.deepEqual([...store.values()], ['dark'], 'only a resolved theme is stored');
-  store.set([...store.keys()][0], 'blue');
-  assert.equal(readTheme(() => storage), 'dark', 'a bad stored value reads as dark');
-
-  const boom = () => { throw new Error('SecurityError'); };
-  assert.equal(readTheme(boom), 'dark');
-  assert.equal(readTheme(() => ({ getItem: boom })), 'dark');
-  assert.equal(writeTheme(() => ({ setItem: boom }), 'light'), false);
-  assert.equal(writeTheme(boom, 'light'), false);
-});
-
-test('globe: legend text reaches 4.5:1 and the lit and pulse colours 3:1 on its night sky, both themes', () => {
-  for (const theme of ['light', 'dark']) {
-    assert.ok(contrast('--color-globe-text', '--color-globe-sky', theme) >= 4.5, `legend text, ${theme}`);
-    for (const role of ['lit', 'pulse']) {
-      assert.ok(contrast(`--color-globe-${role}`, '--color-globe-sky', theme) >= 3, `${role} on sky, ${theme}`);
-    }
+test('globe: legend text reaches 4.5:1 and the lit and pulse colours 3:1 on its night sky', () => {
+  assert.ok(contrast('--color-globe-text', '--color-globe-sky') >= 4.5, 'legend text');
+  for (const role of ['lit', 'pulse']) {
+    assert.ok(contrast(`--color-globe-${role}`, '--color-globe-sky') >= 3, `${role} on sky`);
   }
   // The pulse must read apart from the lit glow, and not as brand red (an alarm).
-  const [lit, pulse, red] = ['var(--color-globe-lit)', 'var(--color-globe-pulse)', 'var(--d0-red)'].map((v) => resolveColor(v, 'dark'));
+  const [lit, pulse, red] = ['var(--color-globe-lit)', 'var(--color-globe-pulse)', 'var(--d0-red)'].map((v) => resolveColor(v));
   assert.notDeepEqual(pulse, lit);
   assert.notDeepEqual(pulse, red);
 });
 
-test('trace waterfall (#146): bar text on every service fill, trace chips, hint text and the success card reach AA, both themes', () => {
-  for (const theme of ['light', 'dark']) {
-    for (let i = 0; i < 6; i++) {
-      const r = contrast('--color-text', `--color-svc-${i}`, theme);
-      assert.ok(r >= 4.5, `${theme}: text on --color-svc-${i} is ${r.toFixed(2)}, needs 4.5`);
-    }
-    for (const t of [0, 1]) {
-      const r = contrast('--color-text', `--color-trace-${t}`, theme);
-      assert.ok(r >= 4.5, `${theme}: text on --color-trace-${t} is ${r.toFixed(2)}, needs 4.5`);
-    }
-    for (const bg of ['--color-surface', '--color-bg']) {
-      const hint = contrast('--color-hint', bg, theme);
-      assert.ok(hint >= 4.5, `${theme}: hint text on ${bg} is ${hint.toFixed(2)}, needs 4.5`);
-      // Used as text in styles/widgets.css (the "its parent" tag, the queue heading, the muted copy): 4.5.
-      for (const fg of ['--color-parent', '--color-text-muted']) {
-        const r = contrast(fg, bg, theme);
-        assert.ok(r >= 4.5, `${theme}: text in ${fg} on ${bg} is ${r.toFixed(2)}, needs 4.5`);
-      }
-      // Marker only (the failed tick glyph): 3.
-      const note = contrast('--color-note', bg, theme);
-      assert.ok(note >= 3, `${theme}: --color-note on ${bg} is ${note.toFixed(2)}, needs 3 (markers and borders)`);
-    }
-    for (const fg of ['--color-win-text', '--color-win-muted']) {
-      const r = contrast(fg, '--color-win-bg', theme);
-      assert.ok(r >= 4.5, `${theme}: ${fg} on the success card is ${r.toFixed(2)}, needs 4.5`);
-    }
+test('trace waterfall (#146): bar text on every service fill, trace chips, hint text and the success card reach AA', () => {
+  for (let i = 0; i < 6; i++) {
+    const r = contrast('--color-text', `--color-svc-${i}`);
+    assert.ok(r >= 4.5, `text on --color-svc-${i} is ${r.toFixed(2)}, needs 4.5`);
   }
-  // Six service fills, each its own colour, in each theme.
-  for (const theme of ['light', 'dark']) {
-    const fills = Array.from({ length: 6 }, (_, i) => resolveColor(`var(--color-svc-${i})`, theme).join());
-    assert.equal(new Set(fills).size, 6, theme);
+  for (const t of [0, 1]) {
+    const r = contrast('--color-text', `--color-trace-${t}`);
+    assert.ok(r >= 4.5, `text on --color-trace-${t} is ${r.toFixed(2)}, needs 4.5`);
   }
+  for (const bg of ['--color-surface', '--color-bg']) {
+    const hint = contrast('--color-hint', bg);
+    assert.ok(hint >= 4.5, `hint text on ${bg} is ${hint.toFixed(2)}, needs 4.5`);
+    // Used as text in styles/widgets.css (the "its parent" tag, the queue heading, the muted copy): 4.5.
+    for (const fg of ['--color-parent', '--color-text-muted']) {
+      const r = contrast(fg, bg);
+      assert.ok(r >= 4.5, `text in ${fg} on ${bg} is ${r.toFixed(2)}, needs 4.5`);
+    }
+    // Marker only (the failed tick glyph): 3.
+    const note = contrast('--color-note', bg);
+    assert.ok(note >= 3, `--color-note on ${bg} is ${note.toFixed(2)}, needs 3 (markers and borders)`);
+  }
+  for (const fg of ['--color-win-text', '--color-win-muted']) {
+    const r = contrast(fg, '--color-win-bg');
+    assert.ok(r >= 4.5, `${fg} on the success card is ${r.toFixed(2)}, needs 4.5`);
+  }
+  // Six service fills, each its own colour, on dark.
+  const fills = Array.from({ length: 6 }, (_, i) => resolveColor(`var(--color-svc-${i})`).join());
+  assert.equal(new Set(fills).size, 6);
 });
 
-test('parent-coloured text (the "its parent" tag, the queue heading) reaches 4.5:1 on the unfaded row fills (plain, hover, pressed, likely, valid, arriving), both themes', () => {
+test('parent-coloured text (the "its parent" tag, the queue heading) reaches 4.5:1 on the unfaded row fills (plain, hover, pressed, likely, valid, arriving)', () => {
   for (const [sel, prop] of [['.wf-tag[data-tag="par"]', 'color'], ['.wf-queue-head strong', 'color']]) {
     assert.equal(last(declsFor(sel), prop), 'var(--color-parent)', `${sel} is set in --color-parent`);
   }
   // Each row state's background, read from widgets.css: a flat token or a token tint over transparent.
   const rowFills = ['.wf-row:hover', '.wf-row[aria-pressed="true"]', '.wf-row[data-mark="likely"]', '.wf-row[data-mark="valid"]', '.wf-row[data-arriving]']
     .map((sel) => [sel, last(declsFor(sel), 'background') ?? '']);
-  for (const theme of ['light', 'dark']) {
-    const fg = luminance(resolveColor('var(--color-parent)', theme));
-    for (const under of ['--color-surface', '--color-bg']) {
-      const u = resolveColor(`var(${under})`, theme);
-      const fills = [[under, u], ['--color-surface-2', resolveColor('var(--color-surface-2)', theme)]];
-      for (const [sel, bg] of rowFills) {
-        const tint = /^color-mix\(in srgb, (var\(--color-[\w-]+\)) ([\d.]+)%, transparent\)$/.exec(bg);
-        if (tint) fills.push([`${sel} on ${under}`, resolveColor(tint[1], theme).map((c, i) => c * tint[2] / 100 + u[i] * (1 - tint[2] / 100))]);
-        else {
-          assert.match(bg, /^var\(--color-[\w-]+\)$/, `${sel} background is a token or a token tint`);
-          fills.push([sel, resolveColor(bg, theme)]);
-        }
+  const fg = luminance(resolveColor('var(--color-parent)'));
+  for (const under of ['--color-surface', '--color-bg']) {
+    const u = resolveColor(`var(${under})`);
+    const fills = [[under, u], ['--color-surface-2', resolveColor('var(--color-surface-2)')]];
+    for (const [sel, bg] of rowFills) {
+      const tint = /^color-mix\(in srgb, (var\(--color-[\w-]+\)) ([\d.]+)%, transparent\)$/.exec(bg);
+      if (tint) fills.push([`${sel} on ${under}`, resolveColor(tint[1]).map((c, i) => c * tint[2] / 100 + u[i] * (1 - tint[2] / 100))]);
+      else {
+        assert.match(bg, /^var\(--color-[\w-]+\)$/, `${sel} background is a token or a token tint`);
+        fills.push([sel, resolveColor(bg)]);
       }
-      for (const [name, rgb] of fills) {
-        const b = luminance(rgb);
-        const r = (Math.max(fg, b) + 0.05) / (Math.min(fg, b) + 0.05);
-        assert.ok(r >= 4.5, `${theme}: --color-parent text on ${name} is ${r.toFixed(2)}, needs 4.5`);
-      }
+    }
+    for (const [name, rgb] of fills) {
+      const b = luminance(rgb);
+      const r = (Math.max(fg, b) + 0.05) / (Math.min(fg, b) + 0.05);
+      assert.ok(r >= 4.5, `--color-parent text on ${name} is ${r.toFixed(2)}, needs 4.5`);
     }
   }
 });
 
-test('reward stars (#178): the glyph colour comes from a token and reaches 3:1 on the card, both themes', () => {
+test('reward stars (#178): the glyph colour comes from a token and reaches 3:1 on the card', () => {
   const rule = rules(read('styles/hub.css')).find((r) => r.selector.split(',').map((s) => s.trim()).includes('.reward-card .reward-stars'));
   assert.ok(rule, '.reward-card .reward-stars rule');
   const colour = decls(rule.body).filter(([k]) => k === 'color').at(-1)?.[1];
   const token = /^var\((--color-[\w-]+)\)$/.exec(colour ?? '')?.[1];
   assert.ok(token, `the stars take a --color-* token, not ${colour}`);
-  for (const theme of ['light', 'dark']) {
-    for (const bg of ['--color-surface', '--color-bg']) {
-      const r = contrast(token, bg, theme);
-      assert.ok(r >= 3, `${theme}: reward stars (${token}) on ${bg} are ${r.toFixed(2)}, need 3`);
-    }
+  for (const bg of ['--color-surface', '--color-bg']) {
+    const r = contrast(token, bg);
+    assert.ok(r >= 3, `reward stars (${token}) on ${bg} are ${r.toFixed(2)}, need 3`);
   }
 });
 
-test('every star display (#221): each star rule takes a --color-* token and reaches 3:1 on its background, both themes', () => {
+test('every star display (#221): each star rule takes a --color-* token and reaches 3:1 on its background', () => {
   // Every rule in styles/ whose selector names a star, except the win-card star line: that is
   // muted text on the success card, held to 4.5 in the trace-waterfall test above.
   const all = readdirSync(join(ROOT, 'styles')).filter((f) => f.endsWith('.css')).flatMap((f) => rules(read(`styles/${f}`)));
@@ -392,17 +330,27 @@ test('every star display (#221): each star rule takes a --color-* token and reac
       if (value === 'none' || value === 'currentColor') continue;
       const tint = /^color-mix\(in srgb, (var\(--color-[\w-]+\)) ([\d.]+)%, transparent\)$/.exec(value);
       assert.ok(tint || /^var\(--color-[\w-]+\)$/.test(value), `${r.selector} ${prop} is a token, not ${value}`);
-      for (const theme of ['light', 'dark']) {
-        for (const bg of ['--color-surface', '--color-bg']) {
-          const u = resolveColor(`var(${bg})`, theme);
-          const fg = tint ? resolveColor(tint[1], theme).map((c, i) => c * tint[2] / 100 + u[i] * (1 - tint[2] / 100)) : resolveColor(value, theme);
-          const [a, b] = [luminance(fg), luminance(u)];
-          const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
-          assert.ok(ratio >= 3, `${theme}: ${r.selector} ${prop} ${value} on ${bg} is ${ratio.toFixed(2)}, needs 3`);
-          checked++;
-        }
+      for (const bg of ['--color-surface', '--color-bg']) {
+        const u = resolveColor(`var(${bg})`);
+        const fg = tint ? resolveColor(tint[1]).map((c, i) => c * tint[2] / 100 + u[i] * (1 - tint[2] / 100)) : resolveColor(value);
+        const [a, b] = [luminance(fg), luminance(u)];
+        const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+        assert.ok(ratio >= 3, `${r.selector} ${prop} ${value} on ${bg} is ${ratio.toFixed(2)}, needs 3`);
+        checked++;
       }
     }
   }
-  assert.ok(checked >= 20, `expected the star rules, checked ${checked}`);
+  assert.ok(checked >= 10, `expected the star rules, checked ${checked}`);
+});
+
+test('no stylesheet is theme-aware: no light-dark(), prefers-color-scheme or [data-theme] (#322)', () => {
+  const sheets = readdirSync(join(ROOT, 'styles')).filter((n) => n.endsWith('.css'));
+  assert.ok(sheets.includes('tokens.css'));
+  for (const f of sheets) {
+    const css = stripComments(read(`styles/${f}`));
+    assert.equal(/light-dark\s*\(/.test(css), false, `styles/${f} uses light-dark()`);
+    assert.equal(/prefers-color-scheme/.test(css), false, `styles/${f} uses prefers-color-scheme`);
+    assert.equal(/\[data-theme/.test(css), false, `styles/${f} has a [data-theme] selector`);
+  }
+  assert.equal(existsSync(join(ROOT, 'lib', 'theme.mjs')), false, 'the theme helper is gone');
 });
