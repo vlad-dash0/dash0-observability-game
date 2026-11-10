@@ -25,6 +25,7 @@ import { howToView } from './lib/how-to-play.mjs';
 import { createGuideClient } from './lib/guide/client.mjs';
 import { createAccountClient } from './lib/account/client.mjs';
 import { ACCOUNT_UNAVAILABLE, accountHtml, boardHtml, nudgeText, starsText } from './lib/account/board-view.mjs';
+import { NICK_RE } from './lib/account/nickname.mjs';
 import { setFeedback } from './lib/ui/index.mjs';
 import { escapeHtml } from './lib/lesson-kit.mjs';
 import { trapTab } from './lib/modal-focus.mjs';
@@ -283,6 +284,7 @@ export function createGame(deps) {
     },
     dismissSigninNotice() {
       this.signinStatus = null;
+      this.focusSoon('#save-open'); // the dismissed notice held focus; the hub's progress area is stable
     },
     // GET /api/account, once per page (init); the only request an anonymous or unconfigured visit makes.
     async loadAccount() {
@@ -364,6 +366,7 @@ export function createGame(deps) {
     dismissSigninNudge() {
       nudgeAsked++;
       this.signinNudgeOpen = false;
+      this.focusSoon('#reward-close'); // the nudge's own button held focus
     },
     // Don't ask again: stored under hideHelp, and always hidden for this visit.
     hideSigninNudge() {
@@ -449,10 +452,16 @@ export function createGame(deps) {
       this.accountStars = null;
       this.accountRank = null;
       this.accountNotice = '';
-      this.closeAccount();
+      // The opener (#account-open) is hidden once signed out: focus the board button, else Save code.
+      if (!this.accountOpen) return;
+      this.accountOpen = false;
+      this.confirmDelete = false;
+      this.focusSoon(this.accountEnabled ? '#board-open' : '#save-open');
     },
     async saveNickname(nick) {
-      const res = await accountClient.setNickname(String(nick).trim());
+      const trimmed = String(nick).trim();
+      if (!NICK_RE.test(trimmed)) return this.accountSay('error', NICK_ERRORS.format); // no request; reserved and blocked names are the server's
+      const res = await accountClient.setNickname(trimmed);
       if (res.state !== 'ok') return this.accountRefused(res);
       this.account = { ...this.account, nick: res.nick ?? String(nick).trim() };
       this.accountSay('success', 'Nickname saved.');
