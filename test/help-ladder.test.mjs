@@ -10,7 +10,7 @@ import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { withGuide } from './helpers/guide-ctx.mjs';
 import { helpChips, sideColumn } from '../lib/ui/index.mjs';
 import * as ladder from '../lib/widgets/help-ladder.mjs';
-import { hintCost, ladderText, LADDER, mountHintLadder, mountSide, PENALTY, RULE, ruleText, starsLabel, validateHelps } from '../lib/widgets/help-ladder.mjs';
+import { hintCost, ladderRungs, ladderText, LADDER, LADDER_RUNGS, mountHintLadder, mountSide, PENALTY, RULE, ruleText, starsLabel, validateHelps } from '../lib/widgets/help-ladder.mjs';
 import { RULE as SORT_RULE, PENALTY as SORT_PENALTY } from '../lib/widgets/sort-it-view.mjs';
 import { RULE as SPOT_RULE, PENALTY as SPOT_PENALTY } from '../lib/widgets/spot-it-view.mjs';
 import { RULE as INCIDENT_RULE, PENALTY as INCIDENT_PENALTY } from '../lib/widgets/incident-view.mjs';
@@ -20,7 +20,13 @@ const sideHtml = (id, { hints, title }) =>
   sideColumn({ id, titleHtml: title, counts: [{ key: 'wrong', label: '' }], hints, ruleHtml: RULE });
 
 test('help-ladder keeps the behaviour; the markup lives in the kit (lib/ui/side.mjs)', () => {
-  assert.deepEqual(Object.keys(ladder).sort(), ['HINT_TIERS', 'LADDER', 'PENALTY', 'RULE', 'boardStars', 'hintCost', 'ladderText', 'mountHintLadder', 'mountSide', 'ruleText', 'starsLabel', 'validateHelps']);
+  assert.deepEqual(Object.keys(ladder).sort(), ['HINT_TIERS', 'LADDER', 'LADDER_RUNGS', 'PENALTY', 'RULE', 'boardStars', 'hintCost', 'ladderRungs', 'ladderText', 'mountHintLadder', 'mountSide', 'ruleText', 'starsLabel', 'validateHelps']);
+});
+
+test('LADDER_RUNGS is the same ladder as rungs, from the same rule', () => {
+  assert.deepEqual(ladderRungs((p) => (p <= 1 ? 5 - p : 1)).map(({ from, stars }) => [from, stars]), [[0, 5], [1, 4], [2, 1]]);
+  assert.equal(LADDER_RUNGS.length, 5);
+  assert.deepEqual(LADDER_RUNGS.map((r) => r.stars), [5, 4, 3, 2, 1]);
 });
 
 test('LADDER is generated from scoreStars', () => {

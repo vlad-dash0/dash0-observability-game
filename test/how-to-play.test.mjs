@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HOW_TO, NOT_SCORED, NO_HINTS, PAR, REPLAY, howToView } from '../lib/how-to-play.mjs';
-import { LADDER, PENALTY as BUILD_PENALTY } from '../lib/widgets/help-ladder.mjs';
+import { LADDER_RUNGS, PENALTY as BUILD_PENALTY } from '../lib/widgets/help-ladder.mjs';
 import { PENALTY as CHOICE_PENALTY } from '../lib/widgets/choice.mjs';
 import { PENALTY as SORT_PENALTY } from '../lib/widgets/sort-it-view.mjs';
 import { PENALTY as SPOT_PENALTY } from '../lib/widgets/spot-it-view.mjs';
@@ -63,57 +63,98 @@ test('help copy is plain text', () => {
   for (const s of strings) assert.ok(!/[<&]/.test(s), `markup in ${JSON.stringify(s)}`);
 });
 
-test('howToView: topics in play order, deduped; scored, par and unscored footers', () => {
+const part = (topic, label) => topic.parts.find((p) => p.label === label);
+const labels = (topic) => topic.parts.map((p) => p.label);
+
+test('howToView: topics in play order, deduped, each laid out as labelled parts', () => {
   const v = howToView(level({ widgets: ['choice', 'sort', 'choice'] }));
   assert.deepEqual(v.topics.map((t) => t.key), ['choice', 'sort']);
-  assert.ok(v.footer.includes(LADDER));
-  assert.ok(v.footer.includes(REPLAY));
-  assert.equal(v.footer.includes(PAR), false);
+  assert.deepEqual(Object.keys(v), ['topics'], 'no level-wide footer: each guide carries its own parts');
   const sort = v.topics[1];
   assert.equal(sort.title, HOW_TO.sort.title);
-  assert.equal(sort.play, HOW_TO.sort.play);
-  assert.equal(sort.hints, HOW_TO.sort.hints);
-  assert.ok(sort.stars.includes(SORT_PENALTY.costs));
-  assert.ok(sort.stars.includes(SORT_PENALTY.free));
+  assert.deepEqual(labels(sort), ['How it works', 'What costs a star', 'Hints', 'Your stars']);
+  assert.deepEqual(part(sort, 'How it works').items, HOW_TO.sort.play);
+  assert.equal(part(sort, 'Hints').text, HOW_TO.sort.hints);
+  assert.deepEqual(howToView(level({ widgets: [] })), { topics: [] });
+});
 
-  assert.ok(howToView(level({ scoring: { parMs: 60000 } })).footer.includes(PAR));
-  assert.equal(howToView(level({ scoring: { parMs: null } })).footer.includes(PAR), false);
+test('a one-sentence how it works is text, several are a list', () => {
+  const [spot, choice] = howToView(level({ widgets: ['spot', 'choice'] })).topics;
+  assert.equal(HOW_TO.spot.play.length, 1);
+  assert.equal(part(spot, 'How it works').text, HOW_TO.spot.play[0]);
+  assert.deepEqual(part(spot, 'How it works').items, []);
+  assert.ok(HOW_TO.choice.play.length > 1);
+  assert.equal(part(choice, 'How it works').text, '');
+});
 
-  const off = howToView(level({ scored: false, scoring: { parMs: 60000 } }));
-  assert.deepEqual(off.topics.map((t) => t.stars), ['', '']);
-  assert.equal(off.footer, NOT_SCORED);
-  assert.deepEqual(howToView(level({ widgets: [] })), { topics: [], footer: '' });
+test('what costs a star is built from the widget\'s own PENALTY: its costs, then what is free', () => {
+  for (const w of WIDGETS) {
+    const [t] = howToView(level({ widgets: [w] })).topics;
+    const p = part(t, 'What costs a star');
+    if (PENALTIES[w].free === '') assert.ok(p.text.endsWith('penalty.') || p.text.endsWith(' hint.'), `${w}: nothing free, nothing said`);
+    else assert.ok(p.text.endsWith(` ${PENALTIES[w].free}`), w);
+    assert.equal(p.text.includes('undefined'), false, w);
+  }
+  assert.equal(part(howToView(level({ widgets: ['choice'] })).topics[0], 'What costs a star').text, 'A wrong pick costs one penalty.');
+  const text = (w) => part(howToView(level({ widgets: [w] })).topics[0], 'What costs a star').text;
+  assert.equal(text('sort'), 'Each of these costs one penalty: a wrong placement and a hint. Retrying is free.');
+  assert.equal(text('build'), 'Each of these costs one penalty: a wrong drop, a failed Check, a wrong pick and a hint. Retrying is free.');
+  assert.ok(text('tradeoff').startsWith('Each of these costs one penalty: a failed Check (over the cap, or a need dropped) and a hint. '), 'a comma inside parentheses is not a split');
+});
+
+test('Your stars lists the ladder rung by rung, then the par sentence (with a par time) and REPLAY', () => {
+  const [t] = howToView(level({ widgets: ['sort'], scoring: { parMs: null } })).topics;
+  const p = part(t, 'Your stars');
+  assert.equal(p.items.length, LADDER_RUNGS.length);
+  assert.equal(p.items[0], `No penalties: ${LADDER_RUNGS[0].stars} stars`);
+  assert.equal(p.items[1], `1 penalty: ${LADDER_RUNGS[1].stars} stars`);
+  assert.match(p.items.at(-1), /^\d+ or more penalties: 1 star$/);
+  assert.equal(p.note, REPLAY);
+  assert.equal(part(howToView(level({ widgets: ['sort'], scoring: { parMs: 60000 } })).topics[0], 'Your stars').note, `${PAR} ${REPLAY}`);
+});
+
+test('a level that gives no stars says so and has no cost part', () => {
+  const [t] = howToView(level({ widgets: ['sort'], scored: false, scoring: { parMs: 60000 } })).topics;
+  assert.deepEqual(labels(t), ['How it works', 'Hints', 'Your stars']);
+  assert.equal(part(t, 'Your stars').text, NOT_SCORED);
+  assert.deepEqual(part(t, 'Your stars').items, []);
 });
 
 test('howToView refuses a widget it has no copy for', () => {
   assert.throws(() => howToView(level({ widgets: ['quiz'] })), /quiz/);
 });
 
-test('a widget with nothing free has no free sentence', () => {
-  // choice costs "a wrong pick" and frees nothing: the free sentence is absent.
-  const [choice] = howToView(level({ widgets: ['choice'] })).topics;
-  assert.ok(choice.stars.includes('a wrong pick'));
-  assert.equal(choice.stars.includes('undefined'), false);
-  assert.equal(choice.stars.endsWith(' '), false);
-});
-
 test('a widget in the level\'s hintless list says no hints; the others keep their own hint line', () => {
   const v = howToView(level({ widgets: ['sort', 'build', 'choice'], hintless: ['sort'] }));
-  assert.deepEqual(v.topics.map((t) => t.hints), [NO_HINTS, HOW_TO.build.hints, HOW_TO.choice.hints]);
+  assert.deepEqual(v.topics.map((t) => part(t, 'Hints').text), [NO_HINTS, HOW_TO.build.hints, HOW_TO.choice.hints]);
   assert.notEqual(HOW_TO.sort.hints, NO_HINTS);
-  assert.equal(howToView(level({ widgets: ['sort'] })).topics[0].hints, HOW_TO.sort.hints, 'no hintless list: the entry\'s line');
+  assert.equal(part(howToView(level({ widgets: ['sort'] })).topics[0], 'Hints').text, HOW_TO.sort.hints, 'no hintless list: the entry\'s line');
 });
 
-test('the hint lines state the cost as one penalty and the Hint button as pricing on that board\'s score card', () => {
-  assert.equal(HOW_TO.sort.hints, "Each hint counts as one penalty. Where the board has hints, the Hint button shows what the next one costs on that board's score card.");
-  assert.equal(HOW_TO.query.hints, 'Showing a hint costs one penalty. Some steps have no hint.');
+test('the hint lines are plain sentences about one penalty per hint', () => {
+  assert.equal(NO_HINTS, 'This step has no Hint button.');
+  assert.equal(HOW_TO.sort.hints, 'Each hint costs one penalty. The Hint button shows what the next one costs.');
+  assert.equal(HOW_TO.query.hints, 'A hint costs one penalty. Some steps have no Hint button.');
   assert.equal(HOW_TO.configure.hints, HOW_TO.query.hints);
 });
 
-test('the star line names the level, not the board, and the play lines name what the screen says', () => {
-  const [choice] = howToView(level({ widgets: ['choice'] })).topics;
-  assert.equal(choice.stars, "Penalties count against the level's stars: a wrong pick.");
-  assert.ok(HOW_TO.choice.play.includes('Not quite'));
-  assert.ok(HOW_TO.sort.play.includes('Not quite'));
-  assert.ok(HOW_TO.query.play.startsWith('Write a PromQL query and press Run. A new query that runs shows its result; running one you already tried shows its result again and costs nothing.'));
+test('copy reads as sentences: full stops, "Not quite" in quotes, no em dash, no terse fragments', () => {
+  const lines = [];
+  for (const [w, e] of Object.entries(HOW_TO)) {
+    assert.ok(Array.isArray(e.play) && e.play.length >= 1, w);
+    lines.push(...e.play, e.hints);
+  }
+  lines.push(NO_HINTS, PAR, REPLAY, NOT_SCORED);
+  for (const l of lines) {
+    assert.match(l, /^[A-Z].*\.$/s, l);
+    assert.equal(l.includes('\u2014'), false, l);
+    if (l.includes('Not quite')) assert.ok(l.includes('"Not quite"'), l);
+  }
+  assert.equal(HOW_TO.choice.play.join(' ').includes('Not quite'), true);
+  assert.equal(HOW_TO.sort.play.join(' ').includes('Not quite'), true);
+  assert.equal(lines.some((l) => /^No hints\.$/.test(l)), false);
+});
+
+test('the Query it guide says a repeated query is free', () => {
+  assert.ok(HOW_TO.query.play.join(' ').includes('and that is free'));
 });

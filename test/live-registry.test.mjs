@@ -260,7 +260,7 @@ test('which widgets have no hints on each live level is pinned, and the how-to-p
     assert.deepEqual([...lv.hintless], want, id);
     for (const t of howToView(lv).topics) {
       const none = want.includes(t.key) || t.key === 'choice';
-      assert.equal(t.hints === NO_HINTS, none, `${id} ${t.key}`);
+      assert.equal(t.parts.find((p) => p.label === 'Hints').text === NO_HINTS, none, `${id} ${t.key}`);
     }
   }
 });
