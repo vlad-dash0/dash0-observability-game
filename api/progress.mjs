@@ -71,7 +71,7 @@ export function createProgress({
     if (request.method !== 'POST') return done(405, { error: 'method-not-allowed' }, 'method', { allow: 'POST' });
     const cfg = auth.config;
     if (cfg === null) return done(503, { error: 'not-configured' }, 'not-configured');
-    if (!originMatches(request, cfg.host)) return done(403, { error: 'forbidden' }, 'forbidden');
+    if (!originMatches(request, cfg.origin)) return done(403, { error: 'forbidden' }, 'forbidden');
     if (!isJson(request)) return done(415, { error: 'unsupported-media-type' }, 'media-type');
     if (Number(request.headers.get('content-length')) > MAX_BODY_BYTES) return done(413, { error: 'too-large' }, 'too-large');
     const { res, profile } = await signedIn(request, done);
@@ -93,8 +93,8 @@ export function createProgress({
       const [status, out, headers, outcome] = refusal(put);
       return done(status, out, outcome, headers);
     }
-    const reg = registry ?? (await import('../app.mjs')).liveRegistry();
-    const why = implausible({ before: before.ok ? (before.stars ?? 0) : null, after: put.stars, max: starTotals(put.progress, reg).max, created: profile.created, at: now() });
+    const reg = await auth.registry();
+    const why = implausible({ before: before.ok ? before.stars : null, after: put.stars, max: starTotals(put.progress, reg).max, created: profile.created, at: now() });
     if (why !== null) log({ msg: 'board', outcome: 'implausible', why });
     return done(200, { v: 1, progress: put.progress, stars: put.stars, rank: put.rank }, 'write');
   });
@@ -102,9 +102,9 @@ export function createProgress({
   return { GET, POST };
 }
 
-/** 'jump' (one write raised the total by more than half the maximum), 'fast' (the maximum within 30 minutes of the account), else null. */
+/** `before` is the stored total, or null when nothing was saved or it could not be read. 'jump' (one write raised the total by more than half the maximum), 'fast' (the maximum within 30 minutes of the account), else null. */
 export function implausible({ before, after, max, created, at }) {
-  if (before === null || !(max > 0)) return null;
+  if (before === null || !(max > 0)) return null; // nothing saved before (or an unreadable store): a first sync is never implausible
   if (after - before > JUMP_SHARE * max) return 'jump';
   if (before < max && after === max && Number.isFinite(created) && at - created <= FAST_MAX_MS) return 'fast';
   return null;

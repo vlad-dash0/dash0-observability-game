@@ -106,6 +106,16 @@ test('a signed-in read whose session lookup fails is 502 too', async () => {
   assert.equal((await api.GET(get(URL_, { cookie: ada.cookie }))).status, 502);
 });
 
+test('only the session lookup failing: anonymous is 200, a cookie is 502 (never anonymous by accident)', async () => {
+  const { r, api } = setup();
+  const ada = await player(r, 'g-1', 'ada@dash0.com', { s1: 5 });
+  r.fake.beforeCommand = (args) => {
+    if (String(args[0]).toUpperCase() === 'HGETALL') throw new Error('boom'); // the profile read of the session lookup
+  };
+  assert.equal((await api.GET(get(URL_))).status, 200);
+  assert.equal((await api.GET(get(URL_, { cookie: ada.cookie }))).status, 502);
+});
+
 test('a bad cookie reads as anonymous', async () => {
   const { r, api } = setup();
   const ada = await player(r, 'g-1', 'ada@dash0.com', { s1: 5 });

@@ -395,11 +395,11 @@ saves the merged response locally, and never syncs in debug mode.
 - `POST /api/account` `{v:1, action}`: `signout`, `nickname {nick}` (409 `nick-taken`, or 400 with field `nick`),
   `listing {listed}`, `delete {confirm:'delete'}`.
 - `GET/POST /api/progress`: 200 `{v:1, progress, stars|null, rank|null}` (stars is null until a first write, never 0); errors 401,
-  400, 413 (over 16 KB), 429, 502; 503 when unconfigured. POST needs the AUTH_ORIGIN Origin and JSON like the account POSTs, checks
-  the session, then the size and body, then the Redis rate limit (a refused body does not use the quota). The response stars come
+  400, 413 (over 16 KB), 429, 502; 503 when unconfigured. POST needs the AUTH_ORIGIN origin and JSON like the account POSTs, then checks the
+  declared content-length (413), then the session (401), then the body (its real size, 413, and its shape, 400), then the Redis rate limit (a refused body does not use the quota). The response stars come
   from the server's total, never the body. P4 decisions: the body must be exactly `{v:1, progress}` with `progress.levels` an
   object (field `body` for an extra key, `progress` for a bad progress); the plausibility check reads the stored total just
-  before the write (a failed read skips the check) and logs a second line `{msg:'board', outcome:'implausible', why:'jump'|'fast'}`
+  before the write (a failed read, or nothing saved yet, skips the check: a first sync never logs) and logs a second line `{msg:'board', outcome:'implausible', why:'jump'|'fast'}`
   (`fast` only when the total first reaches the maximum, at most 30 minutes after `profile.created`, which the store now returns).
 - `GET /api/leaderboard` (anonymous allowed): 200 `{v:1, ok:true, size, top:[{rank, nick, stars}] x10,
   me:{stars, rank|null, listed}|null}`, never a pid; rank and size are over the listed set; an empty board is ok with

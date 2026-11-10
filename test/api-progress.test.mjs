@@ -135,19 +135,44 @@ test('a store that is down is 502 on read and write, never a 200', async () => {
 
 test('plausibility: exactly half the maximum in one write is quiet', async () => {
   const { put, r } = await signedIn();
-  const res = await put({ v: 1, progress: prog({ s1: 5, s2: 5 }) }); // 10 of 20 from nothing
-  assert.equal((await res.json()).stars, 10);
+  await put({ v: 1, progress: prog({ s1: 1 }) });
+  const res = await put({ v: 1, progress: prog({ s1: 5, s2: 5, s3: 1 }) }); // 1 -> 11 of 20: +10, exactly half
+  assert.equal((await res.json()).stars, 11);
   assert.equal(board(r).length, 0);
 });
 
 test('plausibility: more than half in one write logs {msg:board, outcome:implausible} and still returns 200', async () => {
   const { put, r } = await signedIn();
-  const res = await put({ v: 1, progress: prog({ s1: 5, s2: 5, s3: 1 }) }); // 11 of 20 from nothing
+  await put({ v: 1, progress: prog({ s1: 1 }) });
+  const res = await put({ v: 1, progress: prog({ s1: 5, s2: 5, s3: 2 }) }); // 1 -> 12 of 20: +11
   assert.equal(res.status, 200);
-  assert.equal((await res.json()).stars, 11);
+  assert.equal((await res.json()).stars, 12);
   assert.equal(board(r).length, 1);
   assert.equal(board(r)[0].outcome, 'implausible');
   assert.equal(board(r)[0].why, 'jump');
+});
+
+test('plausibility: a first sync is never implausible, even the whole maximum within minutes of sign-in', async () => {
+  const { put, r } = await signedIn();
+  const res = await put({ v: 1, progress: prog({ s1: 5, s2: 5, s3: 5, s4: 5 }) }); // nothing saved before
+  assert.equal((await res.json()).stars, 20);
+  assert.equal(board(r).length, 0);
+});
+
+test('plausibility: a failed pre-write read skips the check; the write still lands with 200', async () => {
+  const { put, r } = await signedIn();
+  let armed = true;
+  r.fake.beforeCommand = (args) => {
+    if (armed && String(args[0]).toUpperCase() === 'ZREVRANK') {
+      armed = false; // one shot: only getProgress's read fails, not the rank read after the write
+      throw new Error('boom');
+    }
+  };
+  const res = await put({ v: 1, progress: prog({ s1: 5, s2: 5, s3: 1 }) });
+  assert.equal(armed, false, 'the pre-write read was the one that failed');
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).stars, 11);
+  assert.equal(board(r).length, 0);
 });
 
 test('plausibility: the jump counts from the stored total, not from zero', async () => {
