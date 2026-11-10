@@ -268,7 +268,7 @@ test('sync: a signed-in player gets no nudge; a 401 on sync signs them out local
   assert.equal(b.game.account.state, 'signedOut');
 });
 
-test('GET /api/account failing says so, SHOWN in the markup, and changes nothing else', async () => {
+test('GET /api/account failing shows the notice in the markup and changes nothing else', async () => {
   const { game, calls, store } = setup({ routes: { 'GET /api/account': res(502, {}) } });
   await initOf(game);
   game.completeLevel('x', WIN);
@@ -361,8 +361,8 @@ test('the reward card says, quietly, that a failed sync is saved here and will c
   assert.ok(line, 'the reward card has the sync line');
   assert.ok(line.classList.contains('ui-note'), 'the kit note markup (lib/ui/text.mjs note)');
   assert.match(line.textContent, /saved in this browser/);
-  assert.match(line.textContent, /account will catch up/);
-  assert.equal(line.getAttribute('x-show'), "accountNotice !== ''");
+  assert.match(line.textContent, /account catches up on your next win or when you reload/);
+  assert.equal(line.getAttribute('x-show'), "signedIn && accountNotice !== ''");
   const bad = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': res(502, {}) } });
   await initOf(bad.game);
   assert.equal(shownIn(bad.game, line), true);
@@ -699,18 +699,82 @@ test('a rate-limited account change says to wait, not "Account unavailable"', as
   game.openAccount();
   await game.saveNickname('neo');
   const said = dom.document.querySelector('#account-feedback [data-feedback-text]').innerHTML;
-  assert.match(said, /Wait a few minutes and try again/);
+  assert.match(said, /Wait up to an hour and try again/);
   assert.doesNotMatch(said, /unavailable/i);
   assert.equal(game.account.nick, 'grace');
   assert.equal(game.account.state, 'signedIn');
 });
 
-test('Delete account moves focus to the confirm control; Keep my account moves it back to Delete', async () => {
+test('Delete account moves focus to Keep my account (the least destructive choice); Keep my account moves it back to Delete', async () => {
   const { game, dom } = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': merged({}) } });
   await initOf(game);
   game.openAccount();
   const f = focusLog(game);
   dom.document.querySelector('#account-delete').onclick();
   dom.document.querySelector('#account-delete-no').onclick();
-  assert.deepEqual(f, ['#account-delete-yes', '#account-delete']);
+  assert.deepEqual(f, ['#account-delete-no', '#account-delete']);
+});
+
+// ---- review of #301 ---------------------------------------------------------------------------
+
+test('an anonymous visitor whose GET /api/account fails never sees the reward card sync line', async () => {
+  const line = parseHTML(INDEX).document.querySelector('[data-sync-note]');
+  const { game } = setup({ routes: { 'GET /api/account': res(502, {}) } });
+  await initOf(game);
+  game.completeLevel('x', WIN);
+  await settle();
+  assert.match(game.accountNotice, /Account unavailable/);
+  assert.equal(shownIn(game, line), false);
+});
+
+test('?signin=new with the count unknown (sync in flight or failed) promises nothing about stars', async () => {
+  const want = 'Signed in as grace. Change your nickname or hide yourself in Account.';
+  const bad = setup({ signin: 'new', routes: { 'GET /api/account': IN(), 'POST /api/progress': res(502, {}) } });
+  await initOf(bad.game);
+  assert.equal(bad.game.signinNoticeText(), want);
+  let release;
+  const held = new Promise((r) => { release = r; });
+  const slow = setup({ signin: 'new', routes: { 'GET /api/account': IN(), 'POST /api/progress': async () => { await held; return merged({}); } } });
+  slow.game.init();
+  await settle();
+  assert.equal(slow.game.signinNoticeText(), want);
+  release();
+  await settle();
+});
+
+test('a nickname or listing answer that arrives after sign-out or delete changes nothing', async () => {
+  for (const [act, run] of [['nickname', (g) => g.saveNickname('neo')], ['listing', (g) => g.setListing(false)]]) {
+    for (const leave of ['signOut', 'deleteAccount']) {
+      let release;
+      const held = new Promise((r) => { release = r; });
+      let n = 0;
+      const { game, dom } = setup({
+        routes: {
+          'GET /api/account': IN(), 'POST /api/progress': merged({}),
+          'POST /api/account': async () => { if (n++ === 0) await held; return res(200, { v: 1, ok: true, nick: 'neo', listed: false }); },
+        },
+      });
+      await initOf(game);
+      game.openAccount();
+      const pending = run(game);
+      await game[leave]();
+      release();
+      await pending;
+      assert.equal(game.account.state, 'signedOut', `${act} ${leave}`);
+      assert.equal(game.account.nick, '', `${act} ${leave}: nick not written`);
+      assert.equal(game.account.listed, false);
+      assert.doesNotMatch(dom.document.getElementById('account-body').innerHTML, /saved|hidden from/i, `${act} ${leave}`);
+    }
+  }
+});
+
+test('the hub count line is hidden while it has nothing to say', async () => {
+  const line = hubLine('accountSummary()');
+  const { game } = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': res(502, {}) } });
+  await initOf(game);
+  assert.equal(game.signedIn, true);
+  assert.equal(shownIn(game, line), false);
+  const ok = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': merged({}) } });
+  await initOf(ok.game);
+  assert.equal(shownIn(ok.game, line), true);
 });

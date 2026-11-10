@@ -62,7 +62,7 @@ export const NOTICES = Object.freeze({
 
 // The wait before the one retry after a 429 is capped here.
 const MAX_RETRY_S = 60;
-const ACCOUNT_LIMITED = 'Too many changes just now. Wait a few minutes and try again.';
+const ACCOUNT_LIMITED = 'Too many changes just now. Wait up to an hour and try again.';
 const SYNC_PAUSED = 'Saving to your account is paused for a moment; your progress is safe in this browser';
 
 // The hideHelp key of the sign-in nudge (its own "Don't ask again").
@@ -284,6 +284,7 @@ export function createGame(deps) {
       if (this.signinStatus !== 'new') return SIGNIN_NOTICES[this.signinStatus];
       if (!this.signedIn) return '';
       if (!this.account.listed) return `Signed in as ${this.account.nick}.`;
+      if (!this.accountKnown) return `Signed in as ${this.account.nick}. Change your nickname or hide yourself in Account.`; // stars unknown: promise nothing
       const onBoard = this.accountKnown && Number.isInteger(this.accountStars) && this.accountStars >= 1;
       return onBoard
         ? `You're on the leaderboard as ${this.account.nick}. Change your nickname or hide yourself in Account.`
@@ -323,10 +324,14 @@ export function createGame(deps) {
       });
       return syncing;
     },
+    // True when the session an answer was asked under has ended (sign-out, delete, 401): drop that answer.
+    staleAnswer(epoch) {
+      return epoch !== this.accountEpoch || !this.signedIn;
+    },
     async syncOnce() {
       const epoch = this.accountEpoch;
       const res = await accountClient.syncProgress(this.progress);
-      if (epoch !== this.accountEpoch || !this.signedIn) return; // signed out or deleted while it was in flight
+      if (this.staleAnswer(epoch)) return; // signed out or deleted while it was in flight
       this.accountKnown = false; // current only once this answer is ok
       if (res.state === 'signedOut') {
         this.endAccountSession();
@@ -438,7 +443,7 @@ export function createGame(deps) {
       on('account-delete', () => {
         this.confirmDelete = true;
         this.renderAccount();
-        this.focusSoon('#account-delete-yes'); // the Delete button is gone; the confirm step takes its place
+        this.focusSoon('#account-delete-no'); // the Delete button is gone; land on the least destructive choice
       });
       on('account-delete-no', () => {
         this.confirmDelete = false;
@@ -480,13 +485,17 @@ export function createGame(deps) {
     async saveNickname(nick) {
       const trimmed = String(nick).trim();
       if (!NICK_RE.test(trimmed)) return this.accountSay('error', NICK_ERRORS.format); // no request; reserved and blocked names are the server's
+      const epoch = this.accountEpoch;
       const res = await accountClient.setNickname(trimmed);
+      if (this.staleAnswer(epoch)) return;
       if (res.state !== 'ok') return this.accountRefused(res);
       this.account = { ...this.account, nick: res.nick ?? String(nick).trim() };
       this.accountSay('success', 'Nickname saved.');
     },
     async setListing(listed) {
+      const epoch = this.accountEpoch;
       const res = await accountClient.setListing(listed);
+      if (this.staleAnswer(epoch)) return;
       if (res.state !== 'ok') {
         const box = doc.getElementById('account-listed');
         if (box) box.checked = this.account.listed === true; // the server did not accept the click

@@ -377,8 +377,11 @@ always the same for the same email, is: the fun names in that order, then `<firs
 characters. `pickNick(email, isTaken)` returns the first candidate whose lowercase key is not taken, or null when every
 candidate is taken (the caller must treat null as a failure, never invent a name). The player can override the nickname at any time. A new profile is listed by default
 (`listed=1`) and joins the board on its first progress write; the account modal has a "Show me on the leaderboard"
-toggle to hide. There is no confirm-once step. After first sign-in a notice says "You're on the leaderboard as <nick>.
-Change your nickname or hide yourself in Account."
+toggle to hide. There is no confirm-once step. The callback redirects to `/?signin=new` only when the profile was just created
+(`/?signin=ok` otherwise, which shows nothing). Then a notice says, by what the client knows: unlisted, "Signed in as <nick>.";
+count unknown (first sync in flight or failed), "Signed in as <nick>. Change your nickname or hide yourself in Account.";
+known with no stars, "You'll appear on the leaderboard as <nick> once you earn a star. Change your nickname or hide yourself
+in Account."; known with a star, "You're on the leaderboard as <nick>. Change your nickname or hide yourself in Account."
 
 
 **Merge.** `mergeStored(storedRaw, incoming, registry)` in `lib/progress.mjs` is the one merge expression (unknown ids
