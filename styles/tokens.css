@@ -105,9 +105,17 @@
   /* White on red is 3.5:1 (fails AA for normal text); near-black is 5.5:1. */
   --color-primary-contrast: light-dark(var(--d0-grey-900), var(--d0-grey-900));
   --color-accent: light-dark(var(--d0-orange), var(--d0-orange));
+  /* Brand orange as small text: plain orange on the light card is 2.56:1, so light is orange
+     darkened with grey-900 (5.0:1 on surface, 4.6:1 on surface-2, 5.5:1 on bg); dark stays orange.
+     The plain accent stays for borders, strokes and glows (non-text). */
+  --color-accent-text: light-dark(color-mix(in srgb, var(--d0-orange) 65%, var(--d0-grey-900)), var(--d0-orange));
   /* Plain mint on white is 1.2:1, so light success is mint darkened with grey-900
      (4.2:1 on bg, 3.8:1 on surface: WCAG 1.4.11 for borders and markers). */
   --color-success: light-dark(color-mix(in srgb, var(--d0-mint) 50%, var(--d0-grey-900)), var(--d0-mint));
+  /* Success as small text: plain light success is 3.8:1 on the card, so light is mint darkened
+     further (5.3:1 on surface, 4.8:1 on surface-2, 5.7:1 on bg); dark stays mint. Borders, dots and
+     check glyphs keep --color-success (non-text, 3:1). */
+  --color-success-text: light-dark(color-mix(in srgb, var(--d0-mint) 40%, var(--d0-grey-900)), var(--d0-mint));
   --color-error: light-dark(var(--d0-purple), var(--d0-purple));
   /* Orange on white is under 3:1, so the light-theme ring is near-black. */
   --color-focus: light-dark(var(--d0-grey-900), var(--d0-orange));

@@ -73,6 +73,36 @@ test('WCAG AA: text and muted text on bg and surfaces, button text on primary, f
   }
 });
 
+test('accent text: --color-accent-text reaches 4.5:1 on the card and page fills, and the small-text rules use it (#318)', () => {
+  const [lightText, darkText] = splitTop(call('light-dark', VARS['--color-accent-text']));
+  assert.match(lightText, /var\(--d0-orange\)/, 'light is darkened brand orange');
+  assert.equal(darkText.trim(), 'var(--d0-orange)', 'dark stays the plain accent');
+  for (const bg of ['--color-bg', '--color-surface', '--color-surface-2']) {
+    const r = contrast('--color-accent-text', bg, 'light');
+    assert.ok(r >= 4.5, `light: accent-text on ${bg} is ${r.toFixed(2)}, needs 4.5`);
+  }
+  assert.ok(contrast('--color-accent-text', '--color-surface', 'dark') >= 4.5, 'dark on surface');
+  const hub = rules(read('styles/hub.css'));
+  for (const sel of ['.level-no', '.level-card.nudge .level-sub']) {
+    const rule = hub.find((r) => r.selector === sel);
+    assert.ok(rule, sel);
+    assert.equal(decls(rule.body).find(([k]) => k === 'color')[1], 'var(--color-accent-text)', sel);
+  }
+});
+
+test('success text: --color-success-text reaches 4.5:1 on the page and card fills, and the done status uses it (#318)', () => {
+  const [lightText, darkText] = splitTop(call('light-dark', VARS['--color-success-text']));
+  assert.match(lightText, /var\(--d0-mint\)/, 'light is darkened mint');
+  assert.equal(darkText.trim(), 'var(--d0-mint)', 'dark stays the plain success');
+  for (const bg of ['--color-bg', '--color-surface', '--color-surface-2']) {
+    const r = contrast('--color-success-text', bg, 'light');
+    assert.ok(r >= 4.5, `light: success-text on ${bg} is ${r.toFixed(2)}, needs 4.5`);
+  }
+  const rule = rules(read('styles/hub.css')).find((r) => r.selector === '.level-card.done .level-status');
+  assert.ok(rule);
+  assert.equal(decls(rule.body).find(([k]) => k === 'color')[1], 'var(--color-success-text)');
+});
+
 test('WCAG 1.4.11: success and error borders reach 3:1 on bg and surface, both themes', () => {
   for (const theme of ['light', 'dark']) {
     for (const fg of ['--color-success', '--color-error']) {
