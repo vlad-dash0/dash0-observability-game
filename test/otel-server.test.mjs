@@ -1,5 +1,5 @@
 // lib/otel/server.mjs: one export per api/ invocation, flushed before the response, dormant unless configured.
-// Spec: the epic #18 design contract; semconv http-spans; OTel SDK ForceFlush.
+// Spec: the server telemetry plan in #18; semconv http-spans; OTel SDK ForceFlush.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { reply } from '../lib/http.mjs';
@@ -72,7 +72,7 @@ test('2 invalid config is dormant and logs its reason once per instance, never t
   assert.ok(!JSON.stringify(logs).includes('ingress'));
 });
 
-test('3 one export per invocation, shaped as the contract says', async () => {
+test('3 one export per invocation, shaped as the plan says', async () => {
   const { t, ing, logs } = rig();
   const res = await run(t, h(t, 201, 'write'));
   assert.equal(res.status, 201);
@@ -225,12 +225,11 @@ test('12 no client calls: one span, and the export transport is never traced', a
   assert.equal(now.calls, 3);
 });
 
-test('13 concurrent invocations export separately', async () => {
+test('13 concurrent invocations export separately, each with its own client span', async () => {
   const { t, ing } = rig({ opts: { random: bytes([1], [2], [3], [4], [5], [6], [7], [8], [9]), now: clock([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) } });
   let release;
   const gate = new Promise((r) => { release = r; });
-  const upstream = async (url) => new Response('{}', { status: String(url).endsWith('/a') ? 200 : 201 });
-  const traced = t.trace(upstream);
+  const traced = t.trace(async () => new Response('{}', { status: 200 }));
   const handler = t.instrument({
     POST: async (request) => {
       await gate;
@@ -238,16 +237,22 @@ test('13 concurrent invocations export separately', async () => {
       return reply(200, {});
     },
   }).POST;
-  const a = handler(post('https://game.example/api/a'));
-  const b = handler(post('https://game.example/api/b'));
+  const withTrace = (path, trace) => post(`https://game.example${path}`, { headers: { traceparent: `00-${trace.repeat(16)}-${'aa'.repeat(8)}-01` } });
+  const a = handler(withTrace('/api/a', 'ab'));
+  const b = handler(withTrace('/api/b', 'cd'));
   await flush();
   release();
   await Promise.all([a, b]);
   assert.equal(ing.calls.length, 2);
-  const urls = ing.calls.map((c) => spansOf(c.body).filter((s) => s.kind === 3).map((s) => s.attrs['url.full']));
-  assert.deepEqual(urls.map((u) => u.length), [1, 1]);
-  assert.deepEqual(urls.flat().sort(), ['https://api.anthropic.com/api/a', 'https://api.anthropic.com/api/b']);
-  assert.notEqual(spansOf(ing.calls[0].body)[0].traceId, spansOf(ing.calls[1].body)[0].traceId);
+  for (const [trace, path] of [['ab', '/api/a'], ['cd', '/api/b']]) {
+    const call = ing.calls.find((c) => spansOf(c.body)[0].traceId === trace.repeat(16));
+    const spans = spansOf(call.body);
+    assert.equal(spans.length, 2, path);
+    const server = spans.find((s) => s.kind === 2);
+    const client = spans.find((s) => s.kind === 3);
+    assert.equal(client.parentSpanId, server.spanId, path);
+    assert.equal(client.attrs['url.full'], `https://api.anthropic.com${path}`);
+  }
 });
 
 test('14 a traced fetch outside a request passes through without a span', async () => {
@@ -276,7 +281,7 @@ test('15 a stalled exporter costs at most the flush budget, then the player gets
   assert.equal(tm.active(), 0);
 });
 
-test('16 a stalled exporter on the real clock delays the response by about the budget', { timeout: 3000 }, async () => {
+test('16 a stalled exporter on the real clock delays the response by about the 500 ms budget', { timeout: 3000 }, async () => {
   const { t } = rig({ ing: ingress({ mode: 'stall' }), opts: { setTimeout, clearTimeout, now: undefined, random: undefined } });
   const started = performance.now();
   await run(t, async () => reply(200, {}));
@@ -439,4 +444,65 @@ test('26 consoleExporter prints one line per span and accepts', async () => {
   await run(t, h(t, 201, 'write'));
   assert.equal(lines.length, 1);
   assert.match(lines[0], /^span POST \/api\/progress 2 0 42ms \{.*"http\.response\.status_code":201/);
+});
+
+test('27 a client URL that is not http(s) leaves no span and no payload', async () => {
+  const { t, ing } = rig({ opts: { now: clock([1000, 1001, 1002, 1003, 1004, 1005]) } });
+  const traced = t.trace(async () => new Response('x'));
+  await run(t, async () => {
+    await traced('data:text/plain,PLAYER-SECRET-in-data-url');
+    await traced('mailto:alice@example.com');
+    return reply(200, {});
+  });
+  const spans = spansOf(ing.calls[0].body);
+  assert.equal(spans.length, 1);
+  assert.ok(!JSON.stringify(ing.calls[0].body).includes('SECRET'));
+});
+
+test('28 a thrown undefined is still a failure, on the server span and on a client span', async () => {
+  const server = rig();
+  let caught = 'none';
+  await run(server.t, async () => { throw undefined; }).catch((e) => { caught = e; });
+  assert.equal(caught, undefined);
+  const [span] = spansOf(server.ing.calls[0].body);
+  assert.deepEqual(span.status, { code: 2 });
+  assert.equal(span.attrs['error.type'], '_OTHER');
+
+  const client = rig();
+  const traced = client.t.trace(() => Promise.reject(undefined));
+  await run(client.t, async () => { await traced('https://api.example/x').catch(() => {}); return reply(200, {}); });
+  const c = spansOf(client.ing.calls[0].body).find((s) => s.kind === 3);
+  assert.deepEqual(c.status, { code: 2 });
+  assert.equal(c.attrs['error.type'], '_OTHER');
+});
+
+test('29 an observer that rejects is not an unhandled rejection', async () => {
+  const seen = [];
+  const listener = (e) => seen.push(e);
+  process.on('unhandledRejection', listener);
+  try {
+    const { t } = rig({ opts: { onExport: async () => { throw new Error('observer'); } } });
+    const res = await run(t, async () => reply(200, {}));
+    assert.equal(res.status, 200);
+    await flush();
+    await flush();
+  } finally {
+    process.off('unhandledRejection', listener);
+  }
+  assert.deepEqual(seen, []);
+});
+
+test('30 a won export leaves no timer armed', async () => {
+  const { t, tm } = rig();
+  await run(t, async () => reply(200, {}));
+  assert.equal(tm.active(), 0);
+});
+
+test('31 the handler gets every argument, dormant or not', async () => {
+  const dormant = rig({ opts: { env: { DASH0_OTLP_ENDPOINT: 'https://ingress.evil.example' } } });
+  for (const { t } of [rig(), dormant]) {
+    let got;
+    await t.instrument({ POST: async (...args) => { got = args; return reply(200, {}); } }).POST(post(), 'ctx', 7);
+    assert.deepEqual(got.slice(1), ['ctx', 7]);
+  }
 });

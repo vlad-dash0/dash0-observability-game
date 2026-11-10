@@ -1,5 +1,5 @@
 // lib/otel/config.mjs: server telemetry config from env, dormant unless fully valid.
-// Spec: docs/DASH0-LAB.md, lib/dash0/ingress.mjs (the validators this reuses).
+// Spec: the header of lib/otel/config.mjs; the validators are in lib/dash0/ingress.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { serverTelemetryConfig } from '../lib/otel/config.mjs';
