@@ -59,6 +59,12 @@
     <!-- WORLD MAP. lib/globe-render.mjs draws a three.js globe into .globe-stage (act = region,
          level = country); its canvas is sized by CSS classes, never a style attribute (CSP
          style-src 'self'). Without WebGL the list below takes its place. -->
+    <!-- The ?signin= result, dismissible. Always rendered (a hidden live region would not announce). -->
+    <div class="signin-notice" id="signin-notice" role="status" x-show="signinNoticeText() !== ''" x-cloak>
+      <p x-text="signinNoticeText()"></p>
+      <button type="button" class="ui-btn ui-btn--ghost" @click="dismissSigninNotice()">Dismiss</button>
+    </div>
+
     <section class="map-panel" aria-labelledby="map-title">
       <h2 id="map-title" class="section-label" tabindex="-1">World map</h2>
       <p class="visually-hidden" role="status" x-text="litNote"></p>
@@ -120,7 +126,20 @@
     <section class="save-entry" aria-labelledby="save-entry-title" x-show="!debug" x-cloak>
       <h2 id="save-entry-title" class="section-label">Your progress</h2>
       <p class="save-entry-text">Copy it to another browser with a code.</p>
-      <button type="button" class="ui-btn ui-btn--ghost" id="save-open" @click="openSave()">Save code</button>
+      <div class="save-entry-actions">
+        <button type="button" class="ui-btn ui-btn--ghost" id="save-open" @click="openSave()">Save code</button>
+        <button type="button" class="ui-btn ui-btn--ghost" id="board-open" x-show="accountEnabled" x-cloak
+                aria-haspopup="dialog" @click="openBoard()">Leaderboard</button>
+        <button type="button" class="ui-btn ui-btn--ghost" id="account-open" x-show="signedIn" x-cloak
+                aria-haspopup="dialog" @click="openAccount()">Account</button>
+        <!-- A kit button that navigates: the markup lib/ui/button.mjs linkButton makes. -->
+        <a class="ui-btn ui-btn--ghost" href="/api/auth-start" x-show="accountEnabled &amp;&amp; !signedIn" x-cloak>Sign in with Google (@dash0.com)</a>
+      </div>
+      <div id="account-entry" x-show="accountEnabled" x-cloak>
+        <p class="save-entry-text" x-show="signedIn" x-text="signedInText()"></p>
+        <p class="save-entry-text" x-show="signedIn" x-text="accountSummary()"></p>
+        <p class="save-entry-text" x-show="accountNotice !== ''" x-text="accountNotice"></p>
+      </div>
     </section>
   </div>
 
@@ -191,6 +210,14 @@
           <p class="nuance-card" x-text="front"></p>
         </template>
       </div>
+      <div class="reward-nudge" x-show="signinNudgeOpen" x-cloak>
+        <p x-text="signinNudgeText"></p>
+        <div class="reward-nudge-actions">
+          <a class="ui-btn ui-btn--ghost" href="/api/auth-start">Sign in</a>
+          <button type="button" class="ui-btn ui-btn--ghost" @click="dismissSigninNudge()">Not now</button>
+          <button type="button" class="ui-btn ui-btn--ghost" @click="hideSigninNudge()">Don't ask again</button>
+        </div>
+      </div>
       <button type="button" class="ui-btn ui-btn--primary" id="reward-close" @click="closeReward()">Back to the map</button>
     </div>
   </div>
@@ -239,6 +266,36 @@
         <button type="button" class="ui-btn ui-btn--icon" id="save-x" aria-label="Close save code" @click="closeSave()"><span aria-hidden="true">&times;</span></button>
       </header>
       <div class="ui-modal-body" id="save-body" x-ignore></div>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD and ACCOUNT: kit modals like Save code. app.mjs draws each body (lib/account/board-view.mjs),
+       so the bodies carry no Alpine attributes. Outside #hub, which they make inert. -->
+  <div class="ui-modal" id="board-modal" x-show="boardOpen" x-cloak
+       role="dialog" aria-modal="true" aria-labelledby="board-title">
+    <div class="ui-modal-card">
+      <header class="ui-modal-head">
+        <div class="ui-modal-heading">
+          <p class="ui-eyebrow">On Call by Dash0</p>
+          <h2 id="board-title" tabindex="-1">Leaderboard</h2>
+        </div>
+        <button type="button" class="ui-btn ui-btn--icon" id="board-x" aria-label="Close the leaderboard" @click="closeBoard()"><span aria-hidden="true">&times;</span></button>
+      </header>
+      <div class="ui-modal-body" id="board-body" x-ignore></div>
+    </div>
+  </div>
+
+  <div class="ui-modal" id="account-modal" x-show="accountOpen" x-cloak
+       role="dialog" aria-modal="true" aria-labelledby="account-title">
+    <div class="ui-modal-card">
+      <header class="ui-modal-head">
+        <div class="ui-modal-heading">
+          <p class="ui-eyebrow">Your progress</p>
+          <h2 id="account-title" tabindex="-1">Account</h2>
+        </div>
+        <button type="button" class="ui-btn ui-btn--icon" id="account-x" aria-label="Close account" @click="closeAccount()"><span aria-hidden="true">&times;</span></button>
+      </header>
+      <div class="ui-modal-body" id="account-body" x-ignore></div>
     </div>
   </div>
 

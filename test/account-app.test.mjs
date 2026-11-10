@@ -502,3 +502,63 @@ test('accountHtml: the listing checkbox is checked only when listed', () => {
   assert.doesNotMatch(accountHtml({ nick: 'grace', listed: false }), /checked/);
   assert.match(accountHtml({ nick: 'grace', listed: true }), /checked/);
 });
+
+// ---- focus stays in place; a bad nickname format makes no request (#273 P6b review) ---------
+
+const focusLog = (game) => { const f = []; game.focusSoon = (s) => f.push(s); return f; };
+
+test('Not now and Don\'t ask again put focus on the reward card\'s Back to the map', async () => {
+  const { game } = setup({ routes: { 'GET /api/account': OUT } });
+  await initOf(game);
+  const f = focusLog(game);
+  game.dismissSigninNudge();
+  game.hideSigninNudge();
+  assert.deepEqual(f, ['#reward-close', '#reward-close']);
+});
+
+test('dismissing the sign-in notice focuses Save code, a target that stays visible', async () => {
+  const { game } = setup({ routes: { 'GET /api/account': OUT }, signin: 'failed' });
+  await initOf(game);
+  const f = focusLog(game);
+  game.dismissSigninNotice();
+  assert.deepEqual(f, ['#save-open']);
+});
+
+test('a session that ends in the account modal (sign out, delete, 401) focuses the board button, never the hidden #account-open', async () => {
+  for (const act of ['signout', 'delete', '401']) {
+    const route = act === '401' ? res(401, {}) : res(200, { v: 1, ok: true });
+    const { game } = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': merged({}), 'POST /api/account': route } });
+    await initOf(game);
+    game.openAccount();
+    const f = focusLog(game);
+    if (act === 'signout') await game.signOut(); else if (act === 'delete') await game.deleteAccount(); else await game.saveNickname('ada');
+    assert.equal(game.accountOpen, false, act);
+    assert.deepEqual(f, ['#board-open'], act);
+  }
+});
+
+test('Close in the account modal still returns focus to #account-open', async () => {
+  const { game } = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': merged({}) } });
+  await initOf(game);
+  game.openAccount();
+  const f = focusLog(game);
+  game.closeAccount();
+  assert.deepEqual(f, ['#account-open']);
+});
+
+test('a nickname with a bad format is refused in place and makes no POST; a good one still goes to the server', async () => {
+  const { game, dom, calls } = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': merged({}), 'POST /api/account': res(200, { v: 1, ok: true, nick: 'neo' }) } });
+  await initOf(game);
+  game.openAccount();
+  const before = calls.length;
+  for (const bad of ['', 'ab', '-abc', 'has space', 'x'.repeat(21)]) await game.saveNickname(bad);
+  assert.equal(calls.length, before, 'no request for a bad format');
+  assert.match(dom.document.querySelector('#account-feedback [data-feedback-text]').innerHTML, /3 to 20 letters/);
+  await game.saveNickname('neo');
+  assert.equal(calls.length, before + 1);
+  assert.equal(game.account.nick, 'neo');
+});
+
+test('the account body has no second "Account" eyebrow (the modal head has it)', () => {
+  assert.doesNotMatch(accountHtml({ nick: 'grace', listed: true }), /ui-eyebrow/);
+});
