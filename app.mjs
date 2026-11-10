@@ -23,6 +23,10 @@ import { dotStates, globeLabel, globeLines, globeTarget } from './lib/globe-view
 import { hideHelp, readHiddenHelp } from './lib/help-prefs.mjs';
 import { howToView } from './lib/how-to-play.mjs';
 import { createGuideClient } from './lib/guide/client.mjs';
+import { createAccountClient } from './lib/account/client.mjs';
+import { ACCOUNT_UNAVAILABLE, accountHtml, boardHtml, nudgeText } from './lib/account/board-view.mjs';
+import { setFeedback } from './lib/ui/index.mjs';
+import { escapeHtml } from './lib/lesson-kit.mjs';
 import { trapTab } from './lib/modal-focus.mjs';
 import { createLevelContext } from './lib/level-context.mjs';
 import { cardTotals, mergeProgress, recordCompletion, registryIds, starTotals } from './lib/progress.mjs';
@@ -53,6 +57,29 @@ export const NOTICES = Object.freeze({
     'Your progress was saved by a newer version of the game. Reload the page to get it; nothing is saved from this tab until then.',
   unavailable:
     'This browser is not letting the game save (private mode or full storage). Progress lasts until you close the tab.',
+});
+
+// The wait before the one retry after a 429 is capped here.
+const MAX_RETRY_S = 60;
+const SYNC_PAUSED = 'Saving to your account is paused for a moment; your progress is safe in this browser';
+
+// The hideHelp key of the sign-in nudge (its own "Don't ask again").
+export const NUDGE_KEY = 'signin-nudge';
+
+// What `?signin=` says (main.mjs strips it after reading it); any other value says nothing.
+export const SIGNIN_NOTICES = Object.freeze({
+  failed: 'Sign-in did not work. Try again.',
+  domain: 'Sign-in is for @dash0.com Google accounts only.',
+  cancelled: 'Sign-in was cancelled.',
+  unavailable: 'Sign-in is unavailable right now. Your progress is still saved in this browser.',
+});
+
+// Nickname refusals (POST /api/account 400 or 409).
+const NICK_ERRORS = Object.freeze({
+  taken: 'That nickname is taken.',
+  format: 'Use 3 to 20 letters, digits, - or _, starting with a letter or digit.',
+  reserved: 'That nickname is not available.',
+  blocked: 'That nickname is not available.',
 });
 
 // Screen-reader wording for each levelState.
@@ -111,6 +138,7 @@ export function createGame(deps) {
     debug = false,
     telemetry = null,
     fetch: request = null,
+    signin = null, // the `?signin=` value main.mjs read once (and stripped from the URL)
   } = deps;
   const report = (e) => {
     try {
@@ -123,6 +151,14 @@ export function createGame(deps) {
   // Ask the guide (#17): the status is fetched once, at init; a level opened before it arrives, or when it
   // failed, has no panel. ?mode=debug is no exception, so the panel can be tried locally.
   const guideClient = typeof request === 'function' ? createGuideClient({ fetch: request }) : null;
+  // The account client (#273): without a fetch, or in debug, the game never asks and nothing changes.
+  const accountClient = typeof request === 'function' && debug !== true ? createAccountClient({ fetch: request }) : null;
+  let syncing = null; // the running sync chain
+  let syncAgain = false; // a sync was asked for while one ran
+  let nudgeShown = false; // the sign-in nudge shows at most once per page session
+  let retrying = false; // a 429 retry is scheduled or running (one per pause)
+  let nudgeAsked = 0; // bumps on every nudge request, so a stale leaderboard answer is dropped
+  let dontAsk = false; // "Don't ask again" for this visit, even when storage refused the write
   const loaded = loadProgress(storage, registry);
   // The open level's AbortController; aborting it makes that ctx's finish a no-op.
   let session = null;
@@ -188,6 +224,19 @@ export function createGame(deps) {
     rewardStars: null,
     rewardCards: [],
     globeFallback: false,
+    // Sign-in and saved progress (#273). account.state: 'unknown' until GET /api/account answers, then
+    // 'unconfigured' | 'signedOut' | 'signedIn' | 'unavailable'. Nothing shows unless signedOut or signedIn.
+    account: { state: 'unknown', nick: '', listed: false },
+    accountStars: null, // the server's stars for this player; null before the first write (say "no stars yet", never 0)
+    accountRank: null,
+    accountNotice: '', // text when the account could not be reached; progress is still saved here
+    signinStatus: debug !== true && (Object.hasOwn(SIGNIN_NOTICES, signin) || signin === 'ok') ? signin : null,
+    signinNudgeOpen: false,
+    signinNudgeText: '',
+    boardOpen: false,
+    board: { state: 'loading', size: 0, top: [], me: null },
+    accountOpen: false,
+    confirmDelete: false,
     litNote: '', // "Germany is now lit: The signals.": the polite announcement and the fallback's first line
 
     init() {
@@ -199,10 +248,225 @@ export function createGame(deps) {
       });
       this.showGlobe();
       guideClient?.status();
+      this.loadAccount();
     },
     // Alpine calls this when the component is torn down.
     destroy() {
       this.hideGlobe();
+    },
+
+    // ---------- account (#273) ----------
+    // True when the account UI shows: configured (the server said so), not debug.
+    get accountEnabled() {
+      return !this.debug && (this.account.state === 'signedOut' || this.account.state === 'signedIn');
+    },
+    get signedIn() {
+      return !this.debug && this.account.state === 'signedIn';
+    },
+    // "Signed in as <nick>" for the hub, '' otherwise.
+    signedInText() {
+      return this.signedIn ? `Signed in as ${this.account.nick}` : '';
+    },
+    // The notice for `?signin=`: the first-sign-in line needs the nickname, so it waits for GET /api/account.
+    signinNoticeText() {
+      if (this.signinStatus === null) return '';
+      if (this.signinStatus !== 'ok') return SIGNIN_NOTICES[this.signinStatus];
+      if (!this.signedIn) return '';
+      return this.account.listed
+        ? `You're on the leaderboard as ${this.account.nick}. Change your nickname or hide yourself in Account.`
+        : `Signed in as ${this.account.nick}.`;
+    },
+    dismissSigninNotice() {
+      this.signinStatus = null;
+    },
+    // GET /api/account, once per page (init); the only request an anonymous or unconfigured visit makes.
+    async loadAccount() {
+      if (!accountClient) return;
+      const res = await accountClient.account();
+      if (res.state === 'unavailable') {
+        this.account = { state: 'unavailable', nick: '', listed: false };
+        this.accountNotice = ACCOUNT_UNAVAILABLE;
+        return;
+      }
+      this.account = { state: res.state, nick: res.nick ?? '', listed: res.listed ?? false };
+      if (res.state === 'signedIn') await this.syncProgress();
+    },
+    // POST this browser's progress to the account and save the merged answer locally (saveProgress).
+    // One at a time; a request that arrives mid-sync runs once more after it. Never when not signed in.
+    syncProgress() {
+      if (!accountClient || !this.signedIn) return Promise.resolve();
+      if (syncing) {
+        syncAgain = true;
+        return syncing;
+      }
+      syncing = (async () => {
+        do {
+          syncAgain = false;
+          await this.syncOnce();
+        } while (syncAgain && this.signedIn);
+      })().finally(() => {
+        syncing = null;
+      });
+      return syncing;
+    },
+    async syncOnce() {
+      const res = await accountClient.syncProgress(this.progress);
+      if (res.state === 'signedOut') {
+        this.endAccountSession();
+        return;
+      }
+      if (res.state === 'limited') {
+        this.accountNotice = SYNC_PAUSED; // the local copy is already saved; one retry after the wait
+        if (!retrying) {
+          retrying = true;
+          later(async () => {
+            try {
+              await this.syncProgress();
+            } finally {
+              retrying = false;
+            }
+          }, Math.min(res.retryAfterS, MAX_RETRY_S) * 1000);
+        }
+        return;
+      }
+      if (res.state !== 'ok') {
+        this.accountNotice = ACCOUNT_UNAVAILABLE; // the local copy is already saved
+        return;
+      }
+      this.accountNotice = '';
+      this.accountStars = res.stars;
+      this.accountRank = res.rank;
+      const saved = saveProgress(storage, res.progress, registry);
+      if (saved.saved) {
+        this.progress = saved.progress;
+        this.refreshGlobe();
+      } else this.notice = saved.reason;
+    },
+
+    // The nudge after a win: signed out, not debug, once per page session, not hidden. It waits for the
+    // leaderboard so its copy is complete (debug has no account client, so it never gets here); a failed board gives the plain "Sign in to save your progress".
+    async maybeSigninNudge() {
+      if (!accountClient || this.account.state !== 'signedOut' || nudgeShown || dontAsk) return;
+      if (readHiddenHelp(storage).hidden.has(NUDGE_KEY)) return;
+      nudgeShown = true;
+      const ask = ++nudgeAsked;
+      const board = await accountClient.leaderboard();
+      if (ask !== nudgeAsked || !this.rewardOpen || this.account.state !== 'signedOut') return;
+      this.signinNudgeText = nudgeText(board);
+      this.signinNudgeOpen = true;
+    },
+    // Not now: gone for this page session (the flag already says so).
+    dismissSigninNudge() {
+      nudgeAsked++;
+      this.signinNudgeOpen = false;
+    },
+    // Don't ask again: stored under hideHelp, and always hidden for this visit.
+    hideSigninNudge() {
+      dontAsk = true;
+      if (!this.debug) hideHelp(storage, [NUDGE_KEY]);
+      this.dismissSigninNudge();
+    },
+
+    // The board modal (#board-modal draws into #board-body): the top 10 and "You: N stars, #r".
+    async openBoard() {
+      if (!this.accountEnabled || this.dialogOpen()) return false;
+      this.board = { state: 'loading', size: 0, top: [], me: null };
+      this.boardOpen = true;
+      this.renderBoard();
+      this.focusSoon('#board-title');
+      const res = await accountClient.leaderboard();
+      if (!this.boardOpen) return true;
+      this.board = res;
+      this.renderBoard();
+      return true;
+    },
+    renderBoard() {
+      const host = doc.getElementById('board-body');
+      if (host) host.innerHTML = boardHtml(this.board);
+    },
+    closeBoard() {
+      if (!this.boardOpen) return;
+      this.boardOpen = false;
+      this.focusSoon('#board-open');
+    },
+
+    // The account modal (#account-modal draws into #account-body): nickname, listing, sign out, delete.
+    openAccount() {
+      if (!this.signedIn || this.dialogOpen()) return false;
+      this.confirmDelete = false;
+      this.accountOpen = true;
+      this.renderAccount();
+      this.focusSoon('#account-title');
+      return true;
+    },
+    closeAccount() {
+      if (!this.accountOpen) return;
+      this.accountOpen = false;
+      this.confirmDelete = false;
+      this.focusSoon('#account-open');
+    },
+    renderAccount() {
+      const host = doc.getElementById('account-body');
+      if (!host) return;
+      host.innerHTML = accountHtml({ nick: this.account.nick, listed: this.account.listed, confirmDelete: this.confirmDelete });
+      const on = (id, fn) => {
+        const el = host.querySelector(`#${id}`);
+        if (el) el.onclick = fn;
+      };
+      on('account-nick-save', () => this.saveNickname(host.querySelector('#account-nick')?.value ?? ''));
+      on('account-listed', () => this.setListing(host.querySelector('#account-listed')?.checked === true));
+      on('account-signout', () => this.signOut());
+      on('account-delete', () => {
+        this.confirmDelete = true;
+        this.renderAccount();
+      });
+      on('account-delete-no', () => {
+        this.confirmDelete = false;
+        this.renderAccount();
+      });
+      on('account-delete-yes', () => this.deleteAccount());
+    },
+    accountSay(tone, text) {
+      const el = doc.getElementById('account-feedback');
+      if (el) setFeedback(el, tone, escapeHtml(text));
+    },
+    // A refused account action: a lost session closes the modal; anything else is said in place.
+    accountRefused(res) {
+      if (res.state === 'signedOut') {
+        this.endAccountSession();
+        return;
+      }
+      const why = res.state === 'taken' ? 'taken' : res.state === 'invalid' ? res.reason : null;
+      this.accountSay('error', why === null ? ACCOUNT_UNAVAILABLE : NICK_ERRORS[why] ?? NICK_ERRORS.format);
+    },
+    endAccountSession() {
+      this.account = { state: 'signedOut', nick: '', listed: false };
+      this.accountStars = null;
+      this.accountRank = null;
+      this.accountNotice = '';
+      this.closeAccount();
+    },
+    async saveNickname(nick) {
+      const res = await accountClient.setNickname(String(nick).trim());
+      if (res.state !== 'ok') return this.accountRefused(res);
+      this.account = { ...this.account, nick: res.nick ?? String(nick).trim() };
+      this.accountSay('success', 'Nickname saved.');
+    },
+    async setListing(listed) {
+      const res = await accountClient.setListing(listed);
+      if (res.state !== 'ok') return this.accountRefused(res);
+      this.account = { ...this.account, listed: res.listed ?? listed };
+      this.accountSay('success', this.account.listed ? 'You are on the leaderboard.' : 'You are hidden from the leaderboard.');
+    },
+    async signOut() {
+      const res = await accountClient.signOut();
+      if (res.state !== 'ok') return this.accountRefused(res);
+      this.endAccountSession();
+    },
+    async deleteAccount() {
+      const res = await accountClient.deleteAccount();
+      if (res.state !== 'ok') return this.accountRefused(res);
+      this.endAccountSession();
     },
 
     // ---------- derived ----------
@@ -341,7 +605,7 @@ export function createGame(deps) {
     // The one answer to "is a dialog open": the hub goes inert and openLevel / openAbout
     // refuse while it is true.
     dialogOpen() {
-      return this.overlayOpen || this.rewardOpen || this.aboutOpen || this.saveOpen;
+      return this.overlayOpen || this.rewardOpen || this.aboutOpen || this.saveOpen || this.boardOpen || this.accountOpen;
     },
     hubInert() {
       return this.dialogOpen();
@@ -398,6 +662,7 @@ export function createGame(deps) {
       this.progress = saved.progress;
       this.notice = saved.saved ? null : saved.reason;
       this.refreshGlobe();
+      this.syncProgress();
       return saved;
     },
 
@@ -539,6 +804,11 @@ export function createGame(deps) {
       this.rewardOpen = true;
       this.focusSoon('#reward-close');
       this.recordTelemetry(levelId, level, result);
+      this.signinNudgeOpen = false;
+      if (!this.debug) {
+        if (this.signedIn) this.syncProgress();
+        else this.maybeSigninNudge();
+      }
     },
 
     // Telemetry never blocks play (docs/DASH0-LAB.md, Telemetry session): a span for the completion, then a
@@ -564,6 +834,8 @@ export function createGame(deps) {
 
     closeReward() {
       this.rewardOpen = false;
+      nudgeAsked++; // a board reply still on its way must not open the nudge on a later card
+      this.signinNudgeOpen = false;
       if (pendingLit) this.revealLit();
       else this.returnFocus();
     },
@@ -609,7 +881,7 @@ export function createGame(deps) {
     // The page behind an open kit modal must not scroll: a class on <html> (index.html x-effect keeps it
     // in step with the three flags; the rule is in base.css, never an inline style).
     scrollLocked() {
-      return this.howToOpen || this.aboutOpen || this.saveOpen;
+      return this.howToOpen || this.aboutOpen || this.saveOpen || this.boardOpen || this.accountOpen;
     },
     syncScrollLock() {
       doc.documentElement.classList.toggle('modal-open', this.scrollLocked());
@@ -619,6 +891,8 @@ export function createGame(deps) {
     openModalSelector() {
       if (this.howToOpen) return '#howto-modal';
       if (this.saveOpen) return '#save-modal';
+      if (this.boardOpen) return '#board-modal';
+      if (this.accountOpen) return '#account-modal';
       if (this.aboutOpen) return '#about-modal';
       return null;
     },
@@ -642,6 +916,14 @@ export function createGame(deps) {
       }
       if (this.saveOpen) {
         this.closeSave();
+        return;
+      }
+      if (this.boardOpen) {
+        this.closeBoard();
+        return;
+      }
+      if (this.accountOpen) {
+        this.closeAccount();
         return;
       }
       if (!this.overlayOpen) return;
