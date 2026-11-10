@@ -35,5 +35,5 @@ test('a reward text is plain text: the card sets it with x-text, so an HTML enti
   const texts = [...(await finishes()), { id: 'the-pager', text: CONTENT.reward }];
   const bad = texts.filter(({ text }) => /&(amp|lt|gt|quot|apos|#\d+);/.test(text)).map((t) => t.id);
   assert.deepEqual(bad, []);
-  assert.equal(texts.length > 40, true, 'every level with a closing text was checked');
+  assert.equal(texts.length > 40, true, 'every play level with a closing text was checked; run levels are checked in levels-play.test.mjs');
 });
