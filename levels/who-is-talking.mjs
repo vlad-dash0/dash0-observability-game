@@ -202,7 +202,8 @@ export default {
     ],
     finish:
       'A resource told you who was talking: the fallback name unknown_service:node gave away the missing service.name, and the k8s ' +
-      'attributes still pointed at the notifications deployment. Dash0 builds its Resources view from resource attributes: it lists ' +
+      'attributes still pointed at the notifications deployment.\n\n' +
+      'Dash0 builds its Resources view from resource attributes: it lists ' +
       'Kubernetes pods and deployments and filters by resource attributes, so the pod could be found by its k8s attributes even though ' +
       'its service name was no help.',
   },

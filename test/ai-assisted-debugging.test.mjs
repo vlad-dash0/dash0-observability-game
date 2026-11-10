@@ -235,10 +235,10 @@ test('8.5: the legacy view costs no mistake; a player who opened it and the clue
 
 // ---- the agent is simulated ------------------------------------------------------------
 
-test('the copy says the agent is simulated: the alert and the step intro, and no view claims a model, a tool or a product', () => {
+test('the copy says the agent is simulated once, in the alert (not again in the step intro), and no view claims a model, a tool or a product', () => {
   assert.equal(/simulated/.test(plain(S.alert.html)) && /no model is called and no real MCP server is reached/.test(plain(S.alert.html)), true);
   const intro = plain(LEVEL.play.steps[0].intro);
-  assert.equal(intro.includes('The agent is simulated') && intro.includes('calls no model') && intro.includes('reaches no real MCP server'), true);
+  assert.equal(/simulated|no model|MCP/i.test(intro), false, 'the step intro does not repeat it');
   for (const v of S.views) assert.equal(/Dash0|Agent0|MCP|getAttributeKeys|credit|pricing|GPT|Claude/i.test(plain(v.html)), false, `${v.id}: no product or tool claim inside a simulated view`);
 });
 

@@ -216,7 +216,9 @@
       <h2 id="reward-title" x-text="rewardTitle"></h2>
       <p class="reward-stars" role="img" :aria-label="rewardStarsLabel()" x-show="rewardStars !== null"
          x-text="rewardStarsText()"></p>
-      <p x-text="rewardText"></p>
+      <div class="reward-text">
+        <template x-for="(para, i) in rewardParagraphs()" :key="i"><p x-text="para"></p></template>
+      </div>
       <p x-show="rewardDebug" x-cloak x-text="rewardNote()"></p>
       <div class="reward-cards" x-show="rewardCards.length > 0">
         <p class="reward-cards-title">New nuance card</p>

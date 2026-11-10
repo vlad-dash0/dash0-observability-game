@@ -187,30 +187,31 @@ test('T12 each step renders one kit step, wide by its type: a sort, build, incid
   assert.deepEqual(['sort', 'build', 'incident', 'spot', 'query', 'configure', 'choice'].every((k) => seen.includes(k)), true);
 });
 
-const HOW = 'ol[aria-label="How this board works"]';
+const HOW = '.ui-lesson [data-rules]';
 
-test('P1 an incident step\'s lesson card is its scenario line, then the generic How this board works list; no other step has it', () => {
-  const lists = [];
+test('P1 an incident step\'s lesson card is its scenario line, then one short rules line that points to How to play; no other step has it', () => {
+  const lines = [];
   playAll(FX, (i, { key, spec }) => {
     const card = q('.ui-step .ui-lesson');
     if (key !== 'incident') {
-      assert.equal(qa(HOW).length, 0, `step ${i + 1} (${key}) has no board list`);
+      assert.equal(qa(HOW).length, 0, `step ${i + 1} (${key}) has no rules line`);
       return;
     }
     assert.equal(card.textContent.trim().startsWith(FX.play.steps[i].intro), true, 'the scenario line opens the card');
-    assert.equal(qa(`.ui-lesson ${HOW}`).length, 1, 'the list is inside the lesson card');
-    const items = qa(`${HOW} > li`).map((li) => li.textContent.replace(/\s+/g, ' ').trim());
-    assert.equal(items.length, 3);
-    ['Investigate', 'Unlock the causes', 'Name the cause'].forEach((name, n) => assert.equal(items[n].includes(name), true, items[n]));
+    assert.equal(qa(`${HOW}`).length, 1, 'one rules line inside the lesson card');
+    assert.equal(qa('.ui-lesson ol, .ui-lesson ul').length, 0, 'no rules list');
+    assert.equal(card.querySelectorAll('p').length, 2, 'the scenario, then the rules line');
+    assert.equal(/How to play/.test(q(HOW).textContent), true, 'it points to How to play');
     const t = card.textContent;
     for (const v of spec.views) assert.equal(t.includes(v.label), false, `the lesson does not name the view ${v.label}`);
     for (const h of spec.hypotheses) assert.equal(t.includes(h.label), false, `nor the cause ${h.label}`);
-    lists.push(q(HOW).outerHTML);
+    lines.push(q(HOW).outerHTML);
   });
-  assert.equal(lists.length, 1, 'the fixture has one incident step');
+  assert.equal(lines.length, 1, 'the fixture has one incident step');
   for (const level of LEVELS.filter((l) => l.play.steps[0].incident)) {
     start(level);
-    assert.equal(q(HOW)?.outerHTML, lists[0], `${level.id}: the same list on every incident board`);
+    assert.equal(q(HOW)?.outerHTML, lines[0], `${level.id}: the same line on every incident board`);
+    assert.equal(q('.ui-lesson').textContent.length < 400, true, `${level.id}: a short lesson card, the alert stays on the first screen`);
   }
 });
 
