@@ -209,7 +209,7 @@ test('lesson code breaks inside a long token: the lesson card clips, so an unbre
   assert.equal(pick('.ui-lesson').overflow, 'hidden', 'premise: the card clips');
   assert.equal(pick('.ui-lesson code')['overflow-wrap'], 'break-word');
   assert.equal(pick('.ui-panel').overflow, 'hidden', 'premise: the panel clips too');
-  assert.equal(pick('.ui-panel code')['overflow-wrap'], 'break-word', 'a trace id wider than the panel in a panel breaks instead of clipping');
+  assert.equal(pick('.ui-panel code')['overflow-wrap'], 'break-word', 'a trace id wider than the panel breaks instead of clipping');
   assert.equal(pick('.ui-panel-sec')['overflow-wrap'], 'anywhere', 'long plain text in a panel section wraps at 320px instead of clipping');
 });
 
