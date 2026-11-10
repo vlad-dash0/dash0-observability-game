@@ -9,7 +9,7 @@
 // markup must not use Alpine attributes (x-*, @*, :*). test/levels-play.test.mjs checks.
 import { DECK } from './cards/deck.mjs';
 import { DOTS } from './hub/globe-data.mjs';
-import { GAME_SUMMARY } from './hub/about.mjs';
+import { GAME_SUMMARY, GLOBE_LOOP } from './hub/about.mjs';
 import { badgeViews } from './hub/badges.mjs';
 import { COMING_SOON } from './hub/coming-soon.mjs';
 import { ACT_REGIONS, actOfCountry, COUNTRY_NAMES, islandDots, LEVEL_COUNTRY } from './hub/globe-map.mjs';
@@ -19,7 +19,7 @@ import { shuffle as kitShuffle } from './lib/lesson-kit.mjs';
 import { endSentence } from './lib/text.mjs';
 import { globeState } from './lib/globe.mjs';
 import { freshlyLit, igniteView, litText } from './lib/globe-ignite.mjs';
-import { dotStates, globeLabel, globeLines, globeTarget } from './lib/globe-view.mjs';
+import { dotStates, globeCaption, globeLabel, globeLegend, globeLines, globeTarget } from './lib/globe-view.mjs';
 import { hideHelp, readHiddenHelp } from './lib/help-prefs.mjs';
 import { howToView } from './lib/how-to-play.mjs';
 import { createGuideClient } from './lib/guide/client.mjs';
@@ -228,6 +228,7 @@ export function createGame(deps) {
     aboutOpen: false,
     saveOpen: false,
     aboutSummary: GAME_SUMMARY,
+    aboutLoop: GLOBE_LOOP,
     howTo: NO_HOW_TO,
     howToOpen: false,
     rewardTitle: '',
@@ -529,10 +530,6 @@ export function createGame(deps) {
     },
 
     // ---------- derived ----------
-    // True when some act is shown as coming soon; the globe legend's "Coming soon" key hides without one.
-    hasSoon() {
-      return this.acts.some((a) => a.soon);
-    },
     get hasLevels() {
       return registry.order.length > 0;
     },
@@ -598,6 +595,20 @@ export function createGame(deps) {
     // The globe's accessible name: levels done, regions lit, any open incident.
     mapLabel() {
       return globeLabel(this.mapState());
+    },
+    // The one-line story under the globe ('' when no act has a region).
+    captionText() {
+      return globeCaption(registry, this.mapState())?.text ?? '';
+    },
+    // The map key: one entry per kind of dot drawn now (lib/globe-view.mjs globeLegend).
+    globeLegend() {
+      if (globeCaption(registry, this.mapState()) === null) return [];
+      return globeLegend(dotStates(this.mapState(), dots, globeMap.actOf), dots, globeMap.actOf);
+    },
+    // The swatch class of a key entry: the incident key reuses the pulse swatch, the dark key the plain one.
+    legendKeyClass(e) {
+      const swatch = e.key === 'incident' ? 'pulse' : e.key === 'dark' ? '' : e.key;
+      return swatch ? `globe-key ${swatch}` : 'globe-key';
     },
     // The text fallback (no WebGL): one line per act with its region and progress.
     globeLines() {

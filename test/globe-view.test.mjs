@@ -5,11 +5,11 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DOTS } from '../hub/globe-data.mjs';
-import { actOfCountry } from '../hub/globe-map.mjs';
+import { ACT_REGIONS, actOfCountry } from '../hub/globe-map.mjs';
 import { liveRegistry } from '../app.mjs';
 import { globeState } from '../lib/globe.mjs';
 import {
-  COLOR_ROLES, DOT, MAX_TILT, createLoop, currentActId, dotStates, facingRotation, globeLabel, globeLines,
+  COLOR_ROLES, DOT, MAX_TILT, createLoop, currentActId, dotStates, facingRotation, globeCaption, globeLabel, globeLegend, globeLines,
   globeTarget, parseColor, readColors, regionCentre, spherePoint,
 } from '../lib/globe-view.mjs';
 import { mountGlobe } from '../lib/globe-render.mjs';
@@ -164,9 +164,9 @@ test('the text fallback lists each act with its region, done of total and an ope
     'Act 2 (Two): 0 of 1 done',
   ]);
   assert.deepEqual(globeLines(REG, globeState(REG, progressOf(['a', 'b', 'boss0', 'd']), MAP)), [
-    'Act 0, Zeroth (Zero): 3 of 3 done, resolved',
+    'Act 0, Zeroth (Zero): 3 of 3 done, saved',
     'Act 1, First (One): 0 of 1 done',
-    'Act 2 (Two): 1 of 1 done, resolved',
+    'Act 2 (Two): 1 of 1 done, saved',
   ]);
   const partial = { ACT_REGIONS: { g1: { region: 'One' } }, LEVEL_COUNTRY: {} };
   assert.deepEqual(globeLines(REG, globeState(REG, progressOf([]), partial)), ['Act 1, First (One): 0 of 1 done']);
@@ -180,11 +180,11 @@ test('the accessible name counts levels done, names lit regions and the open inc
   );
   assert.equal(
     globeLabel(globeState(REG, progressOf(['a', 'b', 'boss0', 'd']), MAP)),
-    'World map: 4 of 5 levels done. Resolved: Zero, Two.',
+    'World map: 4 of 5 levels done. Saved: Zero, Two.',
   );
   assert.equal(
     globeLabel(globeState(REG, progressOf(['a', 'c']), MAP)),
-    'World map: 2 of 5 levels done. Resolved: One. Lit: Zero 1 of 3.',
+    'World map: 2 of 5 levels done. Saved: One. Lit: Zero 1 of 3.',
   );
 });
 
@@ -641,9 +641,9 @@ test('the text fallback lists soon acts in act order', () => {
 test('the accessible name names soon regions and leaves them out of the count', () => {
   assert.equal(
     globeLabel(globeState(REG3, progressOf(['a']), MAP3, [S7])),
-    'World map: 1 of 2 levels done. Resolved: Zero. Coming soon: Seven.',
+    'World map: 1 of 2 levels done. Saved: Zero. Coming soon: Seven.',
   );
-  assert.equal(globeLabel(globeState(REG3, progressOf(['a']), MAP3)), 'World map: 1 of 2 levels done. Resolved: Zero.');
+  assert.equal(globeLabel(globeState(REG3, progressOf(['a']), MAP3)), 'World map: 1 of 2 levels done. Saved: Zero.');
   // Given out of order, the soon regions are still named by act number.
   const map8 = { ...MAP3, ACT_REGIONS: { ...MAP3.ACT_REGIONS, s8: { region: 'Eight' } } };
   const S8 = { id: 's8', no: 8, name: 'Later still', sub: '', teaser: 't' };
@@ -875,4 +875,89 @@ test('the seed is drawn when sparks are first made, never by a mount without an 
   const reduced = await mountSparks(PULSING, true, { seed: undefined, random });
   assert.equal(calls, 1, 'reduced motion never asks');
   reduced.handle.dispose();
+});
+
+// ---- the story: caption and legend (#309 P2) ----------------------------------------
+
+const captionOf = (ids) => globeCaption(REG, globeState(REG, progressOf(ids), MAP));
+
+test('the caption follows the story: dark, building, incident, saved, every region saved', () => {
+  assert.deepEqual(captionOf([]), {
+    phase: 'dark', actId: 'g0', region: 'Zero', done: 0, total: 3,
+    text: 'The planet is dark. Shine the o11y light on your world.',
+  });
+  assert.deepEqual(captionOf(['a']), {
+    phase: 'building', actId: 'g0', region: 'Zero', done: 1, total: 3, text: "You're building! Zero: 1 of 3 done.",
+  });
+  assert.equal(captionOf(['a', 'b']).phase, 'incident');
+  assert.equal(captionOf(['a', 'b']).text, 'Alert! Zero is down. Tend to it now.');
+  assert.deepEqual(captionOf(['a', 'b', 'boss0']), {
+    phase: 'saved', actId: 'g0', region: 'Zero', done: 3, total: 3, text: 'Zero is calm. You saved the day.',
+  });
+  const next = captionOf(['a', 'b', 'boss0', 'c']);
+  assert.deepEqual([next.phase, next.actId, next.region, next.text], ['saved', 'g1', 'One', 'One is calm. You saved the day.']);
+  const live = globeCaption(LIVE, globeState(LIVE, progressOf([...ACT_0, 'the-pager', 'resources'])));
+  assert.deepEqual([live.phase, live.actId, live.text], ['building', 'act-1', "You're building! Northern Europe: 1 of 4 done."], 'building again once the next act is entered');
+  const all = captionOf(['a', 'b', 'boss0', 'c', 'd']);
+  assert.deepEqual(all, { phase: 'allSaved', actId: null, region: null, done: 5, total: 5, text: 'Every region is calm. You saved the day.' });
+  assert.equal(captionOf(['a', 'b', 'c', 'd']).actId, 'g0', 'an open incident outranks the later acts');
+  assert.equal(captionOf(['a', 'b', 'c', 'd']).phase, 'incident');
+  const soon = globeCaption(REG, globeState(REG, progressOf(['a', 'b', 'boss0', 'c', 'd']), { ...MAP, ACT_REGIONS: { ...MAP.ACT_REGIONS, s7: { region: 'Seven' } } }, [S7]));
+  assert.equal(soon.text, 'You saved the day. More regions are coming soon.');
+});
+
+test('an untouched current act with no saved act before it reads dark, even when a later act has progress', () => {
+  const c = captionOf(['d']);
+  assert.deepEqual([c.phase, c.actId, c.region], ['dark', 'g0', 'Zero']);
+});
+
+test('two open incidents: the caption names the lower act', () => {
+  const state = {
+    regions: {
+      g0: { region: 'Zero', done: 3, total: 4, pulse: true, resolved: false },
+      g1: { region: 'One', done: 1, total: 2, pulse: true, resolved: false },
+    },
+  };
+  const reg = { acts: [{ id: 'g0' }, { id: 'g1' }] };
+  assert.equal(globeCaption(reg, state).region, 'Zero');
+});
+
+test('no mapped region, no caption', () => {
+  assert.equal(globeCaption(REG, { regions: {}, countries: {} }), null);
+  assert.equal(globeCaption({ acts: [] }, { regions: {}, countries: {} }), null);
+});
+
+test('every live caption fits 60 characters, for every region and phase, with plain punctuation', () => {
+  const maxTotal = Math.max(...LIVE.acts.map((a) => a.levelIds.length + (a.bossId == null ? 0 : 1)));
+  assert.ok(maxTotal >= 3, 'the live registry has acts');
+  const pair = { acts: [{ id: 'p' }, { id: 'q' }] };
+  for (const { region } of Object.values(ACT_REGIONS)) {
+    const r = (o) => ({ region, total: maxTotal, done: 0, pulse: false, resolved: false, ...o });
+    const states = [
+      { regions: { p: r({}) } },
+      { regions: { p: r({ done: maxTotal - 1 }) } },
+      { regions: { p: r({ done: maxTotal - 1, pulse: true }) } },
+      { regions: { p: r({ done: maxTotal, resolved: true }), q: r({ region: 'Next' }) } },
+      { regions: { p: r({ done: maxTotal, resolved: true }), q: r({ region: 'Next', done: maxTotal, resolved: true }) }, soon: { s: { region: 'S' } } },
+    ];
+    for (const state of states) {
+      const { text } = globeCaption(pair, state);
+      assert.ok(text.length <= 60, `${region}: "${text}" is ${text.length} characters`);
+      assert.ok(!text.includes('\u2014') && !text.includes('  '), `${region}: "${text}"`);
+    }
+  }
+});
+
+test('the legend lists only what is drawn, in a fixed order, with its words', () => {
+  const dots = [[0, 0, 'A', ''], [0, 0, 'B', ''], [0, 0, 'C', ''], [0, 0, 'D', ''], [0, 0, 'E', '']];
+  const actOf = () => 'x';
+  assert.deepEqual(globeLegend([0, 1, 2, 3, 4], dots, actOf), [
+    { key: 'incident', text: 'Production down' },
+    { key: 'resolved', text: 'Saved, all calm' },
+    { key: 'lit', text: 'Instrumented' },
+    { key: 'dark', text: 'Still dark' },
+    { key: 'soon', text: 'Coming soon' },
+  ]);
+  assert.deepEqual(globeLegend([4, 0], [dots[0], dots[1]], (iso) => (iso === 'A' ? 'x' : null)).map((e) => e.key), ['resolved'], 'an unlit dot with no act is not "still dark"');
+  assert.deepEqual(globeLegend([], [], actOf), []);
 });

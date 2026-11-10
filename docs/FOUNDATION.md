@@ -187,7 +187,7 @@ State: `lib/globe.mjs` `globeState` (country `{lit}`, lit when its level is comp
 `isActComplete`; a region is never both). The per-country `pulse` was an unread duplicate and is gone (#309).
 View, pure (`lib/globe-view.mjs`): `dotStates` (per dot UNLIT / LIT / PULSE / SOON / RESOLVED, precedence PULSE > SOON > RESOLVED > LIT:
 a fixed incident leaves its whole region RESOLVED, a static calm mint (`--color-globe-resolved`, `uResolved`, no `uTime`),
-and `globeLines` adds ", resolved", `globeLabel` "Resolved: ..." and leaves resolved regions out of "Lit:";
+and `globeLines` adds ", saved", `globeLabel` "Saved: ..." and leaves saved regions out of "Lit:";
 a coming-soon region's dots are SOON, static and dim, and never lit), `currentActId` (lowest unlocked act not complete, else the last) and
 `globeTarget` (rotation facing that act's region centre), `globeLabel` (the accessible name)
 and `globeLines` (the no-WebGL text, one line per act), `readColors` (the `--color-globe-*`
@@ -203,6 +203,8 @@ slot and period so there is no backlog after a hidden tab; each spark is a burst
 particles fanning outward from its dot; the seed is per mount; one lazy `THREE.Points` of
 `SLOTS * COUNT` vertices, never made under reduced motion, hidden while no region pulses). Level `lights` stay level data, validated
 against `hub/map-data.mjs` `NODE_IDS`, and are no longer drawn.
+
+Story (#309): `globeCaption(registry, state)` is the one-line caption inside `.globe` (not a live region; `litNote` announces): the first phase that matches wins, tried in this order: incident (`Alert! {Region} is down. Tend to it now.`), allSaved, dark, saved (the current act is untouched and the one before it is saved) or building (`{done} of {total}`, levels plus boss, from `regions`; an untouched current act with no saved act before it reads dark); every live text is at most 60 characters, null without a mapped region. `globeLegend(states, dots, actOf)` is the map key (`<ul aria-label="Map key">`) of what is drawn now, in the order incident, resolved, lit, dark (an unlit dot with an act), soon; `app.mjs` `legendKeyClass` maps incident to the pulse swatch and dark to the plain one. The caption and the key are hidden with the globe in the text fallback, and the key is empty when there is no caption. The About dialog carries the loop as `hub/about.mjs` `GLOBE_LOOP`.
 
 Debug (#309): `?mode=debug` draws the globe with every level done (`app.mjs` `globeProgress()`, read by `mapState()` and `globeView()`), so every mapped region is resolved; cards, stars, level states and storage still use the real progress.
 
