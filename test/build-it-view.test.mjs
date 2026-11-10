@@ -109,6 +109,22 @@ test('one instruction line, rendered by renderBuild, describes every span row; t
   assert.equal(q('#b1-helps').textContent, 'Helps: One span at a time off Trace tint off Time-window guide off Instant feedback off Hints on');
 });
 
+test('a bar label stays inside the track: it sits right of a bar starting in the left half and ends left of one starting in the right half', () => {
+  const spec = withHelps({});
+  Object.assign(spec.spans[3], { startMs: 70, endMs: 95 }); // D now starts at 70% of the 0 to 100 window
+  setup(spec);
+  const spans = qa('[data-span]').map((r) => {
+    const bar = r.querySelector('[data-bar]');
+    const lab = r.querySelector('[data-bar-label]');
+    return { x: parseFloat(bar.getAttribute('x')), anchor: lab.getAttribute('text-anchor'), dx: lab.getAttribute('dx') };
+  });
+  assert.ok(spans.some((s) => s.x > 50) && spans.some((s) => s.x <= 50), 'premise: the fixture has early and late bars');
+  for (const s of spans) {
+    if (s.x > 50) assert.deepEqual([s.anchor, s.dx], ['end', '-7'], `bar at ${s.x}%`);
+    else assert.deepEqual([s.anchor, s.dx], [null, '7'], `bar at ${s.x}%`);
+  }
+});
+
 test('rows: name and service first, kind, status and timing secondary; 8-char trace ids with the full id in a tooltip, no ellipsis', () => {
   setup(withHelps({}));
   assert.deepEqual(placedIds(), [A, B, C, D, E], 'every span a root, trace 4bf9 then 0af7, by start');

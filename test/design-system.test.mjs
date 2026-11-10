@@ -211,6 +211,17 @@ test('lesson code breaks inside a long token: the lesson card clips, so an unbre
   assert.equal(pick('.ui-panel-sec')['overflow-wrap'], 'anywhere', 'long plain text in a panel section wraps at 320px instead of clipping');
 });
 
+test('inline code breaks inside a long token (a traceparent at 320px), but code blocks keep scrolling', () => {
+  const pick = (sel) => Object.fromEntries(sheetRules('base.css').filter((r) => r.selector === sel).flatMap((r) => decls(r.body)));
+  assert.equal(pick('code, kbd')['overflow-wrap'], 'anywhere');
+  assert.equal(pick('pre code')['overflow-wrap'], 'normal', 'a block under <pre> scrolls, it does not wrap');
+});
+
+test('a waterfall track clips its bar label, so a long label cannot widen the page', () => {
+  const d = Object.fromEntries(sheetRules('widgets.css').filter((r) => r.selector === '.wf-row .wf-trackcell').flatMap((r) => decls(r.body)));
+  assert.equal(d.overflow, 'hidden');
+});
+
 test('palette rule 5: kit.css puts no shadow or glow on anything, only inset rings', () => {
   let rings = 0;
   for (const r of sheetRules('kit.css')) {
