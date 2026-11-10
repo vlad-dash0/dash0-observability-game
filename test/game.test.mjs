@@ -204,7 +204,9 @@ test('the guide status is fetched once at init and the level ctx carries it (deb
     game.openLevel('x');
     game.closeOverlay();
     game.openLevel('x');
-    assert.deepEqual(calls, [['/api/guide', 'GET']], 'one status request per page');
+    // The account's one GET (#273) rides along outside debug; debug never asks.
+    const expected = debug ? [['/api/guide', 'GET']] : [['/api/guide', 'GET'], ['/api/account', 'GET']];
+    assert.deepEqual(calls, expected, 'one status request per page');
     assert.equal(ctxs.x.guide.configured, true);
     assert.equal(typeof ctxs.x.guide.ask, 'function');
   }
