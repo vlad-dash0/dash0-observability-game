@@ -22,7 +22,7 @@ export function createAuthStart({
   random = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n)),
   registry = null,
   log = (line) => console.log(JSON.stringify(line)),
-  limiter = createLimiter({ now, clientMax: START_MAX, clientWindowMs: START_WINDOW_MS }),
+  limiter = createLimiter({ now, clientMax: START_MAX, clientWindowMs: START_WINDOW_MS, instanceMax: Infinity }), // per IP only
 } = {}) {
   const auth = createAuthContext({ env, redis, now, random, registry });
   const b64u = (bytes) => Buffer.from(bytes).toString('base64url');

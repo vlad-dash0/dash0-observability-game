@@ -144,6 +144,16 @@ test('start: per-client rate limit sends the 21st request to unavailable', async
   assert.equal((await hit()).headers.get('location'), '/?signin=unavailable');
 });
 
+test('start: only the per-IP limit applies: 100 distinct addresses all get Google, one address still stops at 20', async () => {
+  const r = rig();
+  const from = (ip) => r.start.GET(get(`${ORIGIN}/api/auth-start`, { 'x-forwarded-for': ip }));
+  for (let i = 0; i < 100; i++) {
+    assert.ok((await from(`10.1.0.${i}`)).headers.get('location').startsWith('https://accounts.google.com/'), `address ${i}`);
+  }
+  for (let i = 0; i < 19; i++) await from('10.1.0.0');
+  assert.equal((await from('10.1.0.0')).headers.get('location'), '/?signin=unavailable');
+});
+
 // ---- auth-callback --------------------------------------------------------------------
 
 test('callback success: 302 to /?signin=ok with the session cookie and the auth cookie cleared', async () => {

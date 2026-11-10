@@ -135,6 +135,16 @@ test('the per-IP limiter answers 429 with retry-after, per address', async () =>
   assert.equal((await api.GET(from('2.2.2.2'))).status, 200);
 });
 
+test('only the per-IP limit applies: 150 distinct addresses in one minute all read the board', async () => {
+  const { api } = setup();
+  for (let i = 0; i < 150; i++) {
+    assert.equal((await api.GET(get(URL_, { 'x-forwarded-for': `10.0.${i >> 8}.${i & 255}` }))).status, 200, `address ${i}`);
+  }
+  const hammer = get(URL_, { 'x-forwarded-for': '10.0.0.0' });
+  for (let i = 1; i < READ_MAX; i++) await api.GET(hammer.clone());
+  assert.equal((await api.GET(hammer.clone())).status, 429, 'the per-IP limit still bites');
+});
+
 test('a 0-star player is not on the board', async () => {
   const { r, api } = setup();
   await player(r, 'g-1', 'ada@dash0.com', {});
