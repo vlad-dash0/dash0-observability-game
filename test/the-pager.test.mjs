@@ -30,14 +30,17 @@ const LOOKS = [
   ['customers', 'Which customers?', 'No data. Requests carry no customer details, so there is nothing to slice by.'],
   ['trace', 'Show me a trace', 'No data. No service records traces, so there is no request to follow.'],
 ];
-const budgetText = (pct) => `Error budget: ${pct}% left`;
+// The budget is said once, by the meter, as what is spent: "25 of 100 percent spent".
+const budgetText = (spentPct) => `${spentPct} of 100 percent spent`;
 // The kit meter: 4 cells of 25%, spent cells first; its text line counts what is spent.
 const meterCells = () => qa('#pager-meter [data-cell]').map((c) => c.dataset.cell);
 const cellsFor = (spentCells) => Array.from({ length: 4 }, (_, i) => (i < spentCells ? 'spent' : 'left'));
 const meterLine = () => q('#pager-meter-value')?.textContent.replace(/\s+/g, ' ').trim() ?? null;
 /** The "Spent on" chips, in the order the looks were taken. */
 const spentChips = () => qa('#pager-spent .ui-chip').map((c) => c.textContent.replace(/\s+/g, ' ').trim());
-const INTRO = 'Your pager goes off. Try the four questions below: you will find you cannot answer them, because nothing sends telemetry yet. Each try burns error budget. When you give up, press Escalate.';
+const INTRO = 'Your pager goes off. Try the four questions below: you will find you cannot answer them, because nothing sends telemetry yet. Each try burns error budget. Press Escalate when you give up. If the budget runs out first, the pager escalates for you.';
+/** A question label reads on as it is; any other label gets a colon before the text. */
+const mark = (label) => (label.endsWith('?') ? label : `${label}:`);
 const LIT_INTRO = 'Same alert, now with telemetry. Ask the same four questions. The data is made up, for illustration. Ask all four to finish.';
 // Part 2: the same four questions, key and label as part 1, and the made-up answer.
 const ASKS = [
@@ -109,7 +112,7 @@ function start() {
 }
 
 const text = (sel) => q(sel)?.textContent.replace(/\s+/g, ' ').trim() ?? null;
-const budget = () => text('#pager-budget');
+const budget = () => text('#pager-budget #pager-meter-value');
 // The kit lesson card ctx.speech renders.
 const intro = () => text('.ui-lesson');
 const escalateDisabled = () => q('#pager-escalate').disabled;
@@ -122,9 +125,9 @@ const finishDisabled = () => q('#pager-finish').disabled;
 test('the-pager: the first screen shows the alert, a full budget and a disabled Escalate', () => {
   start();
   assert.equal(text('#pager-alert'), ALERT);
-  assert.equal(budget(), budgetText(100));
+  assert.equal(budget(), budgetText(0));
   assert.deepEqual(meterCells(), cellsFor(0), 'four cells, none spent');
-  assert.equal(meterLine(), '0 of 100 % spent');
+  assert.equal(meterLine(), '0 of 100 percent spent');
   assert.deepEqual(spentChips(), [], 'no look taken, no chip');
   assert.deepEqual(qa('[data-look]').map((b) => `${b.dataset.look}|${b.textContent.trim()}|${b.disabled}`),
     LOOKS.map(([k, label]) => `${k}|${label}|false`));
@@ -143,31 +146,31 @@ for (const [key, label, reason] of LOOKS) {
     start();
     click(`[data-look="${key}"]`);
     assert.deepEqual(said(), [key], 'only this look is answered');
-    assert.equal(text(`[data-said="${key}"]`), `${label} ${reason}`);
+    assert.equal(text(`[data-said="${key}"]`), `${mark(label)} ${reason}`);
     assert.equal(q('#pager-feedback').contains(q(`[data-said="${key}"]`)), true, 'announced in the live region (the newest row)');
-    assert.equal(budget(), budgetText(75));
+    assert.equal(budget(), budgetText(25));
     assert.deepEqual(meterCells(), cellsFor(1), 'one cell spent');
-    assert.equal(meterLine(), '25 of 100 % spent');
-    assert.deepEqual(spentChips(), [`${label} 25%`], 'one Spent on chip for this look');
+    assert.equal(meterLine(), '25 of 100 percent spent');
+    assert.deepEqual(spentChips(), [`${label} 25 percent`], 'one Spent on chip for this look');
     assert.equal(q(`[data-look="${key}"]`).disabled, true, 'a look is used once');
     assert.equal(escalateDisabled(), false, 'Escalate opens after the first look');
   });
 }
 
-test('the-pager: the looks add up, 25 each, to 0% left; a used look costs nothing again', () => {
+test('the-pager: the looks add up, 25 each, to 100 percent spent; a used look costs nothing again', () => {
   start();
   LOOKS.slice(0, 3).forEach(([key, label, reason], i) => {
     click(`[data-look="${key}"]`);
-    assert.equal(budget(), budgetText(100 - 25 * (i + 1)), `after ${i + 1} looks`);
+    assert.equal(budget(), budgetText(25 * (i + 1)), `after ${i + 1} looks`);
     assert.deepEqual(meterCells(), cellsFor(i + 1), `after ${i + 1} looks: cells`);
-    assert.equal(meterLine(), `${25 * (i + 1)} of 100 % spent`);
-    assert.deepEqual(spentChips(), LOOKS.slice(0, i + 1).map(([, l]) => `${l} 25%`), 'chips in look order');
-    assert.equal(text(`[data-said="${key}"]`), `${label} ${reason}`);
+    assert.equal(meterLine(), `${25 * (i + 1)} of 100 percent spent`);
+    assert.deepEqual(spentChips(), LOOKS.slice(0, i + 1).map(([, l]) => `${l} 25 percent`), 'chips in look order');
+    assert.equal(text(`[data-said="${key}"]`), `${mark(label)} ${reason}`);
   });
   assert.deepEqual(said(), ['service', 'since', 'customers']);
   const used = q('[data-look="service"]');
   used.onclick({ currentTarget: used, target: used }); // a stray click on a disabled look
-  assert.equal(budget(), budgetText(25), 'a used look costs nothing again');
+  assert.equal(budget(), budgetText(75), 'a used look costs nothing again');
   assert.equal(spentChips().length, 3, 'and adds no chip');
   assert.deepEqual(meterCells(), cellsFor(3));
   assert.equal(said().length, 3);
@@ -178,7 +181,7 @@ test('the-pager: chips follow the order the looks are taken, not the screen orde
   start();
   click('[data-look="trace"]');
   click('[data-look="since"]');
-  assert.deepEqual(spentChips(), ['Show me a trace 25%', 'Since when? 25%']);
+  assert.deepEqual(spentChips(), ['Show me a trace 25 percent', 'Since when? 25 percent']);
   assert.equal(budget(), budgetText(50));
   assert.deepEqual(meterCells(), cellsFor(2));
 });
@@ -186,9 +189,9 @@ test('the-pager: chips follow the order the looks are taken, not the screen orde
 test('the-pager: budget 0 moves to part 2 by itself, with no Escalate click', () => {
   const { finished } = start();
   for (const [key] of LOOKS.slice(0, 3)) click(`[data-look="${key}"]`);
-  assert.equal(partTwo(), false, 'still blind at 25% left');
+  assert.equal(partTwo(), false, 'still blind at 75 percent spent');
   click('[data-look="trace"]');
-  assert.equal(partTwo(), true, 'part 2 at 0% left');
+  assert.equal(partTwo(), true, 'part 2 at 100 percent spent');
   assert.equal(qa('#pager-budget, #pager-meter, #pager-spent').length, 0, 'the budget, meter and chips are gone');
   assert.equal(finished.length, 0, 'moving on does not finish');
 });
@@ -232,7 +235,7 @@ test('the-pager: part 2 reveals each answer by clicking its question, once', () 
   for (const [key] of ASKS) if (key !== 'customers') click(`[data-ask="${key}"]`);
   assert.deepEqual(answered(), ['customers', 'service', 'since', 'trace']);
   for (const [key, label, answer] of ASKS) {
-    assert.equal(text(`[data-answer="${key}"]`), `${label} ${answer}`);
+    assert.equal(text(`[data-answer="${key}"]`), `${mark(label)} ${answer}`);
   }
 });
 
@@ -313,4 +316,55 @@ test('the-pager: each append changes only the newest row in the live region; ear
   assert.deepEqual(answered(), ['trace', 'service'], 'each answer once');
   assert.deepEqual(qa('#pager-answer-rows [data-answer]').map((el) => el.dataset.answer), ['trace']);
   assert.deepEqual(qa('#pager-answers [data-answer]').map((el) => el.dataset.answer), ['service']);
+});
+
+test('the-pager: the budget is stated once, in one direction, and no space splits the unit', () => {
+  start();
+  click('[data-look="service"]');
+  const t = text('#pager-budget');
+  assert.equal(/left/i.test(t), false, 'no "left" restatement of the spent figure');
+  assert.equal((t.match(/\d+ of 100/g) ?? []).length, 1, 'one figure');
+  assert.equal(/ %/.test(t), false, 'no stray space before a percent sign');
+  assert.equal(qa('#pager-budget #pager-meter').length, 1, 'the meter sits inside the live region, so a change is announced');
+});
+
+test('the-pager: the intro says what happens: Escalate, or the budget runs out and part 2 follows by itself', () => {
+  start();
+  assert.equal(/Escalate/.test(intro()) && /runs out/.test(intro()), true);
+  for (const [key] of LOOKS) click(`[data-look="${key}"]`);
+  assert.equal(partTwo(), true, 'running out moves on without Escalate, as the intro says');
+});
+
+test('the-pager: a row has a separator after its label, and every row is a plain full-width paragraph', () => {
+  start();
+  click('[data-look="trace"]');
+  click('[data-look="since"]');
+  assert.equal(text('[data-said="trace"]').startsWith('Show me a trace: No data.'), true, 'a label that is not a question gets a colon');
+  assert.equal(text('[data-said="since"]').startsWith('Since when? No data.'), true);
+  assert.equal(qa('#pager-said-rows .ui-prose').length, 0, 'older rows are not narrowed to the prose measure');
+  assert.equal(q('#pager-said-rows').contains(q('[data-said="trace"]')), true, 'the older row sits in the rows list');
+  click('#pager-escalate');
+  click('[data-ask="trace"]');
+  click('[data-ask="service"]');
+  assert.equal(text('[data-answer="trace"]').startsWith('Show me a trace: Trace 4bf9'), true);
+  assert.equal(qa('#pager-answer-rows .ui-prose').length, 0);
+});
+
+test('the-pager: when the budget runs out, part 2 opens with a line that says so; a manual Escalate has no such line', () => {
+  start();
+  for (const [key] of LOOKS) click(`[data-look="${key}"]`);
+  assert.equal(partTwo(), true);
+  const line = text('.ui-note');
+  assert.equal(line.startsWith('Budget spent: 100 of 100 percent.'), true, line);
+  assert.equal(/escalated for you/.test(line), true);
+  start();
+  click('[data-look="service"]');
+  click('#pager-escalate');
+  assert.equal(partTwo(), true);
+  assert.equal(qa('.ui-note').length, 0, 'no budget line after a manual Escalate');
+});
+
+test('the-pager: earlier rows are inset like the text of the feedback box they came from', () => {
+  const css = readFileSync(new URL('../styles/widgets.css', import.meta.url), 'utf8');
+  assert.match(css, /\.pager-rows \{[^}]*padding-inline-start: 43px/);
 });

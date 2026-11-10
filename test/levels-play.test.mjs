@@ -715,6 +715,8 @@ function assertRun(level, run, { calls, steps, first, injected, classes, attrs, 
   }
   assert.ok(result.text.length > 10, 'finish carries reward text');
   assert.ok(!result.text.includes('\u2014'), 'reward text has an em dash');
+  assert.ok(!/&(amp|lt|gt|quot|apos|#\d+);/.test(result.text), 'reward text has an HTML entity; the card sets it as plain text (x-text)');
+  assert.ok(result.text.split(/\n\s*\n/).every((p) => p.length <= 420), 'a reward paragraph over 420 characters; split it at a blank line');
   assert.ok(steps.some(hasFinish), 'some step shows a Finish button ([data-finish])');
   for (const s of steps) {
     assert.ok(/<button|<input/.test(s), `step has nothing to click: ${s.slice(0, 80)}`);
