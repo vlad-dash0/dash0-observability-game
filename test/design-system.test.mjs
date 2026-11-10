@@ -217,13 +217,15 @@ test('inline code breaks inside a long token (a traceparent at 320px), but code 
   assert.equal(pick('pre code')['overflow-wrap'], 'normal', 'a block under <pre> scrolls, it does not wrap');
 });
 
-test('only the bar label is clipped (never the cell, whose connectors overhang), and it has a panel-surface halo', () => {
+test('only the bar label is clipped (never the cell, whose connectors overhang), and a label beside its bar has a halo', () => {
   const rules = sheetRules('widgets.css');
   const pick = (sel) => Object.fromEntries(rules.filter((r) => r.selector === sel).flatMap((r) => decls(r.body)));
   assert.equal(pick('.wf-label-clip').overflow, 'hidden');
   assert.equal(pick('.wf-trackcell').overflow, undefined, 'the cell must not clip: the parent connector bridges into the next row');
   assert.equal(rules.some((r) => r.selector.includes('.wf-trackcell') && decls(r.body).some(([p]) => p === 'overflow')), false);
-  const label = pick('.wf-bar-label');
+  const label = pick('.wf-bar-label[text-anchor="end"]');
+  assert.equal(pick('.wf-bar-label').stroke, undefined, 'a label on its bar has no halo');
+  assert.equal(pick('.wf-bar-label')['stroke-width'], undefined);
   assert.equal(label.stroke, 'var(--color-surface)');
   assert.equal(label['stroke-width'], '8px', 'wide enough to hide the connector between words');
   assert.equal(label['paint-order'], 'stroke');
