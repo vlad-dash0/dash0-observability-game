@@ -454,3 +454,25 @@ test('after tier 3 solves the step the Hint button is spent, so Escape on the hi
   assert.equal(e.defaultPrevented, true);
   assert.equal(focus.last(), '#qa-input');
 });
+
+test('the query box wraps and grows with a long query: wrap=soft, rows follow the lines, no style (#321)', () => {
+  const long = 'sum by (service) (\n  rate(http_server_requests_total[5m])\n) / on (service) group_left\nsum by (service) (\n  rate(x[5m])\n)';
+  const s = setup({ ...fixture(), given: long });
+  s.mount();
+  const input = q('#qa-input');
+  assert.equal(input.getAttribute('wrap'), 'soft');
+  assert.equal(input.getAttribute('rows'), String(long.split('\n').length));
+  assert.equal(input.hasAttribute('style'), false);
+});
+
+test('a hint fill regrows the box to the filled query: rows follow the reference (#326)', () => {
+  const tall = 'sum by (service) (\n  rate(\n    http_server_requests_total[5m]\n  )\n)';
+  const { mount } = setup({ ...fixture(), ...HELPS, reference: tall });
+  mount();
+  assert.equal(q('#qa-input').getAttribute('rows'), '3');
+  click('#qa-hint');
+  click('#qa-hint');
+  click('#qa-hint');
+  assert.equal(q('#qa-input').value, tall);
+  assert.equal(q('#qa-input').getAttribute('rows'), '5');
+});

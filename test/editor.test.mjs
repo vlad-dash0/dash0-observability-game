@@ -52,3 +52,78 @@ test('lockEditor: read-only, still focusable, every button disabled', () => {
   assert.equal(q('#ed-go').disabled, true);
   assert.equal(extra.disabled, true);
 });
+
+test('editorPanel wrap: a wrapping code field; default is a scrolling one (#321)', () => {
+  mount({ wrap: true });
+  assert.equal(q('#ed').getAttribute('wrap'), 'soft');
+  mount();
+  assert.equal(q('#ed').hasAttribute('wrap'), false);
+});
+
+test('fitEditor: rows follow the line count between the minimum and the maximum, and refit on typing and on a script fill (#321)', async () => {
+  const { fitEditor } = await import('../lib/widgets/editor.mjs');
+  mount({ rows: 3, value: 'a\nb\nc\nd\ne' });
+  const input = q('#ed');
+  const fit = fitEditor(input, { max: 8 });
+  assert.equal(input.getAttribute('rows'), '5', 'grows to its content on mount');
+  input.value = 'a';
+  input.dispatchEvent(new input.ownerDocument.defaultView.Event('input'));
+  assert.equal(input.getAttribute('rows'), '3', 'never below the rows it was given');
+  input.value = Array.from({ length: 30 }, (_, i) => `l${i}`).join('\n');
+  fit();
+  assert.equal(input.getAttribute('rows'), '8', 'a script fill needs the returned fit; the maximum then scrolls inside');
+  assert.equal(input.hasAttribute('style'), false, 'attributes only: the CSP forbids a style');
+});
+
+test('fitEditor: a soft-wrapped line that still overflows adds rows until the browser reports it fits (#321)', async () => {
+  const { fitEditor } = await import('../lib/widgets/editor.mjs');
+  mount({ rows: 3, value: 'one long line' });
+  const input = q('#ed');
+  // A browser reports scrollHeight and clientHeight; model one that needs 6 rows.
+  Object.defineProperty(input, 'clientHeight', { get() { return Number(input.getAttribute('rows')) * 20; } });
+  Object.defineProperty(input, 'scrollHeight', { get() { return 6 * 20; } });
+  fitEditor(input, { max: 12 });
+  assert.equal(input.getAttribute('rows'), '6');
+});
+
+test('fitEditor: content that always overflows stops at max rows (#326)', async () => {
+  const { fitEditor } = await import('../lib/widgets/editor.mjs');
+  mount({ rows: 3, value: 'x' });
+  const input = q('#ed');
+  Object.defineProperty(input, 'clientHeight', { get() { return Number(input.getAttribute('rows')) * 20; } });
+  Object.defineProperty(input, 'scrollHeight', { get() { return 10000; } });
+  fitEditor(input, { max: 7 });
+  assert.equal(input.getAttribute('rows'), '7');
+});
+
+test('fitEditor: the signal releases the observer; the observer refits on a width change and ignores a height-only change (#326)', async () => {
+  const { fitEditor } = await import('../lib/widgets/editor.mjs');
+  const saved = globalThis.ResizeObserver;
+  const log = { cb: null, disconnected: 0 };
+  globalThis.ResizeObserver = class { constructor(cb) { log.cb = cb; } observe() {} disconnect() { log.disconnected += 1; } };
+  try {
+    mount({ rows: 3, value: 'a' });
+    const input = q('#ed');
+    let width = 300;
+    Object.defineProperty(input, 'clientWidth', { get() { return width; } });
+    const ac = new AbortController();
+    const opts = [];
+    const add = input.addEventListener.bind(input);
+    input.addEventListener = (t, f, o) => { opts.push([t, o]); return add(t, f); };
+    fitEditor(input, { max: 10, signal: ac.signal });
+    assert.equal(opts.find(([t]) => t === 'input')[1].signal, ac.signal, 'the input listener is bound to the signal (a browser removes it on abort)');
+    input.value = 'a\nb\nc\nd\ne\nf';
+    log.cb();
+    assert.equal(input.getAttribute('rows'), '3', 'the width is the same: our own height change must not refit (no observer loop)');
+    width = 200;
+    log.cb();
+    assert.equal(input.getAttribute('rows'), '6', 'the width changed: refit');
+    input.value = 'a';
+    log.cb();
+    assert.equal(input.getAttribute('rows'), '6', 'the new width was recorded, so the same width does not refit again');
+    ac.abort();
+    assert.equal(log.disconnected, 1);
+  } finally {
+    globalThis.ResizeObserver = saved;
+  }
+});

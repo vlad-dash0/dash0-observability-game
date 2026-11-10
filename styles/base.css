@@ -24,6 +24,9 @@ body {
 }
 
 code, pre, kbd { font-family: var(--font-mono); font-size: 0.88em; }
+/* Martian Mono draws "://" through a contextual alternate that opens a gap after the colon ("http: //");
+   code reads as typed, so contextual alternates and ligatures are off (#321). */
+code, pre, kbd { font-variant-ligatures: none; font-feature-settings: "calt" 0, "liga" 0; }
 code, kbd {
   background: var(--color-code-bg); border: 1px solid var(--color-border);
   border-radius: 6px; padding: 0.05em 0.35em;
@@ -32,7 +35,12 @@ pre {
   background: var(--color-code-bg); border: 1px solid var(--color-border);
   border-radius: var(--radius-sm); padding: 12px 14px; overflow-x: auto; line-height: 1.6;
 }
-code, kbd { overflow-wrap: anywhere; } /* a long token (traceparent) breaks at 320px instead of widening the panel */
+/* Inline code is plain inline text that breaks at its spaces and punctuation, and only a token wider than the
+   line breaks inside (break-word, not anywhere, so a short word is never split mid-letter) (#321). An authored
+   `data-token` (a traceparent) is a box instead: it moves whole to the next line while it fits, so it is not split
+   at a hyphen at the line end; one wider than the line still breaks inside. */
+code, kbd { overflow-wrap: break-word; }
+code[data-token] { display: inline-block; max-inline-size: 100%; box-sizing: border-box; }
 pre code { overflow-wrap: normal; background: none; border: none; padding: 0; font-size: inherit; }
 kbd { border-bottom-width: 2px; }
 

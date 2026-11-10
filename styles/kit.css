@@ -50,7 +50,7 @@
 .ui-lesson code {
   font-family: var(--font-mono); font-size: .8em; border: 0; border-radius: var(--radius-xs); padding: 2px 6px;
   background: var(--color-code-bg); color: var(--color-lesson-code);
-  overflow-wrap: anywhere; /* the card clips (overflow: hidden): a long token must break, not clip */
+  overflow-wrap: break-word; /* the card clips (overflow: hidden): a token wider than the card must break, not clip */
 }
 /* The scenario line and the step names in the list read in full text colour; the line after the
    list (what costs a star) is muted. */
@@ -79,6 +79,10 @@
 /* A deletion keeps text colour; the strike carries the error tone. */
 .ui-prose del { text-decoration-color: var(--color-error); text-decoration-thickness: 2px; }
 .ui-prose pre, .ui-code { font-size: 12px; line-height: 1.6; overflow-x: auto; max-inline-size: 100%; }
+/* Log and command output (authored `<pre data-wrap>`) wraps inside the card so its decisive part is on screen; a
+   config or code block keeps its lines and scrolls, because its indentation is the meaning. */
+.ui-prose pre[data-wrap] { white-space: pre-wrap; overflow-wrap: break-word; overflow-x: hidden; }
+.ui-prose pre[data-wrap] code { overflow-wrap: break-word; }
 
 /* ---------- Panel (panel.mjs) ---------- */
 .ui-panel {
@@ -95,7 +99,7 @@
 /* A region a widget redraws in place (the incident board's tiles, evidence log, causes). The column
    is minmax(0, 1fr): an implicit auto column grows to min-content and the panel clips it at 320px. */
 .ui-panel-sec > [data-region] { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); min-width: 0; align-content: start; }
-.ui-panel code { overflow-wrap: anywhere; } /* the panel clips (overflow: hidden) and is no table cell: a long id must break, not clip */
+.ui-panel code { overflow-wrap: break-word; } /* the panel clips (overflow: hidden) and is no table cell: an id wider than the panel must break, not clip */
 .ui-panel-head h3 { font-size: var(--text-base); font-weight: var(--weight-semibold); }
 .ui-panel--inset { background: var(--color-bg); border-radius: var(--radius-sm); }
 .ui-panel--alert { border-color: color-mix(in srgb, var(--color-alert) 55%, var(--color-border)); }
@@ -348,7 +352,10 @@
   font-family: var(--font-mono); font-size: 13px; line-height: 1.6; background: var(--color-code-bg);
   padding: var(--space-3) 14px; resize: vertical;
   white-space: pre; overflow-wrap: normal; overflow-x: auto;
+  font-variant-ligatures: none; font-feature-settings: "calt" 0, "liga" 0;
 }
+/* A query or an env list (field `wrap`): indentation means nothing, so the whole text wraps into view. */
+.ui-input--code[wrap="soft"] { white-space: pre-wrap; overflow-wrap: break-word; overflow-x: hidden; }
 .ui-input[readonly] { color: var(--color-text-muted); }
 .ui-check { display: flex; gap: 10px; align-items: center; cursor: pointer; }
 .ui-check-label { min-width: 0; overflow-wrap: anywhere; }
