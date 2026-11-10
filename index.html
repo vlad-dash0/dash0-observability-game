@@ -69,15 +69,14 @@
       <h2 id="map-title" class="section-label" tabindex="-1">World map</h2>
       <p class="visually-hidden" role="status" x-text="litNote"></p>
       <div class="globe" x-show="!globeFallback">
+        <p class="globe-caption" x-show="captionText() !== ''" x-text="captionText()"></p>
         <div class="globe-stage" role="img" :aria-label="mapLabel()"></div>
         <p class="globe-hint" aria-hidden="true">Drag to rotate</p>
-        <p class="globe-legend">
-          <span><i class="globe-key lit" aria-hidden="true"></i>Lit: level completed</span>
-          <span><i class="globe-key pulse" aria-hidden="true"></i>Pulsing: incident open</span>
-          <span><i class="globe-key resolved" aria-hidden="true"></i>Saved: all calm</span>
-          <span><i class="globe-key" aria-hidden="true"></i>Not reached</span>
-          <span x-show="hasSoon()"><i class="globe-key soon" aria-hidden="true"></i>Coming soon</span>
-        </p>
+        <ul class="globe-legend" aria-label="Map key">
+          <template x-for="e in globeLegend()" :key="e.key">
+            <li><i :class="legendKeyClass(e)" aria-hidden="true"></i><span x-text="e.text"></span></li>
+          </template>
+        </ul>
       </div>
       <ul class="globe-fallback" x-show="globeFallback" x-cloak>
         <template x-for="line in globeLines()" :key="line">
@@ -239,6 +238,10 @@
       </header>
       <div class="ui-modal-body">
         <p x-text="aboutSummary"></p>
+        <section class="about-map">
+          <h3 x-text="aboutLoop.title"></h3>
+          <p x-text="aboutLoop.text"></p>
+        </section>
         <ol class="about-acts">
           <template x-for="act in aboutActs()" :key="act.id">
             <li>

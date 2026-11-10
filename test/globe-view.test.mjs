@@ -5,14 +5,15 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DOTS } from '../hub/globe-data.mjs';
-import { actOfCountry } from '../hub/globe-map.mjs';
+import { ACT_REGIONS, actOfCountry } from '../hub/globe-map.mjs';
 import { liveRegistry } from '../app.mjs';
 import { globeState } from '../lib/globe.mjs';
 import {
-  COLOR_ROLES, DOT, MAX_TILT, createLoop, currentActId, dotStates, facingRotation, globeLabel, globeLines,
+  COLOR_ROLES, DOT, MAX_TILT, createLoop, currentActId, dotStates, facingRotation, globeCaption, globeLabel, globeLegend, globeLines,
   globeTarget, parseColor, readColors, regionCentre, spherePoint,
 } from '../lib/globe-view.mjs';
 import { mountGlobe } from '../lib/globe-render.mjs';
+import { BURST, burstDir, burstSpeed, sparksAt, tangentFrame } from '../lib/globe-sparks.mjs';
 import * as render from '../lib/globe-render.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
@@ -163,9 +164,9 @@ test('the text fallback lists each act with its region, done of total and an ope
     'Act 2 (Two): 0 of 1 done',
   ]);
   assert.deepEqual(globeLines(REG, globeState(REG, progressOf(['a', 'b', 'boss0', 'd']), MAP)), [
-    'Act 0, Zeroth (Zero): 3 of 3 done, resolved',
+    'Act 0, Zeroth (Zero): 3 of 3 done, saved',
     'Act 1, First (One): 0 of 1 done',
-    'Act 2 (Two): 1 of 1 done, resolved',
+    'Act 2 (Two): 1 of 1 done, saved',
   ]);
   const partial = { ACT_REGIONS: { g1: { region: 'One' } }, LEVEL_COUNTRY: {} };
   assert.deepEqual(globeLines(REG, globeState(REG, progressOf([]), partial)), ['Act 1, First (One): 0 of 1 done']);
@@ -179,11 +180,11 @@ test('the accessible name counts levels done, names lit regions and the open inc
   );
   assert.equal(
     globeLabel(globeState(REG, progressOf(['a', 'b', 'boss0', 'd']), MAP)),
-    'World map: 4 of 5 levels done. Resolved: Zero, Two.',
+    'World map: 4 of 5 levels done. Saved: Zero, Two.',
   );
   assert.equal(
     globeLabel(globeState(REG, progressOf(['a', 'c']), MAP)),
-    'World map: 2 of 5 levels done. Resolved: One. Lit: Zero 1 of 3.',
+    'World map: 2 of 5 levels done. Saved: One. Lit: Zero 1 of 3.',
   );
 });
 
@@ -352,7 +353,7 @@ test('mountGlobe gives null before touching WebGL when the token colours cannot 
 
 /** A fake THREE that records what is made and released; `throwIn` names a class whose constructor throws. */
 function recordingThree(throwIn = null) {
-  const rec = { geometries: [], materials: [], renderer: null, renders: 0 };
+  const rec = { geometries: [], materials: [], points: [], vectors: 0, renderer: null, renders: 0 };
   const maybeThrow = (name) => {
     if (name === throwIn) throw new Error(`${name} failed`);
   };
@@ -370,12 +371,15 @@ function recordingThree(throwIn = null) {
       maybeThrow('BufferGeometry');
       rec.geometries.push(this);
     }
-    setAttribute() {}
+    setAttribute(name, attr) {
+      (this.attributes ??= {})[name] = attr;
+    }
   }
   class SphereGeometry extends BufferGeometry {}
   class ShaderMaterial extends Disposable {
-    constructor() {
+    constructor(opts = {}) {
       super();
+      this.opts = opts;
       maybeThrow('ShaderMaterial');
       rec.materials.push(this);
     }
@@ -419,8 +423,16 @@ function recordingThree(throwIn = null) {
     BufferGeometry,
     SphereGeometry,
     ShaderMaterial,
-    BufferAttribute: class {},
-    Vector3: class {},
+    BufferAttribute: class {
+      constructor(array) {
+        this.array = array;
+      }
+    },
+    Vector3: class {
+      constructor() {
+        rec.vectors++;
+      }
+    },
     Color: class {
       setRGB() {
         return this;
@@ -430,7 +442,15 @@ function recordingThree(throwIn = null) {
     PerspectiveCamera: class PerspectiveCamera extends Node3 {},
     Group: class Group extends Node3 {},
     Mesh: class Mesh extends Node3 {},
-    Points: class Points extends Node3 {},
+    Points: class Points extends Node3 {
+      constructor(geometry, material) {
+        super();
+        this.geometry = geometry;
+        this.material = material;
+        this.visible = true;
+        rec.points.push(this);
+      }
+    },
     AdditiveBlending: 2,
     BackSide: 1,
     SRGBColorSpace: 'srgb',
@@ -621,9 +641,9 @@ test('the text fallback lists soon acts in act order', () => {
 test('the accessible name names soon regions and leaves them out of the count', () => {
   assert.equal(
     globeLabel(globeState(REG3, progressOf(['a']), MAP3, [S7])),
-    'World map: 1 of 2 levels done. Resolved: Zero. Coming soon: Seven.',
+    'World map: 1 of 2 levels done. Saved: Zero. Coming soon: Seven.',
   );
-  assert.equal(globeLabel(globeState(REG3, progressOf(['a']), MAP3)), 'World map: 1 of 2 levels done. Resolved: Zero.');
+  assert.equal(globeLabel(globeState(REG3, progressOf(['a']), MAP3)), 'World map: 1 of 2 levels done. Saved: Zero.');
   // Given out of order, the soon regions are still named by act number.
   const map8 = { ...MAP3, ACT_REGIONS: { ...MAP3.ACT_REGIONS, s8: { region: 'Eight' } } };
   const S8 = { id: 's8', no: 8, name: 'Later still', sub: '', teaser: 't' };
@@ -657,4 +677,287 @@ test('every colour role has a probe rule and a token', () => {
     assert.ok(def, `token for ${role}`);
     assert.doesNotMatch(def[1], /oklab|oklch/, `${role} must stay a colour parseColor reads`);
   }
+});
+
+// ---- incident sparks (#309 P3) ---------------------------------------------------------
+
+const PULSING = Uint8Array.from([DOT.PULSE, DOT.LIT, DOT.PULSE]);
+const CALM = Uint8Array.from([DOT.LIT, DOT.UNLIT, DOT.RESOLVED]);
+async function mountSparks(states, reduced, extra = {}) {
+  const { THREE, rec } = recordingThree();
+  const dom = recordingDom();
+  const handle = await mountGlobe(dom.host, { ...VIEW, states, reduced, seed: 5, ...extra, window: dom.window, document: dom.document, importThree: async () => THREE });
+  return { handle, rec, dom };
+}
+const sparkPoints = (rec) => rec.points.filter((p) => p.material.opts.vertexShader === render.SPARK_VS);
+const frameAt = (dom, ms) => {
+  const fns = [...dom.frames.pending.values()];
+  dom.frames.pending.clear();
+  fns.forEach((fn) => fn(ms));
+};
+
+test('an open incident with motion adds one spark geometry and material, each freed once', async () => {
+  const { handle, rec } = await mountSparks(PULSING, false);
+  assert.equal(rec.geometries.length, 4);
+  assert.equal(rec.materials.length, 5);
+  assert.equal(sparkPoints(rec).length, 1);
+  handle.dispose();
+  handle.dispose();
+  assert.deepEqual(rec.geometries.map((g) => g.disposed), [1, 1, 1, 1]);
+  assert.deepEqual(rec.materials.map((m) => m.disposed), [1, 1, 1, 1, 1]);
+});
+
+test('under reduced motion an incident makes no sparks', async () => {
+  const { handle, rec } = await mountSparks(PULSING, true);
+  assert.equal(rec.geometries.length, 3);
+  assert.equal(rec.materials.length, 4);
+  handle.update(PULSING, null);
+  assert.equal(rec.geometries.length, 3);
+  handle.dispose();
+});
+
+test('sparks are made lazily, hidden while no dot pulses, and never made twice', async () => {
+  const { handle, rec } = await mountSparks(CALM, false);
+  assert.equal(rec.geometries.length, 3, 'no incident, no sparks yet');
+  handle.update(PULSING, null);
+  assert.equal(sparkPoints(rec).length, 1);
+  assert.equal(sparkPoints(rec)[0].visible, true);
+  handle.update(CALM, null);
+  assert.equal(sparkPoints(rec)[0].visible, false);
+  handle.update(PULSING, null);
+  assert.equal(sparkPoints(rec).length, 1);
+  assert.equal(sparkPoints(rec)[0].visible, true);
+  assert.equal(rec.geometries.length, 4);
+  handle.dispose();
+  assert.deepEqual(rec.geometries.map((g) => g.disposed), [1, 1, 1, 1]);
+});
+
+test('a frame writes at most SLOTS live ages, on the pulsing dots; the rest are -1', async () => {
+  const { handle, rec, dom } = await mountSparks(PULSING, false);
+  const [{ geometry }] = sparkPoints(rec);
+  let seen = 0;
+  for (let ms = 1000; ms < 60000; ms += 500) {
+    frameAt(dom, ms);
+    const ages = [...geometry.attributes.aAge.array];
+    const live = ages.filter((a) => a >= 0);
+    assert.ok(live.length <= 6 * BURST.COUNT && live.length % BURST.COUNT === 0 && live.every((a) => a < 1));
+    assert.deepEqual(ages.filter((a) => a < 0), ages.filter((a) => a < 0).map(() => -1));
+    seen += live.length;
+  }
+  assert.ok(seen > 0, 'sparks appear');
+  handle.update(CALM, null);
+  frameAt(dom, 61000);
+  assert.deepEqual([...geometry.attributes.aAge.array], Array(6 * BURST.COUNT).fill(-1));
+  handle.dispose();
+});
+
+test('the spark shader hides the far side, uses the pulse colour, and sparks add no colour vectors', async () => {
+  assert.match(render.SPARK_VS, /smoothstep\(-0\.02, 0\.32, n\.z\)/);
+  assert.match(render.SPARK_VS, /vAlpha = aAge < 0\.0 \? 0\.0/, 'dead slots have no alpha');
+  assert.match(render.SPARK_VS, /gl_PointSize = aAge < 0\.0 \? 0\.0/, 'dead slots have no size');
+  assert.match(render.SPARK_FS, /uPulse/);
+  const calm = await mountSparks(CALM, false);
+  const loud = await mountSparks(PULSING, false);
+  assert.equal(loud.rec.vectors, calm.rec.vectors, 'only the colour roles make Vector3');
+  const [spark] = sparkPoints(loud.rec);
+  const dots = loud.rec.materials[1].opts.uniforms;
+  for (const u of ['uPulse', 'uPR', 'uScale']) assert.equal(spark.material.opts.uniforms[u], dots[u], `${u} is shared`);
+  assert.equal(spark.material.opts.depthTest, false);
+  assert.equal(spark.material.opts.depthWrite, false);
+  calm.handle.dispose();
+  loud.handle.dispose();
+});
+
+test('every live particle starts on a pulsing dot, a whole burst on one dot, and flies outward from it', async () => {
+  const states = Uint8Array.from([DOT.PULSE, DOT.LIT, DOT.PULSE]);
+  const pulsing = [0, 2].map((k) => spherePoint(DOTS[k][0], DOTS[k][1]));
+  const { handle, rec, dom } = await mountSparks(states, false);
+  const { geometry } = sparkPoints(rec)[0];
+  let bursts = 0;
+  for (let ms = 1000; ms < 90000; ms += 700) {
+    frameAt(dom, ms);
+    const { position, aAge, aDir } = geometry.attributes;
+    for (let k = 0; k < 6; k++) {
+      const first = k * BURST.COUNT;
+      if (aAge.array[first] < 0) continue;
+      bursts++;
+      const at = [...position.array.slice(first * 3, first * 3 + 3)];
+      const dirs = new Set();
+      assert.ok(pulsing.some((p) => p.every((v, m) => Math.abs(v - at[m]) < 1e-6)), `burst ${k} starts at ${at}`);
+      for (let j = 0; j < BURST.COUNT; j++) {
+        const i = first + j;
+        assert.deepEqual([...position.array.slice(i * 3, i * 3 + 3)], at, 'one dot per burst');
+        assert.ok(aAge.array[i] >= 0);
+        const raw = [...aDir.array.slice(i * 3, i * 3 + 3)];
+        dirs.add(raw.map((v) => (v / Math.hypot(...raw)).toFixed(4)).join());
+        const d = [...aDir.array.slice(i * 3, i * 3 + 3)];
+        const out = d[0] * at[0] + d[1] * at[1] + d[2] * at[2];
+        assert.ok(Math.hypot(...d) <= 1 + 1e-6 && out > 0, 'outward');
+      }
+      assert.equal(dirs.size, BURST.COUNT, 'every particle has its own direction');
+    }
+  }
+  assert.ok(bursts > 0);
+  assert.equal(sparkPoints(rec)[0].material.opts.uniforms.uTravel.value, BURST.TRAVEL);
+  assert.match(render.SPARK_VS, /position \+ aDir \* uTravel \* \(1\.0 - f \* f\)/, 'particles travel away along aDir');
+  handle.dispose();
+});
+
+test('each mount has its own seed: an injected seed or random decides the sparks, else crypto', async () => {
+  const play = async (extra, crypto) => {
+    const { THREE, rec } = recordingThree();
+    const dom = recordingDom();
+    if (crypto) dom.window.crypto = crypto;
+    const h = await mountGlobe(dom.host, { ...VIEW, states: PULSING, reduced: false, ...extra, window: dom.window, document: dom.document, importThree: async () => THREE });
+    const { geometry } = sparkPoints(rec)[0];
+    const out = [];
+    for (let ms = 1000; ms < 60000; ms += 700) {
+      frameAt(dom, ms);
+      out.push([...geometry.attributes.aAge.array].map((a) => (a < 0 ? 0 : 1)).join(''));
+    }
+    h.dispose();
+    return JSON.stringify(out);
+  };
+  const fixed = (v) => ({ getRandomValues: (a) => ((a[0] = v), a) });
+  assert.equal(await play({ seed: 11 }), await play({ seed: 11 }));
+  assert.notEqual(await play({ seed: 11 }), await play({ seed: 12 }));
+  assert.equal(await play({ random: () => 0.25 }), await play({ seed: Math.floor(0.25 * 2 ** 32) }));
+  assert.equal(await play({}, fixed(77)), await play({ seed: 77 }));
+  assert.notEqual(await play({}, fixed(77)), await play({}, fixed(78)));
+});
+
+test('the renderer writes each particle direction as tangentFrame x burstDir x burstSpeed for the mount seed', async () => {
+  const states = Uint8Array.from([DOT.PULSE, DOT.LIT, DOT.PULSE]);
+  const sources = [0, 2];
+  const seen = {};
+  for (const seed of [21, 22]) {
+    const { handle, rec, dom } = await mountSparks(states, false, { seed });
+    const { geometry } = sparkPoints(rec)[0];
+    const firsts = [];
+    for (let ms = 1000; ms < 60000; ms += 700) {
+      frameAt(dom, ms);
+      const live = sparksAt(ms / 1000, sources.length, seed);
+      const { position, aDir, aAge } = geometry.attributes;
+      live.forEach((sp, k) => {
+        const n = spherePoint(DOTS[sources[sp.dot]][0], DOTS[sources[sp.dot]][1]);
+        const [t1, t2] = tangentFrame(n);
+        for (let j = 0; j < BURST.COUNT; j++) {
+          const i = k * BURST.COUNT + j;
+          const [a, b, c] = burstDir(sp.slot, sp.epoch, seed, j);
+          const v = burstSpeed(sp.slot, sp.epoch, seed, j);
+          for (let m = 0; m < 3; m++) {
+            const want = (a * t1[m] + b * t2[m] + c * n[m]) * v;
+            assert.ok(Math.abs(aDir.array[i * 3 + m] - want) < 1e-6, `seed ${seed} burst ${k} particle ${j}`);
+          }
+          assert.ok(Math.abs(aAge.array[i] - sp.age) < 1e-6);
+        }
+        firsts.push(...aDir.array.slice(k * BURST.COUNT * 3, k * BURST.COUNT * 3 + 3));
+      });
+    }
+    assert.ok(firsts.length > 0);
+    seen[seed] = firsts.map((v) => v.toFixed(4)).join();
+    handle.dispose();
+  }
+  assert.notEqual(seen[21], seen[22], 'another seed, other directions');
+});
+
+test('the seed is drawn when sparks are first made, never by a mount without an incident', async () => {
+  let calls = 0;
+  const random = () => (calls++, 0.5);
+  const calm = await mountSparks(CALM, false, { seed: undefined, random });
+  calm.handle.update(CALM, null);
+  assert.equal(calls, 0);
+  calm.handle.update(PULSING, null);
+  calm.handle.update(CALM, null);
+  calm.handle.update(PULSING, null);
+  assert.equal(calls, 1);
+  calm.handle.dispose();
+  const reduced = await mountSparks(PULSING, true, { seed: undefined, random });
+  assert.equal(calls, 1, 'reduced motion never asks');
+  reduced.handle.dispose();
+});
+
+// ---- the story: caption and legend (#309 P2) ----------------------------------------
+
+const captionOf = (ids) => globeCaption(REG, globeState(REG, progressOf(ids), MAP));
+
+test('the caption follows the story: dark, building, incident, saved, every region saved', () => {
+  assert.deepEqual(captionOf([]), {
+    phase: 'dark', actId: 'g0', region: 'Zero', done: 0, total: 3,
+    text: 'The planet is dark. Shine the o11y light on your world.',
+  });
+  assert.deepEqual(captionOf(['a']), {
+    phase: 'building', actId: 'g0', region: 'Zero', done: 1, total: 3, text: "You're building! Zero: 1 of 3 done.",
+  });
+  assert.equal(captionOf(['a', 'b']).phase, 'incident');
+  assert.equal(captionOf(['a', 'b']).text, 'Alert! Zero is down. Tend to it now.');
+  assert.deepEqual(captionOf(['a', 'b', 'boss0']), {
+    phase: 'saved', actId: 'g0', region: 'Zero', done: 3, total: 3, text: 'Zero is calm. You saved the day.',
+  });
+  const next = captionOf(['a', 'b', 'boss0', 'c']);
+  assert.deepEqual([next.phase, next.actId, next.region, next.text], ['saved', 'g1', 'One', 'One is calm. You saved the day.']);
+  const live = globeCaption(LIVE, globeState(LIVE, progressOf([...ACT_0, 'the-pager', 'resources'])));
+  assert.deepEqual([live.phase, live.actId, live.text], ['building', 'act-1', "You're building! Northern Europe: 1 of 4 done."], 'building again once the next act is entered');
+  const all = captionOf(['a', 'b', 'boss0', 'c', 'd']);
+  assert.deepEqual(all, { phase: 'allSaved', actId: null, region: null, done: 5, total: 5, text: 'Every region is calm. You saved the day.' });
+  assert.equal(captionOf(['a', 'b', 'c', 'd']).actId, 'g0', 'an open incident outranks the later acts');
+  assert.equal(captionOf(['a', 'b', 'c', 'd']).phase, 'incident');
+  const soon = globeCaption(REG, globeState(REG, progressOf(['a', 'b', 'boss0', 'c', 'd']), { ...MAP, ACT_REGIONS: { ...MAP.ACT_REGIONS, s7: { region: 'Seven' } } }, [S7]));
+  assert.equal(soon.text, 'You saved the day. More regions are coming soon.');
+});
+
+test('an untouched current act with no saved act before it reads dark, even when a later act has progress', () => {
+  const c = captionOf(['d']);
+  assert.deepEqual([c.phase, c.actId, c.region], ['dark', 'g0', 'Zero']);
+});
+
+test('two open incidents: the caption names the lower act', () => {
+  const state = {
+    regions: {
+      g0: { region: 'Zero', done: 3, total: 4, pulse: true, resolved: false },
+      g1: { region: 'One', done: 1, total: 2, pulse: true, resolved: false },
+    },
+  };
+  const reg = { acts: [{ id: 'g0' }, { id: 'g1' }] };
+  assert.equal(globeCaption(reg, state).region, 'Zero');
+});
+
+test('no mapped region, no caption', () => {
+  assert.equal(globeCaption(REG, { regions: {}, countries: {} }), null);
+  assert.equal(globeCaption({ acts: [] }, { regions: {}, countries: {} }), null);
+});
+
+test('every live caption fits 60 characters, for every region and phase, with plain punctuation', () => {
+  const maxTotal = Math.max(...LIVE.acts.map((a) => a.levelIds.length + (a.bossId == null ? 0 : 1)));
+  assert.ok(maxTotal >= 3, 'the live registry has acts');
+  const pair = { acts: [{ id: 'p' }, { id: 'q' }] };
+  for (const { region } of Object.values(ACT_REGIONS)) {
+    const r = (o) => ({ region, total: maxTotal, done: 0, pulse: false, resolved: false, ...o });
+    const states = [
+      { regions: { p: r({}) } },
+      { regions: { p: r({ done: maxTotal - 1 }) } },
+      { regions: { p: r({ done: maxTotal - 1, pulse: true }) } },
+      { regions: { p: r({ done: maxTotal, resolved: true }), q: r({ region: 'Next' }) } },
+      { regions: { p: r({ done: maxTotal, resolved: true }), q: r({ region: 'Next', done: maxTotal, resolved: true }) }, soon: { s: { region: 'S' } } },
+    ];
+    for (const state of states) {
+      const { text } = globeCaption(pair, state);
+      assert.ok(text.length <= 60, `${region}: "${text}" is ${text.length} characters`);
+      assert.ok(!text.includes('\u2014') && !text.includes('  '), `${region}: "${text}"`);
+    }
+  }
+});
+
+test('the legend lists only what is drawn, in a fixed order, with its words', () => {
+  const dots = [[0, 0, 'A', ''], [0, 0, 'B', ''], [0, 0, 'C', ''], [0, 0, 'D', ''], [0, 0, 'E', '']];
+  const actOf = () => 'x';
+  assert.deepEqual(globeLegend([0, 1, 2, 3, 4], dots, actOf), [
+    { key: 'incident', text: 'Production down' },
+    { key: 'resolved', text: 'Saved, all calm' },
+    { key: 'lit', text: 'Instrumented' },
+    { key: 'dark', text: 'Still dark' },
+    { key: 'soon', text: 'Coming soon' },
+  ]);
+  assert.deepEqual(globeLegend([4, 0], [dots[0], dots[1]], (iso) => (iso === 'A' ? 'x' : null)).map((e) => e.key), ['resolved'], 'an unlit dot with no act is not "still dark"');
+  assert.deepEqual(globeLegend([], [], actOf), []);
 });
