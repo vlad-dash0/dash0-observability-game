@@ -282,7 +282,9 @@ slows a runaway client, it is not a quota. Only requests that reach the model co
 
 Privacy: the key is in no response, header or log line, and neither are the question, the reply or the address.
 One log line per request, `{msg:'guide', levelId, stepId, outcome, status, ms}` (ids null until validated). There is
-no client telemetry for the guide.
+no client telemetry for the guide. With server telemetry on (§2.10) the guide's spans carry the level and step ids
+(`game.level.id`, `game.step.id`, validated, dropped when they do not match `[a-z0-9-]`) and the outcome, never the
+question, the reply or the key; the model call is a client span with only `https://api.anthropic.com/v1/messages` as its URL.
 
 Local: `tools/serve.mjs` runs `api/<name>.mjs` at `/api/<name>` (GET and POST) and never serves `api/` source as a
 file. `GUIDE_STUB=1 npm run dev` answers the guide with a canned reply and no key; the stub exists only in the dev
@@ -481,6 +483,49 @@ database only; it runs the same scenarios on the real endpoint and on the fake, 
 deletes its random-prefix keys afterwards, and `REDIS_IT=1` without a store config fails). `__Host-` cookies over
 http://localhost work in Chrome and
 Firefox, not Safari.
+
+### 2.10 Server telemetry (#18)
+
+The `api/` functions send one trace per request to the owner's Dash0 when configured, and do nothing otherwise.
+Code: `lib/otel/` (`config.mjs`, `traceparent.mjs`, `attributes.mjs`, `server.mjs`) over the lab's `lib/otlp/encode.mjs`
+and `lib/otlp/send.mjs`; no package, no install step. Each `api/<name>.mjs` ends with the same three lines
+(`createServerTelemetry({name, env: process.env})`, the factory over `log: telemetry.log` (the guide and the sign-in
+callback also `fetch: telemetry.trace(globalThis.fetch)`), `export const {...} = telemetry.instrument(...)`).
+
+- Env: `DASH0_OTLP_ENDPOINT` (an ingress base URL, the same check as the lab, `http://localhost` only off Vercel),
+  `DASH0_AUTH_TOKEN` (`auth_...`), `DASH0_DATASET` (optional). All three absent or empty is off; any set must pass
+  its check, else it is `invalid`. Off and invalid change nothing a player sees: the exports are the factory's own
+  functions, no request is made. Invalid logs `{msg:'telemetry', outcome:'not-configured', reason:'<field>:<reason>'}`
+  once per instance, at the first request, never at import, and never a value.
+- Spans: a SERVER span per request (`GET /api/progress`, route and `url.path` the constant `/api/<name>`, status code,
+  `error.type`, `game.api.outcome` from the function's own log line) and a CLIENT span per outbound call that was passed
+  through `telemetry.trace` (no query, no headers, no body). An incoming `traceparent` makes the server span its child;
+  a parent with the sampled flag 0 exports nothing. The resource is `oncall-game-api` plus the function name, the
+  commit and environment when Vercel exposes them, and a random instance id.
+- Never carried: query strings, client addresses, user agents, cookies, any header or body, exception messages,
+  pids, nicknames, emails, questions, replies, keys, the token. Every attribute passes the allowlist in
+  `lib/otel/attributes.mjs`; a value that fails its pattern is dropped, not cut.
+- Flush: the export is awaited before the response is returned, because a function may be suspended after it
+  returns (the OpenTelemetry SDK's ForceFlush sentence, level 9.8). The export aborts at 450 ms and a 500 ms race
+  backstops it, so telemetry adds at most 500 ms to a request. The response object is the handler's own, untouched.
+  A handler that throws still flushes, then throws the same error.
+- Log lines (the function's own lines are unchanged): exported and not-sampled are silent; otherwise
+  `{msg:'telemetry', outcome:'dropped', reason, spans, ms}` with reason `auth`, `rejected` (plus `ingressStatus`),
+  `network`, `timeout`, `opaque`, `aborted`, `budget`, `internal`, `too-large` or `overflow` (more than 16 spans); or
+  the one `not-configured` line above. The three outcomes are exported, dropped and not-configured.
+- Local: `TELEMETRY_STUB=1 npm run dev` (or `startServer({telemetryStub: true})`) prints one line per span,
+  `span <name> <kind> <status> <ms>ms <attributes>`, through the dev server's log. No network, no token. Under
+  `AUTH_STUB` and `GUIDE_STUB` the rebuilt handlers are wrapped the same way (`instrumented` in `tools/serve.mjs`).
+  Without the flag a dev server with the three variables set sends real traces.
+- Owner steps to turn it on: (1) in the Vercel project set the three variables (Production, and Preview if wanted),
+  using an ingest-only token for the dataset you want; pick the ingress that matches the Dash0 organisation's region
+  (the default function region is iad1, so `https://ingress.us-east-1.aws.dash0.com` for a us-east-1 org). (2) Turn on
+  "Enable access to System Environment Variables" in the project's Environment Variables settings, so the commit and
+  environment reach the resource; without it those two attributes are omitted and nothing else changes. (3) Redeploy,
+  call `/api/leaderboard` once, and check that one `GET /api/leaderboard` span arrives in Dash0 under
+  `oncall-game-api`. This check is required: no Dash0 page confirms that the ingress accepts OTLP/HTTP with a JSON body
+  (the documented default is protobuf). If it does not, the function log shows `dropped` with `reason: rejected` and
+  `ingressStatus: 415`, and the encoder needs a protobuf body (a follow-up, not a game change).
 
 ## 3. Invariants
 

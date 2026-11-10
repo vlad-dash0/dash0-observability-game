@@ -18,6 +18,7 @@ ES modules, no build step), local-first progress, serverless `api/` later.
 - `index.html`, `main.mjs` (the only file that touches Alpine), `styles/`.
 - `lib/` pure modules, `levels/` one file per level + `levels/index.mjs` registry,
   `cards/deck.mjs`, `hub/` globe data.
+- `lib/otel/` server telemetry for `api/` (traces to the owner's Dash0 when configured, dormant otherwise): docs/FOUNDATION.md §2.10; `TELEMETRY_STUB=1 npm run dev` prints the spans.
 - `vendor/` self-hosted Alpine 3.14.1, js-yaml 5.5.0 (an ES module, imported by `lib/configure/`) and three.js 0.180.0 (`vendor/three-0.180.0/`, upstream file names, imported by `lib/globe-render.mjs` and `lib/swirl-render.mjs`), pinned by `vendor/SHA256SUMS`.
 - `test/` (`*.test.mjs`; `test/helpers/dom.mjs` is the linkedom DOM + click helpers).
 - `tools/serve.mjs` dev server; `.github/workflows/ci.yml`; `tools/pr-findings.mjs` (findings

@@ -7,6 +7,7 @@ Every Dash0 fact not yet confirmed is marked `VERIFY (#195)` in code and listed 
 - Placement: inside Act 9. "Connect the game to Dash0" is an Act 9 level on PNG (9.1 filter-or-sampler takes NZL, 9.2 keeps AUS, 9.8 edge-of-the-platform takes WSM); the lab "It's us" is Act 9's boss. No new act, no globe region change.
 - Hosting: Vercel. The token lives in memory only (a closure in `lib/telemetry.mjs`), never in localStorage, sessionStorage, progress, span attributes, the DOM after capture, a URL or `reportError`.
 - Transport: the browser sends OTLP/HTTP JSON straight to the player's ingress. A Vercel relay `api/otlp` is built only if Dash0 refuses browser CORS; it would forward the player's own `Authorization`, never store or log it, forward only to allowlisted hosts and cap the body at 64 KiB.
+- Server telemetry (docs/FOUNDATION.md §2.10) is separate from the lab: the `api/` functions use the owner's endpoint, token and dataset from the Vercel environment, never the player's token or dataset.
 - Practice mode scores full stars.
 - Each phase is one PR against main, never stacked.
 

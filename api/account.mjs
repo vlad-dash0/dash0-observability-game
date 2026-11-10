@@ -5,6 +5,7 @@ import { clearSessionCookie } from '../lib/auth/session.mjs';
 import { createAuthContext, requestHost } from '../lib/auth/config.mjs';
 import { validateNick } from '../lib/account/nickname.mjs';
 import { isJson, originMatches, reply } from '../lib/http.mjs';
+import { createServerTelemetry } from '../lib/otel/server.mjs';
 
 const MAX_BODY_BYTES = 1024;
 const NICK_LIMIT = { max: 10, windowS: 3600 };
@@ -133,6 +134,6 @@ function parse(text) {
   return body;
 }
 
-const account = createAccount();
-export const GET = account.GET;
-export const POST = account.POST;
+const telemetry = createServerTelemetry({ name: 'account', env: process.env });
+const account = createAccount({ log: telemetry.log });
+export const { GET, POST } = telemetry.instrument(account);
