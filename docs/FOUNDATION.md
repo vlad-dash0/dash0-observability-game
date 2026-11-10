@@ -582,7 +582,7 @@ builds run side by side, only the current build's registry is protected at the c
 | `createLevelContext` | `lib/level-context.mjs` |
 | `emptyProgress`, `sanitizeProgress`, `registryIds(registry)` → `{levelIds, cardIds}` (the `keep` ids), `migrate(raw, {current, migrations})` → migrated record, `raw` if at/past `current`, or `null` (corrupt), `mergeProgress(a, b, {keep}?)`, `recordCompletion(progress, levelId, {stars, cards, at}, registry)` → `{progress, firstCompletion, newBest, newCards}`, `starTotals` → `{earned, max}`, `cardTotals` → `{earned, max}` | `lib/progress.mjs` |
 | `encodeProgress`, `decodeProgress`, `previewImport`, `REFUSALS` (save codes, #18) | `lib/save-code.mjs` |
-| `isCompleted`, `isActComplete`, `isActUnlocked`, `levelState`, `lockReason` | `lib/unlock.mjs` |
+| `isCompleted`, `isActComplete`, `isActUnlocked`, `levelState`, `lockReason`, `nextUp`, `actCounts` | `lib/unlock.mjs` |
 | `loadProgress(storageGetter, registry)` → `{status, progress}` (`TypeError` before any read without a registry), `saveProgress(storageGetter, progress, registry)` → `{saved, reason?, progress}` (`progress` is always the registry view; `TypeError` before any storage access without a registry) | `lib/storage.mjs` |
 | `resolveTheme`, `readTheme(getter)`, `writeTheme(getter, t)` | `lib/theme.mjs` |
 | `HELP_KEY` (`oncall.help`), `readHiddenHelp(getter)` → `{status, hidden: Set}`, `hideHelp(getter, keys)` → `{saved, reason?}` | `lib/help-prefs.mjs` |
