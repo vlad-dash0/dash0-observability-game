@@ -96,15 +96,16 @@ test('fitEditor: content that always overflows stops at max rows (#326)', async 
   assert.equal(input.getAttribute('rows'), '7');
 });
 
-test('fitEditor: the signal removes the input listener and disconnects the observer; the observer refits on the next frame (#326)', async () => {
+test('fitEditor: the signal releases the observer; the observer refits on a width change and ignores a height-only change (#326)', async () => {
   const { fitEditor } = await import('../lib/widgets/editor.mjs');
-  const saved = { ro: globalThis.ResizeObserver, raf: globalThis.requestAnimationFrame };
-  const log = { cb: null, disconnected: 0, frames: [] };
+  const saved = globalThis.ResizeObserver;
+  const log = { cb: null, disconnected: 0 };
   globalThis.ResizeObserver = class { constructor(cb) { log.cb = cb; } observe() {} disconnect() { log.disconnected += 1; } };
-  globalThis.requestAnimationFrame = (f) => { log.frames.push(f); return 1; };
   try {
     mount({ rows: 3, value: 'a' });
     const input = q('#ed');
+    let width = 300;
+    Object.defineProperty(input, 'clientWidth', { get() { return width; } });
     const ac = new AbortController();
     const opts = [];
     const add = input.addEventListener.bind(input);
@@ -113,14 +114,16 @@ test('fitEditor: the signal removes the input listener and disconnects the obser
     assert.equal(opts.find(([t]) => t === 'input')[1].signal, ac.signal, 'the input listener is bound to the signal (a browser removes it on abort)');
     input.value = 'a\nb\nc\nd\ne\nf';
     log.cb();
-    assert.equal(input.getAttribute('rows'), '3', 'not refitted inside the observer callback');
-    assert.equal(log.frames.length, 1);
-    log.frames[0]();
-    assert.equal(input.getAttribute('rows'), '6', 'refitted in the frame');
+    assert.equal(input.getAttribute('rows'), '3', 'the width is the same: our own height change must not refit (no observer loop)');
+    width = 200;
+    log.cb();
+    assert.equal(input.getAttribute('rows'), '6', 'the width changed: refit');
+    input.value = 'a';
+    log.cb();
+    assert.equal(input.getAttribute('rows'), '6', 'the new width was recorded, so the same width does not refit again');
     ac.abort();
     assert.equal(log.disconnected, 1);
   } finally {
-    globalThis.ResizeObserver = saved.ro;
-    globalThis.requestAnimationFrame = saved.raf;
+    globalThis.ResizeObserver = saved;
   }
 });
