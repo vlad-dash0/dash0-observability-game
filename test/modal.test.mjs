@@ -12,7 +12,7 @@ const shell = parseHTML(readFileSync(join(ROOT, 'index.html'), 'utf8')).document
 
 test('every dialog on the page but the reward is one kit modal: the same shell, a named close, a focusable title', () => {
   const modals = [...shell.querySelectorAll('.ui-modal')];
-  assert.deepEqual(modals.map((m) => m.id), ['howto-modal', 'about-modal', 'save-modal']);
+  assert.deepEqual(modals.map((m) => m.id), ['howto-modal', 'about-modal', 'save-modal', 'board-modal', 'account-modal']);
   for (const m of modals) {
     assert.equal(m.getAttribute('role'), 'dialog', m.id);
     assert.equal(m.getAttribute('aria-modal'), 'true', m.id);
@@ -23,8 +23,22 @@ test('every dialog on the page but the reward is one kit modal: the same shell, 
     assert.equal(title.getAttribute('tabindex'), '-1', `${m.id}: focus lands on the title`);
     assert.equal(title.closest('.ui-modal-head') !== null, true);
     const x = m.querySelector('.ui-modal-head .ui-btn--icon');
-    assert.ok(x && x.getAttribute('aria-label') && /^@click|^closeHowTo|^close/.test(x.getAttribute('@click')), `${m.id} has a close button with a name`);
+    assert.ok(x && x.getAttribute('aria-label') && /^close/.test(x.getAttribute('@click')), `${m.id} has a close button with a name`);
     assert.ok(m.querySelector('.ui-modal-card > .ui-modal-body'), `${m.id} has a body that scrolls inside the card`);
+  }
+});
+
+test('the board and account modals are kit shells with an app-drawn body, and the openers they return focus to exist', () => {
+  for (const [id, body, title, opener] of [['board-modal', 'board-body', 'board-title', 'board-open'], ['account-modal', 'account-body', 'account-title', 'account-open']]) {
+    const m = shell.getElementById(id);
+    assert.equal(m.getAttribute('x-show'), id === 'board-modal' ? 'boardOpen' : 'accountOpen');
+    assert.equal(m.getAttribute('aria-labelledby'), title);
+    const b = shell.getElementById(body);
+    assert.ok(b && b.classList.contains('ui-modal-body') && m.contains(b), `${id} body`);
+    assert.equal(b.hasAttribute('x-ignore'), true, `${id}: the app writes the body, so Alpine skips it`);
+    assert.equal(b.querySelectorAll('[x-text],[x-show],[\\@click]').length, 0);
+    const o = shell.getElementById(opener);
+    assert.ok(o && o.closest('#hub') !== null && o.classList.contains('ui-btn'), `${opener} is a hub kit button`);
   }
 });
 

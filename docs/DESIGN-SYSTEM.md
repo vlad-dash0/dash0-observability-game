@@ -73,7 +73,7 @@ each function's JSDoc for the exact markup.
 | `note(bodyHtml)`, `prose(bodyHtml)`, `codeBlock(text)` | text | Muted small print; classless authored content; escaped code. |
 | `panel({id, variant, headHtml, sections})` | panel | Card with sections; `inset`, `alert`, `drop` (dashed means drop zone only; Sort it no longer uses it, #261: it categorises with choice options and plain groups, no boxes). |
 | `chip({text, tone, dot, swatch, dashed})` | chip | Mono pill; `data-tone` neutral, success, error, hint, attention. |
-| `button({id, label, variant, disabled, finish, type, icon, describedBy})`, `nextButton(id)`, `finishButton(id)` | button | Pill; `primary` (red, D2), `ghost`, `hint`, `icon`; `describedBy` (an id) points a disabled button at its reason; Finish has `data-finish`. |
+| `button({id, label, variant, disabled, finish, type, icon, describedBy})`, `nextButton(id)`, `finishButton(id)`, `linkButton({id, label, href, variant})` | button | Pill; `linkButton` is the same pill as an `<a>` for a navigation (the sign-in link; `primary`, `ghost`, `hint`; `href` a local path only); `primary` (red, D2), `ghost`, `hint`, `icon`; `describedBy` (an id) points a disabled button at its reason; Finish has `data-finish`. |
 | `option({attr, value, labelHtml, metaHtml, kind, pressed, state, disabled, hinted, drop, name})`, `options({id, labelledBy, layout, itemsHtml})` | option | Selectable card and its group (list, grid, wrap, drops). `drop` (choice kind only) makes a category target: dashed, centred, legible while disabled (muted text, no fade); `drops` lays targets out as an equal-width row that wraps. Sort it's category row uses both. The `radio` kind is a label around a real `<input type="radio" name>`: the dot, the label, then the meta line beneath; a picked card carries `data-picked`. |
 | `feedback({id, bar})`, `setFeedback(el, tone, bodyHtml)`, `clearFeedback(el)` | feedback | The one feedback region; tones neutral, success, error (D7). |
 | `meter({id, label, value, max, cells, unit, previewCells, over})` | meter | Cells (20 by default) plus a text line that is the accessible value (en-US grouping, so 4800 reads 4,800). |
@@ -107,7 +107,7 @@ conditions. Kit text inside a clipping container (`overflow: hidden`) must be ab
 
 ## Modal
 
-One dialog shell for How to play (`#howto-modal`), About (`#about-modal`) and Save code (`#save-modal`)
+One dialog shell for How to play (`#howto-modal`), About (`#about-modal`), Save code (`#save-modal`), Leaderboard (`#board-modal`) and Account (`#account-modal`; the last three have a body `app.mjs` draws)
 (#282, owner direction 2026-11-08; D5 sign-off from the PR screenshots). Its markup is static in
 `index.html` (the one place that writes `ui-` classes by hand, like the buttons), because Alpine opens
 it with `x-show`; `test/modal.test.mjs` pins every shell to the same parts:

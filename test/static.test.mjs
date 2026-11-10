@@ -249,7 +249,9 @@ test('every local src and href in index.html exists on disk', () => {
   assert.ok(refs.length > 0, 'expected local references');
   for (const ref of refs) {
     if (/^([a-z][a-z0-9+.-]*:|\/\/|#)/i.test(ref)) continue; // external, data:, mailto:, fragment
-    const path = join(ROOT, ref.split(/[?#]/)[0]);
+    // /api/<name> is a serverless function (api/<name>.mjs), not a static file.
+    const clean = ref.split(/[?#]/)[0];
+    const path = join(ROOT, /^\/api\/[\w-]+$/.test(clean) ? `${clean}.mjs` : clean);
     assert.ok(existsSync(path) && statSync(path).isFile(), `${ref} does not exist`);
   }
 });

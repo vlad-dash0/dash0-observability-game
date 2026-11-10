@@ -12,9 +12,9 @@ import * as ui from '../lib/ui/index.mjs';
 
 const {
   actions, button, checkbox, chip, clearFeedback, codeBlock, dots, eyebrow, feedback, field, finishButton, fold,
-  helpChips, lesson, meter, nextButton, note, option, options, panel, prose, question, radio, radioGroup, setFeedback,
+  helpChips, lesson, linkButton, meter, nextButton, note, option, options, panel, prose, question, radio, radioGroup, setFeedback,
   sideColumn, split, stars, stats, step, stepHead, table,
-  BUTTON_VARIANTS, DOTS_TONES, FEEDBACK_TONES, OPTION_KINDS, OPTION_STATES, OPTIONS_LAYOUTS, PANEL_VARIANTS, TONES,
+  BUTTON_VARIANTS, DOTS_TONES, FEEDBACK_TONES, LINK_VARIANTS, OPTION_KINDS, OPTION_STATES, OPTIONS_LAYOUTS, PANEL_VARIANTS, TONES,
 } = ui;
 
 const BAD = '<b>"&';
@@ -283,6 +283,7 @@ const CASES = [
   ['panel', null, (h) => panel({ headHtml: h, sections: [h] })],
   ['chip', (t) => chip({ text: t, dot: true }), null],
   ['button', (t) => button({ label: t }), null],
+  ['linkButton', (t) => linkButton({ label: t, href: '/x' }), null],
   ['nextButton', null, null, () => nextButton('n')],
   ['finishButton', null, null, () => finishButton('f')],
   ['option', (t) => option({ attr: 'pick', value: t, labelHtml: 'l' }), (h) => option({ attr: 'pick', value: 'v', labelHtml: h, metaHtml: h })],
@@ -308,6 +309,7 @@ const VARIANTS = () => [
   ...OPTION_KINDS.map((kind) => option({ attr: 'a', value: 'v', labelHtml: 'l', metaHtml: 'm', kind, ...(kind === 'radio' ? { name: 'n' } : {}) })),
   ...OPTIONS_LAYOUTS.map((layout) => options({ layout, itemsHtml: '' })),
   ...PANEL_VARIANTS.map((variant) => panel({ variant, headHtml: 'h', sections: ['s'] })),
+  ...LINK_VARIANTS.map((variant) => linkButton({ label: 'l', href: '/x', variant })),
   ...BUTTON_VARIANTS.map((variant) => button({ label: 'l', variant, ...(variant === 'icon' ? { icon: 'x' } : {}) })),
   ...TONES.map((tone) => chip({ text: 't', tone, dot: true, swatch: 0, dashed: true })),
   ...DOTS_TONES.map((tone) => dots({ total: 2, on: 1, decorative: true, tone })),
@@ -428,6 +430,7 @@ const INVALID = [
   ['chip', () => chip({})],
   ['chip', () => chip({ text: 'x', swatch: 6 })],
   ['button', () => button({ label: '' })],
+  ['linkButton', () => linkButton({ label: 'x', href: 'javascript:alert(1)' })],
   ['button', () => button({ label: 'x', variant: 'danger' })],
   ['button', () => button({ label: 'x', type: 'reset' })],
   ['button', () => button({ label: 'x', id: '"x"' })],

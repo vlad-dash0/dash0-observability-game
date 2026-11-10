@@ -24,7 +24,7 @@ import { hideHelp, readHiddenHelp } from './lib/help-prefs.mjs';
 import { howToView } from './lib/how-to-play.mjs';
 import { createGuideClient } from './lib/guide/client.mjs';
 import { createAccountClient } from './lib/account/client.mjs';
-import { ACCOUNT_UNAVAILABLE, accountHtml, boardHtml, nudgeText } from './lib/account/board-view.mjs';
+import { ACCOUNT_UNAVAILABLE, accountHtml, boardHtml, nudgeText, starsText } from './lib/account/board-view.mjs';
 import { setFeedback } from './lib/ui/index.mjs';
 import { escapeHtml } from './lib/lesson-kit.mjs';
 import { trapTab } from './lib/modal-focus.mjs';
@@ -261,6 +261,11 @@ export function createGame(deps) {
     // "Signed in as <nick>" for the hub, '' otherwise.
     signedInText() {
       return this.signedIn ? `Signed in as ${this.account.nick}` : '';
+    },
+    // The hub's account line: the server's stars and rank; "no stars yet" until the first write, never 0.
+    accountSummary() {
+      if (!this.signedIn) return '';
+      return this.accountRank === null ? starsText(this.accountStars) : `${starsText(this.accountStars)}, #${this.accountRank}`;
     },
     // The notice for `?signin=`: the first-sign-in line needs the nickname, so it waits for GET /api/account.
     signinNoticeText() {
