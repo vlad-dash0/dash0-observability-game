@@ -427,7 +427,52 @@ test('G3 focus returns to Continue when it opened the level and is still shown, 
   game.continueNext();
   game.progress = { ...game.progress, levels: Object.fromEntries(['x', 'y', 'a', 'b', 'z'].map((id) => [id, { stars: 3, at: null }])) };
   game.closeOverlay();
-  assert.equal(focused.at(-1), '[data-level-id="x"]', 'Continue is gone once all is done, so the card is the target');
+  assert.equal(focused.at(-1), '#act-toggle-a0', 'Continue is gone once all is done and a0 is saved and folded: its toggle is the target');
+  game.toggleAct('a0');
+  assert.equal(game.returnTarget(), '[data-level-id="x"]', 'unfolded, the card is the target');
+});
+
+test('G5 acts fold by progress, a toggle overrides and stores nothing, it survives progress, debug unfolds', () => {
+  const done = Object.fromEntries(['x', 'y', 'a', 'b'].map((id) => [id, { stars: 3, at: null }]));
+  const { game, store } = setup({ initial: { [STORAGE_KEY]: v1(done) }, comingSoon: [S7] });
+  const before = JSON.stringify([...store.data]);
+  assert.equal(game.actExpanded('a0'), false, 'a saved act folds');
+  assert.equal(game.actExpanded('a1'), true, 'the next act is open');
+  assert.equal(game.actExpanded('s7'), true, 'a coming-soon act is unfolded by default');
+  assert.equal(game.actExpandedAttr('a0'), 'false');
+  assert.equal(game.actExpandedAttr('a1'), 'true');
+  assert.equal(game.actLine(game.acts.find((a) => a.id === 'a0')), 'Act 0: First act, saved, 4 of 4');
+  assert.equal(game.actLine(game.acts.find((a) => a.id === 'a1')), 'Act 1: Second act, 0 of 1');
+  assert.equal(game.actLine(game.acts.find((a) => a.id === 's7')), 'Act 7: Later, coming soon');
+  assert.equal(game.toggleAct('a0'), true);
+  assert.equal(game.actExpanded('a0'), true);
+  assert.equal(game.toggleAct('s7'), false);
+  assert.equal(game.actExpanded('s7'), false);
+  game.progress = { ...game.progress, levels: { ...done, z: { stars: 3, at: null } } };
+  assert.equal(game.actExpanded('a0'), true, 'the choice survives a progress change');
+  assert.equal(game.actExpanded('a1'), false, 'untouched acts follow the progress');
+  assert.equal(game.toggleAct('nope'), false);
+  assert.equal(game.actExpanded('nope'), false);
+  assert.equal(JSON.stringify([...store.data]), before, 'nothing is stored');
+  const dbg = setup({ initial: { [STORAGE_KEY]: v1(done) }, debug: true }).game;
+  assert.equal(dbg.actExpanded('a0'), true);
+  assert.equal(dbg.actExpanded('a1'), true);
+});
+
+test('M3 each act heading is a disclosure button wired to its body', () => {
+  const toggle = deepQuery(shell, 'h3.act-title > button.act-toggle');
+  assert.ok(toggle, 'h3.act-title > button.act-toggle');
+  assert.equal(toggle.getAttribute('type'), 'button');
+  assert.equal(toggle.getAttribute(':id'), "'act-toggle-' + act.id");
+  assert.equal(toggle.getAttribute(':aria-expanded'), 'actExpandedAttr(act.id)');
+  assert.equal(toggle.getAttribute(':aria-controls'), "'act-body-' + act.id");
+  assert.equal(toggle.getAttribute('@click'), 'toggleAct(act.id)');
+  const body = deepQuery(shell, 'div.act-body');
+  assert.ok(body, 'div.act-body');
+  assert.equal(body.getAttribute(':id'), "'act-body-' + act.id");
+  assert.equal(body.getAttribute('x-show'), 'actExpanded(act.id)');
+  for (const sel of ['.act-sub', '.act-badges', '.act-soon', '.level-list']) assert.ok(body.querySelector(sel), `${sel} is inside the body`);
+  assert.equal(toggle.children.length, 0, 'the toggle holds only its text');
 });
 
 test('completion: stored with its stars, done, its country lit, totals and reward updated', () => {
@@ -845,10 +890,12 @@ test('hubInert is true while any dialog is open', () => {
   assert.equal(game.hubInert(), true);
 });
 
-test('acts carry their display title and the hub template renders it', () => {
+test('acts carry their display title and the hub toggle renders the act line that starts with it', () => {
   const { game } = setup();
   assert.equal(game.acts[0].title, 'Act 0: First act');
-  assert.ok(deepQuery(shell, '.act-title [x-text="act.title"]'), 'the hub renders act.title');
+  const toggle = deepQuery(shell, 'h3.act-title > button.act-toggle');
+  assert.equal(toggle.getAttribute('x-text'), 'actLine(act)', 'the hub renders actLine(act)');
+  for (const act of game.acts) assert.ok(game.actLine(act).startsWith(act.title), act.id);
 });
 
 test('a soon act changes nothing: not playable, not counted, nothing saved', () => {
@@ -1842,9 +1889,11 @@ test('M2 the Next up chip is a kit attention chip inside the hidden status colum
 test('M5 every name the Continue and Next up markup binds exists on the game', () => {
   const { game } = setup();
   const status = deepQuery(shell, '.level-status');
-  const els = [shell.querySelector('#hub-continue'), status, ...status.querySelectorAll('*')];
+  const act = deepQuery(shell, 'h3.act-title');
+  const body = deepQuery(shell, 'div.act-body');
+  const els = [shell.querySelector('#hub-continue'), status, ...status.querySelectorAll('*'), ...act.querySelectorAll('*'), body];
   const seen = new Set();
-  for (const el of els) for (const a of ['x-show', 'x-text', '@click']) {
+  for (const el of els) for (const a of ['x-show', 'x-text', '@click', ':aria-expanded']) {
     const v = el.getAttribute(a);
     if (v === null) continue;
     for (const m of v.matchAll(/[A-Za-z]+\(/g)) {
@@ -1853,5 +1902,5 @@ test('M5 every name the Continue and Next up markup binds exists on the game', (
       assert.equal(typeof game[name], 'function', `${a}="${v}": game.${name}`);
     }
   }
-  for (const k of ['continueLabel', 'continueNext', 'isNextUp']) assert.ok(seen.has(k), `the markup binds ${k}`);
+  for (const k of ['continueLabel', 'continueNext', 'isNextUp', 'actLine', 'toggleAct', 'actExpandedAttr', 'actExpanded']) assert.ok(seen.has(k), `the markup binds ${k}`);
 });

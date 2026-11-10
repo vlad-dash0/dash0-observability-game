@@ -115,34 +115,36 @@
       </p>
       <template x-for="act in acts" :key="act.id">
         <div class="act" :class="act.soon ? 'soon' : ''">
-          <h3 class="act-title"><span x-text="act.title"></span></h3>
-          <p class="act-sub" x-show="act.sub" x-text="act.sub"></p>
-          <p class="act-badges" x-show="act.badges.length > 0"><template x-for="b in act.badges" :key="b.id"><span class="ui-chip" :data-tone="b.tone" x-text="b.label"></span></template></p>
-          <div class="act-soon" x-show="act.soon"><p class="act-soon-chip"><span class="ui-chip" data-tone="neutral">Coming soon</span></p><p class="act-soon-teaser" x-text="act.teaser"></p></div>
-          <div class="level-list">
-            <template x-for="id in act.ids" :key="id">
-              <div class="level-card"
-                   role="button" tabindex="0"
-                   :data-level-id="id"
-                   :aria-disabled="levelState(id) === 'locked' ? 'true' : 'false'"
-                   :aria-label="levelLabel(id)"
-                   :class="levelClasses(id)"
-                   @click="openLevel(id)"
-                   @keydown.enter.prevent="openLevel(id)"
-                   @keydown.space.prevent="openLevel(id)">
-                <div class="level-ico" aria-hidden="true" x-text="level(id).icon"></div>
-                <div class="level-body">
-                  <div class="level-no" x-text="level(id).kind === 'boss' ? 'Incident' : level(id).no"></div>
-                  <div class="level-name" x-text="level(id).name"></div>
-                  <div class="level-sub" aria-live="polite" x-text="levelSub(id)"></div>
+          <h3 class="act-title"><button type="button" class="act-toggle" :id="'act-toggle-' + act.id" :aria-expanded="actExpandedAttr(act.id)" :aria-controls="'act-body-' + act.id" @click="toggleAct(act.id)" x-text="actLine(act)"></button></h3>
+          <div class="act-body" :id="'act-body-' + act.id" x-show="actExpanded(act.id)">
+            <p class="act-sub" x-show="act.sub" x-text="act.sub"></p>
+            <p class="act-badges" x-show="act.badges.length > 0"><template x-for="b in act.badges" :key="b.id"><span class="ui-chip" :data-tone="b.tone" x-text="b.label"></span></template></p>
+            <div class="act-soon" x-show="act.soon"><p class="act-soon-chip"><span class="ui-chip" data-tone="neutral">Coming soon</span></p><p class="act-soon-teaser" x-text="act.teaser"></p></div>
+            <div class="level-list">
+              <template x-for="id in act.ids" :key="id">
+                <div class="level-card"
+                     role="button" tabindex="0"
+                     :data-level-id="id"
+                     :aria-disabled="levelState(id) === 'locked' ? 'true' : 'false'"
+                     :aria-label="levelLabel(id)"
+                     :class="levelClasses(id)"
+                     @click="openLevel(id)"
+                     @keydown.enter.prevent="openLevel(id)"
+                     @keydown.space.prevent="openLevel(id)">
+                  <div class="level-ico" aria-hidden="true" x-text="level(id).icon"></div>
+                  <div class="level-body">
+                    <div class="level-no" x-text="level(id).kind === 'boss' ? 'Incident' : level(id).no"></div>
+                    <div class="level-name" x-text="level(id).name"></div>
+                    <div class="level-sub" aria-live="polite" x-text="levelSub(id)"></div>
+                  </div>
+                  <div class="level-status" aria-hidden="true">
+                    <span class="level-stars" x-show="levelState(id) === 'done' &amp;&amp; level(id).scored" x-text="starText(id)"></span>
+                    <span class="ui-chip" data-tone="attention" x-show="isNextUp(id)">Next up</span>
+                    <span x-text="levelState(id) === 'done' ? 'Play again' : levelState(id) === 'open' ? 'Start' : 'Locked'"></span>
+                  </div>
                 </div>
-                <div class="level-status" aria-hidden="true">
-                  <span class="level-stars" x-show="levelState(id) === 'done' &amp;&amp; level(id).scored" x-text="starText(id)"></span>
-                  <span class="ui-chip" data-tone="attention" x-show="isNextUp(id)">Next up</span>
-                  <span x-text="levelState(id) === 'done' ? 'Play again' : levelState(id) === 'open' ? 'Start' : 'Locked'"></span>
-                </div>
-              </div>
-            </template>
+              </template>
+            </div>
           </div>
         </div>
       </template>

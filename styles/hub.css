@@ -169,7 +169,22 @@
   color: var(--color-text-muted); text-align: center;
 }
 .act + .act { margin-top: 18px; }
-.act-title { font-size: 16px; font-weight: 700; margin: 0 6px 2px; }
+.act-title { font-size: 16px; font-weight: 700; margin: 0; }
+/* The act heading is one full-width button (a 44px target): the whole line folds and unfolds the act. */
+.act-toggle {
+  display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 44px;
+  margin: 0; padding: 0 6px; border: 0; background: none; color: inherit; font: inherit;
+  text-align: left; cursor: pointer;
+}
+.act-toggle::before {
+  content: ""; flex: none; width: 7px; height: 7px;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg); transition: transform .15s;
+}
+.act-toggle[aria-expanded="true"]::before { transform: rotate(45deg); }
+.act-toggle:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; border-radius: var(--radius); }
+@media (prefers-reduced-motion: reduce) { .act-toggle::before { transition: none; } }
+.act-body { padding-top: 2px; }
 .act-sub { font-size: 13px; color: var(--color-text-muted); margin: 0 6px 10px; }
 .act.soon .act-title, .act.soon .act-sub { color: var(--color-text-muted); }
 .act-soon {
