@@ -304,7 +304,9 @@ shows the panel like any other mode. `MAX_QUESTION` in the client mirrors the se
 Optional, dormant until its env is set, and never required to play. Sign-in is for @dash0.com Google accounts only,
 verified on the server. Rank is total stars (the sum of the best stars per level); a tie goes to whoever reached the
 total first. Anonymous play (signed out or unconfigured) writes nothing new to storage, never touches
-`oncall.progress` through sync, and leaves level play unchanged; the only addition is one `GET /api/account` per page.
+`oncall.progress` through sync, and leaves level play unchanged; the only additions are one `GET /api/account` per
+page and, on a signed-out win, at most one `GET /api/leaderboard` per page for the sign-in nudge (`maybeSigninNudge`
+in `app.mjs`; none after "Don't ask again").
 The full email and the Google name are never stored, shown or logged. Phases: P1 `lib/auth/` (this section's auth
 parts), P2 score, nickname, merge and store, P3 auth and account endpoints, P4 progress and leaderboard endpoints,
 P5 dev server, P6 client and markup.
@@ -403,10 +405,17 @@ saves the merged response locally, and never syncs in debug mode.
   (`fast` only when the total first reaches the maximum, at most 30 minutes after `profile.created`, which the store now returns).
 - `GET /api/leaderboard` (anonymous allowed): 200 `{v:1, ok:true, size, top:[{rank, nick, stars}] x10,
   me:{stars, rank|null, listed}|null}`, never a pid; rank and size are over the listed set; an empty board is ok with
-  `top:[]`; 503 `not-configured`, 502 `store-unavailable`, 429 `rate-limited` (30 reads a minute per IP, in
-  memory). A signed-in reader gets `me:{stars|null, rank|null, listed}`; a bad cookie reads as anonymous; a 0-star player is not on the board.
+  `top:[]`; 503 `not-configured`, 502 `store-unavailable`, 429 `rate-limited` (120 reads a minute per IP, in
+  memory; no cap across all IPs). A signed-in reader gets `me:{stars|null, rank|null, listed}`; a bad cookie reads as
+  anonymous; a 0-star player is not on the board.
 - Rate limits: signed in, a Redis fixed window per pid (30 progress writes per 10 minutes, 10 nickname changes per
-  hour); anonymous routes use `createLimiter` per IP with their own instance.
+  hour); anonymous routes use `createLimiter` per IP with their own instance, `instanceMax: Infinity` and
+  `maxKeys: 50000`, so only the per-IP limit applies (the guide keeps its 60 a minute per-instance cap) and thousands
+  of other addresses in a window do not evict an over-limit one. Players behind one shared address (an office or venue
+  network) share that address's allowance, which is set high for that case (120 board reads a minute, 100 sign-in
+  starts per 10 minutes). The nickname quota is charged only for a name that can be claimed: a name refused for
+  format, reserved or blocked is 400 before the quota is taken and takes none; a taken name uses the quota, so
+  probing for taken names is bounded at 10 an hour.
 - Logs: one line per request `{msg, outcome, status, ms}`; never a pid, sub, nick, email or cookie.
 - `reply`, `sameOrigin` and the cookie helpers move to `lib/http.mjs`; `api/guide.mjs` imports them.
 
@@ -440,8 +449,10 @@ the store env. `lib/auth/config.mjs` holds the shared env check (`authConfig`), 
 `lib/http.mjs` holds `reply`, `redirect`, `sameOrigin` (lenient, the guide's), `originMatches` (strict, a required
 Origin for account POSTs), `isJson`, `readCookie` and `clientKey`. Sign-in is configured only with all four env values,
 a store and an https AUTH_ORIGIN (http only for localhost). A GET /api/account on a host other than AUTH_ORIGIN's
-answers `configured:false`, so preview deploys show no sign-in UI. auth-start allows 20 starts per client IP per
-10 minutes (its own in-memory limiter); over it, or any other refusal, redirects to `/?signin=unavailable`. The
+answers `configured:false`, so preview deploys show no sign-in UI. auth-start allows 100 starts per client IP per
+10 minutes (its own in-memory limiter, no cap across all IPs; a shared network shares the allowance); over it, or any
+other refusal, redirects to `/?signin=unavailable`. Accepted: there is one `__Host-oc-auth` cookie, so starting
+sign-in in two tabs makes the earlier tab fail with "Sign-in did not work" (the later start replaced its cookie). The
 callback maps failures as: no or bad auth cookie, state mismatch, Google error other than `access_denied`, a missing or
 oversized code, a token refusal (4xx), an unreadable token and any other ID token reason (including
 `email_verified` false) to `failed`; `domain` to `domain`; `access_denied` to `cancelled` (the state must still match);

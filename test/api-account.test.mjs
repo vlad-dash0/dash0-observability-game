@@ -202,6 +202,30 @@ test('nickname: 10 changes an hour, the 11th is 429 with retry-after; the next h
   assert.equal((await act(r, cookie, { action: 'nickname', nick: 'nick-later' })).status, 200);
 });
 
+test('nickname: refused names (format, reserved, blocked) do not use the hourly quota', async () => {
+  const { r, pid } = await signedIn();
+  const cookie = await r.cookieFor(pid, { exp: NOW + 10_000_000 });
+  for (let i = 0; i < 12; i++) assert.equal((await act(r, cookie, { action: 'nickname', nick: i % 2 ? 'admin' : 'a b' })).status, 400, `try ${i}`);
+  for (let i = 0; i < 10; i++) assert.equal((await act(r, cookie, { action: 'nickname', nick: `fine-${i}x` })).status, 200, `change ${i}`);
+  assert.equal((await act(r, cookie, { action: 'nickname', nick: 'fine-over' })).status, 429, 'ten successes still use it up');
+});
+
+test('nickname: a refused name is 400 even when the quota is used up (refusing it takes no quota)', async () => {
+  const { r, pid } = await signedIn();
+  const cookie = await r.cookieFor(pid, { exp: NOW + 10_000_000 });
+  for (let i = 0; i < 10; i++) await act(r, cookie, { action: 'nickname', nick: `fine-${i}x` });
+  assert.equal((await act(r, cookie, { action: 'nickname', nick: 'admin' })).status, 400);
+});
+
+test('nickname: a taken name uses the hourly quota, so probing for taken names is bounded', async () => {
+  const { r, pid } = await signedIn();
+  const cookie = await r.cookieFor(pid, { exp: NOW + 10_000_000 });
+  const { profile: other } = await r.store.signIn('g-2', 'bob@dash0.com');
+  assert.equal((await r.store.setNickname(other.pid, 'grace-hop')).ok, true);
+  for (let i = 0; i < 10; i++) assert.equal((await act(r, cookie, { action: 'nickname', nick: 'grace-hop' })).status, 409, `probe ${i}`);
+  assert.equal((await act(r, cookie, { action: 'nickname', nick: 'grace-hop' })).status, 429);
+});
+
 test('nickname: the rate limiter failing closed is 502', async () => {
   const { r, cookie } = await signedIn();
   r.fake.fail = 'throw';

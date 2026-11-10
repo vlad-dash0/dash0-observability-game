@@ -137,11 +137,30 @@ test('start: a store env alone is enough for the store (UPSTASH_* or KV_*), and 
   assert.equal(res.status, 405);
 });
 
-test('start: per-client rate limit sends the 21st request to unavailable', async () => {
+test('start: per-client rate limit sends the 101st request in 10 minutes to unavailable', async () => {
   const r = rig();
   const hit = () => r.start.GET(get(`${ORIGIN}/api/auth-start`, { 'x-forwarded-for': '1.2.3.4' }));
-  for (let i = 0; i < 20; i++) assert.ok((await hit()).headers.get('location').startsWith('https://accounts.google.com/'));
+  for (let i = 0; i < 100; i++) assert.ok((await hit()).headers.get('location').startsWith('https://accounts.google.com/'));
   assert.equal((await hit()).headers.get('location'), '/?signin=unavailable');
+});
+
+test('start: only the per-IP limit applies: 100 distinct addresses all get Google, one address still stops at 100', async () => {
+  const r = rig();
+  const from = (ip) => r.start.GET(get(`${ORIGIN}/api/auth-start`, { 'x-forwarded-for': ip }));
+  for (let i = 0; i < 100; i++) {
+    assert.ok((await from(`10.1.0.${i}`)).headers.get('location').startsWith('https://accounts.google.com/'), `address ${i}`);
+  }
+  for (let i = 0; i < 99; i++) await from('10.1.0.0');
+  assert.equal((await from('10.1.0.0')).headers.get('location'), '/?signin=unavailable');
+});
+
+test('start: an address over its limit stays refused after 2000+ other addresses in the window', async () => {
+  const r = rig();
+  const from = (ip) => r.start.GET(get(`${ORIGIN}/api/auth-start`, { 'x-forwarded-for': ip }));
+  for (let i = 0; i < 100; i++) await from('9.9.9.9');
+  assert.equal((await from('9.9.9.9')).headers.get('location'), '/?signin=unavailable');
+  for (let i = 0; i < 2100; i++) await from(`10.${i >> 8}.${i & 255}.1`);
+  assert.equal((await from('9.9.9.9')).headers.get('location'), '/?signin=unavailable', 'not evicted, not reset');
 });
 
 // ---- auth-callback --------------------------------------------------------------------

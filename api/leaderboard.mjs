@@ -5,7 +5,8 @@ import { clientKey, reply } from '../lib/http.mjs';
 import { createLimiter } from '../lib/guide/limit.mjs';
 
 export const TOP = 10;
-export const READ_MAX = 30;
+export const READ_MAX = 120;
+const LIMITER_KEYS = 50_000; // many addresses in one window must not evict an over-limit one
 export const READ_WINDOW_MS = 60 * 1000;
 
 /** The handlers over injected `env`, `redis`, `now`, `random`, `registry`, `log` and `limiter`. */
@@ -16,7 +17,7 @@ export function createLeaderboard({
   random = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n)),
   registry = null,
   log = (line) => console.log(JSON.stringify(line)),
-  limiter = createLimiter({ now, clientMax: READ_MAX, clientWindowMs: READ_WINDOW_MS }),
+  limiter = createLimiter({ now, clientMax: READ_MAX, clientWindowMs: READ_WINDOW_MS, instanceMax: Infinity, maxKeys: LIMITER_KEYS }), // per IP only
 } = {}) {
   const auth = createAuthContext({ env, redis, now, random, registry });
 

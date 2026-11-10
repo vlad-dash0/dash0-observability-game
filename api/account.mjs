@@ -3,6 +3,7 @@
 // Origin on AUTH_ORIGIN's host and JSON (no CORS headers are ever sent). Logs carry no id, nickname or cookie.
 import { clearSessionCookie } from '../lib/auth/session.mjs';
 import { createAuthContext, requestHost } from '../lib/auth/config.mjs';
+import { validateNick } from '../lib/account/nickname.mjs';
 import { isJson, originMatches, reply } from '../lib/http.mjs';
 
 const MAX_BODY_BYTES = 1024;
@@ -93,6 +94,10 @@ export function createAccount({
     };
 
     if (body.action === 'nickname') {
+      // A name that cannot be claimed (format, reserved, blocked) is refused before the quota: it takes no quota.
+      // A taken name does use the quota, so probing for taken names is bounded at NICK_LIMIT an hour.
+      const valid = validateNick(body.nick);
+      if (!valid.ok) return fail(valid);
       const limited = await store.rateLimit(pid, 'nick', NICK_LIMIT);
       if (!limited.ok) return fail(limited);
       const set = await store.setNickname(pid, body.nick);
