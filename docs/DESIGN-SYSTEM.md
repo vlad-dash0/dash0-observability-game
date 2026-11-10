@@ -45,7 +45,7 @@ lesson card), `--color-meter-left`, `--color-alert` (the firing banner only; D1)
 Scale: `--space-1` to `--space-6` and `--space-8` (4N px); `--text-xs` 10.5, `-sm` 12.5, `-md` 14,
 `-base` 15, `-q` 18, `-lesson` 18, `-title` 24; `--weight-regular` / `-semibold` / `-bold`;
 `--radius-xs` 6, `-sm` 10, `--radius` 14, `-lg` 18, `-pill`; `--layout-narrow` 760px, `--layout-wide`
-1320px, `--side-width` 300px, `--measure` 72ch; `--opacity-disabled`; `--dur-fast`.
+1320px, `--side-width` 300px, `--measure` 72ch; `--opacity-disabled`; `--dur-fast`; `--touch-target` 44px (the minimum height of a kit button or input; the width and height of an icon button).
 
 Palette rules:
 1. Surfaces are neutral greys; the only tinted ones are the lesson glow and the night success card.

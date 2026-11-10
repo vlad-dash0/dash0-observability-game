@@ -31,14 +31,27 @@
   padding: 3px 8px; border-radius: 6px;
 }
 .star-count {
-  display: flex; align-items: center; gap: 5px;
+  display: flex; align-items: center; gap: 5px; flex: none; white-space: nowrap;
   background: var(--color-surface); border: 1px solid var(--color-border);
   padding: 6px 11px; border-radius: 20px; font-weight: 700; font-size: 13px;
 }
 .star-count span:first-child { color: var(--color-parent); }
 /* The theme, ?, Back and reward buttons are kit buttons (index.html; D3: the hub changes only its buttons). */
-@media (max-width: 360px) {
+/* Header widths (brand ~97px without "by Dash0", chip ~66px, two 44px buttons): "by Dash0" goes at
+   430px and under, and at 360px and under the padding and button gap tighten, so 320px leaves
+   296 - (88 + 66 + 8) - 12 = 122px for a ~97px brand. */
+@media (max-width: 430px) {
   .brand-name span { display: none; }
+}
+/* The ?mode=debug badge (~60px + 8px gap) fits only when the full brand does: brand 164 + gap 12 +
+   right side 170 + 68 = 414px needs a 454px viewport (20px padding each side), so it hides at 480px
+   and under; the debug banner is a dev aid, not part of the phone layout. */
+@media (max-width: 480px) {
+  .debug-badge { display: none; }
+}
+@media (max-width: 360px) {
+  .hub-header { padding-inline: 12px; }
+  .head-right { gap: 4px; }
 }
 
 .notice {

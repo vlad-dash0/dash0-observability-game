@@ -55,7 +55,7 @@ test('the shells take their look from the kit alone: no style attribute, no extr
 function fixture() {
   const { document } = parseHTML(`<!doctype html><body><button id="before">b</button>
     <div id="m"><h2 id="t" tabindex="-1">T</h2><button id="a">a</button><button id="off" disabled>x</button>
-    <div hidden><button id="gone">g</button></div><a id="b" href="#">b</a><button id="z">z</button></div></body>`);
+    <div hidden><button id="gone">g</button></div><a id="b" href="#">b</a><button id="z">z</button><div id="tail"></div></div></body>`);
   const modal = document.getElementById('m');
   // linkedom does not track focus: record it, and read it back as document.activeElement.
   let current = null;
@@ -103,6 +103,20 @@ test('Tab in the middle is left to the browser', () => {
   assert.equal(trapTab(key(false), modal, document), false, 'Tab from the title goes to the first control natively');
 });
 
+test('Tab from an element inside the dialog that is not a listed control still wraps at the edges, so focus never leaves the dialog', () => {
+  const { document, modal, key, at } = fixture();
+  at('tail');
+  const e = key();
+  assert.equal(trapTab(e, modal, document), true, 'Tab after the last control wraps');
+  assert.equal(e.prevented, true);
+  assert.equal(document.activeElement.id, 'a');
+  at('tail');
+  assert.equal(trapTab(key(true), modal, document), false, 'Shift+Tab from the tail goes back to the last control natively');
+  at('t');
+  assert.equal(trapTab(key(true), modal, document), true);
+  assert.equal(document.activeElement.id, 'z');
+});
+
 test('focus outside the modal is pulled back in', () => {
   const { document, modal, key, at } = fixture();
   at('before');
@@ -121,4 +135,25 @@ test('other keys, no modal and an empty modal', () => {
   const e = key();
   assert.equal(trapTab(e, d2.getElementById('e'), d2), true, 'nothing to focus: Tab stays put');
   assert.equal(e.prevented, true);
+});
+
+test('the real board modal: its scroller joins the Tab cycle, and Tab from it, the title or the close button stays in the dialog', () => {
+  const { document } = parseHTML(readFileSync(join(ROOT, 'index.html'), 'utf8'));
+  let current = null;
+  for (const el of document.querySelectorAll('*')) el.focus = () => { current = el; };
+  Object.defineProperty(document, 'activeElement', { get: () => current });
+  const m = document.getElementById('board-modal');
+  const key = (shiftKey) => ({ key: 'Tab', shiftKey, preventDefault() {} });
+  assert.deepEqual(focusables(m).map((e) => e.id), ['board-x', 'board-body']);
+  assert.ok(document.getElementById('board-body').getAttribute('aria-label'), 'the scroller has a name');
+  document.getElementById('board-body').focus();
+  assert.equal(trapTab(key(false), m, document), true);
+  assert.equal(current.id, 'board-x', 'Tab past the last control goes to the first');
+  assert.equal(trapTab(key(true), m, document), true);
+  assert.equal(current.id, 'board-body', 'Shift+Tab before the first goes to the last');
+  document.getElementById('board-title').focus();
+  assert.equal(trapTab(key(true), m, document), true);
+  assert.equal(current.id, 'board-body');
+  document.getElementById('board-title').focus();
+  assert.equal(trapTab(key(false), m, document), false, 'Tab from the title is native, to the close button');
 });
