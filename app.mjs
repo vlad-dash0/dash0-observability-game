@@ -37,7 +37,7 @@ import { buildRegistry } from './lib/registry.mjs';
 import { createSaveDialog } from './lib/save-dialog.mjs';
 import { loadProgress, saveProgress, STORAGE_KEY } from './lib/storage.mjs';
 import { readTheme, writeTheme } from './lib/theme.mjs';
-import { continueView, hubActs } from './lib/hub-view.mjs';
+import { continueView, hubActs, nextView } from './lib/hub-view.mjs';
 import { levelState, lockReason } from './lib/unlock.mjs';
 
 // ?mode=debug shows the globe with everything finished (#309): a progress where every level is done.
@@ -235,6 +235,8 @@ export function createGame(deps) {
     aboutLoop: GLOBE_LOOP,
     howTo: NO_HOW_TO,
     howToOpen: false,
+    howToFlagKey: null, // a type that turned up mid-level with an unseen guide: the header button says so (#321)
+    howToNote: '', // the polite announcement of that flag
     howToKey: null, // the widget of the step on screen: the one guide the modal shows (#316)
     rewardTitle: '',
     rewardText: '',
@@ -397,7 +399,7 @@ export function createGame(deps) {
     dismissSigninNudge() {
       nudgeAsked++;
       this.signinNudgeOpen = false;
-      this.focusSoon('#reward-close'); // the nudge's own button held focus
+      this.focusSoon(this.rewardFocus()); // the nudge's own button held focus
     },
     // Don't ask again: stored under hideHelp, and always hidden for this visit.
     hideSigninNudge() {
@@ -828,8 +830,9 @@ export function createGame(deps) {
         const fresh = this.howToNew(key);
         if (starting) this.howToOpen = fresh;
         else if (fresh) {
-          this.howToOpen = true;
-          this.focusSoon('#ov-howto-title');
+          // Mid-level: never a pop-up over the step. The header button is flagged and announced once.
+          this.howToFlagKey = key;
+          this.howToNote = `New step type: ${this.howTo.topics.find((t) => t.key === key).title}. Its guide is under How to play.`;
         }
       };
       try {
@@ -884,10 +887,19 @@ export function createGame(deps) {
     howToNew(key) {
       return !seenHelp.has(key) && !readHiddenHelp(storage).hidden.has(key);
     },
+    // The header button's flag: this step's type is new to the player and its guide not yet opened.
+    howToFlagged() {
+      return this.howToFlagKey !== null && this.howToFlagKey === this.howToKey && this.howToNew(this.howToKey);
+    },
+    howToLabel() {
+      return this.howToFlagged() ? 'How to play: new step type' : 'How to play';
+    },
     toggleHowTo() {
       if (!this.overlayOpen || this.howToKey === null) return false;
       if (this.howToOpen) this.closeHowTo();
       else {
+        this.howToFlagKey = null;
+        this.howToNote = '';
         this.howToOpen = true;
         this.focusSoon('#ov-howto-title');
       }
@@ -916,6 +928,8 @@ export function createGame(deps) {
       session = null;
       this.howTo = NO_HOW_TO;
       this.howToKey = null;
+      this.howToFlagKey = null;
+      this.howToNote = '';
       this.howToOpen = false;
       for (const id of ['ov-body', 'ov-actions']) {
         const el = doc.getElementById(id);
@@ -955,7 +969,7 @@ export function createGame(deps) {
       this.rewardStars = level?.scored ? result.stars : null; // this run's stars
       this.rewardCards = rec.newCards.map((c) => cardFront[c] ?? c);
       this.rewardOpen = true;
-      this.focusSoon('#reward-close');
+      this.focusSoon(this.rewardFocus());
       this.recordTelemetry(levelId, level, result);
       this.signinNudgeOpen = false;
       if (!this.debug) {
@@ -985,6 +999,27 @@ export function createGame(deps) {
       }
     },
 
+    // The reward dialog's Next button: what Continue would open, read fresh (lib/hub-view.mjs nextView).
+    rewardNext() {
+      return nextView(registry, this.progress, { debug: this.debug });
+    },
+    rewardNextLabel() {
+      return this.rewardNext()?.label ?? '';
+    },
+    // Where focus starts in the reward dialog: Next when it is offered, else Back to the map.
+    rewardFocus() {
+      return this.rewardNextLabel() !== '' ? '#reward-next' : '#reward-close';
+    },
+    // Straight to the next level: the dialog closes without the map reveal, then the level opens like Continue.
+    openNextLevel() {
+      const next = this.rewardNext();
+      if (!this.rewardOpen || next === null) return false;
+      this.rewardOpen = false;
+      nudgeAsked++;
+      this.signinNudgeOpen = false;
+      pendingLit = null;
+      return this.openLevel(next.levelId, 'continue');
+    },
     closeReward() {
       this.rewardOpen = false;
       nudgeAsked++; // a board reply still on its way must not open the nudge on a later card
@@ -1040,7 +1075,7 @@ export function createGame(deps) {
       doc.documentElement.classList.toggle('modal-open', this.scrollLocked());
     },
     // Tab (and Shift+Tab) wrap inside the open kit modal; the page behind is inert, so without this
-    // focus would fall out to the browser's own controls. Not a modal (the level, the reward): untouched.
+    // focus would fall out to the browser's own controls. The level overlay and the reward card are trapped too (trapSelector).
     openModalSelector() {
       if (this.howToOpen) return '#howto-modal';
       if (this.saveOpen) return '#save-modal';
@@ -1049,8 +1084,16 @@ export function createGame(deps) {
       if (this.aboutOpen) return '#about-modal';
       return null;
     },
+    // An open level (or the reward) keeps Tab too, at any width (#327): the hub behind is inert, and
+    // without a trap Tab would leave for the browser's own controls and come back on the hub or body.
+    trapSelector() {
+      const modal = this.openModalSelector();
+      if (modal !== null) return modal;
+      if (this.rewardOpen) return '.reward-card';
+      return this.overlayOpen ? '.overlay' : null;
+    },
     trapTab(e) {
-      const sel = this.openModalSelector();
+      const sel = this.trapSelector();
       return sel === null ? false : trapTab(e, doc.querySelector(sel), doc);
     },
 

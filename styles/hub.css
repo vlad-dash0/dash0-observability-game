@@ -281,6 +281,7 @@
   border-radius: 26px; padding: 30px 26px; text-align: center; max-width: 380px; width: 100%;
   box-shadow: 0 0 50px color-mix(in srgb, var(--color-accent) 25%, transparent);
 }
+.reward-actions { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); margin-top: var(--space-3); }
 .reward-card h2 { font-weight: 800; font-size: 24px; margin-bottom: 6px; }
 .reward-card p { font-size: 14.5px; color: var(--color-text-muted); line-height: 1.5; margin-bottom: 8px; }
 .reward-card .reward-stars { font-size: 30px; letter-spacing: 6px; color: var(--color-parent); margin: 6px 0 12px; }
