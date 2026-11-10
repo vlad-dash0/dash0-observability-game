@@ -29,8 +29,8 @@ makes them pass, then proves each test by a one-line mutation of the implementat
    real ones (we drop them).
 
 Provisional answers (recorded on #16; the user can override):
-success = mint `#a8fbbe`; error = purple `#ad46ff` (dash0.com purple-500); dark by
-default with an explicit light toggle; star rule as §2.6 (five stars since #155); Martian Mono self-hosted
+success = mint `#a8fbbe`; error = purple `#ad46ff` (dash0.com purple-500); dark only
+(the light theme and its toggle were removed in #322); star rule as §2.6 (five stars since #155); Martian Mono self-hosted
 (OFL); no finale until after M0; F6 ships Act 1 only (first unlocked act).
 
 ## 2. Data contracts
@@ -586,7 +586,6 @@ builds run side by side, only the current build's registry is protected at the c
 | `encodeProgress`, `decodeProgress`, `previewImport`, `REFUSALS` (save codes, #18) | `lib/save-code.mjs` |
 | `isCompleted`, `isActComplete`, `isActUnlocked`, `levelState`, `lockReason`, `nextUp`, `actCounts` | `lib/unlock.mjs` |
 | `loadProgress(storageGetter, registry)` → `{status, progress}` (`TypeError` before any read without a registry), `saveProgress(storageGetter, progress, registry)` → `{saved, reason?, progress}` (`progress` is always the registry view; `TypeError` before any storage access without a registry) | `lib/storage.mjs` |
-| `resolveTheme`, `readTheme(getter)`, `writeTheme(getter, t)` | `lib/theme.mjs` |
 | `HELP_KEY` (`oncall.help`), `readHiddenHelp(getter)` → `{status, hidden: Set}`, `hideHelp(getter, keys)` → `{saved, reason?}` | `lib/help-prefs.mjs` |
 | `globeState(registry, progress, map?, soon?)` | `lib/globe.mjs` |
 | `dotStates`, `currentActId`, `regionCentre`, `facingRotation`, `globeTarget`, `globeLines`, `globeLabel`, `parseColor`, `readColors`, `createLoop` | `lib/globe-view.mjs` |
@@ -647,8 +646,8 @@ for those. After F1, only the named phase edits each file.
   `styles/base.css` → F2; `index.html` → F5.
 
 **F2 theme tokens (#10)**: `styles/tokens.css`, `styles/base.css`, `fonts/MartianMono-*.woff2`,
-`fonts/OFL.txt`, `lib/theme.mjs`, `test/theme.test.mjs`. Adapt R/styles.css: `:root` vars →
-Dash0 tokens in `light-dark()`; carry over reset/body, `.btn` (+`.ghost`, `.small`),
+`fonts/OFL.txt`, `test/theme.test.mjs`. Adapt R/styles.css: `:root` vars →
+Dash0 tokens (dark values only, #322); carry over reset/body, `.btn` (+`.ghost`, `.small`),
 `.choice` (`.correct`, `.wrong`), `.feedback` (`.good`, `.info`, `.show`), `.speech`,
 `.bubble`, `.lesson-intro`, `.lesson-stage`, `h3.q`, focus and reduced-motion; system sans,
 Martian Mono for `code, pre, kbd`; every hex → token; `.correct`/`.good` → success,
@@ -710,16 +709,14 @@ Order: F1 → (F2 ∥ F3 ∥ F4; the F6 checker may also start) → F5 → F6.
   `--d0-orange-soft:#fd8c66`, `--d0-grey-900:#101010`, `-800:#212121`, `-700:#2c2c2c`,
   `-600:#424242`, `-400:#9e9e9e`, `--d0-white:#ffffff`, `--d0-mint:#a8fbbe`,
   `--d0-purple:#ad46ff`. Mutation: change one hex.
-- Every `--color-*` in `:root` is `light-dark(<light>, <dark>)`; `:root` has
-  `color-scheme: dark`; `[data-theme="light"]` sets only `color-scheme: light`.
-- `--color-primary` uses `var(--d0-red)` both sides; `--color-success` mint;
+- Every `--color-*` in `:root` is a plain value (no `light-dark()`); `:root` has `color-scheme: dark`; no stylesheet
+  has `light-dark(`, `prefers-color-scheme` or a `[data-theme]` selector (dark only, #322).
+- `--color-primary` uses `var(--d0-red)`; `--color-success` mint;
   `--color-error` purple, not red, not primary. Mutation: error → red.
-- WCAG: `--color-text` and `--color-text-muted` on `--color-bg` ≥ 4.5 in both themes.
-  Mutation: light text `#9e9e9e` on white.
+- WCAG: `--color-text` and `--color-text-muted` on `--color-bg` ≥ 4.5.
+  Mutation: text `#555` on `--color-bg`.
 - No hex in `styles/*.css` except tokens.css. Mutation: `color:#fff` in base.css.
 - `code, pre, kbd` use `"Martian Mono"`; `@font-face` src is local `/fonts/`.
-- `resolveTheme`: `'light'`→light, `'dark'`→dark, `null`/`'blue'`/`undefined`→dark.
-  `readTheme` with a throwing getter → `'dark'`; `writeTheme` with a throwing `setItem` → false.
 
 ### F3 `test/kit.test.mjs`
 - `escapeHtml('<b>"x"</b> & y')` → `'&lt;b&gt;&quot;x&quot;&lt;/b&gt; &amp; y'`;

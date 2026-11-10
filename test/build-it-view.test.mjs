@@ -886,15 +886,15 @@ test('styles: tokens only; services and traces from tokens.css; the selected bar
   const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, sel, body]) => ({ sels: sel.split(',').map((s) => s.trim()), body: body.replace(/\s+/g, ' ') }));
   const bodyOf = (sel) => rules.filter((r) => r.sels.includes(sel)).map((r) => r.body).join(';');
   for (let i = 0; i < 6; i++) {
-    assert.equal(new RegExp(`--color-svc-${i}:\\s*light-dark\\(`).test(tokens), true, `--color-svc-${i}`);
+    assert.equal(new RegExp(`--color-svc-${i}:\\s*var\\(--wf-svc-${i}-dark\\)`).test(tokens), true, `--color-svc-${i}`);
     assert.equal(/fill:\s*var\(--color-svc-\d\)/.test(bodyOf(`.wf-row[data-svc="${i}"] .wf-bar`)), true, `bar fill for service ${i}`);
   }
-  for (const t of [0, 1]) assert.equal(new RegExp(`--color-trace-${t}:\\s*light-dark\\(`).test(tokens), true, `--color-trace-${t}`);
+  for (const t of [0, 1]) assert.equal(new RegExp(`--color-trace-${t}:\\s*var\\(--wf-trace-${t}-dark\\)`).test(tokens), true, `--color-trace-${t}`);
   assert.equal(/stroke:\s*var\(--color-error\)/.test(bodyOf('.wf-row[data-error="true"] .wf-bar')), true, 'ERROR is a stroke, not the fill');
   assert.equal(/outline|stroke/.test(bodyOf('.wf-row[aria-pressed="true"] .wf-bar')), true, 'the selected bar is outlined');
   assert.equal(/outline:\s*none/.test(bodyOf('.ui-win-title:focus')), true);
   const mine = rules.filter((r) => r.sels.some((s) => /\.(wf|ui)-/.test(s))).map((r) => r.body).join(' ');
-  assert.equal(/#[0-9a-fA-F]{3,8}\b|rgb\(|hsl\(|oklch\(/.test(mine), false, 'tokens only, so both themes follow');
+  assert.equal(/#[0-9a-fA-F]{3,8}\b|rgb\(|hsl\(|oklch\(/.test(mine), false, 'tokens only');
 });
 
 // ---- logs mode (#113): fixture L1 (test/fixtures/build-logs.mjs) -----------------------

@@ -4,13 +4,8 @@ import { createGame, liveRegistry } from './app.mjs';
 import { mountGlobe } from './lib/globe-render.mjs';
 import { isDebugMode } from './lib/debug-mode.mjs';
 import { prefersReducedMotion } from './lib/lesson-kit.mjs';
-import { readTheme } from './lib/theme.mjs';
 import { takeSignin } from './lib/signin-param.mjs';
 import { createTelemetry } from './lib/telemetry.mjs';
-
-// First statement: apply the stored theme before Alpine renders anything (the CSP
-// allows no inline script in <head>, so this is as early as it gets).
-document.documentElement.dataset.theme = readTheme(() => window.localStorage);
 
 const signin = takeSignin(window);
 
