@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { makeDom, q, qa, click } from './helpers/dom.mjs';
+import { contrast, decls, rules as cssRules } from './helpers/css.mjs';
 import { recordFocus } from './helpers/focus.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { newBuildState, setParent } from '../lib/widgets/build-it.mjs';
@@ -1369,4 +1370,16 @@ test('look-alike spans in two different traces show no span id pill: the naming 
   assert.equal(qa('[data-sid]').length, 0, 'the trace code already tells them apart');
   setup(twinSpec([twin('aaaaaaaaaaaaa1b2', T), twin('aaaaaaaaaaaaa3c4', T, 'retry', 4), twin('aaaaaaaaaaaaa5d6', U, 'retry', 8)]));
   assert.deepEqual(qa('[data-sid]').map((n) => n.textContent), ['span id …a1b2', 'span id …a3c4'], 'only the pair that shares a trace');
+});
+
+test('the dashed border of an off help chip, its main cue on a phone, keeps 3:1 against the page and the panel in both themes (#324)', () => {
+  const rule = cssRules(sheet('kit.css')).find((r) => r.selector === '.ui-chip[data-on="false"]');
+  const border = Object.fromEntries(decls(rule.body))['border-color'];
+  assert.equal(border, 'var(--color-text-muted)', 'a text-strength token, not the hairline --color-border');
+  for (const theme of ['dark', 'light']) {
+    for (const bg of ['--color-bg', '--color-surface']) {
+      const r = contrast('--color-text-muted', bg, theme);
+      assert.equal(r >= 3, true, `${theme} ${bg}: ${r.toFixed(2)}`);
+    }
+  }
 });

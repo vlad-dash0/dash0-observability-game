@@ -194,8 +194,8 @@
 .ui-chip[data-tone="hint"] .ui-chip-dot { background: var(--color-hint); }
 .ui-chip[data-tone="attention"] { border-color: color-mix(in srgb, var(--color-parent) 50%, transparent); color: var(--color-text); }
 .ui-chip[data-tone="attention"] .ui-chip-dot { background: var(--color-parent); }
-/* A help that is off is muted, with a hollow dot, and says "off" in words; never struck through, which reads as deleted. */
-.ui-chip[data-on="false"] { color: var(--color-text-muted); border-color: var(--color-border); border-style: dashed; background: transparent; }
+/* A help that is off is muted, with a hollow dot (and a dashed border, 3:1 on the page: the cue on a phone), and says "off" in words; never struck through, which reads as deleted. */
+.ui-chip[data-on="false"] { color: var(--color-text-muted); border-color: var(--color-text-muted); border-style: dashed; background: transparent; }
 .ui-chip[data-on="false"] .ui-chip-dot { background: transparent; border: 1px solid var(--color-text-muted); }
 
 /* ---------- Buttons (button.mjs) ---------- */
