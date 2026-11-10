@@ -43,9 +43,10 @@ what the endpoint can spend (the in-memory rate limit is per instance and a requ
 served). Locally `GUIDE_STUB=1 npm run dev` answers with a canned reply and needs no key. The rate limit is best
 effort (per instance, in memory), not a quota.
 
-Server telemetry (docs/FOUNDATION.md §2.10) sends one trace per `api/` request to your Dash0 when all of these are set
-in the Vercel project's environment (none set means off; a partial or malformed set is reported in the function log and
-changes nothing for players). `TELEMETRY_STUB=1 npm run dev` prints one span line per request instead, with no network.
+Server telemetry (docs/FOUNDATION.md §2.10) sends one trace per `api/` request to your Dash0 when the endpoint and the
+token are set in the Vercel project's environment (the dataset is optional; none set means off; a partial or malformed
+set is reported in the function log and changes nothing for players). `TELEMETRY_STUB=1 npm run dev` prints one line per
+span instead, with no network.
 
 | Variable | Meaning |
 | --- | --- |

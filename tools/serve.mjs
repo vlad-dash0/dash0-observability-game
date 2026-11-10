@@ -2,7 +2,7 @@
 // headers vercel.json declares (so the CSP bites locally) and refuses whatever
 // .vercelignore keeps out of the deployment (node_modules/ included), plus dotfiles.
 // It also runs `api/<name>.mjs` at `/api/<name>` (GET and POST) through a Node-to-Web Request adapter, as
-// Vercel does (every Set-Cookie and any 3xx with its Location pass through unchanged); `GUIDE_STUB=1` swaps the guide's model call for a canned reply (local dev only, no key needed); `AUTH_STUB=1` gives the sign-in and account functions a stub Google user (dev@dash0.com) and an in-memory Redis (tools/fake-redis.mjs), data gone on restart; `TELEMETRY_STUB=1` prints one `span ...` line per api request instead of sending traces (no network, no token; docs/FOUNDATION.md §2.10).
+// Vercel does (every Set-Cookie and any 3xx with its Location pass through unchanged); `GUIDE_STUB=1` swaps the guide's model call for a canned reply (local dev only, no key needed); `AUTH_STUB=1` gives the sign-in and account functions a stub Google user (dev@dash0.com) and an in-memory Redis (tools/fake-redis.mjs), data gone on restart; `TELEMETRY_STUB=1` prints one `span ...` line per span instead of sending traces (no network, no token; docs/FOUNDATION.md §2.10).
 // Usage: npm run dev   (PORT=8080 npm run dev to change the port)
 import { createServer } from 'node:http';
 import { readFile, realpath, stat } from 'node:fs/promises';

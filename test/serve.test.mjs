@@ -336,7 +336,7 @@ test('the real .vercelignore keeps every api function and everything it imports 
   }
 });
 
-test('TELEMETRY_STUB prints one span line per api request, with no network', async () => {
+test('TELEMETRY_STUB prints one line per span, with no network', async () => {
   const lines = [];
   const saved = globalThis.fetch;
   globalThis.fetch = () => { throw new Error('no network in TELEMETRY_STUB'); };
