@@ -1,7 +1,8 @@
 // An in-memory Upstash Redis for tests and local dev (#273): speaks the REST protocol (one
 // command per POST, `/pipeline` for many) over a fetch-shaped function, and runs each named
 // Lua script from lib/account/redis.mjs as a JS twin. The twins mirror the Lua line by line;
-// the Lua itself is only exercised against a real database. Test hooks:
+// the Lua itself is only exercised against a real database
+// (test/redis-it.test.mjs, opt-in). Test hooks:
 //   fake.beforeScript = (name, keys, args) => {}   runs right before a script executes, so a
 //                                                  test can inject a write between read and EVAL
 //   fake.beforeCommand = (args) => {}              runs before every command (not the commands inside a script)
@@ -93,7 +94,10 @@ export function createFakeRedis({ token = 'fake-token', url = 'https://fake-redi
       return i < 0 ? null : i;
     },
     ZREVRANGE: ([k, a, b, withScores]) => {
-      const rows = ranked(zset(k) ?? new Map()).slice(Number(a), Number(b) + 1);
+      const all = ranked(zset(k) ?? new Map());
+      // As Redis: a negative index counts from the end, a start below 0 clamps to 0.
+      const at = (i) => (Number(i) < 0 ? all.length + Number(i) : Number(i));
+      const rows = all.slice(Math.max(0, at(a)), Math.max(0, at(b) + 1));
       return rows.flatMap(([m, s]) => (withScores === 'WITHSCORES' ? [m, String(s)] : [m]));
     },
   };
