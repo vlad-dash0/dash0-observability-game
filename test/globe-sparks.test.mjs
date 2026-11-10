@@ -77,7 +77,7 @@ test('a burst fans out: unit directions in a cone round the outward normal, spre
       }
       // spread: the tangent angles fall in distinct sectors, so no two particles share a heading
       const sector = dirs.map((d) => Math.floor(((Math.atan2(d[1], d[0]) + 2 * Math.PI) % (2 * Math.PI)) / ((2 * Math.PI) / BURST.COUNT)));
-      assert.ok(new Set(sector).size >= BURST.COUNT - 3, `headings ${sector}`);
+      assert.deepEqual(sector, [...sector.keys()], 'particle j heads into sector j');
       assert.notDeepEqual(dirs[0], burstDir(slot, epoch, 10, 0), 'the seed changes it');
     }
   }

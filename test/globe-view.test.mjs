@@ -13,7 +13,7 @@ import {
   globeTarget, parseColor, readColors, regionCentre, spherePoint,
 } from '../lib/globe-view.mjs';
 import { mountGlobe } from '../lib/globe-render.mjs';
-import { BURST } from '../lib/globe-sparks.mjs';
+import { BURST, burstDir, burstSpeed, sparksAt, tangentFrame } from '../lib/globe-sparks.mjs';
 import * as render from '../lib/globe-render.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
@@ -824,4 +824,55 @@ test('each mount has its own seed: an injected seed or random decides the sparks
   assert.equal(await play({ random: () => 0.25 }), await play({ seed: Math.floor(0.25 * 2 ** 32) }));
   assert.equal(await play({}, fixed(77)), await play({ seed: 77 }));
   assert.notEqual(await play({}, fixed(77)), await play({}, fixed(78)));
+});
+
+test('the renderer writes each particle direction as tangentFrame x burstDir x burstSpeed for the mount seed', async () => {
+  const states = Uint8Array.from([DOT.PULSE, DOT.LIT, DOT.PULSE]);
+  const sources = [0, 2];
+  const seen = {};
+  for (const seed of [21, 22]) {
+    const { handle, rec, dom } = await mountSparks(states, false, { seed });
+    const { geometry } = sparkPoints(rec)[0];
+    const firsts = [];
+    for (let ms = 1000; ms < 60000; ms += 700) {
+      frameAt(dom, ms);
+      const live = sparksAt(ms / 1000, sources.length, seed);
+      const { position, aDir, aAge } = geometry.attributes;
+      live.forEach((sp, k) => {
+        const n = spherePoint(DOTS[sources[sp.dot]][0], DOTS[sources[sp.dot]][1]);
+        const [t1, t2] = tangentFrame(n);
+        for (let j = 0; j < BURST.COUNT; j++) {
+          const i = k * BURST.COUNT + j;
+          const [a, b, c] = burstDir(sp.slot, sp.epoch, seed, j);
+          const v = burstSpeed(sp.slot, sp.epoch, seed, j);
+          for (let m = 0; m < 3; m++) {
+            const want = (a * t1[m] + b * t2[m] + c * n[m]) * v;
+            assert.ok(Math.abs(aDir.array[i * 3 + m] - want) < 1e-6, `seed ${seed} burst ${k} particle ${j}`);
+          }
+          assert.ok(Math.abs(aAge.array[i] - sp.age) < 1e-6);
+        }
+        firsts.push(...aDir.array.slice(k * BURST.COUNT * 3, k * BURST.COUNT * 3 + 3));
+      });
+    }
+    assert.ok(firsts.length > 0);
+    seen[seed] = firsts.map((v) => v.toFixed(4)).join();
+    handle.dispose();
+  }
+  assert.notEqual(seen[21], seen[22], 'another seed, other directions');
+});
+
+test('the seed is drawn when sparks are first made, never by a mount without an incident', async () => {
+  let calls = 0;
+  const random = () => (calls++, 0.5);
+  const calm = await mountSparks(CALM, false, { seed: undefined, random });
+  calm.handle.update(CALM, null);
+  assert.equal(calls, 0);
+  calm.handle.update(PULSING, null);
+  calm.handle.update(CALM, null);
+  calm.handle.update(PULSING, null);
+  assert.equal(calls, 1);
+  calm.handle.dispose();
+  const reduced = await mountSparks(PULSING, true, { seed: undefined, random });
+  assert.equal(calls, 1, 'reduced motion never asks');
+  reduced.handle.dispose();
 });
