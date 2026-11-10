@@ -9,6 +9,7 @@ import { createLimiter } from '../lib/guide/limit.mjs';
 import { systemPrompt, userMessage } from '../lib/guide/prompt.mjs';
 import { clientKey, reply, sameOrigin } from '../lib/http.mjs';
 import { isId } from '../lib/registry.mjs';
+import { createServerTelemetry } from '../lib/otel/server.mjs';
 
 const MODEL = 'claude-haiku-5-5';
 const MESSAGES_URL = 'https://api.anthropic.com/v1/messages';
@@ -132,6 +133,6 @@ function parseBody(text) {
   return { levelId: body.levelId, stepId: body.stepId, question };
 }
 
-const guide = createGuide();
-export const GET = guide.GET;
-export const POST = guide.POST;
+const telemetry = createServerTelemetry({ name: 'guide', env: process.env });
+const guide = createGuide({ log: telemetry.log, fetch: telemetry.trace(globalThis.fetch) });
+export const { GET, POST } = telemetry.instrument(guide);

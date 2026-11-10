@@ -3,6 +3,7 @@
 import { createAuthContext } from '../lib/auth/config.mjs';
 import { clientKey, reply } from '../lib/http.mjs';
 import { createLimiter } from '../lib/guide/limit.mjs';
+import { createServerTelemetry } from '../lib/otel/server.mjs';
 
 export const TOP = 10;
 export const READ_MAX = 120;
@@ -46,5 +47,6 @@ export function createLeaderboard({
   return { GET };
 }
 
-const leaderboard = createLeaderboard();
-export const GET = leaderboard.GET;
+const telemetry = createServerTelemetry({ name: 'leaderboard', env: process.env });
+const leaderboard = createLeaderboard({ log: telemetry.log });
+export const { GET } = telemetry.instrument(leaderboard);

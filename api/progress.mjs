@@ -5,6 +5,7 @@ import { clearSessionCookie } from '../lib/auth/session.mjs';
 import { createAuthContext } from '../lib/auth/config.mjs';
 import { isJson, originMatches, reply } from '../lib/http.mjs';
 import { starTotals } from '../lib/progress.mjs';
+import { createServerTelemetry } from '../lib/otel/server.mjs';
 
 export const MAX_BODY_BYTES = 16 * 1024;
 export const WRITE_LIMIT = { max: 30, windowS: 600 };
@@ -126,6 +127,6 @@ function parse(text) {
   return body;
 }
 
-const progress = createProgress();
-export const GET = progress.GET;
-export const POST = progress.POST;
+const telemetry = createServerTelemetry({ name: 'progress', env: process.env });
+const progress = createProgress({ log: telemetry.log });
+export const { GET, POST } = telemetry.instrument(progress);

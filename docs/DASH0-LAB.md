@@ -7,6 +7,7 @@ Every Dash0 fact not yet confirmed is marked `VERIFY (#195)` in code and listed 
 - Placement: inside Act 9. "Connect the game to Dash0" is an Act 9 level on PNG (9.1 filter-or-sampler takes NZL, 9.2 keeps AUS, 9.8 edge-of-the-platform takes WSM); the lab "It's us" is Act 9's boss. No new act, no globe region change.
 - Hosting: Vercel. The token lives in memory only (a closure in `lib/telemetry.mjs`), never in localStorage, sessionStorage, progress, span attributes, the DOM after capture, a URL or `reportError`.
 - Transport: the browser sends OTLP/HTTP JSON straight to the player's ingress. A Vercel relay `api/otlp` is built only if Dash0 refuses browser CORS; it would forward the player's own `Authorization`, never store or log it, forward only to allowlisted hosts and cap the body at 64 KiB.
+- Server telemetry (docs/FOUNDATION.md §2.10) is separate from the lab: the `api/` functions use the owner's endpoint, token and dataset from the Vercel environment, never the player's token or dataset.
 - Practice mode scores full stars.
 - Each phase is one PR against main, never stacked.
 
@@ -129,4 +130,5 @@ Result: the browser can talk to the ingress directly, so the relay (P6-alt) is n
 2. Scope names (ingest-only, dataset-limited), where tokens are created (the `auth_` prefix and `Dash0-Dataset` header are confirmed in the Dash0 docs), whether 401/403 mean what the game teaches.
 3. Partly answered 2026-11-08: the hosts (inferred from the documented regions and host form) and port 443 (Fluent Bit example) are reasoned and untested with a token. Still open: JSON body acceptance and the dataset identifier rules (the game's regex is its own check).
 4. Trace explorer view name, how to filter by `session.id`, deep-link format. The boss copy cites the Dash0 docs for the Trace Explorer, its Filter and Time Picker, the Trace View waterfall and the Span Sidebar (tracing/about-tracing, view, span-sidebar, span-events, glossary/filtering). Still VERIFY (#195): that a sender-set `session.id` span attribute is offered as a filter key (`session.id` itself: https://opentelemetry.io/docs/specs/semconv/registry/attributes/session/). The span events in the Span Sidebar are confirmed by tracing/span-events and tracing/view.
-5. A test org with an ingest-only token for the live QA run (never committed).
+5. Server telemetry: the ingress accepts OTLP/HTTP with a JSON body; docs/FOUNDATION.md §2.10 step (3) is the check.
+6. A test org with an ingest-only token for the live QA run (never committed).

@@ -9,6 +9,7 @@ import { CALLBACK_PATH, STUB_EMAIL, STUB_SUB, createAuthContext, requestHost } f
 import { createJwksCache, verifyIdToken } from '../lib/auth/jwt.mjs';
 import { SESSION_MAX_AGE, serializeSessionCookie, signSession } from '../lib/auth/session.mjs';
 import { readCookie, redirect, reply } from '../lib/http.mjs';
+import { createServerTelemetry } from '../lib/otel/server.mjs';
 
 export const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const TOKEN_TIMEOUT_MS = 8000;
@@ -111,5 +112,6 @@ export function createAuthCallback({
   return { GET };
 }
 
-const callback = createAuthCallback();
-export const GET = callback.GET;
+const telemetry = createServerTelemetry({ name: 'auth-callback', env: process.env });
+const callback = createAuthCallback({ log: telemetry.log, fetch: telemetry.trace(globalThis.fetch) });
+export const { GET } = telemetry.instrument(callback);

@@ -4,7 +4,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { request } from 'node:http';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -313,20 +313,56 @@ test('the import walk reads multi-line imports', () => {
   assert.deepEqual(found, ['./guide-api.test.mjs', './static.test.mjs', './game.test.mjs']);
 });
 
-test('the real .vercelignore keeps api/ and everything the guide imports in the deployment', () => {
+test('the real .vercelignore keeps every api function and everything it imports in the deployment', () => {
   const ignored = ignoreMatcher(readFileSync(join(ROOT, '.vercelignore'), 'utf8'));
-  assert.ok(!ignored('api/guide.mjs'), 'api/ deploys');
-  // Walk the static imports from the function: each file must deploy, or the function fails on Vercel.
-  const seen = new Set();
-  const walk = (rel) => {
-    if (seen.has(rel)) return;
-    seen.add(rel);
-    assert.ok(!ignored(rel), `${rel} is imported by the guide but .vercelignore keeps it out`);
-    const src = readFileSync(join(ROOT, rel), 'utf8');
-    for (const [, a, b] of src.matchAll(IMPORT)) {
-      walk(join(dirname(rel), a ?? b));
-    }
-  };
-  walk('api/guide.mjs');
-  assert.ok(seen.has('lib/guide/context.mjs') && seen.has('levels/index.mjs'), 'the walk reached the core and the levels');
+  const functions = readdirSync(join(ROOT, 'api')).filter((f) => f.endsWith('.mjs'));
+  assert.ok(functions.length >= 6, 'the walk starts from every api/*.mjs, not only the guide');
+  for (const file of functions) {
+    assert.ok(!ignored(`api/${file}`), `api/${file} deploys`);
+    // Walk the static imports from the function: each file must deploy, or the function fails on Vercel.
+    const seen = new Set();
+    const walk = (rel) => {
+      if (seen.has(rel)) return;
+      seen.add(rel);
+      assert.ok(!ignored(rel), `${rel} is imported by api/${file} but .vercelignore keeps it out`);
+      const src = readFileSync(join(ROOT, rel), 'utf8');
+      for (const [, a, b] of src.matchAll(IMPORT)) {
+        walk(join(dirname(rel), a ?? b));
+      }
+    };
+    walk(`api/${file}`);
+    assert.ok(seen.has('lib/otel/server.mjs') && seen.has('lib/otlp/send.mjs'), `api/${file} reaches the telemetry modules`);
+    if (file === 'guide.mjs') assert.ok(seen.has('lib/guide/context.mjs') && seen.has('levels/index.mjs'), 'the walk reached the core and the levels');
+  }
+});
+
+test('TELEMETRY_STUB prints one line per span, with no network', async () => {
+  const lines = [];
+  const saved = globalThis.fetch;
+  globalThis.fetch = () => { throw new Error('no network in TELEMETRY_STUB'); };
+  const stub = await listen({ telemetryStub: true, log: (l) => lines.push(l) });
+  try {
+    assert.ok(lines.some((l) => l.startsWith('TELEMETRY_STUB=1')), 'the startup line says so');
+    const before = lines.length;
+    const res = await send(stub.port, 'GET', '/api/leaderboard');
+    assert.equal(res.status, 503, 'the function still answers as before');
+    const spans = lines.slice(before).filter((l) => l.startsWith('span GET /api/leaderboard'));
+    assert.equal(spans.length, 1, lines.join('\n'));
+    assert.match(spans[0], /"http\.response\.status_code":503/);
+  } finally {
+    globalThis.fetch = saved;
+    stub.server.close();
+  }
+});
+
+test('AUTH_STUB handlers are instrumented too', async () => {
+  const lines = [];
+  const stub = await listen({ authStub: true, telemetryStub: true, log: (l) => lines.push(l) });
+  try {
+    const res = await send(stub.port, 'GET', '/api/account');
+    assert.equal(res.status, 200);
+    assert.equal(lines.filter((l) => l.startsWith('span GET /api/account')).length, 1, lines.join('\n'));
+  } finally {
+    stub.server.close();
+  }
 });

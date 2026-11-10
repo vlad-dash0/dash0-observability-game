@@ -7,6 +7,7 @@ import { AUTH_MAX_AGE, serializeAuthCookie, signAuth } from '../lib/auth/auth-co
 import { CALLBACK_PATH, createAuthContext, requestHost } from '../lib/auth/config.mjs';
 import { createLimiter } from '../lib/guide/limit.mjs';
 import { clientKey, redirect, reply } from '../lib/http.mjs';
+import { createServerTelemetry } from '../lib/otel/server.mjs';
 
 export const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 export const HOSTED_DOMAIN_HINT = 'dash0.com';
@@ -72,5 +73,6 @@ export function createAuthStart({
   return { GET };
 }
 
-const start = createAuthStart();
-export const GET = start.GET;
+const telemetry = createServerTelemetry({ name: 'auth-start', env: process.env });
+const start = createAuthStart({ log: telemetry.log });
+export const { GET } = telemetry.instrument(start);
