@@ -239,8 +239,8 @@ test('stats and dots', () => {
 test('side: help chips say on or off in words; stars; the column keeps the help-ladder ids', () => {
   assert.equal(helpChips('b1', [{ key: 'tint', label: 'Trace tint', on: false }, { key: 'hints', label: 'Hints', on: true }]),
     '<p class="ui-help-chips" id="b1-helps"><span class="ui-help-chips-title">Helps:</span> ' +
-    '<span class="ui-chip" data-tone="neutral" data-help="tint" data-on="false"><i class="ui-chip-dot" aria-hidden="true"></i>Trace tint off</span> ' +
-    '<span class="ui-chip" data-tone="success" data-help="hints" data-on="true"><i class="ui-chip-dot" aria-hidden="true"></i>Hints on</span></p>');
+    '<span class="ui-chip" data-tone="neutral" data-help="tint" data-on="false"><i class="ui-chip-dot" aria-hidden="true"></i>Trace tint <span data-state>off</span></span> ' +
+    '<span class="ui-chip" data-tone="success" data-help="hints" data-on="true"><i class="ui-chip-dot" aria-hidden="true"></i>Hints <span data-state>on</span></span></p>');
   const s = stars(3, false);
   assert.deepEqual([...s.matchAll(/data-star="(\w+)"/g)].map((m) => m[1]), ['possible', 'possible', 'possible', 'lost', 'lost']);
   assert.deepEqual([...stars(2, true).matchAll(/data-star="(\w+)"/g)].map((m) => m[1]), ['earned', 'earned', 'lost', 'lost', 'lost']);
