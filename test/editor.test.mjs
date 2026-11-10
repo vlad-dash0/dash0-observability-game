@@ -52,3 +52,36 @@ test('lockEditor: read-only, still focusable, every button disabled', () => {
   assert.equal(q('#ed-go').disabled, true);
   assert.equal(extra.disabled, true);
 });
+
+test('editorPanel wrap: a wrapping code field; default is a scrolling one (#321)', () => {
+  mount({ wrap: true });
+  assert.equal(q('#ed').getAttribute('wrap'), 'soft');
+  mount();
+  assert.equal(q('#ed').hasAttribute('wrap'), false);
+});
+
+test('fitEditor: rows follow the line count between the minimum and the maximum, and refit on typing and on a script fill (#321)', async () => {
+  const { fitEditor } = await import('../lib/widgets/editor.mjs');
+  mount({ rows: 3, value: 'a\nb\nc\nd\ne' });
+  const input = q('#ed');
+  const fit = fitEditor(input, { max: 8 });
+  assert.equal(input.getAttribute('rows'), '5', 'grows to its content on mount');
+  input.value = 'a';
+  input.dispatchEvent(new input.ownerDocument.defaultView.Event('input'));
+  assert.equal(input.getAttribute('rows'), '3', 'never below the rows it was given');
+  input.value = Array.from({ length: 30 }, (_, i) => `l${i}`).join('\n');
+  fit();
+  assert.equal(input.getAttribute('rows'), '8', 'a script fill needs the returned fit; the maximum then scrolls inside');
+  assert.equal(input.hasAttribute('style'), false, 'attributes only: the CSP forbids a style');
+});
+
+test('fitEditor: a soft-wrapped line that still overflows adds rows until the browser reports it fits (#321)', async () => {
+  const { fitEditor } = await import('../lib/widgets/editor.mjs');
+  mount({ rows: 3, value: 'one long line' });
+  const input = q('#ed');
+  // A browser reports scrollHeight and clientHeight; model one that needs 6 rows.
+  Object.defineProperty(input, 'clientHeight', { get() { return Number(input.getAttribute('rows')) * 20; } });
+  Object.defineProperty(input, 'scrollHeight', { get() { return 6 * 20; } });
+  fitEditor(input, { max: 12 });
+  assert.equal(input.getAttribute('rows'), '6');
+});

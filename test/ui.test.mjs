@@ -553,3 +553,11 @@ test('T11 clearFeedback hides the region, drops the tone and empties the text', 
   assert.equal(el.querySelector('[data-feedback-text]').innerHTML, '');
   assert.throws(() => clearFeedback({}), (e) => e instanceof TypeError && e.message.startsWith('clearFeedback: '));
 });
+
+test('field wrap: a code field soft-wraps (wrap="soft"); without it nothing changes; other kinds refuse it (#321)', () => {
+  const on = field({ id: 'q', label: 'Query', kind: 'code', rows: 3, wrap: true });
+  assert.match(on, /<textarea class="ui-input ui-input--code" id="q" rows="3" wrap="soft" /);
+  assert.doesNotMatch(field({ id: 'q', label: 'Query', kind: 'code', rows: 3 }), /wrap=/);
+  assert.throws(() => field({ id: 'q', label: 'Q', wrap: true }), /field: wrap/);
+  assert.throws(() => field({ id: 'q', label: 'Q', kind: 'code', wrap: 'yes' }), /field/);
+});
