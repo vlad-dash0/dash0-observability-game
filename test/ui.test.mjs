@@ -247,7 +247,7 @@ test('side: help chips say on or off in words; stars; the column keeps the help-
   assert.equal((s.match(/<svg /g) ?? []).length, 5);
   const col = sideColumn({ id: 'b1', titleHtml: 'Trace <b>rebuilt</b>', counts: [{ key: 'wrong', label: 'failed Checks' }], hints: true, ruleHtml: 'R' });
   const ids = [...col.matchAll(/ id="([\w-]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(ids, ['b1-win', 'b1-win-title', 'b1-win-stars', 'b1-win-closing', 'b1-wrong', 'b1-wrong-label', 'b1-hints',
+  assert.deepEqual(ids, ['b1-win', 'b1-win-title', 'b1-win-stars', 'b1-win-closing', 'b1-wrong', 'b1-wrong-label', 'b1-hints', 'b1-hints-label',
     'b1-stars', 'b1-hint', 'b1-hint-cost', 'b1-hint-tier', 'b1-hint-text']);
   assert.ok(col.startsWith('<aside class="ui-side" aria-label="Result, score and hints"><section class="ui-win" id="b1-win" aria-labelledby="b1-win-title" hidden>'));
   assert.ok(col.includes('<div class="ui-win-swirl" data-swirl aria-hidden="true"></div>'));

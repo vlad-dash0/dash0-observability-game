@@ -157,8 +157,11 @@
 .sort-instr { color: var(--color-text-muted); font-size: 13.5px; margin: 0 0 var(--space-2); }
 .sort-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
 .sort-group { min-width: 0; }
-.sort-group-title { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
-.sort-tally { color: var(--color-text-muted); font-weight: 400; }
+.sort-group-title { margin: 0; font-weight: 600; display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.sort-group-name { min-width: 0; overflow-wrap: anywhere; }
+.sort-tally { flex: none; white-space: nowrap; color: var(--color-text-muted); font-weight: 400; } /* the count never drops to a line of its own */
+[data-sort] [data-region="pool"]:empty { display: none; } /* a finished board keeps no empty band */
+[data-sort] [id$="-feedback"] { scroll-margin-block-end: var(--space-4); }
 .sort-placed { list-style: none; display: flex; flex-direction: column; gap: 4px; margin: var(--space-2) 0 0; padding: 0; }
 .sort-placed li { color: var(--color-text-muted); font-size: 13.5px; font-weight: 600; padding: 0 4px; max-width: 100%; overflow-wrap: anywhere; }
 .sort-placed li::before { content: "\2713"; content: "\2713" / ""; margin-inline-end: var(--space-2); color: var(--color-success); }
