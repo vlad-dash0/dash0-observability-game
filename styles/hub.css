@@ -43,6 +43,12 @@
 @media (max-width: 430px) {
   .brand-name span { display: none; }
 }
+/* The ?mode=debug badge (~60px + 8px gap) fits only when the full brand does: brand 164 + gap 12 +
+   right side 170 + 68 = 414px needs a 454px viewport (20px padding each side), so it hides at 480px
+   and under; the debug banner is a dev aid, not part of the phone layout. */
+@media (max-width: 480px) {
+  .debug-badge { display: none; }
+}
 @media (max-width: 360px) {
   .hub-header { padding-inline: 12px; }
   .head-right { gap: 4px; }
