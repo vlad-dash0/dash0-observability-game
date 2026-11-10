@@ -62,6 +62,7 @@ export const NOTICES = Object.freeze({
 
 // The wait before the one retry after a 429 is capped here.
 const MAX_RETRY_S = 60;
+const ACCOUNT_LIMITED = 'Too many changes just now. Wait a few minutes and try again.';
 const SYNC_PAUSED = 'Saving to your account is paused for a moment; your progress is safe in this browser';
 
 // The hideHelp key of the sign-in nudge (its own "Don't ask again").
@@ -230,8 +231,10 @@ export function createGame(deps) {
     account: { state: 'unknown', nick: '', listed: false },
     accountStars: null, // the server's stars for this player; null before the first write (say "no stars yet", never 0)
     accountRank: null,
+    accountKnown: false, // true only while accountStars / accountRank are the server's current answer (a sync succeeded and none failed since)
+    accountEpoch: 0, // bumped when the session ends, so an answer to an older session is dropped
     accountNotice: '', // text when the account could not be reached; progress is still saved here
-    signinStatus: debug !== true && (Object.hasOwn(SIGNIN_NOTICES, signin) || signin === 'ok') ? signin : null,
+    signinStatus: debug !== true && (Object.hasOwn(SIGNIN_NOTICES, signin) || signin === 'new') ? signin : null,
     signinNudgeOpen: false,
     signinNudgeText: '',
     boardOpen: false,
@@ -268,19 +271,23 @@ export function createGame(deps) {
     signedInText() {
       return this.signedIn ? `Signed in as ${this.account.nick}` : '';
     },
-    // The hub's account line: the server's stars and rank; "no stars yet" until the first write, never 0.
+    // The hub's account line: the server's stars and rank, only while known and current (nothing while the
+    // first sync is in flight or after one failed); "no stars yet" when the server has none, never 0.
     accountSummary() {
-      if (!this.signedIn) return '';
+      if (!this.signedIn || !this.accountKnown) return '';
       return this.accountRank === null ? starsText(this.accountStars) : `${starsText(this.accountStars)}, #${this.accountRank}`;
     },
-    // The notice for `?signin=`: the first-sign-in line needs the nickname, so it waits for GET /api/account.
+    // The notice for `?signin=`: the welcome (`new`, a profile just made) needs the nickname, so it waits for
+    // GET /api/account; `ok` (a returning player) says nothing. It claims a board place only for a known star.
     signinNoticeText() {
       if (this.signinStatus === null) return '';
-      if (this.signinStatus !== 'ok') return SIGNIN_NOTICES[this.signinStatus];
+      if (this.signinStatus !== 'new') return SIGNIN_NOTICES[this.signinStatus];
       if (!this.signedIn) return '';
-      return this.account.listed
+      if (!this.account.listed) return `Signed in as ${this.account.nick}.`;
+      const onBoard = this.accountKnown && Number.isInteger(this.accountStars) && this.accountStars >= 1;
+      return onBoard
         ? `You're on the leaderboard as ${this.account.nick}. Change your nickname or hide yourself in Account.`
-        : `Signed in as ${this.account.nick}.`;
+        : `You'll appear on the leaderboard as ${this.account.nick} once you earn a star. Change your nickname or hide yourself in Account.`;
     },
     dismissSigninNotice() {
       this.signinStatus = null;
@@ -317,7 +324,10 @@ export function createGame(deps) {
       return syncing;
     },
     async syncOnce() {
+      const epoch = this.accountEpoch;
       const res = await accountClient.syncProgress(this.progress);
+      if (epoch !== this.accountEpoch || !this.signedIn) return; // signed out or deleted while it was in flight
+      this.accountKnown = false; // current only once this answer is ok
       if (res.state === 'signedOut') {
         this.endAccountSession();
         return;
@@ -341,6 +351,7 @@ export function createGame(deps) {
         return;
       }
       this.accountNotice = '';
+      this.accountKnown = true;
       this.accountStars = res.stars;
       this.accountRank = res.rank;
       const saved = saveProgress(storage, res.progress, registry);
@@ -427,10 +438,12 @@ export function createGame(deps) {
       on('account-delete', () => {
         this.confirmDelete = true;
         this.renderAccount();
+        this.focusSoon('#account-delete-yes'); // the Delete button is gone; the confirm step takes its place
       });
       on('account-delete-no', () => {
         this.confirmDelete = false;
         this.renderAccount();
+        this.focusSoon('#account-delete');
       });
       on('account-delete-yes', () => this.deleteAccount());
     },
@@ -444,11 +457,17 @@ export function createGame(deps) {
         this.endAccountSession();
         return;
       }
+      if (res.state === 'limited') {
+        this.accountSay('error', ACCOUNT_LIMITED);
+        return;
+      }
       const why = res.state === 'taken' ? 'taken' : res.state === 'invalid' ? res.reason : null;
       this.accountSay('error', why === null ? ACCOUNT_UNAVAILABLE : NICK_ERRORS[why] ?? NICK_ERRORS.format);
     },
     endAccountSession() {
       this.account = { state: 'signedOut', nick: '', listed: false };
+      this.accountEpoch++;
+      this.accountKnown = false;
       this.accountStars = null;
       this.accountRank = null;
       this.accountNotice = '';
@@ -468,7 +487,11 @@ export function createGame(deps) {
     },
     async setListing(listed) {
       const res = await accountClient.setListing(listed);
-      if (res.state !== 'ok') return this.accountRefused(res);
+      if (res.state !== 'ok') {
+        const box = doc.getElementById('account-listed');
+        if (box) box.checked = this.account.listed === true; // the server did not accept the click
+        return this.accountRefused(res);
+      }
       this.account = { ...this.account, listed: res.listed ?? listed };
       this.accountSay('success', this.account.listed ? 'You are on the leaderboard.' : 'You are hidden from the leaderboard.');
     },

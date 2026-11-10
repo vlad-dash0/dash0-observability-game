@@ -3,6 +3,10 @@
 // "METHOD /path"; storage is the fake that records every setItem. Contract: docs/FOUNDATION.md §2.9.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseHTML } from 'linkedom';
 import { makeDom } from './helpers/dom.mjs';
 import { fakeStorage } from './helpers/fake-storage.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
@@ -11,6 +15,17 @@ import { HELP_KEY } from '../lib/help-prefs.mjs';
 import { createGame, SIGNIN_NOTICES } from '../app.mjs';
 import { takeSignin } from '../lib/signin-param.mjs';
 import { nudgeText, starsText, boardHtml, accountHtml, meText } from '../lib/account/board-view.mjs';
+
+const INDEX = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'index.html'), 'utf8');
+/** True when `el` and every ancestor's x-show gate is truthy against the game (the markup's own expressions, evaluated). */
+function shownIn(game, el) {
+  for (let n = el; n && n.getAttribute; n = n.parentElement) {
+    const gate = n.getAttribute('x-show');
+    if (gate !== null && !new Function('g', `with (g) { return (${gate.replaceAll('&amp;', '&')}); }`)(game)) return false;
+  }
+  return true;
+}
+const hubLine = (expr) => parseHTML(INDEX).document.querySelector(`[x-text="${expr}"]`);
 
 const AT = '2026-01-01T00:00:00.000Z';
 const L = (id, no) => ({
@@ -253,7 +268,7 @@ test('sync: a signed-in player gets no nudge; a 401 on sync signs them out local
   assert.equal(b.game.account.state, 'signedOut');
 });
 
-test('GET /api/account failing says so and changes nothing else', async () => {
+test('GET /api/account failing says so, SHOWN in the markup, and changes nothing else', async () => {
   const { game, calls, store } = setup({ routes: { 'GET /api/account': res(502, {}) } });
   await initOf(game);
   game.completeLevel('x', WIN);
@@ -261,20 +276,120 @@ test('GET /api/account failing says so and changes nothing else', async () => {
   assert.deepEqual(calls, ['GET /api/account']);
   assert.match(game.accountNotice, /Account unavailable/);
   assert.equal(game.accountEnabled, false);
+  const line = hubLine('accountNotice');
+  assert.ok(line, 'the hub binds the notice');
+  assert.equal(shownIn(game, line), true, 'no hidden ancestor gate: the player can read it');
+  assert.equal(shownIn(setup({ routes: {} }).game, line), false, 'and it is hidden when there is nothing to say');
   assert.equal(game.signinNudgeOpen, false);
   assert.ok(store.sets.length > 0);
 });
 
+test('a signed-in player whose sync fails sees the notice and no stale or unknown count', async () => {
+  let n = 0;
+  const { game } = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': () => (n++ === 0 ? merged({}) : res(502, {})) } });
+  await initOf(game);
+  assert.equal(game.accountSummary(), '4 stars, #3');
+  game.completeLevel('x', WIN);
+  await settle();
+  assert.match(game.accountNotice, /Account unavailable/);
+  assert.equal(game.accountSummary(), '', 'the last server count is not current while sync fails');
+  assert.equal(shownIn(game, hubLine('accountNotice')), true);
+});
+
+test('before the first sync answers (in flight) the hub shows no count, not "no stars yet"', async () => {
+  let release;
+  const held = new Promise((r) => { release = r; });
+  const { game } = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': async () => { await held; return merged({}); } } });
+  game.init();
+  await settle();
+  assert.equal(game.signedIn, true);
+  assert.equal(game.accountSummary(), '');
+  release();
+  await settle();
+  assert.equal(game.accountSummary(), '4 stars, #3');
+});
+
+test('a failed first sync shows no count; a successful sync with no server stars says "no stars yet"', async () => {
+  const bad = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': res(502, {}) } });
+  await initOf(bad.game);
+  assert.equal(bad.game.accountSummary(), '');
+  const none = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': res(200, { v: 1, progress: { v: 1, levels: {}, cards: [] }, stars: null, rank: null }) } });
+  await initOf(none.game);
+  assert.equal(none.game.accountSummary(), 'no stars yet');
+});
+
+test('a sync answer that arrives after sign-out or delete is dropped: no stars, no rank, nothing written locally', async () => {
+  for (const leave of ['signOut', 'deleteAccount']) {
+    let release;
+    const held = new Promise((r) => { release = r; });
+    let first = true;
+    const { game, store } = setup({
+      routes: {
+        'GET /api/account': IN(),
+        'POST /api/progress': async () => { if (first) { first = false; await held; } return merged({ y: { stars: 3, at: AT } }); },
+        'POST /api/account': res(200, { v: 1, ok: true }),
+      },
+    });
+    game.init();
+    await settle();
+    await game[leave]();
+    assert.equal(game.account.state, 'signedOut', leave);
+    release();
+    await settle();
+    assert.equal(game.accountStars, null, leave);
+    assert.equal(game.accountRank, null, leave);
+    assert.equal(Object.hasOwn(game.progress.levels, 'y'), false, leave);
+    assert.equal(store.sets.length, 0, `${leave}: nothing written to localStorage`);
+    assert.equal(game.accountNotice, '', leave);
+  }
+});
+
+test('a failed sync answer that arrives after sign-out does not put a notice on the signed-out hub', async () => {
+  let release;
+  const held = new Promise((r) => { release = r; });
+  const { game } = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': async () => { await held; return res(502, {}); }, 'POST /api/account': res(200, { v: 1, ok: true }) } });
+  game.init();
+  await settle();
+  await game.signOut();
+  release();
+  await settle();
+  assert.equal(game.accountNotice, '');
+});
+
+test('the reward card says, quietly, that a failed sync is saved here and will catch up', async () => {
+  const line = parseHTML(INDEX).document.querySelector('.reward-card [x-text="accountNotice"], .reward-card [data-sync-note]');
+  assert.ok(line, 'the reward card has the sync line');
+  assert.ok(line.classList.contains('ui-note'), 'the kit note markup (lib/ui/text.mjs note)');
+  assert.match(line.textContent, /saved in this browser/);
+  assert.match(line.textContent, /account will catch up/);
+  assert.equal(line.getAttribute('x-show'), "accountNotice !== ''");
+  const bad = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': res(502, {}) } });
+  await initOf(bad.game);
+  assert.equal(shownIn(bad.game, line), true);
+  const good = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': merged({}) } });
+  await initOf(good.game);
+  assert.equal(shownIn(good.game, line), false);
+});
+
 // ---- ?signin= --------------------------------------------------------------------------------
 
-test('?signin=: ok says the leaderboard line with the nick once the account is known; the rest map to notices; unknown says nothing', async () => {
-  const ok = setup({ signin: 'ok', routes: { 'GET /api/account': IN(), 'POST /api/progress': merged({}) } });
-  assert.equal(ok.game.signinNoticeText(), '');
-  await initOf(ok.game);
-  assert.equal(ok.game.signinNoticeText(), "You're on the leaderboard as grace. Change your nickname or hide yourself in Account.");
-  const hidden = setup({ signin: 'ok', routes: { 'GET /api/account': IN({ listed: false }), 'POST /api/progress': merged({}) } });
+test('?signin=: new welcomes once the account is known and promises no board place before a star; ok says nothing; the rest map to notices; unknown says nothing', async () => {
+  const fresh = setup({ signin: 'new', routes: { 'GET /api/account': IN(), 'POST /api/progress': res(200, { v: 1, progress: { v: 1, levels: {}, cards: [] }, stars: null, rank: null }) } });
+  assert.equal(fresh.game.signinNoticeText(), '');
+  await initOf(fresh.game);
+  assert.equal(fresh.game.signinNoticeText(), "You'll appear on the leaderboard as grace once you earn a star. Change your nickname or hide yourself in Account.");
+  const zero = setup({ signin: 'new', routes: { 'GET /api/account': IN(), 'POST /api/progress': res(200, { v: 1, progress: { v: 1, levels: {}, cards: [] }, stars: 0, rank: null }) } });
+  await initOf(zero.game);
+  assert.match(zero.game.signinNoticeText(), /once you earn a star/, '0 stars is not on the board');
+  const starred = setup({ signin: 'new', routes: { 'GET /api/account': IN(), 'POST /api/progress': merged({}) } });
+  await initOf(starred.game);
+  assert.equal(starred.game.signinNoticeText(), "You're on the leaderboard as grace. Change your nickname or hide yourself in Account.");
+  const hidden = setup({ signin: 'new', routes: { 'GET /api/account': IN({ listed: false }), 'POST /api/progress': merged({}) } });
   await initOf(hidden.game);
   assert.equal(hidden.game.signinNoticeText(), 'Signed in as grace.');
+  const back = setup({ signin: 'ok', routes: { 'GET /api/account': IN(), 'POST /api/progress': merged({}) } });
+  await initOf(back.game);
+  assert.equal(back.game.signinNoticeText(), '', 'a returning player gets no welcome');
   for (const [k, v] of Object.entries(SIGNIN_NOTICES)) assert.equal(setup({ signin: k, routes: {} }).game.signinNoticeText(), v);
   assert.equal(setup({ signin: '<img>', routes: {} }).game.signinNoticeText(), '');
   const g = setup({ signin: 'failed', routes: {} }).game;
@@ -561,4 +676,41 @@ test('a nickname with a bad format is refused in place and makes no POST; a good
 
 test('the account body has no second "Account" eyebrow (the modal head has it)', () => {
   assert.doesNotMatch(accountHtml({ nick: 'grace', listed: true }), /ui-eyebrow/);
+});
+
+// ---- the account modal's refusals and focus (#299) -------------------------------------------
+
+test('a refused listing toggle puts the checkbox back to what the server has', async () => {
+  const { game, dom } = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': merged({}), 'POST /api/account': res(502, {}) } });
+  await initOf(game);
+  game.openAccount();
+  const box = dom.document.querySelector('#account-listed');
+  box.checked = false; // what the click did
+  box.onclick();
+  await settle();
+  assert.equal(game.account.listed, true);
+  assert.equal(dom.document.querySelector('#account-listed').checked, true, 'reset to account.listed');
+  assert.match(dom.document.querySelector('#account-feedback [data-feedback-text]').innerHTML, /Account unavailable/);
+});
+
+test('a rate-limited account change says to wait, not "Account unavailable"', async () => {
+  const { game, dom } = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': merged({}), 'POST /api/account': res(429, {}) } });
+  await initOf(game);
+  game.openAccount();
+  await game.saveNickname('neo');
+  const said = dom.document.querySelector('#account-feedback [data-feedback-text]').innerHTML;
+  assert.match(said, /Wait a few minutes and try again/);
+  assert.doesNotMatch(said, /unavailable/i);
+  assert.equal(game.account.nick, 'grace');
+  assert.equal(game.account.state, 'signedIn');
+});
+
+test('Delete account moves focus to the confirm control; Keep my account moves it back to Delete', async () => {
+  const { game, dom } = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': merged({}) } });
+  await initOf(game);
+  game.openAccount();
+  const f = focusLog(game);
+  dom.document.querySelector('#account-delete').onclick();
+  dom.document.querySelector('#account-delete-no').onclick();
+  assert.deepEqual(f, ['#account-delete-yes', '#account-delete']);
 });

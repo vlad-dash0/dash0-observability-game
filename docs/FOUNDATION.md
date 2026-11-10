@@ -319,7 +319,7 @@ top-level navigation from `<a href="/api/auth-start">`, sign-out is a same-origi
   `prompt=select_account`. Unconfigured, or a request host that is not AUTH_ORIGIN's host: 302 to `/?signin=unavailable`.
 - `GET /api/auth-callback`: checks the auth cookie's signature and age and compares state in constant time, POSTs the
   code, verifier and secret to Google's token endpoint (8 s timeout), verifies the ID token, creates or loads the
-  profile, sets the session cookie, clears the auth cookie and 302s to `/?signin=ok`. Failures go to `/?signin=` with
+  profile, sets the session cookie, clears the auth cookie and 302s to `/?signin=new` when the profile was just created, `/?signin=ok` for a returning player. Failures go to `/?signin=` with
   `domain`, `cancelled` (Google's `access_denied`), `failed` or `unavailable`. The email is read once, to make the
   default nickname.
 - `lib/auth/jwt.mjs`: `createJwksCache({fetch, now})` and `verifyIdToken(token, {jwks, clientId, nonce, now})`
@@ -427,7 +427,7 @@ either an anchor "Sign in with Google (@dash0.com)" or "Signed in as <nick>" wit
 nickname field, a listing toggle, Sign out and Delete with a two-step confirm. The nudge, in the reward card, is
 dismissible, shown at most once per page session and not when `signin-nudge` is hidden through `hideHelp`, with
 buttons Sign in, Not now and Don't ask again. `?signin=` is read once in `main.mjs`, shown as a notice, then stripped
-with `history.replaceState`. Privacy copy: "Optional, @dash0.com Google accounts only. We keep your Google account id,
+with `history.replaceState`; `new` shows the welcome line (it promises a leaderboard place only once the player has a star), `ok` shows nothing. Privacy copy: "Optional, @dash0.com Google accounts only. We keep your Google account id,
 a nickname and your level stars and cards, nothing else. We never store or show your name or email. Signed-in players
 are listed on the leaderboard by default and can hide themselves in Account. Your default nickname is a fun name made
 from your email; change it any time. Delete your account to remove everything we hold; this browser

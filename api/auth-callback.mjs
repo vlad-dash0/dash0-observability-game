@@ -1,6 +1,6 @@
 // Sign in with Google, step 2 (#273 P3; docs/FOUNDATION.md §2.9). GET checks the `__Host-oc-auth` cookie and the
 // state, trades the code for an ID token (8 s timeout), verifies it, creates or loads the profile, sets the session
-// cookie and clears the auth cookie. Every outcome is a 302 to /?signin=ok|domain|cancelled|failed|unavailable.
+// cookie and clears the auth cookie. Every outcome is a 302 to /?signin=ok|new|domain|cancelled|failed|unavailable.
 // The email is read once, by store.signIn, to make the default nickname; it is never stored or logged.
 // With AUTH_STUB (localhost only) the token step is skipped and the user is dev@dash0.com.
 import { createHash, timingSafeEqual } from 'node:crypto';
@@ -102,7 +102,7 @@ export function createAuthCallback({
       const session = await signSession(
         { pid: signed.profile.pid, gen: String(signed.profile.gen), exp: now() + SESSION_MAX_AGE * 1000 }, cfg.secret,
       );
-      return done(signed.created ? 'created' : 'signed-in', redirect(to('ok'), [serializeSessionCookie(session), clearAuthCookie()]));
+      return done(signed.created ? 'created' : 'signed-in', redirect(to(signed.created ? 'new' : 'ok'), [serializeSessionCookie(session), clearAuthCookie()]));
     } catch {
       return done('error', redirect(to('failed'), [clearAuthCookie()])); // never the error: it could carry the code
     }
