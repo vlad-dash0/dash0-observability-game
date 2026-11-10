@@ -554,6 +554,18 @@ test('M3 each act heading is a disclosure button wired to its body', () => {
   assert.equal(toggle.children.length, 0, 'the toggle holds only its text');
 });
 
+test('the reward text splits into paragraphs at a blank line, and the card renders one p per paragraph, left-aligned', () => {
+  const { game } = setup();
+  game.rewardText = 'The story.\n\nThe Dash0 how-to.';
+  assert.deepEqual(game.rewardParagraphs(), ['The story.', 'The Dash0 how-to.']);
+  game.rewardText = 'One line.';
+  assert.deepEqual(game.rewardParagraphs(), ['One line.']);
+  game.rewardText = '';
+  assert.deepEqual(game.rewardParagraphs(), []);
+  assert.match(read('index.html'), /<div class="reward-text">\s*<template x-for="\(para, i\) in rewardParagraphs\(\)"/);
+  assert.match(read('styles/hub.css'), /\.reward-text \{[^}]*text-align: left/);
+});
+
 test('completion: stored with its stars, done, its country lit, totals and reward updated', () => {
   const { game, store } = setup();
   assert.deepEqual(game.stars, { earned: 0, max: 25 });

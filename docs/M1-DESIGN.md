@@ -353,8 +353,8 @@ pick and a locked pick are free. D7 tones: a free open is neutral, a costly open
 the causes success; a wrong pick error, the right one success. Focus: an open moves to its card's heading
 (`tabindex=-1`), a wrong pick to the next cause, a locked pick stays, and solving moves to the success card's
 heading; `onComplete()` only enables Finish. The incident step type is wide and its lesson card is the boss's
-scenario line plus the generic "How this board works" list (`ol[aria-label]`, the same on every board, naming
-no view and no cause).
+scenario line plus one short rules line (`p[data-rules]`, the same on every board, pointing to How to play and
+naming no view and no cause).
 
 ### 4.4 Spot it (M2, #5)
 Core `lib/widgets/spot-it.mjs`, view `lib/widgets/spot-it-view.mjs`; step type `spot`, mechanic `spot`.
@@ -612,12 +612,11 @@ propagates SpanContext). Spec: https://opentelemetry.io/docs/concepts/instrument
 
 **Boss `the-pager`**: `scored:false`; cards `[]`; lights `[]`. Two parts. Part 1, blind: the
 intro states the goal ("Try the four questions below: you will find you cannot answer them,
-because nothing sends telemetry yet. Each try burns error budget. When you give up, press
-Escalate."). Alert "PAGE: checkout p95 > 2 s (firing)". Four looks (Which service? / Since
+because nothing sends telemetry yet. Each try burns error budget. Press Escalate when you give up. If the budget runs out first, the pager escalates for you."). Alert "PAGE: checkout p95 > 2 s (firing)". Four looks (Which service? / Since
 when? / Which customers? / Show me a trace), each reveals "No data. …" with the reason and
-drops "Error budget: N% left" by 25. `#pager-escalate` "Escalate" (no `data-finish`) is
+spends 25 percent of the error budget. `#pager-escalate` "Escalate" (no `data-finish`) is
 enabled after the first look and moves to part 2; the budget reaching 0 moves to part 2 by
-itself. The budget also shows as a 4-cell kit meter ("N of 100 % spent") and a Spent on chip per look, in the order taken. Part 2, with telemetry: "Same alert, now with telemetry. Ask the same four questions.
+itself. The budget is stated once, as a 4-cell kit meter ("N of 100 percent spent") with a Spent on chip per look ("Which service? 25 percent"), in the order taken. Part 2, with telemetry: "Same alert, now with telemetry. Ask the same four questions.
 The data is made up, for illustration. Ask all four to finish." The same four questions are
 buttons (`data-ask`); clicking one reveals a made-up answer (service.name, a metric over time
 with service.version, a span attribute, a trace; `CONTENT.telemetry` in

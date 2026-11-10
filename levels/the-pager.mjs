@@ -1,8 +1,8 @@
 // Act 0 boss: The pager, in two parts. Part 1 (blind): an alert fires with no context;
 // every look the player takes finds no data and burns a quarter of the error budget,
 // until they escalate or the budget hits 0. Part 2: the same four questions, each answered
-// from a small instrumented view. It cannot be won and is not scored: it is the reason to
-// The budget is a percent of the error budget, not minutes, in fixed 25% steps. The screen shows a kit meter of 4 cells, the percent left as the headline, and a Spent on chip per look. It is not the incident engine (§4.3). Spec: docs/M1-DESIGN.md §6 Boss the-pager.
+// from a small instrumented view. It cannot be won and is not scored: it is the reason to instrument.
+// The budget is a percent of the error budget, not minutes, in fixed 25% steps. The screen shows a kit meter of 4 cells, its text line (percent spent) as the one statement of the budget, and a Spent on chip per look. It is not the incident engine (§4.3). Spec: docs/M1-DESIGN.md §6 Boss the-pager.
 // Spec: https://opentelemetry.io/docs/concepts/observability-primer/#what-is-observability
 
 import {
@@ -14,7 +14,6 @@ import {
   meter,
   option,
   options,
-  prose,
   question,
   setFeedback,
   step,
@@ -24,7 +23,7 @@ const ALERT = 'PAGE: checkout p95 > 2 s (firing)';
 const BUDGET = { startPct: 100, stepPct: 25 };
 const REWARD = 'Blind, you could not answer one question. With telemetry, all four took seconds. Time to instrument.';
 const INTRO =
-  'Your pager goes off. Try the four questions below: you will find you cannot answer them, because nothing sends telemetry yet. Each try burns error budget. When you give up, press Escalate.';
+  'Your pager goes off. Try the four questions below: you will find you cannot answer them, because nothing sends telemetry yet. Each try burns error budget. Press Escalate when you give up. If the budget runs out first, the pager escalates for you.';
 const LIT_INTRO =
   'Same alert, now with telemetry. Ask the same four questions. The data is made up, for illustration. Ask all four to finish.';
 
@@ -96,10 +95,9 @@ export const CONTENT = {
   telemetry: { intro: LIT_INTRO, asks: ASKS },
 };
 
-const budgetText = (pct) => `Error budget: ${pct}% left`;
 const CELLS = BUDGET.startPct / BUDGET.stepPct;
 
-/** The kit meter: spent cells fill as looks are taken; its text line counts the percent spent. */
+/** The kit meter, the one place the budget is stated: spent cells fill as looks are taken, and its text line says "75 of 100 percent spent". */
 const meterHtml = (left) =>
   meter({
     id: 'pager-meter',
@@ -107,13 +105,13 @@ const meterHtml = (left) =>
     value: BUDGET.startPct - left,
     max: BUDGET.startPct,
     cells: CELLS,
-    unit: '% spent',
+    unit: 'percent spent',
   });
 
 /** One Spent on chip per look taken, in the order taken. */
 const spentHtml = (taken) =>
   taken.length
-    ? `Spent on: ${taken.map((l) => chip({ text: `${l.label} ${BUDGET.stepPct}%` })).join(' ')}`
+    ? `Spent on: ${taken.map((l) => chip({ text: `${l.label} ${BUDGET.stepPct} percent` })).join(' ')}`
     : '';
 
 export default {
@@ -133,7 +131,7 @@ export default {
   run(ctx) {
     const e = ctx.escapeHtml;
     // The rows so far: a plain full-width kit block, not live. Only the newest row is announced, in the feedback region.
-    const rowsList = (id) => `<div id="${id}"></div>`;
+    const rowsList = (id) => `<div class="pager-rows" id="${id}"></div>`;
     const alert = question({ id: 'pager-alert', html: e(ALERT) });
     const choices = (list, attr) =>
       options({
@@ -144,9 +142,11 @@ export default {
     const addRow = (list, region, key, attr, label, body) => {
       if (region.newestHtml) {
         list.rowsHtml = `${list.rowsHtml ?? ''}${region.newestHtml}`;
-        list.innerHTML = prose(list.rowsHtml);
+        list.innerHTML = list.rowsHtml;
       }
-      region.newestHtml = `<p data-${attr}="${key}"><strong>${label}</strong> ${body}</p>`;
+      // A label that is a question reads on as it is; any other label gets a colon.
+      const mark = label.endsWith('?') ? '' : ':';
+      region.newestHtml = `<p data-${attr}="${key}"><strong>${label}${mark}</strong> ${body}</p>`;
       setFeedback(region, 'neutral', region.newestHtml);
     };
     const askAnswers = () => {
@@ -180,8 +180,7 @@ export default {
       step({
         wide: false,
         bodyHtml: `${ctx.speech(INTRO)}${alert}
-        <p id="pager-budget" role="status" aria-live="polite">${budgetText(BUDGET.startPct)}</p>
-        <div id="pager-meter-slot">${meterHtml(BUDGET.startPct)}</div>
+        <div id="pager-budget" role="status" aria-live="polite">${meterHtml(BUDGET.startPct)}</div>
         <p id="pager-spent"></p>
         ${choices(LOOKS, 'look')}${rowsList('pager-said-rows')}${feedbackRegion({ id: 'pager-feedback' })}`,
       }),
@@ -193,7 +192,6 @@ export default {
     const body = ctx.ovBody;
     const escalate = ctx.ovActions.querySelector('#pager-escalate');
     const budgetEl = body.querySelector('#pager-budget');
-    const meterSlot = body.querySelector('#pager-meter-slot');
     const spentEl = body.querySelector('#pager-spent');
     const feedback = body.querySelector('#pager-feedback');
     const saidRows = body.querySelector('#pager-said-rows');
@@ -207,9 +205,8 @@ export default {
         if (b.disabled) return;
         b.disabled = true;
         left = Math.max(0, left - BUDGET.stepPct);
-        budgetEl.textContent = budgetText(left);
         taken.push(look);
-        meterSlot.innerHTML = meterHtml(left);
+        budgetEl.innerHTML = meterHtml(left);
         spentEl.innerHTML = spentHtml(taken);
         addRow(saidRows, feedback, look.key, 'said', look.label, look.reason);
         escalate.disabled = false;
