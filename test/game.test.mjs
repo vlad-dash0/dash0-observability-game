@@ -430,6 +430,16 @@ test('G3 focus returns to Continue when it opened the level and is still shown, 
   assert.equal(focused.at(-1), '#act-toggle-a0', 'Continue is gone once all is done and a0 is saved and folded: its toggle is the target');
   game.toggleAct('a0');
   assert.equal(game.returnTarget(), '[data-level-id="x"]', 'unfolded, the card is the target');
+  // Continue beats the fold: fold the act the player is in, open its level from Continue, close it.
+  const cur = setup().game;
+  const f2 = [];
+  cur.focusSoon = (selector) => f2.push(selector);
+  cur.toggleAct('a0');
+  assert.equal(cur.actExpanded('a0'), false);
+  cur.continueNext();
+  f2.length = 0;
+  cur.closeOverlay();
+  assert.deepEqual(f2, ['#hub-continue'], 'Continue is still shown, so it wins over the folded act toggle');
 });
 
 test('G5 acts fold by progress, a toggle overrides and stores nothing, it survives progress, debug unfolds', () => {
