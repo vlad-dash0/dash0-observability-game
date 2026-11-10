@@ -13,6 +13,7 @@ import {
   globeTarget, parseColor, readColors, regionCentre, spherePoint,
 } from '../lib/globe-view.mjs';
 import { mountGlobe } from '../lib/globe-render.mjs';
+import { BURST } from '../lib/globe-sparks.mjs';
 import * as render from '../lib/globe-render.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
 import { buildRegistry } from '../lib/registry.mjs';
@@ -682,10 +683,10 @@ test('every colour role has a probe rule and a token', () => {
 
 const PULSING = Uint8Array.from([DOT.PULSE, DOT.LIT, DOT.PULSE]);
 const CALM = Uint8Array.from([DOT.LIT, DOT.UNLIT, DOT.RESOLVED]);
-async function mountSparks(states, reduced) {
+async function mountSparks(states, reduced, extra = {}) {
   const { THREE, rec } = recordingThree();
   const dom = recordingDom();
-  const handle = await mountGlobe(dom.host, { ...VIEW, states, reduced, window: dom.window, document: dom.document, importThree: async () => THREE });
+  const handle = await mountGlobe(dom.host, { ...VIEW, states, reduced, seed: 5, ...extra, window: dom.window, document: dom.document, importThree: async () => THREE });
   return { handle, rec, dom };
 }
 const sparkPoints = (rec) => rec.points.filter((p) => p.material.opts.vertexShader === render.SPARK_VS);
@@ -739,20 +740,21 @@ test('a frame writes at most SLOTS live ages, on the pulsing dots; the rest are 
     frameAt(dom, ms);
     const ages = [...geometry.attributes.aAge.array];
     const live = ages.filter((a) => a >= 0);
-    assert.ok(live.length <= 6 && live.every((a) => a < 1));
+    assert.ok(live.length <= 6 * BURST.COUNT && live.length % BURST.COUNT === 0 && live.every((a) => a < 1));
     assert.deepEqual(ages.filter((a) => a < 0), ages.filter((a) => a < 0).map(() => -1));
     seen += live.length;
   }
   assert.ok(seen > 0, 'sparks appear');
   handle.update(CALM, null);
   frameAt(dom, 61000);
-  assert.deepEqual([...geometry.attributes.aAge.array], Array(6).fill(-1));
+  assert.deepEqual([...geometry.attributes.aAge.array], Array(6 * BURST.COUNT).fill(-1));
   handle.dispose();
 });
 
 test('the spark shader hides the far side, uses the pulse colour, and sparks add no colour vectors', async () => {
   assert.match(render.SPARK_VS, /smoothstep\(-0\.02, 0\.32, n\.z\)/);
-  assert.match(render.SPARK_VS, /aAge < 0\.0 \? 0\.0/);
+  assert.match(render.SPARK_VS, /vAlpha = aAge < 0\.0 \? 0\.0/, 'dead slots have no alpha');
+  assert.match(render.SPARK_VS, /gl_PointSize = aAge < 0\.0 \? 0\.0/, 'dead slots have no size');
   assert.match(render.SPARK_FS, /uPulse/);
   const calm = await mountSparks(CALM, false);
   const loud = await mountSparks(PULSING, false);
@@ -764,4 +766,62 @@ test('the spark shader hides the far side, uses the pulse colour, and sparks add
   assert.equal(spark.material.opts.depthWrite, false);
   calm.handle.dispose();
   loud.handle.dispose();
+});
+
+test('every live particle starts on a pulsing dot, a whole burst on one dot, and flies outward from it', async () => {
+  const states = Uint8Array.from([DOT.PULSE, DOT.LIT, DOT.PULSE]);
+  const pulsing = [0, 2].map((k) => spherePoint(DOTS[k][0], DOTS[k][1]));
+  const { handle, rec, dom } = await mountSparks(states, false);
+  const { geometry } = sparkPoints(rec)[0];
+  let bursts = 0;
+  for (let ms = 1000; ms < 90000; ms += 700) {
+    frameAt(dom, ms);
+    const { position, aAge, aDir } = geometry.attributes;
+    for (let k = 0; k < 6; k++) {
+      const first = k * BURST.COUNT;
+      if (aAge.array[first] < 0) continue;
+      bursts++;
+      const at = [...position.array.slice(first * 3, first * 3 + 3)];
+      const dirs = new Set();
+      assert.ok(pulsing.some((p) => p.every((v, m) => Math.abs(v - at[m]) < 1e-6)), `burst ${k} starts at ${at}`);
+      for (let j = 0; j < BURST.COUNT; j++) {
+        const i = first + j;
+        assert.deepEqual([...position.array.slice(i * 3, i * 3 + 3)], at, 'one dot per burst');
+        assert.ok(aAge.array[i] >= 0);
+        const raw = [...aDir.array.slice(i * 3, i * 3 + 3)];
+        dirs.add(raw.map((v) => (v / Math.hypot(...raw)).toFixed(4)).join());
+        const d = [...aDir.array.slice(i * 3, i * 3 + 3)];
+        const out = d[0] * at[0] + d[1] * at[1] + d[2] * at[2];
+        assert.ok(Math.hypot(...d) <= 1 + 1e-6 && out > 0, 'outward');
+      }
+      assert.equal(dirs.size, BURST.COUNT, 'every particle has its own direction');
+    }
+  }
+  assert.ok(bursts > 0);
+  assert.equal(sparkPoints(rec)[0].material.opts.uniforms.uTravel.value, BURST.TRAVEL);
+  assert.match(render.SPARK_VS, /position \+ aDir \* uTravel \* \(1\.0 - f \* f\)/, 'particles travel away along aDir');
+  handle.dispose();
+});
+
+test('each mount has its own seed: an injected seed or random decides the sparks, else crypto', async () => {
+  const play = async (extra, crypto) => {
+    const { THREE, rec } = recordingThree();
+    const dom = recordingDom();
+    if (crypto) dom.window.crypto = crypto;
+    const h = await mountGlobe(dom.host, { ...VIEW, states: PULSING, reduced: false, ...extra, window: dom.window, document: dom.document, importThree: async () => THREE });
+    const { geometry } = sparkPoints(rec)[0];
+    const out = [];
+    for (let ms = 1000; ms < 60000; ms += 700) {
+      frameAt(dom, ms);
+      out.push([...geometry.attributes.aAge.array].map((a) => (a < 0 ? 0 : 1)).join(''));
+    }
+    h.dispose();
+    return JSON.stringify(out);
+  };
+  const fixed = (v) => ({ getRandomValues: (a) => ((a[0] = v), a) });
+  assert.equal(await play({ seed: 11 }), await play({ seed: 11 }));
+  assert.notEqual(await play({ seed: 11 }), await play({ seed: 12 }));
+  assert.equal(await play({ random: () => 0.25 }), await play({ seed: Math.floor(0.25 * 2 ** 32) }));
+  assert.equal(await play({}, fixed(77)), await play({ seed: 77 }));
+  assert.notEqual(await play({}, fixed(77)), await play({}, fixed(78)));
 });

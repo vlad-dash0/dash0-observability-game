@@ -1,7 +1,7 @@
 // Incident sparks (#309 P3): the pure schedule in lib/globe-sparks.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SPARK, sparkSources, sparksAt } from '../lib/globe-sparks.mjs';
+import { BURST, SPARK, burstDir, burstSpeed, sparkSources, sparksAt, tangentFrame } from '../lib/globe-sparks.mjs';
 
 const run = (seed, n = 100, from = 0, to = 600, step = 0.05) => {
   const frames = [];
@@ -61,4 +61,44 @@ test('age is in [0, 1) and a spark outlives no period', () => {
 test('no dots gives no sparks; a huge time gives no backlog', () => {
   assert.deepEqual(sparksAt(10, 0), []);
   assert.ok(sparksAt(1e6, 100).length <= SPARK.SLOTS);
+});
+
+test('a burst fans out: unit directions in a cone round the outward normal, spread apart, each deterministic', () => {
+  const cone = Math.cos(BURST.CONE);
+  for (let slot = 0; slot < SPARK.SLOTS; slot++) {
+    for (const epoch of [-3, 0, 41]) {
+      const dirs = Array.from({ length: BURST.COUNT }, (_, j) => burstDir(slot, epoch, 9, j));
+      for (const [j, d] of dirs.entries()) {
+        assert.ok(Math.abs(Math.hypot(...d) - 1) < 1e-9, 'unit length');
+        assert.ok(d[2] >= cone - 1e-9 && d[2] < 1, 'inside the cone, outward');
+        assert.deepEqual(burstDir(slot, epoch, 9, j), d);
+        const v = burstSpeed(slot, epoch, 9, j);
+        assert.ok(v >= 0.7 && v <= 1);
+      }
+      // spread: the tangent angles fall in distinct sectors, so no two particles share a heading
+      const sector = dirs.map((d) => Math.floor(((Math.atan2(d[1], d[0]) + 2 * Math.PI) % (2 * Math.PI)) / ((2 * Math.PI) / BURST.COUNT)));
+      assert.ok(new Set(sector).size >= BURST.COUNT - 3, `headings ${sector}`);
+      assert.notDeepEqual(dirs[0], burstDir(slot, epoch, 10, 0), 'the seed changes it');
+    }
+  }
+  assert.ok(BURST.COUNT >= 6 && BURST.COUNT <= 8);
+  assert.ok(BURST.TRAVEL >= 0.15 && BURST.TRAVEL <= 0.25);
+});
+
+test('tangentFrame gives two unit tangents, orthogonal to the normal and each other, right-handed', () => {
+  for (const raw of [[0, 0, 1], [0, 1, 0], [1, 0, 0], [0.3, -0.5, 0.8], [0, -0.99, 0.1]]) {
+    const len = Math.hypot(...raw);
+    const n = raw.map((v) => v / len);
+    const [t1, t2] = tangentFrame(n);
+    const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    assert.ok(Math.abs(Math.hypot(...t1) - 1) < 1e-9 && Math.abs(Math.hypot(...t2) - 1) < 1e-9);
+    assert.ok(Math.abs(dot(t1, n)) < 1e-9 && Math.abs(dot(t2, n)) < 1e-9 && Math.abs(dot(t1, t2)) < 1e-9);
+    const cross = [t1[1] * t2[2] - t1[2] * t2[1], t1[2] * t2[0] - t1[0] * t2[2], t1[0] * t2[1] - t1[1] * t2[0]];
+    cross.forEach((v, i) => assert.ok(Math.abs(v - n[i]) < 1e-9));
+  }
+});
+
+test('every live spark carries its epoch, for the burst directions', () => {
+  const [, sparks] = run(0).find(([, s]) => s.length > 0);
+  for (const s of sparks) assert.ok(Number.isInteger(s.epoch));
 });

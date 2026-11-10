@@ -199,8 +199,9 @@ halos, slow spin, drag to rotate, pixel ratio capped at 2, canvas sized by CSS a
 disposes it while a level covers the hub and on `pagehide`, and shows the text fallback when
 three.js, the colours or WebGL are unavailable. An open incident throws off sparks
 (`lib/globe-sparks.mjs`, pure: `SPARK` slots, `sparkSources`, `sparksAt(t, n, seed)`, a hash of the
-slot and period so there is no backlog after a hidden tab; one lazy `THREE.Points` of 6 vertices,
-never made under reduced motion, hidden while no region pulses). Level `lights` stay level data, validated
+slot and period so there is no backlog after a hidden tab; each spark is a burst of `BURST.COUNT`
+particles fanning outward from its dot; the seed is per mount; one lazy `THREE.Points` of
+`SLOTS * COUNT` vertices, never made under reduced motion, hidden while no region pulses). Level `lights` stay level data, validated
 against `hub/map-data.mjs` `NODE_IDS`, and are no longer drawn.
 
 Debug (#309): `?mode=debug` draws the globe with every level done (`app.mjs` `globeProgress()`, read by `mapState()` and `globeView()`), so every mapped region is resolved; cards, stars, level states and storage still use the real progress.
