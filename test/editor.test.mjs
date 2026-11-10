@@ -85,3 +85,42 @@ test('fitEditor: a soft-wrapped line that still overflows adds rows until the br
   fitEditor(input, { max: 12 });
   assert.equal(input.getAttribute('rows'), '6');
 });
+
+test('fitEditor: content that always overflows stops at max rows (#326)', async () => {
+  const { fitEditor } = await import('../lib/widgets/editor.mjs');
+  mount({ rows: 3, value: 'x' });
+  const input = q('#ed');
+  Object.defineProperty(input, 'clientHeight', { get() { return Number(input.getAttribute('rows')) * 20; } });
+  Object.defineProperty(input, 'scrollHeight', { get() { return 10000; } });
+  fitEditor(input, { max: 7 });
+  assert.equal(input.getAttribute('rows'), '7');
+});
+
+test('fitEditor: the signal removes the input listener and disconnects the observer; the observer refits on the next frame (#326)', async () => {
+  const { fitEditor } = await import('../lib/widgets/editor.mjs');
+  const saved = { ro: globalThis.ResizeObserver, raf: globalThis.requestAnimationFrame };
+  const log = { cb: null, disconnected: 0, frames: [] };
+  globalThis.ResizeObserver = class { constructor(cb) { log.cb = cb; } observe() {} disconnect() { log.disconnected += 1; } };
+  globalThis.requestAnimationFrame = (f) => { log.frames.push(f); return 1; };
+  try {
+    mount({ rows: 3, value: 'a' });
+    const input = q('#ed');
+    const ac = new AbortController();
+    const opts = [];
+    const add = input.addEventListener.bind(input);
+    input.addEventListener = (t, f, o) => { opts.push([t, o]); return add(t, f); };
+    fitEditor(input, { max: 10, signal: ac.signal });
+    assert.equal(opts.find(([t]) => t === 'input')[1].signal, ac.signal, 'the input listener is bound to the signal (a browser removes it on abort)');
+    input.value = 'a\nb\nc\nd\ne\nf';
+    log.cb();
+    assert.equal(input.getAttribute('rows'), '3', 'not refitted inside the observer callback');
+    assert.equal(log.frames.length, 1);
+    log.frames[0]();
+    assert.equal(input.getAttribute('rows'), '6', 'refitted in the frame');
+    ac.abort();
+    assert.equal(log.disconnected, 1);
+  } finally {
+    globalThis.ResizeObserver = saved.ro;
+    globalThis.requestAnimationFrame = saved.raf;
+  }
+});

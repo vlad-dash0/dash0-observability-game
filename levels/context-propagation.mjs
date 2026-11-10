@@ -57,23 +57,23 @@ const WHERE = [
 const VALID = [
   {
     key: 'zero-trace',
-    label: '<code>00-00000000000000000000000000000000-00f067aa0ba902b7-01</code>',
+    label: '<code data-token>00-00000000000000000000000000000000-00f067aa0ba902b7-01</code>',
     why: 'A trace ID of all zeros is invalid, and a receiver MUST ignore a <code>traceparent</code> with an invalid trace ID.',
   },
   {
     key: 'uppercase',
-    label: '<code>00-4BF92F3577B34DA6A3CE929D0E0E4736-00F067AA0BA902B7-01</code>',
+    label: '<code data-token>00-4BF92F3577B34DA6A3CE929D0E0E4736-00F067AA0BA902B7-01</code>',
     why: 'The IDs are lowercase hex. A receiver MUST ignore a parent-id with non-lowercase hex characters.',
   },
   {
     key: 'valid',
-    label: `<code>${TRACEPARENT}</code>`,
+    label: `<code data-token>${TRACEPARENT}</code>`,
     right: true,
     why: 'Version <code>00</code>, a 32-digit lowercase hex trace ID, a 16-digit lowercase hex parent-id (the caller\'s span ID), neither all zeros, and the flags <code>01</code>: sampled.',
   },
   {
     key: 'short-parent',
-    label: '<code>00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b-01</code>',
+    label: '<code data-token>00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b-01</code>',
     why: 'The parent-id has 15 hex digits. It must have exactly 16, so a receiver ignores the header.',
   },
 ];
@@ -129,7 +129,7 @@ export default {
       const hops = HOPS.map(
         (h) =>
           `<li>${e(h.from)} → ${e(h.to)}: ${
-            h.traceparent ? `<code>traceparent: ${e(h.traceparent)}</code>` : 'no <code>traceparent</code> header'
+            h.traceparent ? `<code data-token>traceparent: ${e(h.traceparent)}</code>` : 'no <code>traceparent</code> header'
           }</li>`,
       ).join('');
       const roots = ROOTS.map(
@@ -183,7 +183,7 @@ export default {
         step({
           wide: true,
           bodyHtml: `${ctx.speech(
-          `nginx now forwards <code>traceparent: ${e(TRACEPARENT)}</code>, so checkout's spans ` +
+          `nginx now forwards <code data-token>traceparent: ${e(TRACEPARENT)}</code>, so checkout's spans ` +
             'join trace <code>4bf92f35</code>. Its SERVER span still shows as a root here: give it ' +
             'the parent that the header\'s parent-id names.',
           )}${question({ html: 'Join checkout to the request.' })}${renderBuild(TREE, newBuildState(TREE), { escapeHtml: e })}`,

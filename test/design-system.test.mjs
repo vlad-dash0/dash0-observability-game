@@ -213,12 +213,12 @@ test('lesson code breaks inside a long token: the lesson card clips, so an unbre
   assert.equal(pick('.ui-panel-sec')['overflow-wrap'], 'anywhere', 'long plain text in a panel section wraps at 320px instead of clipping');
 });
 
-test('inline code stays whole and breaks only a token wider than the line (a traceparent at 320px), but code blocks keep scrolling', () => {
+test('inline code is inline and breaks only a token wider than the line (a traceparent at 320px), but code blocks keep scrolling', () => {
   const pick = (sel) => Object.fromEntries(sheetRules('base.css').filter((r) => r.selector === sel).flatMap((r) => decls(r.body)));
   assert.equal(pick('code, kbd')['overflow-wrap'], 'break-word', 'anywhere would split short words mid-letter');
-  assert.equal(pick('code, kbd').display, 'inline-block', 'a box moves to the next line whole, so a traceparent is not split at a hyphen it could have fitted past');
-  assert.equal(pick('code, kbd')['max-inline-size'], '100%');
-  assert.equal(pick('pre code').display, 'inline', 'inside a block it is plain text again');
+  assert.equal(pick('code, kbd').display, undefined, 'inline code is inline text: an inline-block code span strands punctuation and leaves the prose ragged');
+  assert.equal(pick('code[data-token]').display, 'inline-block', 'an authored token (a traceparent) moves whole to the next line instead of splitting at a hyphen');
+  assert.equal(pick('code[data-token]')['max-inline-size'], '100%');
   assert.equal(pick('pre code')['overflow-wrap'], 'normal', 'a block under <pre> scrolls, it does not wrap');
 });
 

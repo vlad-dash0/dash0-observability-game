@@ -21,3 +21,9 @@ test('events-and-links shows the catch/finally snippet as a code block, not inli
   assert.doesNotMatch(s, /<code>catch \(err\)/);
   assert.match(s, /codeBlock\('catch \(err\) \{\\n/);
 });
+
+test('a traceparent is marked data-token wherever a level shows one', () => {
+  assert.equal((src('context-propagation').match(/<code data-token>/g) ?? []).length, 6);
+  assert.match(src('frontend-rum'), /<code data-token>traceparent: 00-/);
+  assert.match(src('the-trace-that-starts-in-the-middle'), /header = \(text\) => `<code data-token>/);
+});

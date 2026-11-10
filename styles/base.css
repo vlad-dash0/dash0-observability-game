@@ -35,11 +35,13 @@ pre {
   background: var(--color-code-bg); border: 1px solid var(--color-border);
   border-radius: var(--radius-sm); padding: 12px 14px; overflow-x: auto; line-height: 1.6;
 }
-/* Inline code stays whole: a box that moves to the next line as one piece (a traceparent no longer breaks at a
-   hyphen at the line end), and only a token wider than the line breaks inside (break-word, not anywhere, so a
-   short word is never split mid-letter) (#321). */
-code, kbd { display: inline-block; max-inline-size: 100%; box-sizing: border-box; overflow-wrap: break-word; }
-pre code { display: inline; overflow-wrap: normal; background: none; border: none; padding: 0; font-size: inherit; }
+/* Inline code is plain inline text that breaks at its spaces and punctuation, and only a token wider than the
+   line breaks inside (break-word, not anywhere, so a short word is never split mid-letter) (#321). An authored
+   `data-token` (a traceparent) is a box instead: it moves whole to the next line while it fits, so it is not split
+   at a hyphen at the line end; one wider than the line still breaks inside. */
+code, kbd { overflow-wrap: break-word; }
+code[data-token] { display: inline-block; max-inline-size: 100%; box-sizing: border-box; }
+pre code { overflow-wrap: normal; background: none; border: none; padding: 0; font-size: inherit; }
 kbd { border-bottom-width: 2px; }
 
 :focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }

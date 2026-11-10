@@ -557,3 +557,14 @@ test('the YAML editor keeps its indentation (no soft wrap) and grows to its line
   assert.equal(input.hasAttribute('wrap'), false);
   assert.equal(input.getAttribute('rows'), '20');
 });
+
+test('a hint fill regrows the editor to the filled config (#326)', () => {
+  const { mount } = setup(fixture(HELPS));
+  mount();
+  assert.equal(q('#cf-input').getAttribute('rows'), '12');
+  click('#cf-hint');
+  click('#cf-hint');
+  click('#cf-hint');
+  assert.equal(q('#cf-input').value, REF);
+  assert.equal(q('#cf-input').getAttribute('rows'), String(REF.split('\n').length));
+});
