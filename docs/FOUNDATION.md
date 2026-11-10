@@ -461,7 +461,7 @@ sign-in is unconfigured. The dev server (`startServer({authStub})`, or `AUTH_STU
 (AUTH_ORIGIN `http://localhost:<port>`, a random SESSION_SECRET) and one in-memory store shared by the auth functions,
 so browse via http://localhost, not 127.0.0.1, and the data is gone on restart;
 `tools/fake-redis.mjs` is an in-memory store speaking the REST and pipeline protocol with a JS twin per Lua script
-(Lua itself is covered by an opt-in `REDIS_IT=1` test). `__Host-` cookies over http://localhost work in Chrome and
+(Lua itself is covered by the opt-in `test/redis-it.test.mjs`: run `REDIS_IT=1` with `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (or the `KV_REST_API_*` pair) against a dev database only; it runs the same scenarios on the real endpoint and on the fake, asserts equal results, and deletes its random-prefix keys afterwards). `__Host-` cookies over http://localhost work in Chrome and
 Firefox, not Safari.
 
 ## 3. Invariants
