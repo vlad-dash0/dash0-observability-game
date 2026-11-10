@@ -602,6 +602,7 @@ export function createGame(deps) {
     },
     // The map key: one entry per kind of dot drawn now (lib/globe-view.mjs globeLegend).
     globeLegend() {
+      if (globeCaption(registry, this.mapState()) === null) return [];
       return globeLegend(dotStates(this.mapState(), dots, globeMap.actOf), dots, globeMap.actOf);
     },
     // The swatch class of a key entry: the incident key reuses the pulse swatch, the dark key the plain one.

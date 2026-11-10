@@ -163,9 +163,9 @@ test('the text fallback lists each act with its region, done of total and an ope
     'Act 2 (Two): 0 of 1 done',
   ]);
   assert.deepEqual(globeLines(REG, globeState(REG, progressOf(['a', 'b', 'boss0', 'd']), MAP)), [
-    'Act 0, Zeroth (Zero): 3 of 3 done, resolved',
+    'Act 0, Zeroth (Zero): 3 of 3 done, saved',
     'Act 1, First (One): 0 of 1 done',
-    'Act 2 (Two): 1 of 1 done, resolved',
+    'Act 2 (Two): 1 of 1 done, saved',
   ]);
   const partial = { ACT_REGIONS: { g1: { region: 'One' } }, LEVEL_COUNTRY: {} };
   assert.deepEqual(globeLines(REG, globeState(REG, progressOf([]), partial)), ['Act 1, First (One): 0 of 1 done']);
@@ -179,11 +179,11 @@ test('the accessible name counts levels done, names lit regions and the open inc
   );
   assert.equal(
     globeLabel(globeState(REG, progressOf(['a', 'b', 'boss0', 'd']), MAP)),
-    'World map: 4 of 5 levels done. Resolved: Zero, Two.',
+    'World map: 4 of 5 levels done. Saved: Zero, Two.',
   );
   assert.equal(
     globeLabel(globeState(REG, progressOf(['a', 'c']), MAP)),
-    'World map: 2 of 5 levels done. Resolved: One. Lit: Zero 1 of 3.',
+    'World map: 2 of 5 levels done. Saved: One. Lit: Zero 1 of 3.',
   );
 });
 
@@ -621,9 +621,9 @@ test('the text fallback lists soon acts in act order', () => {
 test('the accessible name names soon regions and leaves them out of the count', () => {
   assert.equal(
     globeLabel(globeState(REG3, progressOf(['a']), MAP3, [S7])),
-    'World map: 1 of 2 levels done. Resolved: Zero. Coming soon: Seven.',
+    'World map: 1 of 2 levels done. Saved: Zero. Coming soon: Seven.',
   );
-  assert.equal(globeLabel(globeState(REG3, progressOf(['a']), MAP3)), 'World map: 1 of 2 levels done. Resolved: Zero.');
+  assert.equal(globeLabel(globeState(REG3, progressOf(['a']), MAP3)), 'World map: 1 of 2 levels done. Saved: Zero.');
   // Given out of order, the soon regions are still named by act number.
   const map8 = { ...MAP3, ACT_REGIONS: { ...MAP3.ACT_REGIONS, s8: { region: 'Eight' } } };
   const S8 = { id: 's8', no: 8, name: 'Later still', sub: '', teaser: 't' };
@@ -678,12 +678,19 @@ test('the caption follows the story: dark, building, incident, saved, every regi
   });
   const next = captionOf(['a', 'b', 'boss0', 'c']);
   assert.deepEqual([next.phase, next.actId, next.region, next.text], ['saved', 'g1', 'One', 'One is calm. You saved the day.']);
+  const live = globeCaption(LIVE, globeState(LIVE, progressOf([...ACT_0, 'the-pager', 'resources'])));
+  assert.deepEqual([live.phase, live.actId, live.text], ['building', 'act-1', "You're building! Northern Europe: 1 of 4 done."], 'building again once the next act is entered');
   const all = captionOf(['a', 'b', 'boss0', 'c', 'd']);
   assert.deepEqual(all, { phase: 'allSaved', actId: null, region: null, done: 5, total: 5, text: 'Every region is calm. You saved the day.' });
   assert.equal(captionOf(['a', 'b', 'c', 'd']).actId, 'g0', 'an open incident outranks the later acts');
   assert.equal(captionOf(['a', 'b', 'c', 'd']).phase, 'incident');
   const soon = globeCaption(REG, globeState(REG, progressOf(['a', 'b', 'boss0', 'c', 'd']), { ...MAP, ACT_REGIONS: { ...MAP.ACT_REGIONS, s7: { region: 'Seven' } } }, [S7]));
   assert.equal(soon.text, 'You saved the day. More regions are coming soon.');
+});
+
+test('an untouched current act with no saved act before it reads dark, even when a later act has progress', () => {
+  const c = captionOf(['d']);
+  assert.deepEqual([c.phase, c.actId, c.region], ['dark', 'g0', 'Zero']);
 });
 
 test('two open incidents: the caption names the lower act', () => {
@@ -718,7 +725,7 @@ test('every live caption fits 60 characters, for every region and phase, with pl
     for (const state of states) {
       const { text } = globeCaption(pair, state);
       assert.ok(text.length <= 60, `${region}: "${text}" is ${text.length} characters`);
-      assert.ok(!text.includes('—') && !text.includes('  '), `${region}: "${text}"`);
+      assert.ok(!text.includes('\u2014') && !text.includes('  '), `${region}: "${text}"`);
     }
   }
 });

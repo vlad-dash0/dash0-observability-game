@@ -972,7 +972,7 @@ test('debug: the globe shows everything finished, and nothing else changes', asy
   await tick();
   assert.deepEqual(log.mounts[0].states, [4, 4, 4, 4, 4, 0], 'every mapped region is resolved; the unmapped dot stays unlit');
   assert.equal(log.mounts[0].actId, 'a1', 'the globe turns to the last act, as when every act is complete');
-  assert.equal(game.mapLabel(), 'World map: 5 of 5 levels done. Resolved: Zero, One.');
+  assert.equal(game.mapLabel(), 'World map: 5 of 5 levels done. Saved: Zero, One.');
   assert.equal(game.levelState('x'), 'open', 'the card state is the real one');
   assert.equal(game.progress.levels.x, undefined, 'progress itself is untouched');
   assert.equal(store.data.size, 0, 'nothing is stored');
@@ -1699,7 +1699,7 @@ test('focusSoon: a target that is already shown is focused at once, with no fram
   assert.equal(rig.queue.length, 0);
 });
 
-test('the legend lists what the globe draws now, and hasSoon is gone', () => {
+test('the legend lists what the globe draws now', () => {
   const keys = (o) => setup(o).game.globeLegend().map((e) => e.key);
   assert.deepEqual(keys({}), ['dark']);
   assert.deepEqual(keys({ initial: { [STORAGE_KEY]: v1({ x: { stars: 3, at: AT } }) } }), ['lit', 'dark']);
@@ -1719,9 +1719,10 @@ test('the caption text follows the progress, and is empty when no region is mapp
   assert.equal(after.captionText(), "You're building! Zero: 1 of 4 done.");
   assert.equal(setup({ debug: true }).game.captionText(), 'Every region is calm. You saved the day.');
   assert.equal(setup({ registry: EMPTY }).game.captionText(), '');
+  assert.deepEqual(setup({ registry: EMPTY }).game.globeLegend(), [], 'no caption, no key');
 });
 
-test('About: the map topic renders GLOBE_LOOP after the summary, and the summary no longer promises a whole region', () => {
+test('About: the map topic renders GLOBE_LOOP after the summary, and the summary does not promise a whole region', () => {
   assert.equal(GLOBE_LOOP.title, 'The map');
   assert.match(GLOBE_LOOP.text, /production goes down there/);
   assert.equal(GAME_SUMMARY.includes('whole region'), false);
