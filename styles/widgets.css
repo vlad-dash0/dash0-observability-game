@@ -111,7 +111,11 @@
 .wf-row[data-parent-of-selected] .wf-bar { stroke: var(--color-parent); stroke-width: 1.5px; stroke-dasharray: 4 3; }
 .wf-row[data-error="true"] .wf-bar { stroke: var(--color-error); stroke-width: 2px; }
 .wf-row[data-waiting] .wf-bar { fill: transparent; stroke: var(--color-text-muted); stroke-dasharray: 4 3; }
+.wf-label-clip { overflow: hidden; } /* clips only the label, so connectors and bar strokes still reach past the cell */
 .wf-bar-label { fill: var(--color-text); font-family: var(--font-mono); font-size: 11px; pointer-events: none; }
+/* The halo only on a label that ends left of its bar (build-it-view.mjs labelFlips): there it crosses the row
+   connector, and the panel surface an idle row sits on, 8px wide to cover the 7.7px gap between words, hides it. */
+.wf-bar-label[text-anchor="end"] { stroke: var(--color-surface); stroke-width: 8px; stroke-linejoin: round; paint-order: stroke; }
 .wf-dur { font-weight: 700; font-variant-numeric: tabular-nums; }
 .wf-row[data-waiting] .wf-bar-label { fill: var(--color-text-muted); }
 .wf-log { fill: var(--color-text); }

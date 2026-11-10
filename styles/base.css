@@ -32,7 +32,8 @@ pre {
   background: var(--color-code-bg); border: 1px solid var(--color-border);
   border-radius: var(--radius-sm); padding: 12px 14px; overflow-x: auto; line-height: 1.6;
 }
-pre code { background: none; border: none; padding: 0; font-size: inherit; }
+code, kbd { overflow-wrap: anywhere; } /* a long token (traceparent) breaks at 320px instead of widening the panel */
+pre code { overflow-wrap: normal; background: none; border: none; padding: 0; font-size: inherit; }
 kbd { border-bottom-width: 2px; }
 
 :focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }

@@ -11,7 +11,7 @@ import { makeDom, q, qa, click } from './helpers/dom.mjs';
 import { recordFocus } from './helpers/focus.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { newBuildState, setParent } from '../lib/widgets/build-it.mjs';
-import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
+import { labelFlips, mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
 import { checkBuild } from '../lib/widgets/build-it.mjs';
 import { noteFor } from '../lib/widgets/build-it-help.mjs';
 import { A, B, C, D, E, b1Spec } from './fixtures/build-b1.mjs';
@@ -107,6 +107,35 @@ test('one instruction line, rendered by renderBuild, describes every span row; t
   assert.equal(q('#b1-helps').textContent, 'Helps: One span at a time on Trace tint on Time-window guide on Instant feedback on Hints on');
   setup(withHelps({ hints: true }));
   assert.equal(q('#b1-helps').textContent, 'Helps: One span at a time off Trace tint off Time-window guide off Instant feedback off Hints on');
+});
+
+test('labelFlips: a label flips left only when it overruns the track on the right and fits on the left (8px a glyph, 240px track, 7px gap)', () => {
+  // x = 60%: bar at 144px, room right 240-144-7 = 89px (11 chars), room left 144-7 = 137px (17 chars).
+  assert.equal(labelFlips(60, 11), false, '88px still fits on the right');
+  assert.equal(labelFlips(60, 12), true, '96px overruns right and fits left');
+  assert.equal(labelFlips(60, 17), true, '136px fits left');
+  assert.equal(labelFlips(60, 18), false, '144px fits neither side: stays right, the clip cuts the tail');
+  // Exact boundaries on a 100px track (bar at 61px, 4 chars = 32px): 61 + 7 + 32 = 100 fits right, one char more does not.
+  assert.equal(labelFlips(61, 4, 100), false, 'ends exactly on the track edge: fits');
+  assert.equal(labelFlips(61, 5, 100), true);
+  // Bar at 63px, 7 chars = 56px: 56 + 7 = 63 fits left exactly; 8 chars does not.
+  assert.equal(labelFlips(63, 7, 100), true, 'fills the left room exactly: fits');
+  assert.equal(labelFlips(63, 8, 100), false);
+  assert.equal(labelFlips(20, 30), false, 'a bar near the left edge never flips');
+  assert.equal(labelFlips(90, 2), false, '16px fits in the 17px left of the track end');
+  assert.equal(labelFlips(90, 3), true, '24px does not');
+});
+
+test('a bar label is placed by labelFlips and drawn inside its own clip, so only the label is cut', () => {
+  const spec = withHelps({});
+  Object.assign(spec.spans[3], { startMs: 70, endMs: 95 }); // D at 70%, label "25ms validate cart" (18 chars)
+  setup(spec);
+  const lab = (id) => q(`[data-span="${id}"] [data-bar-label]`);
+  assert.equal(labelFlips(70, '25ms validate cart'.length), true, 'premise: D flips');
+  assert.deepEqual([lab(D).getAttribute('text-anchor'), lab(D).getAttribute('dx')], ['end', '-7']);
+  assert.deepEqual([lab(B).getAttribute('text-anchor'), lab(B).getAttribute('dx')], [null, '7'], 'B at 10% stays right of its bar');
+  assert.equal(lab(D).parentNode.getAttribute('class'), 'wf-label-clip');
+  assert.equal(q(`[data-span="${D}"] .wf-track`).querySelectorAll('.wf-label-clip').length, 1);
 });
 
 test('rows: name and service first, kind, status and timing secondary; 8-char trace ids with the full id in a tooltip, no ellipsis', () => {
