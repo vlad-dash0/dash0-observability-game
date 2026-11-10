@@ -36,7 +36,7 @@ neutral.
 ## Tokens
 
 Two layers. **Primitives** are hex values and live only in `tokens.css`: `--d0-*` (dash0.com brand),
-`--globe-*`, `--wf-*`, `--kit-*`. **Semantic** tokens are `--color-*`, each one dark value
+`--globe-*`, `--wf-*`, `--kit-*`. **Semantic** tokens are `--color-*`, each a single dark value
 over primitives (the game is dark only, #322: no `light-dark()`, `color-scheme: dark` on `:root`); every other stylesheet uses only these (the hub confetti is the one exception).
 
 Kit colours: `--color-lesson`, `-lesson-eyebrow`, `-lesson-code`, `-lesson-glow`, `-lesson-dot` (the

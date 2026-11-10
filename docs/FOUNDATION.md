@@ -709,7 +709,7 @@ Order: F1 → (F2 ∥ F3 ∥ F4; the F6 checker may also start) → F5 → F6.
   `--d0-orange-soft:#fd8c66`, `--d0-grey-900:#101010`, `-800:#212121`, `-700:#2c2c2c`,
   `-600:#424242`, `-400:#9e9e9e`, `--d0-white:#ffffff`, `--d0-mint:#a8fbbe`,
   `--d0-purple:#ad46ff`. Mutation: change one hex.
-- No `--color-*` in `:root` is `light-dark()`; `:root` has `color-scheme: dark`; no stylesheet
+- Every `--color-*` in `:root` is a plain value (no `light-dark()`); `:root` has `color-scheme: dark`; no stylesheet
   has `light-dark(`, `prefers-color-scheme` or a `[data-theme]` selector (dark only, #322).
 - `--color-primary` uses `var(--d0-red)`; `--color-success` mint;
   `--color-error` purple, not red, not primary. Mutation: error → red.
