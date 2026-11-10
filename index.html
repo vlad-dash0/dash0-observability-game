@@ -235,10 +235,10 @@
         </div>
       </div>
       <div class="reward-actions">
-        <button type="button" class="ui-btn ui-btn--primary" id="reward-next" x-show="rewardNextLabel() !== ''" x-cloak
-                x-text="rewardNextLabel()" @click="openNextLevel()"></button>
-        <button type="button" class="ui-btn ui-btn--ghost" id="reward-back" x-show="rewardNextLabel() !== ''" x-cloak @click="closeReward()">Back to the map</button>
-        <button type="button" class="ui-btn ui-btn--primary" id="reward-close" x-show="rewardNextLabel() === ''" @click="closeReward()">Back to the map</button>
+        <button type="button" class="ui-btn ui-btn--primary" id="reward-continue" x-show="rewardContinueLabel() !== ''" x-cloak
+                x-text="rewardContinueLabel()" @click="continueFromReward()"></button>
+        <button type="button" class="ui-btn ui-btn--ghost" id="reward-back" x-show="rewardContinueLabel() !== ''" x-cloak @click="closeReward()">Back to the map</button>
+        <button type="button" class="ui-btn ui-btn--primary" id="reward-close" x-show="rewardContinueLabel() === ''" @click="closeReward()">Back to the map</button>
       </div>
     </div>
   </div>

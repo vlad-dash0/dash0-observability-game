@@ -295,26 +295,79 @@ test('openLevel while the reward card is open is refused', () => {
 
 // ---- "Next" on the reward dialog (#321) ----
 
-test('the reward offers Next: the level Continue would pick, worded Next: no name', () => {
+test("the reward's Continue button reads exactly as the hub's Continue and opens the same level", () => {
   const { game } = setup();
   game.openLevel('x');
   ctxs.x.finish({ text: 'x is finished now' });
-  assert.equal(game.rewardNextLabel(), 'Next: 0.2 Level y', 'the same pick as Continue');
-  assert.equal(game.rewardNext().levelId, game.continueView().levelId);
-  assert.equal(game.rewardFocus(), '#reward-next');
+  assert.equal(game.rewardContinueLabel(), 'Continue: 0.2 Level y');
+  assert.equal(game.rewardContinueLabel(), game.continueLabel(), 'one wording, one rule');
+  assert.equal(game.rewardFocus(), '#reward-continue');
 });
 
-test('Next closes the reward and opens that level, back returns to Continue', () => {
+test('Continue on the reward closes it and opens that level; closing the level returns focus to the hub Continue', () => {
   const { game } = setup();
   game.openLevel('x');
   ctxs.x.finish({ text: 'x is finished now' });
-  assert.equal(game.openNextLevel(), true);
+  assert.equal(game.continueFromReward(), true);
   assert.equal(game.rewardOpen, false);
   assert.equal(game.overlayOpen, true);
   assert.equal(game.currentLevelId, 'y');
   assert.equal(game.openedFrom, 'continue');
-  assert.equal(game.openNextLevel(), false, 'with no reward open it does nothing');
+  assert.equal(game.continueFromReward(), false, 'with no reward open it does nothing');
   assert.equal(game.currentLevelId, 'y');
+  const f = [];
+  game.focusSoon = (sel) => f.push(sel);
+  game.closeOverlay();
+  assert.deepEqual(f, [], 'x was lit and is still pending: the reveal takes focus to the map, not Continue');
+  assert.equal(game.continueNext(), true, 'the hub Continue opens y again');
+  f.length = 0;
+  game.closeOverlay();
+  assert.deepEqual(f, ['#hub-continue'], 'nothing pending now: focus goes back to the hub Continue');
+});
+
+test('Continue from the reward keeps the globe reveal pending: it plays when the player next reaches the map', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game } = setup({ globe: mount, reduceMotion: false });
+  game.init();
+  await tick();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  game.continueFromReward();
+  await tick();
+  assert.equal(log.ignites.length, 0, 'nothing plays behind the next level');
+  assert.equal(game.litNote, '', 'and nothing is announced yet');
+  game.closeOverlay();
+  await tick();
+  assert.equal(log.ignites.length, 1, 'back on the map: the country lights');
+  assert.equal(log.ignites[0].view.target.key, 'country:XXX');
+  assert.equal(game.litNote, 'Xland is now lit: Level x.');
+  game.openLevel('y');
+  game.closeOverlay();
+  assert.equal(log.ignites.length, 1, 'and only once');
+});
+
+test('Continue twice keeps both reveals: the next reward\'s Back to the map plays them together', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game } = setup({ globe: mount, reduceMotion: false });
+  game.init();
+  await tick();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  game.continueFromReward();
+  ctxs.y.finish({ text: 'y is finished now' });
+  assert.equal(log.ignites.length, 0);
+  game.closeReward();
+  await tick();
+  assert.equal(log.ignites.length, 1);
+  assert.deepEqual([...log.ignites[0].view.flare], [1, 1, 1, 0, 0, 0], 'x and y both flare');
+});
+
+test('the reward overlay scrolls when the card is taller than the screen, the card centred by margin: auto', () => {
+  const css = read('styles/hub.css');
+  const reward = css.match(/\n\.reward \{([^}]*)\}/)[1];
+  assert.match(reward, /overflow-y: auto/);
+  assert.doesNotMatch(reward, /align-items: center|justify-content: center/, 'centring by the container would cut the top off');
+  assert.match(css.match(/\n\.reward-card \{([^}]*)\}/)[1], /margin: auto/);
 });
 
 test('Back to the map stays and behaves as before', () => {
@@ -327,30 +380,30 @@ test('Back to the map stays and behaves as before', () => {
   assert.equal(game.currentLevelId, 'x');
 });
 
-test('no Next when there is no next level, and none in debug', () => {
+test('no Continue on the reward when there is no next level, and none in debug', () => {
   const dbg = setup({ debug: true });
   dbg.game.openLevel('x');
   ctxs.x.finish({ text: 'x is finished now' });
-  assert.equal(dbg.game.rewardNextLabel(), '');
+  assert.equal(dbg.game.rewardContinueLabel(), '');
   assert.equal(dbg.game.rewardFocus(), '#reward-close');
-  assert.equal(dbg.game.openNextLevel(), false);
-  assert.equal(dbg.game.rewardOpen, true, 'a refused Next leaves the dialog');
+  assert.equal(dbg.game.continueFromReward(), false);
+  assert.equal(dbg.game.rewardOpen, true, 'a refused Continue leaves the dialog');
   const ONE = buildRegistry([{ id: 'a0', no: 0, name: 'A', levels: [L('x', '0.1')], boss: null }], { deck: [], nodeIds: [] });
   const last = setup({ registry: ONE });
   last.game.openLevel('x');
   ctxs.x.finish({ text: 'x is finished now' });
-  assert.equal(last.game.rewardNextLabel(), '', 'every act complete: nothing next');
+  assert.equal(last.game.rewardContinueLabel(), '', 'every act complete: nothing next');
   assert.equal(last.game.rewardFocus(), '#reward-close');
 });
 
-test('index.html: the reward dialog has the primary Next, the ghost Back, and the lone primary Back when none is next', () => {
-  const next = shell.querySelector('#reward-next');
-  assert.equal(next.getAttribute('@click'), 'openNextLevel()');
+test('index.html: the reward dialog has the primary Continue, the ghost Back, and the lone primary Back when none is next', () => {
+  const next = shell.querySelector('#reward-continue');
+  assert.equal(next.getAttribute('@click'), 'continueFromReward()');
   assert.match(next.getAttribute('class'), /ui-btn--primary/);
-  assert.equal(next.getAttribute('x-show'), "rewardNextLabel() !== ''");
+  assert.equal(next.getAttribute('x-show'), "rewardContinueLabel() !== ''");
   assert.match(shell.querySelector('#reward-back').getAttribute('class'), /ui-btn--ghost/);
   assert.equal(shell.querySelector('#reward-back').getAttribute('@click'), 'closeReward()');
-  assert.equal(shell.querySelector('#reward-close').getAttribute('x-show'), "rewardNextLabel() === ''");
+  assert.equal(shell.querySelector('#reward-close').getAttribute('x-show'), "rewardContinueLabel() === ''");
   assert.equal(shell.querySelector('#reward-close').textContent.trim(), 'Back to the map');
 });
 
@@ -1430,7 +1483,7 @@ test('a level opens its card unless every widget is seen or hidden', () => {
 
 // ---- one guide per step type (#316) ----
 
-test('the guide follows the step: a new type opens its own guide, once, focused', () => {
+test('the guide follows the step: a new type flags the button, never opens mid-level, and the note is said once', () => {
   const s = cardGame();
   s.game.openLevel('w');
   s.game.closeHowTo();
@@ -1443,8 +1496,13 @@ test('the guide follows the step: a new type opens its own guide, once, focused'
   assert.deepEqual(s.game.howToTopics().map((t) => t.key), ['sort']);
   assert.match(s.game.howToTitle(), /Sort it/);
   assert.equal(s.game.howToFlagged(), true, 'the header button is flagged');
-  assert.equal(s.game.howToLabel(), 'How to play: new step type');
-  assert.match(s.game.howToNote, /Sort it/);
+  assert.equal(s.game.howToLabel(), 'How to play: new guide');
+  assert.equal(s.game.howToNote, 'New guide: Sort it. Open How to play to read it.');
+  ctxs.w.widget('choice');
+  assert.equal(s.game.howToNote, '', 'the flag went away, so does the note');
+  ctxs.w.widget('sort');
+  assert.equal(s.game.howToNote, '', 'an A, C, A sequence does not say it twice');
+  assert.equal(s.game.howToFlagged(), true);
   s.game.toggleHowTo();
   assert.equal(s.game.howToOpen, true, 'the button opens that type\'s guide');
   assert.equal(s.game.howToFlagged(), false, 'and clears the flag');
@@ -1798,7 +1856,7 @@ test('index.html: each element the game focuses on opening a level and the rewar
   assert.equal(game.openLevel('x'), true);
   ctxs.x.finish({ text: 'whatever text here' });
   assert.equal(game.rewardOpen, true);
-  assert.deepEqual(focused, ['#ov-back', '#reward-next'], 'the back button on open, the primary Next on finish');
+  assert.deepEqual(focused, ['#ov-back', '#reward-continue'], 'the back button on open, the primary Continue on finish');
   for (const sel of [...focused, '#reward-close', '#ov-howto-title', '#ov-howto-open']) {
     assert.equal(shell.querySelectorAll(sel).length, 1, `${sel} matches one element in index.html`);
   }
@@ -2200,4 +2258,18 @@ test('M5 every name the Continue and Next up markup binds exists on the game', (
     }
   }
   for (const k of ['continueLabel', 'continueNext', 'isNextUp', 'actLine', 'toggleAct', 'actExpandedAttr', 'actExpanded']) assert.ok(seen.has(k), `the markup binds ${k}`);
+});
+
+test('another tab hiding a guide clears the flag and the note (storage event)', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  s.game.closeHowTo();
+  ctxs.w.widget('sort');
+  assert.equal(s.game.howToFlagged(), true);
+  const rev = s.game.helpRev;
+  s.store.data.set(HELP_KEY, '{"v":1,"hidden":["sort"]}');
+  s.game.onStorage({ key: HELP_KEY });
+  assert.equal(s.game.helpRev, rev + 1, 'Alpine is told to re-read');
+  assert.equal(s.game.howToFlagged(), false);
+  assert.equal(s.game.howToNote, '');
 });

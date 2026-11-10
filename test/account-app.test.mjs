@@ -622,13 +622,13 @@ test('accountHtml: the listing checkbox is checked only when listed', () => {
 
 const focusLog = (game) => { const f = []; game.focusSoon = (s) => f.push(s); return f; };
 
-test('Not now and Don\'t ask again put focus back on the reward card\'s main button (Next, else Back to the map)', async () => {
+test('Not now and Don\'t ask again put focus back on the reward card\'s main button (Continue, else Back to the map)', async () => {
   const { game } = setup({ routes: { 'GET /api/account': OUT } });
   await initOf(game);
   const f = focusLog(game);
   game.dismissSigninNudge();
   game.hideSigninNudge();
-  assert.deepEqual(f, ['#reward-next', '#reward-next'], 'a level is next in this fixture, so Next is the main button');
+  assert.deepEqual(f, ['#reward-continue', '#reward-continue'], 'a level is next in this fixture, so Continue is the main button');
 });
 
 test('dismissing the sign-in notice focuses Save code, a target that stays visible', async () => {
