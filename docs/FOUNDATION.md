@@ -340,10 +340,11 @@ top-level navigation from `<a href="/api/auth-start">`, sign-out is a same-origi
   and requires `gen` to match. Sign-out clears the cookie (Max-Age=0); delete removes the profile, so a kept copy gets
   401. A SESSION_SECRET shorter than 32 bytes counts as not configured (`sessionSecret` returns null; `signSession`
   throws). The secret is measured in UTF-8 bytes of the env string (not base64-decoded). The short-lived
-  `__Host-oc-auth` cookie is built in P3, reusing the same HMAC primitive, but it MUST be signed apart from the
-  session cookie: its own version tag (`a1`, so a session value never verifies as an auth value or the reverse) and a
-  key derived from SESSION_SECRET with HKDF or a fixed label, never the raw secret shared with sessions.
-- CSRF: every POST needs an Origin whose host equals AUTH_ORIGIN's host (a missing Origin is 403) and
+  `__Host-oc-auth` cookie (`lib/auth/auth-cookie.mjs`, `a1.<b64url {state, nonce, verifier, exp}>.<b64url HMAC>`) is
+  signed apart from the session cookie: its own version tag (`a1`, so a session value never verifies as an auth value
+  or the reverse) and a key derived from SESSION_SECRET with HKDF (SHA-256, empty salt, info `oc-auth-cookie-v1`), never
+  the raw secret shared with sessions. Both directions are tested.
+- CSRF: every POST needs an Origin that equals AUTH_ORIGIN (scheme, host and port; a missing Origin is 403) and
   `Content-Type: application/json` (else 415); no CORS headers are ever sent.
 - Env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET, AUTH_ORIGIN (for now the current production
   vercel.app URL, so preview deploys cannot sign in); the store is UPSTASH_REDIS_REST_URL/_TOKEN,
@@ -351,7 +352,7 @@ top-level navigation from `<a href="/api/auth-start">`, sign-out is a same-origi
   prefixes are unsupported).
 
 **Store (Upstash Redis over REST with fetch, no dependency).** Keys are prefixed `oc:v1:`: `sub:<sub>` (pid),
-`profile:<pid>` (HASH: nick, nickKey, listed 0/1, gen, created; never an email or name), `progress:<pid>`
+`profile:<pid>` (HASH: nick, nickKey, listed 0/1, gen, created, sub (needed by delete); never an email or name), `progress:<pid>`
 (HASH: rev, json, total, reachedAt, score), `nick:<nickKey>` (pid, the uniqueness claim), `board` (ZSET of listed pids)
 and `rl:<pid>:<route>:<window>` (INCR plus EXPIRE). The pid is a random 16-byte base64url id; Google's sub never
 reaches a client. `lib/account/score.mjs` encodes `score = total * 2^31 + (2^31 - 1 - s)`, s being the server's
@@ -425,8 +426,33 @@ are listed on the leaderboard by default and can hide themselves in Account. You
 from your email; change it any time. Delete your account to remove everything we hold; this browser
 keeps its own copy."
 
+**P3 decisions.** Each of `api/auth-start.mjs`, `api/auth-callback.mjs` and `api/account.mjs` exports
+`createAuthStart` / `createAuthCallback` / `createAccount({env, fetch, redis, now, random, registry, log})` and the
+default `GET`/`POST` read `process.env` once; `redis` is a ready client (the dev stub passes one), else it is built from
+the store env. `lib/auth/config.mjs` holds the shared env check (`authConfig`), the store and the session lookup;
+`lib/http.mjs` holds `reply`, `redirect`, `sameOrigin` (lenient, the guide's), `originMatches` (strict, a required
+Origin for account POSTs), `isJson`, `readCookie` and `clientKey`. Sign-in is configured only with all four env values,
+a store and an https AUTH_ORIGIN (http only for localhost). A GET /api/account on a host other than AUTH_ORIGIN's
+answers `configured:false`, so preview deploys show no sign-in UI. auth-start allows 20 starts per client IP per
+10 minutes (its own in-memory limiter); over it, or any other refusal, redirects to `/?signin=unavailable`. The
+callback maps failures as: no or bad auth cookie, state mismatch, Google error other than `access_denied`, a missing or
+oversized code, a token refusal (4xx), an unreadable token and any other ID token reason (including
+`email_verified` false) to `failed`; `domain` to `domain`; `access_denied` to `cancelled` (the state must still match);
+a network error, timeout or 5xx at the token endpoint, a JWKS failure and a store failure to `unavailable`. Every callback
+outcome clears the auth cookie. Store reasons map: `store` and `conflict` to 502 `store-unavailable`, `gone` to 401 (the
+cookie is cleared), `limited` to 429 with `retry-after`, nickname `format`/`reserved`/`blocked` to 400
+`{field:'nick', reason}`, `taken` to 409 `nick-taken`. POST /api/account bodies are at most 1 KB with listed fields
+only (`v`, `action` and the action's own field); `signout` needs no session and no store call; a store outage on a
+session lookup is 502 and keeps the cookie, never signed out. Log lines are `{msg, outcome, status, ms}` only.
+
 **Local dev.** `tools/serve.mjs` forwards several Set-Cookie headers and passes a 302 Location through.
-`AUTH_STUB=1` gives a stub sign-in (dev@dash0.com, nickname dev) whose auth-start redirects straight to the callback;
+`AUTH_STUB=1` gives a stub sign-in (Google user `stub-dev`, email dev@dash0.com, so the nickname is the default one made
+from `dev`) whose auth-start redirects straight to the callback (the auth cookie and its state are still made and
+checked; no Google call, no token or JWKS fetch). The stub is honoured only when AUTH_STUB is exactly `1` and
+AUTH_ORIGIN is `http://localhost` (any port); with any other origin the real flow is used, or, with no Google settings,
+sign-in is unconfigured. The dev server (`startServer({authStub})`, or `AUTH_STUB=1 npm run dev`) builds the env itself
+(AUTH_ORIGIN `http://localhost:<port>`, a random SESSION_SECRET) and one in-memory store shared by the auth functions,
+so browse via http://localhost, not 127.0.0.1, and the data is gone on restart;
 `tools/fake-redis.mjs` is an in-memory store speaking the REST and pipeline protocol with a JS twin per Lua script
 (Lua itself is covered by an opt-in `REDIS_IT=1` test). `__Host-` cookies over http://localhost work in Chrome and
 Firefox, not Safari.

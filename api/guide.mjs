@@ -7,6 +7,7 @@ import { liveRegistry } from '../app.mjs';
 import { answerTokens, findStep, guideAllowed, stepContext, withholds } from '../lib/guide/context.mjs';
 import { createLimiter } from '../lib/guide/limit.mjs';
 import { systemPrompt, userMessage } from '../lib/guide/prompt.mjs';
+import { clientKey, reply, sameOrigin } from '../lib/http.mjs';
 import { isId } from '../lib/registry.mjs';
 
 const MODEL = 'claude-haiku-5-5';
@@ -20,8 +21,6 @@ const UPSTREAM_TIMEOUT_MS = 8000;
 const MAX_STEP_ID = 100;
 const BODY_KEYS = ['v', 'levelId', 'stepId', 'question'];
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
-
-const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
 
 /**
  * The handlers over injected `env`, `fetch`, `now`, `log` and `limiter` (and a built `registry`), so a test
@@ -113,24 +112,6 @@ export function createGuide({
 
   return { GET, POST };
 }
-
-function reply(status, body, headers = {}) {
-  return new Response(JSON.stringify(body), { status, headers: { ...JSON_HEADERS, ...headers } });
-}
-
-/** An `Origin` header, when sent, must name the host the request came to; a request without one (curl) passes. */
-function sameOrigin(request) {
-  const origin = request.headers.get('origin');
-  if (origin === null) return true;
-  try {
-    const host = request.headers.get('host') ?? new URL(request.url).host;
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
-
-const clientKey = (request) => request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
 
 /** `{levelId, stepId, question}` from the request text, or `{field}` naming what is wrong. Fields are listed, never bound blindly. */
 function parseBody(text) {

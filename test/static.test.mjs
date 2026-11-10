@@ -139,6 +139,15 @@ test('vercel.json CSP equals the design, with no unsafe-inline and no framing', 
   assert.deepEqual(d['frame-ancestors'], ["'none'"]);
 });
 
+// #273: Google sign-in is a top-level redirect handled by api/, so vercel.json needs no CSP change. Any new
+// Google host (a script, frame, connect or img source) would mean the redirect design was abandoned.
+test('vercel.json is byte-for-byte unchanged by sign-in and names no Google host', () => {
+  const raw = read('vercel.json');
+  assert.ok(!/google/i.test(raw), 'vercel.json mentions google');
+  assert.equal(createHash('sha256').update(raw).digest('hex'), 'e0f7f9e2b92f994a1f2f8635f22c42dc468ba3fa8d3fb9afe176c9b196aa6305');
+  assert.deepEqual(directives(headerRule('/(.*)')['Content-Security-Policy'])['form-action'], ["'none'"]);
+});
+
 // I4 (docs/DASH0-LAB.md): the validator's host set is exactly connect-src minus 'self'.
 test("vercel.json connect-src is 'self' plus exactly the INGRESS_HOSTS origins", () => {
   const d = directives(headerRule('/(.*)')['Content-Security-Policy']);
