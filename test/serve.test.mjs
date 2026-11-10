@@ -292,6 +292,19 @@ test('GUIDE_STUB: the guide answers with a canned reply, no key and no network',
   }
 });
 
+test('AUTH_STUB: the dev server answers /api/progress and /api/leaderboard (not 503)', async () => {
+  const stub = await listen({ authStub: true });
+  try {
+    const board = await send(stub.port, 'GET', '/api/leaderboard');
+    assert.equal(board.status, 200);
+    assert.deepEqual(JSON.parse(board.body), { v: 1, ok: true, size: 0, top: [], me: null });
+    const progress = await send(stub.port, 'GET', '/api/progress');
+    assert.equal(progress.status, 401, 'configured, so it asks for a session instead of 503');
+  } finally {
+    stub.server.close();
+  }
+});
+
 // A static import or re-export with a relative path, on one line or several (`import {\n a,\n b\n} from './x.mjs'`).
 const IMPORT = /^\s*(?:import|export)\b[^'"]*?from\s*['"](\.[^'"]+)['"]|^\s*import\s*['"](\.[^'"]+)['"]/gm;
 
