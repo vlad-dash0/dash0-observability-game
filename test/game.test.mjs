@@ -493,6 +493,10 @@ test('the reward text splits into paragraphs at a blank line, and the card rende
   assert.deepEqual(game.rewardParagraphs(), ['One line.']);
   game.rewardText = '';
   assert.deepEqual(game.rewardParagraphs(), []);
+  game.rewardText = '  Pad \n\nB';
+  assert.deepEqual(game.rewardParagraphs(), ['Pad', 'B'], 'paragraphs are trimmed');
+  game.rewardText = 'A\n\n \n';
+  assert.deepEqual(game.rewardParagraphs(), ['A'], 'a blank paragraph is dropped');
   assert.match(read('index.html'), /<div class="reward-text">\s*<template x-for="\(para, i\) in rewardParagraphs\(\)"/);
   assert.match(read('styles/hub.css'), /\.reward-text \{[^}]*text-align: left/);
 });

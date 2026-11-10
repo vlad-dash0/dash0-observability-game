@@ -349,3 +349,22 @@ test('the-pager: a row has a separator after its label, and every row is a plain
   assert.equal(text('[data-answer="trace"]').startsWith('Show me a trace: Trace 4bf9'), true);
   assert.equal(qa('#pager-answer-rows .ui-prose').length, 0);
 });
+
+test('the-pager: when the budget runs out, part 2 opens with a line that says so; a manual Escalate has no such line', () => {
+  start();
+  for (const [key] of LOOKS) click(`[data-look="${key}"]`);
+  assert.equal(partTwo(), true);
+  const line = text('.ui-note');
+  assert.equal(line.startsWith('Budget spent: 100 of 100 percent.'), true, line);
+  assert.equal(/escalated for you/.test(line), true);
+  start();
+  click('[data-look="service"]');
+  click('#pager-escalate');
+  assert.equal(partTwo(), true);
+  assert.equal(qa('.ui-note').length, 0, 'no budget line after a manual Escalate');
+});
+
+test('the-pager: earlier rows are inset like the text of the feedback box they came from', () => {
+  const css = readFileSync(new URL('../styles/widgets.css', import.meta.url), 'utf8');
+  assert.match(css, /\.pager-rows \{[^}]*padding-inline-start: 43px/);
+});

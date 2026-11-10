@@ -12,6 +12,7 @@ import {
   finishButton,
   feedback as feedbackRegion,
   meter,
+  note,
   option,
   options,
   question,
@@ -19,6 +20,8 @@ import {
   step,
 } from '../lib/ui/index.mjs';
 
+/** Said at the top of part 2 when the fourth look spent the last of the budget: the player never presses Escalate, and the meter and the look's row are gone with part 1. */
+const BUDGET_SPENT = 'Budget spent: 100 of 100 percent. The last look found no data either, so the pager escalated for you.';
 const ALERT = 'PAGE: checkout p95 > 2 s (firing)';
 const BUDGET = { startPct: 100, stepPct: 25 };
 const REWARD = 'Blind, you could not answer one question. With telemetry, all four took seconds. Time to instrument.';
@@ -149,11 +152,11 @@ export default {
       region.newestHtml = `<p data-${attr}="${key}"><strong>${label}${mark}</strong> ${body}</p>`;
       setFeedback(region, 'neutral', region.newestHtml);
     };
-    const askAnswers = () => {
+    const askAnswers = (escalatedByBudget = false) => {
       ctx.renderStep(
         step({
           wide: false,
-          bodyHtml: `${ctx.speech(LIT_INTRO)}${alert}${choices(ASKS, 'ask')}${rowsList('pager-answer-rows')}${feedbackRegion({ id: 'pager-answers' })}`,
+          bodyHtml: `${ctx.speech(LIT_INTRO)}${escalatedByBudget ? note(BUDGET_SPENT) : ''}${alert}${choices(ASKS, 'ask')}${rowsList('pager-answer-rows')}${feedbackRegion({ id: 'pager-answers' })}`,
         }),
         actions({ wide: false, buttonsHtml: finishButton('pager-finish') }),
       );
@@ -210,12 +213,12 @@ export default {
         spentEl.innerHTML = spentHtml(taken);
         addRow(saidRows, feedback, look.key, 'said', look.label, look.reason);
         escalate.disabled = false;
-        if (left === 0) return askAnswers();
+        if (left === 0) return askAnswers(true);
         const rest = [...buttons.slice(i + 1), ...buttons.slice(0, i)];
         (rest.find((x) => !x.disabled) ?? escalate).focus();
       };
     });
-    escalate.onclick = askAnswers;
+    escalate.onclick = () => askAnswers();
     // The app moves focus to Back after run() (docs/DESIGN-SYSTEM.md, Focus); this keeps the step's own focus order.
     buttons[0].focus();
   },

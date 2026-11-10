@@ -1017,7 +1017,7 @@ export function createGame(deps) {
     },
     /** The reward text as paragraphs: a level's closing text may hold a blank line between the story and the Dash0 how-to. */
     rewardParagraphs() {
-      return String(this.rewardText).split(/\n\s*\n/).filter((p) => p.trim() !== '');
+      return String(this.rewardText).split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
     },
     rewardStarsText() {
       return this.rewardStars == null ? '' : starGlyphs(this.rewardStars);
