@@ -59,6 +59,10 @@ export const NOTICES = Object.freeze({
     'This browser is not letting the game save (private mode or full storage). Progress lasts until you close the tab.',
 });
 
+// The wait before the one retry after a 429 is capped here.
+const MAX_RETRY_S = 60;
+const SYNC_PAUSED = 'Saving to your account is paused for a moment; your progress is safe in this browser';
+
 // The hideHelp key of the sign-in nudge (its own "Don't ask again").
 export const NUDGE_KEY = 'signin-nudge';
 
@@ -152,6 +156,7 @@ export function createGame(deps) {
   let syncing = null; // the running sync chain
   let syncAgain = false; // a sync was asked for while one ran
   let nudgeShown = false; // the sign-in nudge shows at most once per page session
+  let retrying = false; // a 429 retry is scheduled or running (one per pause)
   let nudgeAsked = 0; // bumps on every nudge request, so a stale leaderboard answer is dropped
   let dontAsk = false; // "Don't ask again" for this visit, even when storage refused the write
   const loaded = loadProgress(storage, registry);
@@ -225,7 +230,7 @@ export function createGame(deps) {
     accountStars: null, // the server's stars for this player; null before the first write (say "no stars yet", never 0)
     accountRank: null,
     accountNotice: '', // text when the account could not be reached; progress is still saved here
-    signinStatus: Object.hasOwn(SIGNIN_NOTICES, signin) || signin === 'ok' ? signin : null,
+    signinStatus: debug !== true && (Object.hasOwn(SIGNIN_NOTICES, signin) || signin === 'ok') ? signin : null,
     signinNudgeOpen: false,
     signinNudgeText: '',
     boardOpen: false,
@@ -312,7 +317,21 @@ export function createGame(deps) {
     async syncOnce() {
       const res = await accountClient.syncProgress(this.progress);
       if (res.state === 'signedOut') {
-        this.account = { state: 'signedOut', nick: '', listed: false };
+        this.endAccountSession();
+        return;
+      }
+      if (res.state === 'limited') {
+        this.accountNotice = SYNC_PAUSED; // the local copy is already saved; one retry after the wait
+        if (!retrying) {
+          retrying = true;
+          later(async () => {
+            try {
+              await this.syncProgress();
+            } finally {
+              retrying = false;
+            }
+          }, Math.min(res.retryAfterS, MAX_RETRY_S) * 1000);
+        }
         return;
       }
       if (res.state !== 'ok') {
@@ -820,6 +839,7 @@ export function createGame(deps) {
 
     closeReward() {
       this.rewardOpen = false;
+      nudgeAsked++; // a board reply still on its way must not open the nudge on a later card
       this.signinNudgeOpen = false;
       if (pendingLit) this.revealLit();
       else this.returnFocus();

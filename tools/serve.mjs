@@ -36,7 +36,7 @@ const API_MAX_BODY = 16 * 1024;
 export const STUB_REPLY = 'Re-read what the question asks, then look at what each option says about it.';
 
 /** The functions that take an auth-stub env and a Redis client, by file name: the factory each module exports. */
-const AUTH_FACTORIES = { 'auth-start': 'createAuthStart', 'auth-callback': 'createAuthCallback', account: 'createAccount' };
+const AUTH_FACTORIES = { 'auth-start': 'createAuthStart', 'auth-callback': 'createAuthCallback', account: 'createAccount', progress: 'createProgress', leaderboard: 'createLeaderboard' };
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 

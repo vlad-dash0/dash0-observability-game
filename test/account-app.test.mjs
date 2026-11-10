@@ -9,6 +9,7 @@ import { buildRegistry } from '../lib/registry.mjs';
 import { STORAGE_KEY } from '../lib/storage.mjs';
 import { HELP_KEY } from '../lib/help-prefs.mjs';
 import { createGame, SIGNIN_NOTICES } from '../app.mjs';
+import { takeSignin } from '../lib/signin-param.mjs';
 import { nudgeText, starsText, boardHtml, accountHtml, meText } from '../lib/account/board-view.mjs';
 
 const AT = '2026-01-01T00:00:00.000Z';
@@ -32,6 +33,7 @@ function setup({ routes = {}, debug, initial, signin, withFetch = true } = {}) {
   const dom = makeDom(SHELL);
   const store = fakeStorage({ initial });
   const calls = [];
+  const timers = [];
   const fetch = async (url, init = {}) => {
     if (url === '/api/guide') return res(404, {}); // the guide's own status request is not this feature's
     const key = `${init.method ?? 'GET'} ${url}`;
@@ -44,11 +46,11 @@ function setup({ routes = {}, debug, initial, signin, withFetch = true } = {}) {
   };
   const game = createGame({
     registry: REG, deck: [], storage: () => store, document: dom.document, now: () => 1, rand: () => 0,
-    reduceMotion: () => true, reportError: () => {}, setTimeout: () => 0, clearTimeout: () => {},
+    reduceMotion: () => true, reportError: () => {}, setTimeout: (fn, ms) => { timers.push({ fn, ms }); return 0; }, clearTimeout: () => {},
     globeMap: { ACT_REGIONS: {}, LEVEL_COUNTRY: {}, COUNTRY_NAMES: {}, actOf: () => null }, dots: [],
     debug, signin, fetch: withFetch ? fetch : undefined,
   });
-  return { game, store, calls, dom };
+  return { game, store, calls, dom, timers };
 }
 const initOf = async (g) => { g.init(); await settle(); };
 const helpHidden = (store) => JSON.parse(store.data.get(HELP_KEY) ?? '{"hidden":[]}').hidden;
@@ -370,4 +372,133 @@ test('accountHtml carries the privacy copy and no style or on* attributes', () =
   assert.match(html, /listed on the leaderboard by default/);
   assert.doesNotMatch(html, /\sstyle=|\son[a-z]+=/);
   assert.match(html, /checked/);
+});
+
+// ---- review fixes: serialization, stale nudge, 401, 429, ?signin=, checkbox -------------------
+
+/** A route whose responses are held until released, counting how many are in flight. */
+function held() {
+  const state = { inFlight: 0, maxInFlight: 0, bodies: [], waiting: [] };
+  state.route = (init) => {
+    state.bodies.push(JSON.parse(init.body));
+    state.inFlight++;
+    state.maxInFlight = Math.max(state.maxInFlight, state.inFlight);
+    return new Promise((resolve) => state.waiting.push((r) => { state.inFlight--; resolve(r); }));
+  };
+  return state;
+}
+
+test('sync is serialized: a completion then an import mid-flight makes 2 POSTs, never 2 in flight, and the second carries both levels', async () => {
+  const hold = held();
+  const { game, store } = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': hold.route } });
+  game.init();
+  await settle();
+  hold.waiting.shift()(merged({})); // the page-load sync
+  await settle();
+  hold.bodies.length = 0;
+  hold.maxInFlight = 0;
+  game.completeLevel('x', WIN);
+  game.commitImport({ v: 1, levels: { y: { stars: 1, at: AT } }, cards: [] });
+  await settle();
+  assert.equal(hold.bodies.length, 1, 'the second ask waits for the first');
+  hold.waiting.shift()(merged({}));
+  await settle();
+  assert.equal(hold.bodies.length, 2, 'exactly two POSTs');
+  assert.equal(hold.maxInFlight, 1);
+  assert.deepEqual(Object.keys(hold.bodies[1].progress.levels).sort(), ['x', 'y']);
+  hold.waiting.shift()(merged({})); // a reply that lacks y
+  await settle();
+  assert.equal(JSON.parse(store.data.get(STORAGE_KEY)).levels.y.stars, 1, 'a reply without y never removes it');
+  assert.equal(game.progress.levels.y.stars, 1);
+});
+
+test('a board reply that arrives after the reward card closed leaves the nudge closed, even on a later card', async () => {
+  let release;
+  const routes = { 'GET /api/account': OUT, 'GET /api/leaderboard': () => new Promise((r) => { release = r; }) };
+  const { game } = setup({ routes });
+  await initOf(game);
+  game.completeLevel('x', WIN);
+  await settle();
+  game.closeReward();
+  release(board([{ rank: 1, nick: 'grace', stars: 12 }]));
+  await settle();
+  assert.equal(game.signinNudgeOpen, false);
+  const later = setup({ routes });
+  await initOf(later.game);
+  later.game.completeLevel('x', WIN);
+  await settle();
+  later.game.closeReward();
+  later.game.completeLevel('y', WIN); // a later reward card is open when the old reply lands
+  release(board([{ rank: 1, nick: 'grace', stars: 12 }]));
+  await settle();
+  assert.equal(later.game.rewardOpen, true);
+  assert.equal(later.game.signinNudgeOpen, false);
+});
+
+test('a 401 during sync ends the account session: stars and rank cleared, the account modal closed', async () => {
+  let n = 0;
+  const { game } = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': () => (++n === 1 ? merged({}) : res(401, {})) } });
+  await initOf(game);
+  assert.equal(game.accountStars, 4);
+  game.openAccount();
+  assert.equal(game.accountOpen, true);
+  game.completeLevel('x', WIN);
+  await settle();
+  assert.equal(game.account.state, 'signedOut');
+  assert.equal(game.accountStars, null);
+  assert.equal(game.accountRank, null);
+  assert.equal(game.accountOpen, false);
+});
+
+test('a 429 on sync says saving is paused (not unavailable) and retries once after retryAfterS, capped', async () => {
+  let n = 0;
+  const limited = (s) => res(429, { error: 'rate-limited', retryAfterS: s });
+  const { game, timers, calls } = setup({
+    routes: { 'GET /api/account': IN(), 'POST /api/progress': () => (++n === 1 ? limited(30) : n === 2 ? limited(30) : merged({})) },
+  });
+  await initOf(game);
+  assert.match(game.accountNotice, /Saving to your account is paused for a moment; your progress is safe in this browser/);
+  assert.doesNotMatch(game.accountNotice, /unavailable/);
+  const retries = timers.filter((t) => t.ms === 30000);
+  assert.equal(retries.length, 1);
+  retries[0].fn();
+  await settle();
+  assert.equal(calls.filter((c) => c === 'POST /api/progress').length, 2, 'one retry');
+  assert.equal(timers.filter((t) => t.ms === 30000).length, 1, 'a second 429 during the retry schedules nothing more');
+  const capped = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': limited(86400) } });
+  await initOf(capped.game);
+  assert.equal(capped.timers.some((t) => t.ms === 60000), true);
+  assert.equal(capped.timers.some((t) => t.ms > 60000), false);
+});
+
+test('a 429 retry that succeeds clears the notice', async () => {
+  let n = 0;
+  const { game, timers } = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': () => (++n === 1 ? res(429, { retryAfterS: 5 }) : merged({})) } });
+  await initOf(game);
+  timers.find((t) => t.ms === 5000).fn();
+  await settle();
+  assert.equal(game.accountNotice, '');
+});
+
+test('?signin= is ignored in debug mode', () => {
+  assert.equal(setup({ debug: true, signin: 'failed' }).game.signinNoticeText(), '');
+  assert.equal(setup({ debug: true, signin: 'ok' }).game.signinStatus, null);
+});
+
+test('takeSignin reads the value, strips it, and survives a throwing replaceState', () => {
+  const seen = [];
+  const win = (href, throws = false) => ({
+    location: { href },
+    history: { state: null, replaceState: (...a) => { if (throws) throw new Error('sandboxed'); seen.push(a); } },
+  });
+  assert.equal(takeSignin(win('https://x.test/play?signin=ok&mode=debug#top')), 'ok');
+  assert.equal(seen[0][2], '/play?mode=debug#top');
+  assert.equal(takeSignin(win('https://x.test/?signin=failed', true)), 'failed', 'the value still returns');
+  assert.equal(takeSignin(win('https://x.test/')), null);
+  assert.equal(seen.length, 1, 'nothing to strip, no replaceState');
+});
+
+test('accountHtml: the listing checkbox is checked only when listed', () => {
+  assert.doesNotMatch(accountHtml({ nick: 'grace', listed: false }), /checked/);
+  assert.match(accountHtml({ nick: 'grace', listed: true }), /checked/);
 });

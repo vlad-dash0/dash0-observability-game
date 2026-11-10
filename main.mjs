@@ -5,23 +5,14 @@ import { mountGlobe } from './lib/globe-render.mjs';
 import { isDebugMode } from './lib/debug-mode.mjs';
 import { prefersReducedMotion } from './lib/lesson-kit.mjs';
 import { readTheme } from './lib/theme.mjs';
+import { takeSignin } from './lib/signin-param.mjs';
 import { createTelemetry } from './lib/telemetry.mjs';
 
 // First statement: apply the stored theme before Alpine renders anything (the CSP
 // allows no inline script in <head>, so this is as early as it gets).
 document.documentElement.dataset.theme = readTheme(() => window.localStorage);
 
-// `?signin=ok|failed|domain|cancelled|unavailable` is where the sign-in redirect lands: read it once
-// and strip it, so a reload or a shared link does not replay it.
-function takeSignin() {
-  const url = new URL(window.location.href);
-  const value = url.searchParams.get('signin');
-  if (value === null) return null;
-  url.searchParams.delete('signin');
-  window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
-  return value;
-}
-const signin = takeSignin();
+const signin = takeSignin(window);
 
 function browserDeps() {
   const debug = isDebugMode(window.location.search);
