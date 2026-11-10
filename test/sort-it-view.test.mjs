@@ -1188,3 +1188,14 @@ test('#323 the hint note says which item it counts for', () => {
   click('[data-item="i1"]');
   assert.equal(tierLine(), '0 of 3 hints used on this item');
 });
+
+test('#323 breakable adds soft breaks to text runs only, never inside a nested tag or its attributes', () => {
+  assert.equal(
+    breakable('<code><a href="https://x.io/a_b">x.y</a></code>'),
+    '<code><a href="https://x.io/a_b">x.<wbr>y</a></code>',
+  );
+});
+
+test('#323 the guide tells the player to pick the item again after a wrong placement', () => {
+  assert.equal(HOW_TO.sort.play[1].endsWith('Pick it again and try another place.'), true);
+});
