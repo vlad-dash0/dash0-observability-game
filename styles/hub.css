@@ -172,7 +172,7 @@
   background: linear-gradient(90deg, color-mix(in srgb, var(--color-success) 10%, transparent), transparent 60%);
 }
 .level-card.nudge { opacity: .9; animation: nudge .45s ease; }
-.level-card.nudge .level-sub { color: var(--color-accent); font-weight: 700; }
+.level-card.nudge .level-sub { color: var(--color-accent-text); font-weight: 700; }
 @keyframes nudge { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 @media (prefers-reduced-motion: reduce) { .level-card.nudge { animation: none; } }
 .level-ico {
@@ -180,7 +180,7 @@
   display: grid; place-items: center; font-size: 26px; background: var(--color-surface-2);
 }
 .level-body { flex: 1; min-width: 0; }
-.level-no { font-size: 11px; font-weight: 700; color: var(--color-accent); letter-spacing: .5px; font-family: var(--font-mono); }
+.level-no { font-size: 11px; font-weight: 700; color: var(--color-accent-text); letter-spacing: .5px; font-family: var(--font-mono); }
 .level-name { font-weight: 700; font-size: 16px; line-height: 1.2; }
 .level-sub { font-size: 13px; color: var(--color-text-muted); margin-top: 2px; }
 .level-status {
