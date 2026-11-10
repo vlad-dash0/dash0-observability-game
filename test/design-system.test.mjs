@@ -217,9 +217,15 @@ test('inline code breaks inside a long token (a traceparent at 320px), but code 
   assert.equal(pick('pre code')['overflow-wrap'], 'normal', 'a block under <pre> scrolls, it does not wrap');
 });
 
-test('a waterfall track clips its bar label, so a long label cannot widen the page', () => {
-  const d = Object.fromEntries(sheetRules('widgets.css').filter((r) => r.selector === '.wf-row .wf-trackcell').flatMap((r) => decls(r.body)));
-  assert.equal(d.overflow, 'hidden');
+test('only the bar label is clipped (never the cell, whose connectors overhang), and it has a page-colour halo', () => {
+  const rules = sheetRules('widgets.css');
+  const pick = (sel) => Object.fromEntries(rules.filter((r) => r.selector === sel).flatMap((r) => decls(r.body)));
+  assert.equal(pick('.wf-label-clip').overflow, 'hidden');
+  assert.equal(pick('.wf-trackcell').overflow, undefined, 'the cell must not clip: the parent connector bridges into the next row');
+  assert.equal(rules.some((r) => r.selector.includes('.wf-trackcell') && decls(r.body).some(([p]) => p === 'overflow')), false);
+  const label = pick('.wf-bar-label');
+  assert.equal(label.stroke, 'var(--color-bg)');
+  assert.equal(label['paint-order'], 'stroke');
 });
 
 test('palette rule 5: kit.css puts no shadow or glow on anything, only inset rings', () => {
