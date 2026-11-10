@@ -2,12 +2,15 @@
 // Spec: docs/FOUNDATION.md §2.5, §3 Progress, §4 and §6 F4.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { STORAGE_KEY, saveProgress } from '../lib/storage.mjs';
+import { fakeStorage } from './helpers/fake-storage.mjs';
 import {
   CURRENT_VERSION,
   MIGRATIONS,
   cardTotals,
   emptyProgress,
   mergeProgress,
+  mergeStored,
   migrate,
   recordCompletion,
   sanitizeProgress,
@@ -437,4 +440,35 @@ test('reads award nothing: sanitize and totals leave stars and cards as stored',
   starTotals(p, REG);
   cardTotals(p, REG);
   assert.deepEqual(plain(p), { v: 1, levels: { b: { stars: 0, at: null } }, cards: [] });
+});
+
+// ---- mergeStored ----
+
+test('mergeStored: unknown stored ids survive, other levels and cards are unioned', () => {
+  const stored = raw({ 'zz-future': { stars: 3, at: null }, a: { stars: 2, at: T2 } }, ['c1']);
+  const incoming = raw({ b: { stars: 1, at: T3 } }, ['c2']);
+  const merged = mergeStored(stored, incoming, REG);
+  assert.deepEqual(stars(merged), { a: 2, b: 1, 'zz-future': 3 });
+  assert.deepEqual(merged.cards, ['c1', 'c2']);
+});
+
+test('mergeStored: the stored side has more stars and a later at, the incoming side an earlier at', () => {
+  const merged = mergeStored(raw({ a: { stars: 3, at: T2 } }), raw({ a: { stars: 2, at: T1 } }), REG);
+  assert.deepEqual(plain(merged.levels.a), { stars: 3, at: T1 });
+  const flipped = mergeStored(raw({ a: { stars: 2, at: T1 } }), raw({ a: { stars: 3, at: T2 } }), REG);
+  assert.deepEqual(plain(flipped.levels.a), { stars: 3, at: T1 });
+});
+
+test('mergeStored: nothing stored (null) merges onto an empty record; inputs are not mutated', () => {
+  const incoming = deepFreeze(raw({ a: { stars: 1, at: T1 } }));
+  assert.deepEqual(stars(mergeStored(null, incoming, REG)), { a: 1 });
+  assert.deepEqual(plain(mergeStored(null, raw({}), REG)), { v: 1, levels: {}, cards: [] });
+});
+
+test('mergeStored equals what saveProgress writes for the same input', () => {
+  const stored = raw({ 'zz-future': { stars: 3, at: null }, a: { stars: 2, at: T2 } }, ['c1']);
+  const incoming = raw({ a: { stars: 3, at: T1 }, b: { stars: 1, at: null } }, ['c2']);
+  const store = fakeStorage({ initial: { [STORAGE_KEY]: JSON.stringify(stored) } });
+  assert.equal(saveProgress(() => store, incoming, REG).saved, true);
+  assert.deepEqual(JSON.parse(store.data.get(STORAGE_KEY)), plain(mergeStored(stored, incoming, REG)));
 });
