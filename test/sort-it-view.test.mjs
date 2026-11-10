@@ -125,7 +125,7 @@ const RETIRED = [
   'query-data', 'query-input', 'query-label', 'query-note', 'show', 'small', 'sort-bucket-btn', 'sort-hint',
   'sort-item', 'speech', 'spot-line', 'tradeoff-keeps', 'tradeoff-option',
 ];
-const INSTR = 'Pick one to sort, then choose where it goes, or drag it there.';
+const INSTR = 'Pick one to sort.';
 
 // ---- S1, S2 sortView: the board as data -------------------------------------------------
 
@@ -350,7 +350,7 @@ test('S5 a wrong placement costs one mistake, is an error, counts on the score c
   assert.equal(q('#signals-stars').getAttribute('aria-label'), '4 of 5 stars still possible');
   assert.equal(tone(), 'error', 'a wrong answer is an error (D7), not information');
   assert.equal(q('#signals-feedback').hasAttribute('hidden'), false);
-  assert.equal(feedback(), 'Not quite. \u201cStack trace text\u201d does not go in \u201cMetric\u201d. Not a number.');
+  assert.equal(feedback(), 'Not quite. "Stack trace text" does not go in "Metric". Not a number.');
   assert.equal(feedback().includes('Log'), false, 'the right bucket is not named');
   assert.equal(pressed('i2'), 'true', 'the item stays selected');
   assert.deepEqual(enabledBuckets(), ['log', 'trace']);
@@ -359,7 +359,7 @@ test('S5 a wrong placement costs one mistake, is an error, counts on the score c
   sortTo('i1', 'log');
   assert.equal(counts.mistakes, 2);
   assert.equal(q('#signals-wrong').textContent, '2');
-  assert.equal(feedback(), 'Not quite. \u201cRequest rate\u201d does not go in \u201cLog\u201d.', 'no whyNot, no extra text');
+  assert.equal(feedback(), 'Not quite. "Request rate" does not go in "Log".', 'no whyNot, no extra text');
   assert.equal(feedback().includes('Metric'), false, 'the right bucket is not revealed');
 });
 
@@ -372,7 +372,7 @@ test('S6 a repeated drop on a tried bucket is free and neutral', () => {
   assert.equal(counts.mistakes, 1, 'repeating a tried bucket is free');
   assert.equal(q('#signals-wrong').textContent, '1');
   assert.equal(tone(), 'neutral');
-  assert.equal(feedback(), 'You already tried \u201cMetric\u201d for \u201cStack trace text\u201d.');
+  assert.equal(feedback(), 'You already tried "Metric" for "Stack trace text".');
 });
 
 test('S7 then the right placement costs nothing, is a success, says why, lists the item in its bucket and counts it sorted', () => {
@@ -382,7 +382,7 @@ test('S7 then the right placement costs nothing, is a success, says why, lists t
   click('[data-bucket="log"]');
   assert.equal(counts.mistakes, 1);
   assert.equal(tone(), 'success');
-  assert.equal(feedback(), 'Right. \u201cStack trace text\u201d goes in \u201cLog\u201d. A timestamped record.');
+  assert.equal(feedback(), 'Right. "Stack trace text" goes in "Log". A timestamped record.');
   assert.equal(placed('log').includes('Stack trace text'), true);
   assert.equal(sorted(), 'Sorted 1 of 4');
   assert.deepEqual(items(), ['i1', 'i3', 'i4']);
@@ -428,7 +428,7 @@ test('S8 completion: onComplete once, the success card shown and focused, the sw
   click('[data-bucket="metric"]');
   assert.equal(counts.done, 1);
   assert.equal(counts.mistakes, 1);
-  assert.equal(feedback(), 'Right. \u201cQueue depth\u201d goes in \u201cMetric\u201d. A gauge.');
+  assert.equal(feedback(), 'Right. "Queue depth" goes in "Metric". A gauge.');
   assert.deepEqual(items(), []);
   assert.equal(q('#signals-win').hasAttribute('hidden'), false, 'the success card is shown');
   assert.equal(text('#signals-win-stars'), '4 of 5 stars: 1 wrong placement, 0 hints.');
@@ -441,7 +441,7 @@ test('S8 completion: onComplete once, the success card shown and focused, the sw
   assert.equal(counts.done, 1, 'nothing after completion calls it again');
   assert.equal(counts.mistakes, 1);
   assert.deepEqual(swirls, [false]);
-  assert.equal(feedback(), 'Right. \u201cQueue depth\u201d goes in \u201cMetric\u201d. A gauge.', 'nothing after done says anything');
+  assert.equal(feedback(), 'Right. "Queue depth" goes in "Metric". A gauge.', 'nothing after done says anything');
   assert.equal(focus.last(), '#signals-win-title');
 });
 
@@ -478,13 +478,13 @@ test('the drop path is the click path: a wrong drop costs a mistake, a right dro
   assert.equal(drop('i2', 'metric'), true, 'dragover allows the drop');
   assert.equal(counts.mistakes, 1);
   assert.equal(tone(), 'error');
-  assert.equal(feedback(), 'Not quite. \u201cStack trace text\u201d does not go in \u201cMetric\u201d. Not a number.');
+  assert.equal(feedback(), 'Not quite. "Stack trace text" does not go in "Metric". Not a number.');
   assert.equal(pressed('i2'), 'true', 'the dropped item becomes the selection');
   assert.deepEqual(enabledBuckets(), ['log', 'trace']);
   drop('i2', 'log');
   assert.equal(counts.mistakes, 1);
   assert.equal(tone(), 'success');
-  assert.equal(feedback(), 'Right. \u201cStack trace text\u201d goes in \u201cLog\u201d. A timestamped record.');
+  assert.equal(feedback(), 'Right. "Stack trace text" goes in "Log". A timestamped record.');
   assert.equal(placed('log'), 'Stack trace text');
   drop(null, 'trace');
   assert.equal(counts.mistakes, 1, 'an empty drop costs nothing');
@@ -515,7 +515,7 @@ test('dropping an item on an enabled category button takes the click path; a dis
   assert.equal(counts.mistakes, 1);
 });
 
-test('a bucket with nothing selected costs nothing, is neutral and asks for an item first', () => {
+test('a bucket with nothing selected costs nothing, is neutral and asks to pick one first', () => {
   const { counts, focus, mount } = setup();
   mount();
   drop(null, 'metric');
@@ -605,7 +605,7 @@ test('whyNot is read for its own keys only: a "constructor" bucket never shows O
   mount();
   sortTo('i2', 'constructor'); // i2 has a partial whyNot ({metric}); none for constructor
   assert.equal(counts.mistakes, 1);
-  assert.equal(feedback(), 'Not quite. \u201cStack trace text\u201d does not go in \u201cConstructor\u201d.');
+  assert.equal(feedback(), 'Not quite. "Stack trace text" does not go in "Constructor".');
   assert.equal(feedback().includes('function'), false);
   assert.equal(feedback().includes('native code'), false);
 });
@@ -663,7 +663,7 @@ test('three hint tiers on i2: three hints and no mistake, two outlined candidate
   assert.equal(placed('log'), 'Stack trace text');
   assert.equal(feedback(), 'Placed for you.', 'a hint placement is not earned: no "Right."');
   assert.equal(tone(), 'neutral');
-  assert.equal(hintText().includes('Placed for you. \u201cStack trace text\u201d goes in <b>Log</b>. A timestamped record.'), true,
+  assert.equal(hintText().includes('Placed for you. "Stack trace text" goes in <b>Log</b>. A timestamped record.'), true,
     'the hint panel says where and why');
   assert.deepEqual(items(), ['i1', 'i3', 'i4']);
   assert.deepEqual(hintedBuckets(), [], 'the outlines clear once the item is placed');
@@ -764,11 +764,11 @@ test('the rule is charged once per board: after the rule on i2, Hint on i1 gives
   click('[data-item="i2"]');
   assert.equal(hintLabel(), 'Hint 1 of 3');
   click('#signals-hint'); // the rule, for the board
-  assert.equal(hintText().includes('Ask what the item actually is'), true, 'tier 1 is the rule');
+  assert.equal(hintText().includes('Ask what this one actually is'), true, 'tier 1 is the rule');
   assert.deepEqual(counts, { mistakes: 0, hints: 1, done: 0 });
   click('[data-item="i1"]');
   assert.equal(hintLabel(), 'Hint 2 of 3', 'i1 starts with the rule already used');
-  assert.equal(tierLine(), '1 of 3 used on this one');
+  assert.equal(tierLine(), '1 of 3 hints used on this item');
   click('#signals-hint');
   assert.deepEqual(counts, { mistakes: 0, hints: 2, done: 0 }, 'one click, one hint');
   assert.equal(q('#signals-hints').textContent, '2');
@@ -783,10 +783,10 @@ test('a 2-bucket board: "Hint 1 of 2", then after the rule "Hint 2 of 2" places 
   mount();
   click('[data-item="i1"]');
   assert.equal(hintLabel(), 'Hint 1 of 2', 'tier 2 cannot narrow two buckets: it is not offered');
-  assert.equal(tierLine(), '0 of 2 used on this one');
+  assert.equal(tierLine(), '0 of 2 hints used on this item');
   click('#signals-hint');
   assert.equal(hintLabel(), 'Hint 2 of 2');
-  assert.equal(tierLine(), '1 of 2 used on this one');
+  assert.equal(tierLine(), '1 of 2 hints used on this item');
   assert.deepEqual(hintedBuckets(), []);
   click('#signals-hint');
   assert.equal(placed('metric'), 'Request rate', 'the second hint places it');
@@ -795,7 +795,7 @@ test('a 2-bucket board: "Hint 1 of 2", then after the rule "Hint 2 of 2" places 
   assert.equal(tone(), 'neutral');
   // i2 is the next target: the rule was already shown on this board.
   assert.equal(hintLabel(), 'Hint 2 of 2');
-  assert.equal(tierLine(), '1 of 2 used on this one');
+  assert.equal(tierLine(), '1 of 2 hints used on the next item');
   click('#signals-hint');
   assert.equal(placed('log'), 'Stack trace text');
   assert.deepEqual(counts, { mistakes: 0, hints: 3, done: 1 });
@@ -821,21 +821,21 @@ test('the outlines are per item: gone while another item is selected, back on re
   click('#signals-hint');
   click('#signals-hint'); // tier 2 on i2: metric and log
   assert.deepEqual(hintedBuckets(), ['metric', 'log']);
-  assert.equal(tierLine(), '2 of 3 used on this one');
+  assert.equal(tierLine(), '2 of 3 hints used on this item');
   click('[data-item="i1"]');
   assert.deepEqual(hintedBuckets(), [], 'i2\'s outlines are not i1\'s');
   assert.equal(hintLabel(), 'Hint 2 of 3', 'i1 has only the board-wide rule used');
-  assert.equal(tierLine(), '1 of 3 used on this one');
+  assert.equal(tierLine(), '1 of 3 hints used on this item');
   click('[data-item="i2"]');
   assert.deepEqual(hintedBuckets(), ['metric', 'log'], 'reselecting i2 redraws its outlines');
   assert.equal(hintLabel(), 'Hint 3 of 3');
-  assert.equal(tierLine(), '2 of 3 used on this one');
+  assert.equal(tierLine(), '2 of 3 hints used on this item');
   assert.deepEqual(counts, { mistakes: 0, hints: 2, done: 0 }, 'selecting costs nothing');
   click('[data-bucket="metric"]'); // the decoy: wrong, two untried left, but the tier 2 given stays counted
   assert.deepEqual(counts, { mistakes: 1, hints: 2, done: 0 });
   assert.deepEqual(hintedBuckets(), ['log'], 'the tried decoy loses its outline; the right bucket keeps it');
   assert.equal(hintLabel(), 'Hint 3 of 3');
-  assert.equal(tierLine(), '2 of 3 used on this one');
+  assert.equal(tierLine(), '2 of 3 hints used on this item');
 });
 
 test('the tier-2 decoy is drawn through ctx.shuffle: a reversing draw picks Trace, not Metric', () => {
@@ -881,7 +881,7 @@ test('the hint panel follows the hint target: each item\'s own tier-2 pair on re
   assert.deepEqual(pairOf(hintText()), ['Metric', 'Trace']);
   assert.deepEqual(hintedBuckets(), ['metric', 'trace']);
   click('[data-item="i3"]'); // no hint of its own, but the rule was paid for on this board
-  assert.equal(hintText().includes('Ask what the item actually is'), true, 'the rule text stays');
+  assert.equal(hintText().includes('Ask what this one actually is'), true, 'the rule text stays');
   assert.equal(hintText().includes('Hint 1 of 3'), true);
   assert.deepEqual(pairOf(hintText()), [], 'no other item\'s pair');
   assert.deepEqual(hintedBuckets(), []);
@@ -891,7 +891,7 @@ test('the hint panel follows the hint target: each item\'s own tier-2 pair on re
   assert.deepEqual(hintedBuckets(), ['metric'], 'the tried decoy loses its outline');
   click('[data-bucket="metric"]');
   assert.equal(placed('metric'), 'Request rate');
-  assert.equal(hintText().includes('Ask what the item actually is'), true, 'placed: the next target has no own hint, so the rule');
+  assert.equal(hintText().includes('Ask what this one actually is'), true, 'placed: the next target has no own hint, so the rule');
   assert.deepEqual(counts, { mistakes: 1, hints: 3, done: 0 }, 'syncing the panel never charges');
 });
 
@@ -931,7 +931,7 @@ test('the outlines follow the hint target: tier 2 on i1, then i2 placed by hand:
   click('[data-bucket="log"]'); // i2 right, by hand
   assert.equal(placed('log'), 'Stack trace text');
   assert.deepEqual(items().map(pressed), ['false', 'false', 'false'], 'nothing is selected after a right placement');
-  assert.equal(tierLine(), '2 of 3 used on this one', 'the target fell back to i1, first remaining');
+  assert.equal(tierLine(), '2 of 3 hints used on the next item', 'the target fell back to i1, first remaining');
   assert.deepEqual(hintedBuckets(), ['metric', 'log'], 'i1\'s untried pair is outlined with nothing selected');
   assert.deepEqual(pairOf(hintText()), ['Metric', 'Log'], 'the panel names the same pair as the outlines');
   assert.deepEqual(counts, { mistakes: 0, hints: 2, done: 0 });
@@ -954,16 +954,16 @@ test('item ids that are Object.prototype names ("constructor") mount with hints 
   const { counts, mount } = setup(spec);
   mount(); // the target at mount is "constructor" (first shown): no own map entry yet
   assert.equal(hintLabel(), 'Hint 1 of 3');
-  assert.equal(tierLine(), '0 of 3 used on this one');
+  assert.equal(tierLine(), '0 of 3 hints used on the next item');
   assert.deepEqual(hintedBuckets(), []);
   assert.equal(hintText(), '');
   click('#signals-hint'); // the rule
   assert.equal(hintLabel(), 'Hint 2 of 3');
-  assert.equal(tierLine(), '1 of 3 used on this one');
+  assert.equal(tierLine(), '1 of 3 hints used on this item');
   click('#signals-hint'); // tier 2: untried wrong metric, trace; identity decoy metric
   assert.deepEqual(hintedBuckets(), ['metric', 'log']);
   assert.equal(hintLabel(), 'Hint 3 of 3');
-  assert.equal(tierLine(), '2 of 3 used on this one');
+  assert.equal(tierLine(), '2 of 3 hints used on this item');
   click('#signals-hint'); // tier 3: placed for you
   assert.equal(placed('log'), 'Ctor item');
   assert.equal(feedback(), 'Placed for you.');
@@ -977,14 +977,14 @@ test('one bucket left with no hint taken: the side line says so, no dots, "No mo
   mount();
   sortTo('i2', 'metric');
   sortTo('i2', 'trace'); // only log, the right bucket, is untried
-  assert.equal(tierLine(), 'Only one place left for this one.');
+  assert.equal(tierLine(), 'Only one place left for this item.');
   assert.equal(q('#signals-hint-tier').querySelectorAll('.ui-dots').length, 0, 'no dots');
   assert.equal(hintLabel(), 'No more hints');
   assert.equal(q('#signals-hint').disabled, true);
   assert.deepEqual(counts, { mistakes: 2, hints: 0, done: 0 });
   // Another item with its ladder intact shows the count and its dots again.
   click('[data-item="i1"]');
-  assert.equal(tierLine(), '0 of 3 used on this one');
+  assert.equal(tierLine(), '0 of 3 hints used on this item');
   assert.equal(q('#signals-hint-tier').querySelectorAll('.ui-dots i').length, 3);
 });
 
@@ -996,13 +996,13 @@ test('after a tier 3 placement of a non-last item the panel keeps "Placed for yo
   click('#signals-hint');
   click('#signals-hint'); // tier 3: i2 placed; i1 becomes the target
   assert.equal(placed('log'), 'Stack trace text');
-  assert.equal(tierLine(), '1 of 3 used on this one', 'the side line already follows i1');
-  assert.equal(hintText().includes('Placed for you. \u201cStack trace text\u201d goes in <b>Log</b>. A timestamped record.'), true,
+  assert.equal(tierLine(), '1 of 3 hints used on the next item', 'the side line already follows i1');
+  assert.equal(hintText().includes('Placed for you. "Stack trace text" goes in <b>Log</b>. A timestamped record.'), true,
     'the panel keeps the tier 3 text');
-  assert.equal(hintText().includes('Ask what the item actually is'), false, 'not yet the rule for i1');
+  assert.equal(hintText().includes('Ask what this one actually is'), false, 'not yet the rule for i1');
   click('[data-item="i3"]');
   assert.equal(hintText().includes('Placed for you.'), false, 'the next selection re-syncs the panel');
-  assert.equal(hintText().includes('Ask what the item actually is'), true, 'i3 has no own hint: the rule');
+  assert.equal(hintText().includes('Ask what this one actually is'), true, 'i3 has no own hint: the rule');
   assert.equal(hintText().includes('Hint 1 of 3'), true);
 });
 
@@ -1085,9 +1085,9 @@ test('#321 wording names the item and the category in quotes, so any text reads 
   const { mount } = setup(spec);
   mount();
   sortTo('i1', 'log');
-  assert.equal(feedback(), 'Not quite. “Is CPU on db-1 above 90%?” does not go in “Log”.');
+  assert.equal(feedback(), 'Not quite. "Is CPU on db-1 above 90%?" does not go in "Log".');
   click('[data-bucket="metric"]');
-  assert.equal(feedback(), 'Right. “Is CPU on db-1 above 90%?” goes in “New question”. A number over time.');
+  assert.equal(feedback(), 'Right. "Is CPU on db-1 above 90%?" goes in "New question". A number over time.');
 });
 
 test('#321 the instructions use no level noun (no item, no category)', () => {
@@ -1152,4 +1152,39 @@ test('#321 breakable: code gets a soft break after . ( and _ only; text outside 
   makeDom(renderSort(spec, newSortState(spec)));
   assert.equal(q('[data-item="i1"]').innerHTML.includes('http.<wbr>request.<wbr>method'), true, 'the pool renders it breakable');
   assert.equal(q('[data-item="i1"]').textContent.includes('http.request.method'), true, 'the text is unchanged');
+});
+
+// ---- #323 review ----------------------------------------------------------------------------
+
+import { HOW_TO } from '../lib/how-to-play.mjs';
+import { SORT_RULE } from '../lib/widgets/sort-it-help.mjs';
+
+test('#323 after a placement focus does not scroll (the one reveal does); picking an item still scrolls to its buttons', () => {
+  const { focus, mount } = setup();
+  mount();
+  click('[data-item="i2"]');
+  assert.equal(focus.prevented().at(-1), false, 'select: plain focus');
+  click('[data-bucket="metric"]');
+  assert.equal(focus.last(), 'bucket:log');
+  assert.equal(focus.prevented().at(-1), true, 'wrong: no focus scroll');
+  click('[data-bucket="log"]');
+  assert.equal(focus.prevented().at(-1), true, 'right: no focus scroll');
+});
+
+test('#323 the guide, the rule and the instructions share one vocabulary, and no quote is curly', () => {
+  assert.equal(/\b(item|category)\b/i.test(HOW_TO.sort.play[0]), false, HOW_TO.sort.play[0]);
+  assert.equal(/\b(item|category)\b/i.test(SORT_RULE), false, SORT_RULE);
+  const { mount } = setup();
+  mount();
+  sortTo('i2', 'metric');
+  assert.equal(/[“”]/.test(feedback()), false, 'straight quotes only');
+  assert.equal(feedback().includes('"Stack trace text"'), true);
+});
+
+test('#323 the hint note says which item it counts for', () => {
+  const { mount } = setup(withHints());
+  mount();
+  assert.equal(tierLine(), '0 of 3 hints used on the next item');
+  click('[data-item="i1"]');
+  assert.equal(tierLine(), '0 of 3 hints used on this item');
 });

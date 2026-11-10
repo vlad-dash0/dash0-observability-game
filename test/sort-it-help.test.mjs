@@ -211,5 +211,5 @@ test('hintFor tier 3: applies the RIGHT bucket (from the answer), whichever buck
   const st = after(spec, [['x', 'a']]);
   const { apply } = hintFor(spec, st, 'x', 3, { shuffle: identity });
   assert.equal(place(spec, st, 'x', apply.bucket).outcome, 'right');
-  assert.equal(hintFor(spec, st, 'x', 3, { shuffle: identity }).html, '<p>Placed for you. \u201cItem X\u201d goes in <b>Bucket C</b>. C it is.</p>');
+  assert.equal(hintFor(spec, st, 'x', 3, { shuffle: identity }).html, '<p>Placed for you. "Item X" goes in <b>Bucket C</b>. C it is.</p>');
 });

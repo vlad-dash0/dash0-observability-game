@@ -105,17 +105,17 @@ row `Helps: Instant feedback on, Hints on|off` above the board). Items are toggl
 `aria-describedby="ID-instr"`); there are no bucket boxes (#261): the categories are a row of kit
 choice options (`data-bucket`, disabled until an item is selected and for a category already tried
 for it, outlined when hinted) under a plain "Then choose its category." line, and below that one plain
-group per category (`[data-drop]`: a heading "Label, a middle dot, N" with the tally, and the
+group per category (`[data-drop]`: a heading "Label" with the tally "(N)", and the
 `[data-bucket-list]` of placed items); a kit stats line reads "Sorted N of M";
-`#ID-feedback` is the kit feedback region; the plain-text instruction ("Pick an item, then its
-category, or drag an item onto a category.") is `<p class="sort-instr" id="ID-instr">`.
+`#ID-feedback` is the kit feedback region; the plain-text instruction ("Pick one to sort.", and over the
+category buttons "Then choose where it goes, or drag it there.") is `<p class="sort-instr" id="ID-instr">`.
 `labelledBy`, a plain-token heading id, makes the widget a labelled group.
 `mountSort(ctx, spec, {onComplete, swirl?})`: the pool order is shuffled once per mount through
 `ctx.shuffle`; tap-to-place (item then category button; keyboard-native); drag is an enhancement calling
 the same path, dropping an item on a category's group. Only `'wrong'` costs a mistake (`ctx.mistake()` and the score card's count in one
-branch); nothing counts after the last item. Feedback (D7): `Right. <label> goes in <bucket>.
-<why>` (success) / `Not quite. <label> is not <bucket>. <whyNot?>` (error; doesn't reveal the
-answer) / `You already tried <bucket> for <label>.` (a repeat; free, neutral) / `Pick an item
+branch); nothing counts after the last item. Feedback (D7): `Right. "<label>" goes in "<bucket>".
+<why>` (success) / `Not quite. "<label>" does not go in "<bucket>". <whyNot?>` (error; doesn't reveal the
+answer) / `You already tried "<bucket>" for "<label>".` (a repeat; free, neutral) / `Pick one to sort
 first.` (neutral). Focus: first remaining item → its first untried bucket → after wrong, next
 untried bucket → after right, next remaining item → after the last, `onComplete()` runs and the
 success card's heading takes focus.
@@ -732,7 +732,7 @@ herring). Hypotheses: n-plus-one (right), provider, redis, replicas.
   byte-identical (`git diff --stat` empty for them).
 - P2: `test/sort-it.test.mjs` (validate, place outcomes incl. repeat/placed/unknown, frozen
   input, untried/remaining) and `test/sort-it-view.test.mjs` (render, penalties, drop path,
-  focus sequence, `Pick an item first.`, no timers in `lib/widgets`).
+  focus sequence, `Pick one to sort first.`, no timers in `lib/widgets`).
 - P3/P4/P6–P9: per level a DRIVER (happy 5★ + cards, sloppy fewer; one slip 4★), per-penalty runs, a content
   pin of the answer tables above, reference solvability via validators, focus walk ending on
   `[data-finish]`; `EXPECTED_ORDER` updated; `test/content.test.mjs` (Spec line, no em dash,
