@@ -385,6 +385,51 @@ test('focus returns to the level card after closing the level and after the rewa
   assert.deepEqual(focused, ['y']);
 });
 
+test('G1 Continue reads the progress when clicked and opens what nextUp names', () => {
+  const { game, store } = setup();
+  assert.equal(game.continueLabel(), 'Start: 0.1 Level x');
+  store.data.set(STORAGE_KEY, v1({ x: { stars: 3, at: null } }));
+  game.progress = { ...game.progress, levels: { x: { stars: 3, at: null } } };
+  assert.equal(game.continueLabel(), 'Continue: 0.2 Level y');
+  assert.equal(game.continueNext(), true);
+  assert.equal(game.overlayOpen, true);
+  assert.equal(game.currentLevelId, 'y');
+});
+
+test('G2 Continue is refused behind a dialog and is absent in debug, when all is done, and with no levels', () => {
+  const { game } = setup();
+  game.openLevel('x');
+  assert.equal(game.continueNext(), false, 'a stray click behind a dialog opens nothing');
+  assert.equal(game.currentLevelId, 'x');
+  const dbg = setup({ debug: true }).game;
+  assert.equal(dbg.continueLabel(), '');
+  assert.equal(dbg.continueNext(), false);
+  const all = setup({ initial: { [STORAGE_KEY]: v1(Object.fromEntries(['x', 'y', 'a', 'b', 'z'].map((id) => [id, { stars: 3, at: null }]))) } }).game;
+  assert.equal(all.continueLabel(), '');
+  assert.equal(all.continueNext(), false);
+  const none = setup({ registry: EMPTY }).game;
+  assert.equal(none.continueLabel(), '');
+  assert.equal(none.continueNext(), false);
+});
+
+test('G3 focus returns to Continue when it opened the level and is still shown, else to the card', () => {
+  const { game } = setup();
+  const focused = [];
+  game.focusSoon = (selector) => focused.push(selector);
+  game.continueNext();
+  focused.length = 0; // opening a level focuses inside it
+  game.closeOverlay();
+  assert.deepEqual(focused, ['#hub-continue']);
+  assert.equal(game.returnTarget(), '#hub-continue');
+  game.openLevel('y');
+  game.closeOverlay();
+  assert.equal(focused.at(-1), '[data-level-id="y"]', 'a card click returns to its card');
+  game.continueNext();
+  game.progress = { ...game.progress, levels: Object.fromEntries(['x', 'y', 'a', 'b', 'z'].map((id) => [id, { stars: 3, at: null }])) };
+  game.closeOverlay();
+  assert.equal(focused.at(-1), '[data-level-id="x"]', 'Continue is gone once all is done, so the card is the target');
+});
+
 test('completion: stored with its stars, done, its country lit, totals and reward updated', () => {
   const { game, store } = setup();
   assert.deepEqual(game.stars, { earned: 0, max: 25 });
@@ -647,18 +692,24 @@ test('acts list every level and boss in order; the empty registry says levels ar
   assert.deepEqual(empty.globeLines(), []);
 });
 
-test('level labels and classes cover every state', () => {
+test('level labels and classes cover every state and exactly one card is next up', () => {
   const { game } = setup({ initial: { [STORAGE_KEY]: v1({ y: { stars: 2, at: null } }) } });
-  assert.match(game.levelLabel('x'), /^0\.1: Level x\. .*ready to play$/);
+  assert.match(game.levelLabel('x'), /^0\.1: Level x\. .*ready to play, next up$/);
+  assert.match(game.levelLabel('a'), /ready to play$/);
   assert.match(game.levelLabel('y'), /done, play again$/);
   assert.match(game.levelLabel('z'), /locked$/);
-  assert.equal(game.levelClasses('x'), 'open');
+  assert.equal(game.levelClasses('x'), 'open next');
+  assert.equal(game.levelClasses('a'), 'open');
   assert.equal(game.levelClasses('y'), 'done');
   assert.equal(game.levelClasses('z'), 'locked');
+  assert.deepEqual(['x', 'y', 'a', 'b', 'z'].filter((id) => game.isNextUp(id)), ['x']);
   game.openLevel('z');
   assert.equal(game.levelClasses('z'), 'locked nudge');
   assert.equal(game.starText('y'), '★★☆☆☆', 'a saved 2 shows two filled of five');
   assert.equal(game.starSummary(), '2 of 25 stars');
+  const debug = setup({ debug: true }).game;
+  assert.deepEqual(['x', 'y', 'a', 'b', 'z'].filter((id) => debug.isNextUp(id)), [], 'debug has no next up');
+  assert.equal(debug.levelClasses('x'), 'open');
 });
 
 test('endSentence adds a full stop only when the text does not already end a sentence', () => {
@@ -1444,19 +1495,15 @@ test('index.html: the level overlay elements live inside an x-ignore wrapper', (
   }
 });
 
-test('index.html: the globe stage is a named image, with a legend and a text fallback, and no style', () => {
+test('index.html: the globe stage is a named image, with a legend and a text fallback, and no style (the caption sits in .map-head)', () => {
   assert.equal(shell.querySelector('svg.system-map') === null, true, 'the SVG system map is gone');
   const stage = shell.querySelector('.globe .globe-stage');
   assert.ok(stage, '.globe-stage inside .globe');
   assert.equal(stage.getAttribute('role'), 'img');
   assert.equal(stage.getAttribute(':aria-label'), 'mapLabel()');
   assert.equal(shell.querySelector('.globe').getAttribute('x-show'), '!globeFallback');
-  const caption = shell.querySelector('.globe > p.globe-caption');
-  assert.ok(caption, 'the caption is a paragraph inside .globe');
-  assert.equal(caption.getAttribute('x-text'), 'captionText()');
-  assert.equal(caption.getAttribute('x-show'), "captionText() !== ''");
-  assert.equal(shell.querySelector('.globe').firstElementChild, caption, 'the caption comes first, before the stage');
-  for (const a of ['role', 'aria-live', 'aria-atomic']) assert.equal(caption.hasAttribute(a), false, `the caption is not a live region (${a})`);
+  assert.equal(shell.querySelector('.globe').firstElementChild === stage, true, 'the stage comes first in .globe; the caption lives in .map-head');
+  assert.equal(shell.querySelector('.globe p.globe-caption') === null, true, 'the caption is not inside .globe');
   const legend = shell.querySelector('ul.globe-legend');
   assert.ok(legend, 'the legend is a list');
   assert.equal(legend.getAttribute('aria-label'), 'Map key');
@@ -1759,4 +1806,52 @@ test('index.html: the progress strip sits under the header, the map and levels s
   assert.equal(title.classList.contains('visually-hidden'), true, 'the heading is spoken, not shown');
   assert.equal(strip.getAttribute('aria-labelledby'), 'save-entry-title');
   assert.equal(strip.textContent.includes('Copy it to another browser'), false, 'the old sentence is gone');
+});
+
+test('M1 .map-head holds the caption and the Continue button, outside the globe, the only primary button on the hub', () => {
+  const head = shell.querySelector('.map-panel > .map-head');
+  assert.ok(head, '.map-head is a child of .map-panel');
+  const caption = head.firstElementChild;
+  assert.equal(caption.tagName, 'P');
+  assert.equal(caption.classList.contains('globe-caption'), true);
+  assert.equal(caption.getAttribute('x-text'), 'captionText()');
+  for (const a of ['role', 'aria-live', 'aria-atomic']) assert.equal(caption.hasAttribute(a), false, `the caption is not a live region (${a})`);
+  const btn = shell.querySelector('#hub-continue');
+  assert.ok(btn);
+  assert.equal(btn.tagName, 'BUTTON');
+  assert.equal(btn.getAttribute('type'), 'button');
+  assert.deepEqual(btn.getAttribute('class').split(' '), ['ui-btn', 'ui-btn--primary']);
+  assert.equal(btn.previousElementSibling === caption, true);
+  assert.equal(btn.parentElement === head, true);
+  assert.equal(btn.closest('.globe') === null, true, 'Continue stays when the globe falls back to text');
+  assert.equal(btn.getAttribute('x-show'), "continueLabel() !== ''");
+  assert.equal(btn.getAttribute('x-text'), 'continueLabel()');
+  assert.equal(btn.getAttribute('@click'), 'continueNext()');
+  assert.equal(btn.hasAttribute('x-cloak'), true);
+  assert.equal(shell.querySelectorAll('#hub .ui-btn--primary').length, 1, 'Continue is the one primary button on the hub');
+});
+
+test('M2 the Next up chip is a kit attention chip inside the hidden status column', () => {
+  const status = deepQuery(shell, '.level-status[aria-hidden="true"]');
+  const chip = status.querySelector('span.ui-chip[data-tone="attention"]');
+  assert.ok(chip, 'the chip sits in .level-status');
+  assert.equal(chip.getAttribute('x-show'), 'isNextUp(id)');
+  assert.equal(chip.textContent.trim(), 'Next up');
+});
+
+test('M5 every name the Continue and Next up markup binds exists on the game', () => {
+  const { game } = setup();
+  const status = deepQuery(shell, '.level-status');
+  const els = [shell.querySelector('#hub-continue'), status, ...status.querySelectorAll('*')];
+  const seen = new Set();
+  for (const el of els) for (const a of ['x-show', 'x-text', '@click']) {
+    const v = el.getAttribute(a);
+    if (v === null) continue;
+    for (const m of v.matchAll(/[A-Za-z]+\(/g)) {
+      const name = m[0].slice(0, -1);
+      seen.add(name);
+      assert.equal(typeof game[name], 'function', `${a}="${v}": game.${name}`);
+    }
+  }
+  for (const k of ['continueLabel', 'continueNext', 'isNextUp']) assert.ok(seen.has(k), `the markup binds ${k}`);
 });

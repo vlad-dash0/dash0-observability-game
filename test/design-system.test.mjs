@@ -322,8 +322,8 @@ const DYNAMIC_ALLOW = {
   'hub.css': {
     // app.mjs `confetti c${(i % 6) + 1}`
     c1: ['confetti'], c2: ['confetti'], c3: ['confetti'], c4: ['confetti'], c5: ['confetti'], c6: ['confetti'],
-    // app.mjs levelClasses(): the level state plus ' nudge'
-    done: ['level-card'], locked: ['level-card'], nudge: ['level-card'],
+    // app.mjs levelClasses(): the level state plus ' next' and ' nudge'
+    done: ['level-card'], locked: ['level-card'], nudge: ['level-card'], next: ['level-card'],
     // lib/globe-render.mjs `globe-probe ${role}` over COLOR_ROLES
     body: ['globe-probe'], dim: ['globe-probe'], rim: ['globe-probe'], sky: ['globe-probe'],
     // app.mjs legendKeyClass(): `globe-key ${swatch}` (incident draws as pulse, dark as the plain key)
