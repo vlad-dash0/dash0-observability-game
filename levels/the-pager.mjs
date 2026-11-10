@@ -1,7 +1,7 @@
 // Act 0 boss: The pager, in two parts. Part 1 (blind): an alert fires with no context;
 // every look the player takes finds no data and burns a quarter of the error budget,
 // until they escalate or the budget hits 0. Part 2: the same four questions, each answered
-// from a small instrumented view. It cannot be won and is not scored: it is the reason to
+// from a small instrumented view. It cannot be won and is not scored: it is the reason to instrument.
 // The budget is a percent of the error budget, not minutes, in fixed 25% steps. The screen shows a kit meter of 4 cells, its text line (percent spent) as the one statement of the budget, and a Spent on chip per look. It is not the incident engine (§4.3). Spec: docs/M1-DESIGN.md §6 Boss the-pager.
 // Spec: https://opentelemetry.io/docs/concepts/observability-primer/#what-is-observability
 
@@ -23,7 +23,7 @@ const ALERT = 'PAGE: checkout p95 > 2 s (firing)';
 const BUDGET = { startPct: 100, stepPct: 25 };
 const REWARD = 'Blind, you could not answer one question. With telemetry, all four took seconds. Time to instrument.';
 const INTRO =
-  'Your pager goes off. Try the four questions below: you will find you cannot answer them, because nothing sends telemetry yet. Each try burns error budget. Press Escalate when you give up; if the budget runs out first, you escalate anyway.';
+  'Your pager goes off. Try the four questions below: you will find you cannot answer them, because nothing sends telemetry yet. Each try burns error budget. Press Escalate when you give up. If the budget runs out first, the pager escalates for you.';
 const LIT_INTRO =
   'Same alert, now with telemetry. Ask the same four questions. The data is made up, for illustration. Ask all four to finish.';
 
@@ -111,7 +111,7 @@ const meterHtml = (left) =>
 /** One Spent on chip per look taken, in the order taken. */
 const spentHtml = (taken) =>
   taken.length
-    ? `Spent on: ${taken.map((l) => chip({ text: `${l.label} ${BUDGET.stepPct}%` })).join(' ')}`
+    ? `Spent on: ${taken.map((l) => chip({ text: `${l.label} ${BUDGET.stepPct} percent` })).join(' ')}`
     : '';
 
 export default {

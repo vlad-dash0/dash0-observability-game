@@ -229,6 +229,6 @@ export default {
       `You followed the volume to its source: one counter went from ${SERIES_BEFORE} to ${n(SERIES_AFTER)} series at a deploy, its label breakdown showed ` +
       `user_id with ${n(USERS)} values, and checkout 5.12.0 had added user.id to its attributes. The fix is to remove the attribute and keep per-user detail on spans or logs.\n\n` +
       'In Dash0, the Metric Explorer tree map sized by cardinality shows which metric is large and its sidebar shows the attributes behind it, ' +
-      'and for random or unbounded values the guidance is to reduce them at the instrumentation layer.',
+      'and for random or unbounded values the advice is to cut them down at the instrumentation layer.',
   },
 };

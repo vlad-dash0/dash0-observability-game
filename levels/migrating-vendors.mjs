@@ -200,6 +200,6 @@ export default {
     finish:
       'Moving off a proprietary tool is part translation, with several places where the meaning shifts: a percentile becomes an estimate from buckets, an exact count becomes an extrapolated one, and what has no counterpart is rebuilt or left behind. ' +
       'Check each converted query against the old one on the same data before you switch it off.\n\n' +
-      'When the move is to Dash0, DART (Dashboards, Alerts &amp; Rules to Terraform) brings dashboards, alerts and rules over as Terraform, and the sorting still matters: some of them need a person, whatever the tool.',
+      'When the move is to Dash0, DART (Dashboards, Alerts & Rules to Terraform) brings dashboards, alerts and rules over as Terraform, and you still have to sort them: some need a person, whatever the tool.',
   },
 };

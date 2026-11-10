@@ -246,6 +246,6 @@ export default {
     ],
     finish:
       'You read an empty answer as a question about a name, not as proof of health. A query on an old attribute name matches nothing, so use the names the spans carry.\n\n' +
-      'In Dash0, the MCP Server lets an assistant query your telemetry with read-only tools, Agent0 reads it in the semantic conventions it was produced in, and you check the keys present with getAttributeKeys on the Dash0 MCP Server before you ask for a name.',
+      'In Dash0, the MCP Server lets an assistant query your telemetry with read-only tools, Agent0 reads telemetry in the OpenTelemetry semantic conventions it was produced in, and you check the keys present with getAttributeKeys on the Dash0 MCP Server before you ask for a name.',
   },
 };

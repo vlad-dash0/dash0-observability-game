@@ -38,7 +38,7 @@ const cellsFor = (spentCells) => Array.from({ length: 4 }, (_, i) => (i < spentC
 const meterLine = () => q('#pager-meter-value')?.textContent.replace(/\s+/g, ' ').trim() ?? null;
 /** The "Spent on" chips, in the order the looks were taken. */
 const spentChips = () => qa('#pager-spent .ui-chip').map((c) => c.textContent.replace(/\s+/g, ' ').trim());
-const INTRO = 'Your pager goes off. Try the four questions below: you will find you cannot answer them, because nothing sends telemetry yet. Each try burns error budget. Press Escalate when you give up; if the budget runs out first, you escalate anyway.';
+const INTRO = 'Your pager goes off. Try the four questions below: you will find you cannot answer them, because nothing sends telemetry yet. Each try burns error budget. Press Escalate when you give up. If the budget runs out first, the pager escalates for you.';
 /** A question label reads on as it is; any other label gets a colon before the text. */
 const mark = (label) => (label.endsWith('?') ? label : `${label}:`);
 const LIT_INTRO = 'Same alert, now with telemetry. Ask the same four questions. The data is made up, for illustration. Ask all four to finish.';
@@ -151,20 +151,20 @@ for (const [key, label, reason] of LOOKS) {
     assert.equal(budget(), budgetText(25));
     assert.deepEqual(meterCells(), cellsFor(1), 'one cell spent');
     assert.equal(meterLine(), '25 of 100 percent spent');
-    assert.deepEqual(spentChips(), [`${label} 25%`], 'one Spent on chip for this look');
+    assert.deepEqual(spentChips(), [`${label} 25 percent`], 'one Spent on chip for this look');
     assert.equal(q(`[data-look="${key}"]`).disabled, true, 'a look is used once');
     assert.equal(escalateDisabled(), false, 'Escalate opens after the first look');
   });
 }
 
-test('the-pager: the looks add up, 25 each, to 0% left; a used look costs nothing again', () => {
+test('the-pager: the looks add up, 25 each, to 100 percent spent; a used look costs nothing again', () => {
   start();
   LOOKS.slice(0, 3).forEach(([key, label, reason], i) => {
     click(`[data-look="${key}"]`);
     assert.equal(budget(), budgetText(25 * (i + 1)), `after ${i + 1} looks`);
     assert.deepEqual(meterCells(), cellsFor(i + 1), `after ${i + 1} looks: cells`);
     assert.equal(meterLine(), `${25 * (i + 1)} of 100 percent spent`);
-    assert.deepEqual(spentChips(), LOOKS.slice(0, i + 1).map(([, l]) => `${l} 25%`), 'chips in look order');
+    assert.deepEqual(spentChips(), LOOKS.slice(0, i + 1).map(([, l]) => `${l} 25 percent`), 'chips in look order');
     assert.equal(text(`[data-said="${key}"]`), `${mark(label)} ${reason}`);
   });
   assert.deepEqual(said(), ['service', 'since', 'customers']);
@@ -181,7 +181,7 @@ test('the-pager: chips follow the order the looks are taken, not the screen orde
   start();
   click('[data-look="trace"]');
   click('[data-look="since"]');
-  assert.deepEqual(spentChips(), ['Show me a trace 25%', 'Since when? 25%']);
+  assert.deepEqual(spentChips(), ['Show me a trace 25 percent', 'Since when? 25 percent']);
   assert.equal(budget(), budgetText(50));
   assert.deepEqual(meterCells(), cellsFor(2));
 });
@@ -189,9 +189,9 @@ test('the-pager: chips follow the order the looks are taken, not the screen orde
 test('the-pager: budget 0 moves to part 2 by itself, with no Escalate click', () => {
   const { finished } = start();
   for (const [key] of LOOKS.slice(0, 3)) click(`[data-look="${key}"]`);
-  assert.equal(partTwo(), false, 'still blind at 25% left');
+  assert.equal(partTwo(), false, 'still blind at 75 percent spent');
   click('[data-look="trace"]');
-  assert.equal(partTwo(), true, 'part 2 at 0% left');
+  assert.equal(partTwo(), true, 'part 2 at 100 percent spent');
   assert.equal(qa('#pager-budget, #pager-meter, #pager-spent').length, 0, 'the budget, meter and chips are gone');
   assert.equal(finished.length, 0, 'moving on does not finish');
 });

@@ -201,8 +201,8 @@ export default {
       },
     ],
     finish:
-      'You did not take the yes on trust: a filter judges one span or record at a time, so it can drop the probe, the debug logs and the load test, but it cannot keep a trace because one of its spans failed. ' +
-      'That takes a tail sampler, and dropping spans inside a kept trace takes both.\n\n' +
+      'You did not accept the yes without checking: a filter judges one span or record at a time, so it can drop the probe, the debug logs and the load test, but it cannot keep a trace because one of its spans failed. ' +
+      'That takes a tail sampler. Dropping spans inside a kept trace takes both a filter and a tail sampler.\n\n' +
       "Dash0 has both kinds of tool: spam filters drop matching telemetry at ingestion, record by record, and SignalControl's sampling stage samples traces before they are stored.",
   },
 };

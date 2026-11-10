@@ -195,6 +195,6 @@ export default {
       'You followed one request from the error logs to its trace to the deploy that changed it: inventory 3.1.0 renamed a ' +
       'field and orders could not read the reply.\n\n' +
       'Dash0 uses PromQL as its query language for logs, traces and metrics alike, ' +
-      'with a Query Builder tab for each, so a filter such as service.name reads the same in all three.',
+      'with a Query Builder tab for each, so a filter on service.name is written the same way in all three.',
   },
 };
