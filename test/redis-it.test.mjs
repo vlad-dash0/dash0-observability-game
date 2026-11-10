@@ -13,6 +13,7 @@ import { nickKey } from '../lib/account/nickname.mjs';
 import { createFakeRedis } from '../tools/fake-redis.mjs';
 
 const T0 = Date.UTC(2026, 5, 1);
+const TTL_S = 3600;
 const registry = {
   order: ['s1', 's2', 'u'],
   cardIds: [],
@@ -30,17 +31,27 @@ const prog = (levels) => ({
 function isolate(raw, runId) {
   const touched = new Set();
   const own = `${KEY_PREFIX}it${runId}:`;
-  const mv = (v) => {
-    if (typeof v !== 'string' || !v.startsWith(KEY_PREFIX)) return v;
-    const k = own + v.slice(KEY_PREFIX.length);
-    touched.add(k);
-    return k;
+  // A killed run must not leave keys behind for good: the keys one call touched get a TTL after it.
+  const through = async (call, build) => {
+    const bag = new Set();
+    const mv = (v) => {
+      if (typeof v !== 'string' || !v.startsWith(KEY_PREFIX)) return v;
+      const k = own + v.slice(KEY_PREFIX.length);
+      bag.add(k);
+      touched.add(k);
+      return k;
+    };
+    try {
+      return await call(build(mv));
+    } finally {
+      if (bag.size) await raw.pipeline([...bag].map((k) => ['EXPIRE', k, TTL_S]));
+    }
   };
   return {
     touched,
-    command: (args) => raw.command(args.map(mv)),
-    pipeline: (cmds) => raw.pipeline(cmds.map((c) => c.map(mv))),
-    script: (name, ks, args) => raw.script(name, ks.map(mv), args.map(mv)),
+    command: (args) => through(raw.command, (mv) => args.map(mv)),
+    pipeline: (cmds) => through(raw.pipeline, (mv) => cmds.map((c) => c.map(mv))),
+    script: (name, ks, args) => through((built) => raw.script(name, ...built), (mv) => [ks.map(mv), args.map(mv)]),
   };
 }
 
@@ -48,7 +59,8 @@ function isolate(raw, runId) {
 function side({ url, token, fetch }, runId) {
   const sent = [];
   const recording = async (u, init) => {
-    sent.push(JSON.parse(init.body)[0]);
+    const body = JSON.parse(init.body);
+    if (typeof body[0] === 'string') sent.push(body[0]); // single commands only, not pipelines
     return fetch(u, init);
   };
   const raw = createRedis({ url, token, fetch: recording });
@@ -67,8 +79,10 @@ async function scenarios({ redis, raw, sent }) {
   const note = (label, value) => out.push([label, value]);
   let n = 0;
   const store = createStore({ redis, registry, now: () => T0, random: (len) => new Uint8Array(len).fill(++n) });
-  const nicks = new Set(['ada', 'grace']);
-  const snap = async (label, pids, subs) => {
+  const nicks = new Set(['ada', 'grace', 'zed']);
+  const pids = [];
+  const subs = [];
+  const snap = async (label) => {
     const cmds = [
       ...subs.map((s) => ['GET', keys.sub(s)]),
       ...pids.flatMap((p) => [['HGETALL', keys.profile(p)], ['HGETALL', keys.progress(p)]]),
@@ -87,6 +101,8 @@ async function scenarios({ redis, raw, sent }) {
   };
   const join = async (sub, email) => {
     const r = await store.signIn(sub, email);
+    pids.push(r.profile.pid);
+    subs.push(sub);
     nicks.add(nickKey(r.profile.nick));
     return r.profile.pid;
   };
@@ -95,13 +111,13 @@ async function scenarios({ redis, raw, sent }) {
   const a = await join('sub-a', 'aaa@dash0.com');
   const b = await join('sub-b', 'bbb@dash0.com');
   const ghost = 'no-such-pid';
-  await snap('signed in', [a, b], ['sub-a', 'sub-b']);
+  await snap('signed in');
 
   // cas-progress: ok, same-progress rewrite, zero total, stale rev, gone.
   note('put a', row(await store.putProgress(a, prog({ s1: 3, u: 5 }))));
   note('put a again', row(await store.putProgress(a, prog({ s1: 3 }))));
   note('put b zero', row(await store.putProgress(b, prog({ u: 2 }))));
-  await snap('after puts', [a, b], ['sub-a', 'sub-b']);
+  await snap('after puts');
   const casKeys = [keys.progress(a), keys.profile(a), keys.board];
   note('cas stale rev', await redis.script('cas-progress', casKeys, ['0', '{}', 1, T0, 5, a]));
   note('cas missing profile', await redis.script('cas-progress', [keys.progress(ghost), keys.profile(ghost), keys.board], ['0', '{}', 1, T0, 5, ghost]));
@@ -110,23 +126,30 @@ async function scenarios({ redis, raw, sent }) {
   // claim-nick: win, case collision, own re-claim, releases the old claim, conflict, gone.
   note('nick Ada', await store.setNickname(a, 'Ada'));
   note('nick ADA by b', await store.setNickname(b, 'ADA'));
-  note('nick 4da by b', await store.setNickname(b, '4da')); // leet form of "ada" for the store's rules
+  note('nick 4da by b', await store.setNickname(b, '4da')); // a separate claim: nickKey does not fold leet
   note('nick ada own case', await store.setNickname(a, 'ada'));
   note('nick Grace', await store.setNickname(a, 'Grace'));
   note('nick ada by b', await store.setNickname(b, 'ada'));
-  await snap('after nicks', [a, b], ['sub-a', 'sub-b']);
+  await snap('after nicks');
+  // claim-nick: the old key is held by another pid, so a rename takes the new key and spares the old one.
+  await redis.command(['SET', keys.nick('ada'), 'other-pid']);
+  note('rename b, old key held by another', await store.setNickname(b, 'Zed'));
+  await snap('old nick key spared');
+  await redis.command(['DEL', keys.nick('ada')]); // the test's own key
   note('claim wrong old', await redis.script('claim-nick', [keys.profile(a), keys.nick('zed'), keys.nick('grace')], [a, 'Zed', 'zed', 'not-grace']));
   note('claim gone', await redis.script('claim-nick', [keys.profile(ghost), keys.nick('zed'), keys.nick('zed')], [ghost, 'Zed', 'zed', '']));
   note('nick ghost', await store.setNickname(ghost, 'Ghost'));
 
   // set-listing: off, on with a stored score, on with none, gone.
   note('unlist a', await store.setListing(a, false));
-  await snap('unlisted', [a, b], ['sub-a', 'sub-b']);
+  await snap('unlisted');
   note('put a while unlisted', row(await store.putProgress(a, prog({ s1: 3, s2: 2 }))));
   note('list a', await store.setListing(a, true));
+  const c = await join('sub-c', 'ccc@dash0.com'); // never saved: no progress hash at all
+  note('list c (no progress)', await store.setListing(c, true));
   note('list b (no total)', await store.setListing(b, true));
   note('list ghost', await store.setListing(ghost, true));
-  await snap('listed', [a, b], ['sub-a', 'sub-b']);
+  await snap('listed');
   note('board', await store.leaderboard({ pid: a }));
 
   // delete-account: conflict, then a nick key held by another pid is spared, then all of it goes.
@@ -135,12 +158,16 @@ async function scenarios({ redis, raw, sent }) {
   note('delete wrong nickKey', await redis.script('delete-account', delKeys(a, 'sub-a', 'grace'), [a, 'sub-a', 'other']));
   await redis.command(['SET', keys.nick('grace'), b]); // grace is now held by another pid
   note('delete a', await store.deleteAccount(a));
-  await snap('a deleted', [a, b], ['sub-a', 'sub-b']);
+  await snap('a deleted');
   await redis.command(['DEL', keys.nick('grace')]); // the spared key is the test's own, not b's claim
   note('load a', await store.loadProfile(a));
   note('delete a twice', await store.deleteAccount(a));
-  note('delete b', await store.deleteAccount(b));
-  await snap('all deleted', [a, b], ['sub-a', 'sub-b']);
+  await redis.command(['SET', keys.sub('sub-b'), 'other-pid']); // the sub key now belongs to another pid
+  note('delete b, sub key held by another', await store.deleteAccount(b));
+  await snap('b deleted, sub key spared');
+  await redis.command(['DEL', keys.sub('sub-b')]); // the test's own key
+  note('delete c', await store.deleteAccount(c));
+  await snap('all deleted');
   note('board after', await store.leaderboard());
 
   // errors: a failed command rejects with RedisError, an unknown script is refused client side.
@@ -179,6 +206,26 @@ const fakeSide = (wrap = (f) => f) => {
 };
 
 describe('the comparison harness', () => {
+  test('the fake ranks a sorted set with negative indexes as Redis does', async () => {
+    const fake = createFakeRedis();
+    const redis = createRedis({ url: fake.url, token: fake.token, fetch: fake.fetch });
+    await redis.pipeline([['ZADD', 'z', 1, 'a'], ['ZADD', 'z', 3, 'c'], ['ZADD', 'z', 2, 'b']]);
+    const range = (a, b) => redis.command(['ZREVRANGE', 'z', a, b]);
+    assert.deepEqual(await range(0, -1), ['c', 'b', 'a']);
+    assert.deepEqual(await range(0, 1), ['c', 'b']);
+    assert.deepEqual(await range(-2, -1), ['b', 'a']);
+    assert.deepEqual(await range(-10, 0), ['c']);
+    assert.deepEqual(await range(1, -2), ['b']);
+    assert.deepEqual(await range(2, 1), []);
+    assert.deepEqual(await redis.command(['ZREVRANGE', 'none', 0, -1]), []);
+  });
+
+  test('the board snapshot sees the listed players', async () => {
+    const out = await scenarios(fakeSide());
+    const board = out.find(([label]) => label === 'state after puts')[1].board;
+    assert.equal(board.length, 2); // one listed player with a total: [pid, score]
+  });
+
   test('two fakes agree on every scenario', async () => {
     assert.ok((await compare(fakeSide(), fakeSide())) > 30);
   });
@@ -193,7 +240,7 @@ describe('the comparison harness', () => {
     await assert.rejects(compare(fakeSide(lie), fakeSide()), /differs at: nick ADA by b/);
   });
 
-  test('it fails when one side leaves state behind (a delete that forgets the sub key)', async () => {
+  test('it fails when one side leaves state behind (a successful delete that leaves its sub key)', async () => {
     const forgets = (fetch) => async (u, init) => {
       const res = await fetch(u, init);
       const cmd = JSON.parse(init.body);
@@ -208,22 +255,37 @@ describe('the comparison harness', () => {
   });
 });
 
-const config = process.env.REDIS_IT === '1' ? redisConfigFromEnv(process.env) : null;
-const skipReason =
-  process.env.REDIS_IT !== '1'
-    ? 'set REDIS_IT=1 (and the Upstash env vars, dev database only) to run the Lua scripts against real Redis'
-    : config === null
-      ? 'REDIS_IT=1 but no store config (UPSTASH_REDIS_REST_URL/_TOKEN or KV_REST_API_URL/_TOKEN)'
-      : false;
+const ENV_HINT =
+  'UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN (or KV_REST_API_URL and KV_REST_API_TOKEN)';
+const optedIn = process.env.REDIS_IT === '1';
+const config = optedIn ? redisConfigFromEnv(process.env) : null;
+const skipReason = optedIn
+  ? false
+  : `set REDIS_IT=1 plus ${ENV_HINT} (a dev database only) to run the Lua scripts against real Redis`;
 
 describe('the Lua scripts on a real Redis', { skip: skipReason }, () => {
-  const live = config ? side({ ...config, fetch: globalThis.fetch }, runId()) : null;
-  after(async () => {
-    const mine = [...live.redis.touched];
-    for (let i = 0; i < mine.length; i += 100) await live.raw.command(['DEL', ...mine.slice(i, i + 100)]);
+  test('REDIS_IT=1 comes with a store config', () => {
+    // An explicit opt-in without a usable config is a failure, not a quiet skip.
+    assert.notEqual(config, null, `REDIS_IT=1 needs a complete store config: ${ENV_HINT}`);
   });
 
-  test('every scenario matches the fake, key for key', async () => {
+  if (config === null) return;
+  const live = side({ ...config, fetch: globalThis.fetch }, runId());
+  after(async () => {
+    // Keep deleting after a failed batch, then report it; the keys also carry a TTL.
+    const mine = [...live.redis.touched];
+    const failures = [];
+    for (let i = 0; i < mine.length; i += 100) {
+      try {
+        await live.raw.command(['DEL', ...mine.slice(i, i + 100)]);
+      } catch (err) {
+        failures.push(err.message);
+      }
+    }
+    assert.deepEqual(failures, [], 'cleanup: some keys were not deleted (they expire after an hour)');
+  });
+
+  test('every scenario gives the same results and state as the fake', async () => {
     const fake = createFakeRedis();
     await compare(live, side({ url: fake.url, token: fake.token, fetch: fake.fetch }, runId()));
   });
