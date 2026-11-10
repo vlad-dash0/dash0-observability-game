@@ -1736,3 +1736,27 @@ test('About: the map topic renders GLOBE_LOOP after the summary, and the summary
   assert.ok(order.indexOf(topic) > order.indexOf(body.querySelector('[x-text="aboutSummary"]')), 'after the summary');
   assert.ok(order.indexOf(topic) < order.indexOf(body.querySelector('ol.about-acts')), 'before the act list');
 });
+
+test('index.html: the progress strip sits under the header, the map and levels share .hub-body (M4)', () => {
+  const hub = shell.getElementById('hub');
+  const order = ['header.hub-header', 'section.save-entry', 'section.map-panel', 'section.levels'];
+  const at = order.map((sel) => {
+    const el = hub.querySelector(sel);
+    assert.ok(el, sel);
+    return [...hub.querySelectorAll('*')].indexOf(el);
+  });
+  assert.deepEqual(at, [...at].sort((a, b) => a - b), 'document order: header, strip, map, levels');
+  const strip = hub.querySelector('section.save-entry');
+  assert.equal(strip.previousElementSibling.matches('header.hub-header'), true, 'the strip follows the header directly');
+  const body = hub.querySelector('div.hub-body');
+  assert.ok(body && body.parentElement === hub);
+  assert.deepEqual([...body.children].map((c) => c.className), ['map-panel', 'levels']);
+  for (const id of ['account-entry', 'save-open', 'board-open', 'account-open']) {
+    assert.ok(strip.querySelector(`#${id}`), `#${id} stays in the strip`);
+  }
+  assert.ok(strip.querySelector('a[href="/api/auth-start"]'), 'the sign-in anchor stays in the strip');
+  const title = strip.querySelector('#save-entry-title');
+  assert.equal(title.classList.contains('visually-hidden'), true, 'the heading is spoken, not shown');
+  assert.equal(strip.getAttribute('aria-labelledby'), 'save-entry-title');
+  assert.equal(strip.textContent.includes('Copy it to another browser'), false, 'the old sentence is gone');
+});
