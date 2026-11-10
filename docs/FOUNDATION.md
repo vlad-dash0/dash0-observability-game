@@ -197,7 +197,10 @@ Renderer (`lib/globe-render.mjs`, three.js 0.180.0 vendored): `THREE.Points` wit
 halos, slow spin, drag to rotate, pixel ratio capped at 2, canvas sized by CSS and
 `setSize(w, h, false)` (no style attribute). `createGame` mounts it into `.globe-stage`,
 disposes it while a level covers the hub and on `pagehide`, and shows the text fallback when
-three.js, the colours or WebGL are unavailable. Level `lights` stay level data, validated
+three.js, the colours or WebGL are unavailable. An open incident throws off sparks
+(`lib/globe-sparks.mjs`, pure: `SPARK` slots, `sparkSources`, `sparksAt(t, n, seed)`, a hash of the
+slot and period so there is no backlog after a hidden tab; one lazy `THREE.Points` of 6 vertices,
+never made under reduced motion, hidden while no region pulses). Level `lights` stay level data, validated
 against `hub/map-data.mjs` `NODE_IDS`, and are no longer drawn.
 
 Debug (#309): `?mode=debug` draws the globe with every level done (`app.mjs` `globeProgress()`, read by `mapState()` and `globeView()`), so every mapped region is resolved; cards, stars, level states and storage still use the real progress.

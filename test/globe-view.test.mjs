@@ -352,7 +352,7 @@ test('mountGlobe gives null before touching WebGL when the token colours cannot 
 
 /** A fake THREE that records what is made and released; `throwIn` names a class whose constructor throws. */
 function recordingThree(throwIn = null) {
-  const rec = { geometries: [], materials: [], renderer: null, renders: 0 };
+  const rec = { geometries: [], materials: [], points: [], vectors: 0, renderer: null, renders: 0 };
   const maybeThrow = (name) => {
     if (name === throwIn) throw new Error(`${name} failed`);
   };
@@ -370,12 +370,15 @@ function recordingThree(throwIn = null) {
       maybeThrow('BufferGeometry');
       rec.geometries.push(this);
     }
-    setAttribute() {}
+    setAttribute(name, attr) {
+      (this.attributes ??= {})[name] = attr;
+    }
   }
   class SphereGeometry extends BufferGeometry {}
   class ShaderMaterial extends Disposable {
-    constructor() {
+    constructor(opts = {}) {
       super();
+      this.opts = opts;
       maybeThrow('ShaderMaterial');
       rec.materials.push(this);
     }
@@ -419,8 +422,16 @@ function recordingThree(throwIn = null) {
     BufferGeometry,
     SphereGeometry,
     ShaderMaterial,
-    BufferAttribute: class {},
-    Vector3: class {},
+    BufferAttribute: class {
+      constructor(array) {
+        this.array = array;
+      }
+    },
+    Vector3: class {
+      constructor() {
+        rec.vectors++;
+      }
+    },
     Color: class {
       setRGB() {
         return this;
@@ -430,7 +441,15 @@ function recordingThree(throwIn = null) {
     PerspectiveCamera: class PerspectiveCamera extends Node3 {},
     Group: class Group extends Node3 {},
     Mesh: class Mesh extends Node3 {},
-    Points: class Points extends Node3 {},
+    Points: class Points extends Node3 {
+      constructor(geometry, material) {
+        super();
+        this.geometry = geometry;
+        this.material = material;
+        this.visible = true;
+        rec.points.push(this);
+      }
+    },
     AdditiveBlending: 2,
     BackSide: 1,
     SRGBColorSpace: 'srgb',
@@ -657,4 +676,92 @@ test('every colour role has a probe rule and a token', () => {
     assert.ok(def, `token for ${role}`);
     assert.doesNotMatch(def[1], /oklab|oklch/, `${role} must stay a colour parseColor reads`);
   }
+});
+
+// ---- incident sparks (#309 P3) ---------------------------------------------------------
+
+const PULSING = Uint8Array.from([DOT.PULSE, DOT.LIT, DOT.PULSE]);
+const CALM = Uint8Array.from([DOT.LIT, DOT.UNLIT, DOT.RESOLVED]);
+async function mountSparks(states, reduced) {
+  const { THREE, rec } = recordingThree();
+  const dom = recordingDom();
+  const handle = await mountGlobe(dom.host, { ...VIEW, states, reduced, window: dom.window, document: dom.document, importThree: async () => THREE });
+  return { handle, rec, dom };
+}
+const sparkPoints = (rec) => rec.points.filter((p) => p.material.opts.vertexShader === render.SPARK_VS);
+const frameAt = (dom, ms) => {
+  const fns = [...dom.frames.pending.values()];
+  dom.frames.pending.clear();
+  fns.forEach((fn) => fn(ms));
+};
+
+test('an open incident with motion adds one spark geometry and material, each freed once', async () => {
+  const { handle, rec } = await mountSparks(PULSING, false);
+  assert.equal(rec.geometries.length, 4);
+  assert.equal(rec.materials.length, 5);
+  assert.equal(sparkPoints(rec).length, 1);
+  handle.dispose();
+  handle.dispose();
+  assert.deepEqual(rec.geometries.map((g) => g.disposed), [1, 1, 1, 1]);
+  assert.deepEqual(rec.materials.map((m) => m.disposed), [1, 1, 1, 1, 1]);
+});
+
+test('under reduced motion an incident makes no sparks', async () => {
+  const { handle, rec } = await mountSparks(PULSING, true);
+  assert.equal(rec.geometries.length, 3);
+  assert.equal(rec.materials.length, 4);
+  handle.update(PULSING, null);
+  assert.equal(rec.geometries.length, 3);
+  handle.dispose();
+});
+
+test('sparks are made lazily, hidden while no dot pulses, and never made twice', async () => {
+  const { handle, rec } = await mountSparks(CALM, false);
+  assert.equal(rec.geometries.length, 3, 'no incident, no sparks yet');
+  handle.update(PULSING, null);
+  assert.equal(sparkPoints(rec).length, 1);
+  assert.equal(sparkPoints(rec)[0].visible, true);
+  handle.update(CALM, null);
+  assert.equal(sparkPoints(rec)[0].visible, false);
+  handle.update(PULSING, null);
+  assert.equal(sparkPoints(rec).length, 1);
+  assert.equal(sparkPoints(rec)[0].visible, true);
+  assert.equal(rec.geometries.length, 4);
+  handle.dispose();
+  assert.deepEqual(rec.geometries.map((g) => g.disposed), [1, 1, 1, 1]);
+});
+
+test('a frame writes at most SLOTS live ages, on the pulsing dots; the rest are -1', async () => {
+  const { handle, rec, dom } = await mountSparks(PULSING, false);
+  const [{ geometry }] = sparkPoints(rec);
+  let seen = 0;
+  for (let ms = 1000; ms < 60000; ms += 500) {
+    frameAt(dom, ms);
+    const ages = [...geometry.attributes.aAge.array];
+    const live = ages.filter((a) => a >= 0);
+    assert.ok(live.length <= 6 && live.every((a) => a < 1));
+    assert.deepEqual(ages.filter((a) => a < 0), ages.filter((a) => a < 0).map(() => -1));
+    seen += live.length;
+  }
+  assert.ok(seen > 0, 'sparks appear');
+  handle.update(CALM, null);
+  frameAt(dom, 61000);
+  assert.deepEqual([...geometry.attributes.aAge.array], Array(6).fill(-1));
+  handle.dispose();
+});
+
+test('the spark shader hides the far side, uses the pulse colour, and sparks add no colour vectors', async () => {
+  assert.match(render.SPARK_VS, /smoothstep\(-0\.02, 0\.32, n\.z\)/);
+  assert.match(render.SPARK_VS, /aAge < 0\.0 \? 0\.0/);
+  assert.match(render.SPARK_FS, /uPulse/);
+  const calm = await mountSparks(CALM, false);
+  const loud = await mountSparks(PULSING, false);
+  assert.equal(loud.rec.vectors, calm.rec.vectors, 'only the colour roles make Vector3');
+  const [spark] = sparkPoints(loud.rec);
+  const dots = loud.rec.materials[1].opts.uniforms;
+  for (const u of ['uPulse', 'uPR', 'uScale']) assert.equal(spark.material.opts.uniforms[u], dots[u], `${u} is shared`);
+  assert.equal(spark.material.opts.depthTest, false);
+  assert.equal(spark.material.opts.depthWrite, false);
+  calm.handle.dispose();
+  loud.handle.dispose();
 });
