@@ -1305,6 +1305,23 @@ test('a first step that reports a different type than the first declared one dec
   assert.deepEqual(s.focused, ['#ov-howto-title']);
 });
 
+test('a first step on a hidden type leaves the guide closed, focus on Back, the topic still its own', () => {
+  const REG = buildRegistry(
+    [{ id: 'a0', no: 0, name: 'A', levels: [L('r', '0.1', {
+      mechanics: ['sort'], widgets: ['choice', 'sort'],
+      run(ctx) { ctxs.r = ctx; ctx.widget('sort'); ctx.renderStep('<p>r</p>', ''); },
+    })], boss: null }],
+    { deck: [], nodeIds: [] },
+  );
+  const s = setup({ registry: REG, initial: { [HELP_KEY]: '{"v":1,"hidden":["sort"]}' } });
+  s.focused = [];
+  s.game.focusSoon = (sel) => s.focused.push(sel);
+  s.game.openLevel('r');
+  assert.equal(s.game.howToOpen, false, 'choice (the first declared) is new, but the first step is the hidden sort');
+  assert.deepEqual(s.game.howToTopics().map((t) => t.key), ['sort']);
+  assert.deepEqual(s.focused, ['#ov-back']);
+});
+
 test('a stale or unknown widget report changes nothing', () => {
   const s = cardGame();
   s.game.openLevel('w');

@@ -125,7 +125,8 @@ Escape closes the top modal (`onEscape`); the page behind is inert (`#hub` via `
 via `:inert="howToOpen"`, so How to play sits beside the overlay, never inside it); Tab and Shift+Tab wrap
 inside (`lib/modal-focus.mjs`, `trapTab`); motion is a short fade and slide that the global
 reduced-motion rule shortens. The reward card is not a modal of this kind (D3: it keeps its glow).
-How to play shows one guide at a time, for the step type the player is on (`ctx.widget(key)`, called by each widget's mount); it opens by itself the first time a type appears and from the level header's
+How to play shows one guide at a time, for the step type the player is on (`ctx.widget(key)`, called
+by each widget's mount); it opens by itself the first time a type appears and from the level header's
 How to play button, which opens the guide of the current step.
 
 ## Focus

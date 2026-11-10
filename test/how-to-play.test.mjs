@@ -91,13 +91,15 @@ test('what costs a star is built from the widget\'s own PENALTY: its costs, then
   for (const w of WIDGETS) {
     const [t] = howToView(level({ widgets: [w] })).topics;
     const p = part(t, 'What costs a star');
-    assert.ok(p.text.includes(PENALTIES[w].costs), w);
-    assert.ok(p.text.startsWith('Each of these costs one penalty: '), w);
-    if (PENALTIES[w].free === '') assert.ok(p.text.endsWith(`${PENALTIES[w].costs}.`), `${w}: nothing free, nothing said`);
+    if (PENALTIES[w].free === '') assert.ok(p.text.endsWith('penalty.') || p.text.endsWith(' hint.'), `${w}: nothing free, nothing said`);
     else assert.ok(p.text.endsWith(` ${PENALTIES[w].free}`), w);
     assert.equal(p.text.includes('undefined'), false, w);
   }
-  assert.equal(part(howToView(level({ widgets: ['choice'] })).topics[0], 'What costs a star').text, 'Each of these costs one penalty: a wrong pick.');
+  assert.equal(part(howToView(level({ widgets: ['choice'] })).topics[0], 'What costs a star').text, 'A wrong pick costs one penalty.');
+  const text = (w) => part(howToView(level({ widgets: [w] })).topics[0], 'What costs a star').text;
+  assert.equal(text('sort'), 'Each of these costs one penalty: a wrong placement and a hint. Retrying is free.');
+  assert.equal(text('build'), 'Each of these costs one penalty: a wrong drop, a failed Check, a wrong pick and a hint. Retrying is free.');
+  assert.ok(text('tradeoff').startsWith('Each of these costs one penalty: a failed Check (over the cap, or a need dropped) and a hint. '), 'a comma inside parentheses is not a split');
 });
 
 test('Your stars lists the ladder rung by rung, then the par sentence (with a par time) and REPLAY', () => {
@@ -130,9 +132,9 @@ test('a widget in the level\'s hintless list says no hints; the others keep thei
 });
 
 test('the hint lines are plain sentences about one penalty per hint', () => {
-  assert.equal(NO_HINTS, 'This step has no hints.');
-  assert.equal(HOW_TO.sort.hints, 'Each hint costs one penalty. The Hint button shows what the next one costs on the score card.');
-  assert.equal(HOW_TO.query.hints, 'A hint costs one penalty. Some steps have no hint.');
+  assert.equal(NO_HINTS, 'This step has no Hint button.');
+  assert.equal(HOW_TO.sort.hints, 'Each hint costs one penalty. The Hint button shows what the next one costs.');
+  assert.equal(HOW_TO.query.hints, 'A hint costs one penalty. Some steps have no Hint button.');
   assert.equal(HOW_TO.configure.hints, HOW_TO.query.hints);
 });
 
@@ -145,7 +147,7 @@ test('copy reads as sentences: full stops, "Not quite" in quotes, no em dash, no
   lines.push(NO_HINTS, PAR, REPLAY, NOT_SCORED);
   for (const l of lines) {
     assert.match(l, /^[A-Z].*\.$/s, l);
-    assert.equal(l.includes('—'), false, l);
+    assert.equal(l.includes('\u2014'), false, l);
     if (l.includes('Not quite')) assert.ok(l.includes('"Not quite"'), l);
   }
   assert.equal(HOW_TO.choice.play.join(' ').includes('Not quite'), true);
@@ -153,6 +155,6 @@ test('copy reads as sentences: full stops, "Not quite" in quotes, no em dash, no
   assert.equal(lines.some((l) => /^No hints\.$/.test(l)), false);
 });
 
-test('the Query it guide still says a repeated query costs nothing', () => {
-  assert.ok(HOW_TO.query.play.join(' ').includes('costs nothing') || HOW_TO.query.play.join(' ').includes('no cost'));
+test('the Query it guide says a repeated query is free', () => {
+  assert.ok(HOW_TO.query.play.join(' ').includes('and that is free'));
 });
