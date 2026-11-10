@@ -88,8 +88,11 @@
     <section class="map-panel" aria-labelledby="map-title">
       <h2 id="map-title" class="section-label" tabindex="-1">World map</h2>
       <p class="visually-hidden" role="status" x-text="litNote"></p>
-      <div class="globe" x-show="!globeFallback">
+      <div class="map-head">
         <p class="globe-caption" x-show="captionText() !== ''" x-text="captionText()"></p>
+        <button type="button" class="ui-btn ui-btn--primary" id="hub-continue" x-show="continueLabel() !== ''" x-text="continueLabel()" @click="continueNext()" x-cloak></button>
+      </div>
+      <div class="globe" x-show="!globeFallback">
         <div class="globe-stage" role="img" :aria-label="mapLabel()"></div>
         <p class="globe-hint" aria-hidden="true">Drag to rotate</p>
         <ul class="globe-legend" aria-label="Map key">
@@ -135,6 +138,7 @@
                 </div>
                 <div class="level-status" aria-hidden="true">
                   <span class="level-stars" x-show="levelState(id) === 'done' &amp;&amp; level(id).scored" x-text="starText(id)"></span>
+                  <span class="ui-chip" data-tone="attention" x-show="isNextUp(id)">Next up</span>
                   <span x-text="levelState(id) === 'done' ? 'Play again' : levelState(id) === 'open' ? 'Start' : 'Locked'"></span>
                 </div>
               </div>

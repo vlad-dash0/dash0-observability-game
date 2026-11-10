@@ -37,6 +37,7 @@ import { buildRegistry } from './lib/registry.mjs';
 import { createSaveDialog } from './lib/save-dialog.mjs';
 import { loadProgress, saveProgress, STORAGE_KEY } from './lib/storage.mjs';
 import { readTheme, writeTheme } from './lib/theme.mjs';
+import { continueView } from './lib/hub-view.mjs';
 import { levelState, lockReason } from './lib/unlock.mjs';
 
 // ?mode=debug shows the globe with everything finished (#309): a progress where every level is done.
@@ -223,6 +224,7 @@ export function createGame(deps) {
     overlayTitle: '',
     overlayNo: '',
     currentLevelId: null,
+    openedFrom: 'card', // who opened the current level: 'card' or 'continue' (returnTarget)
     nudgeId: null,
     rewardOpen: false,
     aboutOpen: false,
@@ -552,13 +554,30 @@ export function createGame(deps) {
     },
     // A class string, never a mixed :class array (Alpine renders "[object Object]").
     levelClasses(id) {
-      return this.levelState(id) + (this.nudgeId === id ? ' nudge' : '');
+      return this.levelState(id) + (this.isNextUp(id) ? ' next' : '') + (this.nudgeId === id ? ' nudge' : '');
+    },
+    // ---------- continue ----------
+    // The Continue button, read fresh each time (lib/hub-view.mjs): null in debug, when all is done, with no levels.
+    continueView() {
+      return continueView(registry, this.progress, { debug: this.debug });
+    },
+    continueLabel() {
+      return this.continueView()?.label ?? '';
+    },
+    // Recomputed on the click, never taken from what was drawn; refused behind a dialog like any card.
+    continueNext() {
+      const next = this.continueView();
+      return next !== null && this.openLevel(next.levelId, 'continue') !== false; // openLevel refuses behind a dialog
+    },
+    // The one card Continue would open (the Next up chip and class); none in debug.
+    isNextUp(id) {
+      return this.continueView()?.levelId === id;
     },
     levelLabel(id) {
       const l = registry.levels[id];
       const head = l.kind === 'boss' ? 'Incident' : l.no;
       const sub = l.sub ? ` ${endSentence(l.sub)}` : '';
-      return `${head}: ${endSentence(l.name)}${sub} ${STATE_LABELS[this.levelState(id)]}`;
+      return `${head}: ${endSentence(l.name)}${sub} ${STATE_LABELS[this.levelState(id)]}${this.isNextUp(id) ? ', next up' : ''}`;
     },
     // The card subtitle: the lock reason while nudged, else the level's sub.
     levelSub(id) {
@@ -744,7 +763,8 @@ export function createGame(deps) {
     // A locked card wiggles and names what unlocks it (R's nudge) instead of doing nothing.
     // Refused while a level or the reward is open: the hub is inert then, and a stray
     // Enter must never abort a run. Close the level first (closeOverlay).
-    openLevel(id) {
+    // `from` is who opened it: 'card' or 'continue' (where focus goes back to, returnTarget).
+    openLevel(id, from = 'card') {
       if (this.dialogOpen()) return false;
       if (this.levelState(id) === 'locked') {
         if (Object.hasOwn(registry.levels, id)) this.nudge(id);
@@ -759,6 +779,7 @@ export function createGame(deps) {
       const controller = new AbortController();
       session = controller;
       this.currentLevelId = id;
+      this.openedFrom = from;
       this.overlayTitle = level.name;
       this.overlayNo = level.kind === 'boss' ? 'Incident' : level.no ? `Level ${level.no}` : '';
       this.overlayOpen = true;
@@ -1011,8 +1032,15 @@ export function createGame(deps) {
     // ---------- focus ----------
     // Put focus back on the card that opened the level (by id, not position).
     returnFocus() {
+      const target = this.returnTarget();
+      if (target) this.focusSoon(target);
+    },
+    // Where focus goes when the level closes: Continue if it opened the level and is still shown, else the card.
+    returnTarget() {
       const id = this.currentLevelId;
-      if (id) this.focusSoon(`[data-level-id="${id}"]`);
+      if (!id) return null;
+      if (this.openedFrom === 'continue' && this.continueLabel() !== '') return '#hub-continue';
+      return `[data-level-id="${id}"]`;
     },
     // Focus after Alpine has rendered (its $nextTick when running under Alpine), and only once the
     // target is shown: an x-show effect may not have flushed yet, and focus() on a display:none

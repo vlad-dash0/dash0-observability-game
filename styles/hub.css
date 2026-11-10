@@ -119,9 +119,14 @@
   font-family: var(--font-mono); font-size: 11px; margin-top: 4px; list-style: none; padding: 0;
 }
 .globe-legend li { display: inline-flex; align-items: center; gap: 7px; }
+/* The caption and Continue sit above the globe, outside it, so both show without WebGL. */
+.map-head {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  margin-bottom: var(--space-3); text-align: center;
+}
 .globe-caption {
-  margin: 0; padding: 10px 14px 0; text-align: center;
-  font-size: var(--text-md); color: var(--color-globe-text);
+  margin: 0; padding: 0; text-align: center;
+  font-size: var(--text-md); color: var(--color-text);
 }
 .globe-key {
   width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block;
@@ -195,6 +200,7 @@
   content: ""; position: absolute; inset: 0; border-radius: var(--radius-lg); pointer-events: none;
   background: linear-gradient(90deg, color-mix(in srgb, var(--color-success) 10%, transparent), transparent 60%);
 }
+.level-card.next { border-color: var(--color-accent); box-shadow: 0 0 0 1px var(--color-accent); }
 .level-card.nudge { opacity: .9; animation: nudge .45s ease; }
 .level-card.nudge .level-sub { color: var(--color-accent); font-weight: 700; }
 @keyframes nudge { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
