@@ -225,7 +225,7 @@ export function createGame(deps) {
     overlayNo: '',
     currentLevelId: null,
     actOverrides: {}, // act id -> bool: the player's fold choice, memory only (never stored)
-    openedFrom: 'card', // who opened the open level: 'card' or 'continue' (returnTarget)
+    openedFrom: 'card', // who opened the current level: 'card' or 'continue' (returnTarget)
     nudgeId: null,
     rewardOpen: false,
     aboutOpen: false,
