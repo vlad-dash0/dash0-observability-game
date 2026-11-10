@@ -53,6 +53,25 @@
       </div>
     </header>
 
+    <section class="save-entry" aria-labelledby="save-entry-title" x-show="!debug" x-cloak>
+      <h2 id="save-entry-title" class="visually-hidden">Your progress</h2>
+      <div class="save-entry-actions">
+        <button type="button" class="ui-btn ui-btn--ghost" id="save-open" @click="openSave()">Save code</button>
+        <button type="button" class="ui-btn ui-btn--ghost" id="board-open" x-show="accountEnabled" x-cloak
+                aria-haspopup="dialog" @click="openBoard()">Leaderboard</button>
+        <button type="button" class="ui-btn ui-btn--ghost" id="account-open" x-show="signedIn" x-cloak
+                aria-haspopup="dialog" @click="openAccount()">Account</button>
+        <!-- A kit button that navigates: the markup lib/ui/button.mjs linkButton makes. -->
+        <a class="ui-btn ui-btn--ghost" href="/api/auth-start" x-show="accountEnabled &amp;&amp; !signedIn" x-cloak>Sign in with Google (@dash0.com)</a>
+      </div>
+      <div id="account-entry" x-show="accountEnabled" x-cloak>
+        <p class="save-entry-text" x-show="signedIn" x-text="signedInText()"></p>
+        <p class="save-entry-text" x-show="signedIn &amp;&amp; accountSummary() !== ''" x-cloak x-text="accountSummary()"></p>
+      </div>
+      <!-- Outside #account-entry: when GET /api/account fails the entry is hidden and this is all the player sees. -->
+      <p class="save-entry-text" x-show="accountNotice !== ''" x-cloak x-text="accountNotice"></p>
+    </section>
+
     <!-- Always rendered (a hidden live region would not announce); .show draws the box. -->
     <p class="notice" role="status" :class="notice ? 'show' : ''" x-text="noticeText()"></p>
 
@@ -65,6 +84,7 @@
       <button type="button" class="ui-btn ui-btn--ghost" @click="dismissSigninNotice()">Dismiss</button>
     </div>
 
+    <div class="hub-body">
     <section class="map-panel" aria-labelledby="map-title">
       <h2 id="map-title" class="section-label" tabindex="-1">World map</h2>
       <p class="visually-hidden" role="status" x-text="litNote"></p>
@@ -123,25 +143,7 @@
         </div>
       </template>
     </section>
-    <section class="save-entry" aria-labelledby="save-entry-title" x-show="!debug" x-cloak>
-      <h2 id="save-entry-title" class="section-label">Your progress</h2>
-      <p class="save-entry-text">Copy it to another browser with a code.</p>
-      <div class="save-entry-actions">
-        <button type="button" class="ui-btn ui-btn--ghost" id="save-open" @click="openSave()">Save code</button>
-        <button type="button" class="ui-btn ui-btn--ghost" id="board-open" x-show="accountEnabled" x-cloak
-                aria-haspopup="dialog" @click="openBoard()">Leaderboard</button>
-        <button type="button" class="ui-btn ui-btn--ghost" id="account-open" x-show="signedIn" x-cloak
-                aria-haspopup="dialog" @click="openAccount()">Account</button>
-        <!-- A kit button that navigates: the markup lib/ui/button.mjs linkButton makes. -->
-        <a class="ui-btn ui-btn--ghost" href="/api/auth-start" x-show="accountEnabled &amp;&amp; !signedIn" x-cloak>Sign in with Google (@dash0.com)</a>
-      </div>
-      <div id="account-entry" x-show="accountEnabled" x-cloak>
-        <p class="save-entry-text" x-show="signedIn" x-text="signedInText()"></p>
-        <p class="save-entry-text" x-show="signedIn &amp;&amp; accountSummary() !== ''" x-cloak x-text="accountSummary()"></p>
-      </div>
-      <!-- Outside #account-entry: when GET /api/account fails the entry is hidden and this is all the player sees. -->
-      <p class="save-entry-text" x-show="accountNotice !== ''" x-cloak x-text="accountNotice"></p>
-    </section>
+    </div>
   </div>
 
   <!-- LEVEL OVERLAY. Levels render into ov-body / ov-actions (found by id) with

@@ -9,7 +9,7 @@ html, body {
   color: var(--color-text);
   font-family: var(--font-sans);
   line-height: 1.5;
-  overflow-x: hidden;
+  overflow-x: clip; /* not hidden: hidden makes body a scroll container and the sticky map never sticks (#313) */
 }
 
 /* A kit modal is open (app.mjs syncScrollLock): the page behind does not scroll. */
