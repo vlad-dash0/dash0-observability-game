@@ -210,14 +210,14 @@ test('nickname: refused names (format, reserved, blocked) do not use the hourly 
   assert.equal((await act(r, cookie, { action: 'nickname', nick: 'fine-over' })).status, 429, 'ten successes still use it up');
 });
 
-test('nickname: a refused name is 400 even when the quota is used up (no store call needed to refuse it)', async () => {
+test('nickname: a refused name is 400 even when the quota is used up (refusing it takes no quota)', async () => {
   const { r, pid } = await signedIn();
   const cookie = await r.cookieFor(pid, { exp: NOW + 10_000_000 });
   for (let i = 0; i < 10; i++) await act(r, cookie, { action: 'nickname', nick: `fine-${i}x` });
   assert.equal((await act(r, cookie, { action: 'nickname', nick: 'admin' })).status, 400);
 });
 
-test('nickname: taken probes are bounded by the same quota (a claim is a store lookup)', async () => {
+test('nickname: a taken name uses the hourly quota, so probing for taken names is bounded', async () => {
   const { r, pid } = await signedIn();
   const cookie = await r.cookieFor(pid, { exp: NOW + 10_000_000 });
   const { profile: other } = await r.store.signIn('g-2', 'bob@dash0.com');

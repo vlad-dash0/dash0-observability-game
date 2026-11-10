@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { createLeaderboard } from '../api/leaderboard.mjs';
 import { NOW, ORIGIN, get, post, rig } from './helpers/auth-api.mjs';
 
-const READ_MAX = 30;
+const READ_MAX = 120;
 const URL_ = `${ORIGIN}/api/leaderboard`;
 const LONG = NOW + 86_400_000;
 const prog = (levels) => ({ levels: Object.fromEntries(Object.entries(levels).map(([id, stars]) => [id, { stars, at: '2026-01-01' }])), cards: [] });
@@ -143,6 +143,15 @@ test('only the per-IP limit applies: 150 distinct addresses in one minute all re
   const hammer = get(URL_, { 'x-forwarded-for': '10.0.0.0' });
   for (let i = 1; i < READ_MAX; i++) await api.GET(hammer.clone());
   assert.equal((await api.GET(hammer.clone())).status, 429, 'the per-IP limit still bites');
+});
+
+test('an address over its limit stays refused after 2000+ other addresses in the window', async () => {
+  const { api } = setup();
+  const from = (ip) => get(URL_, { 'x-forwarded-for': ip });
+  for (let i = 0; i < READ_MAX; i++) await api.GET(from('9.9.9.9'));
+  assert.equal((await api.GET(from('9.9.9.9'))).status, 429);
+  for (let i = 0; i < 2100; i++) await api.GET(from(`10.${i >> 8}.${i & 255}.1`));
+  assert.equal((await api.GET(from('9.9.9.9'))).status, 429, 'not evicted, not reset');
 });
 
 test('a 0-star player is not on the board', async () => {

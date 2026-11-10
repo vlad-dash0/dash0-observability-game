@@ -94,8 +94,8 @@ export function createAccount({
     };
 
     if (body.action === 'nickname') {
-      // A name that cannot be claimed (format, reserved, blocked) is refused before the quota: it costs no store call.
-      // A taken name does reach the store, so it counts: that bounds probing for taken names at NICK_LIMIT an hour.
+      // A name that cannot be claimed (format, reserved, blocked) is refused before the quota: it takes no quota.
+      // A taken name does use the quota, so probing for taken names is bounded at NICK_LIMIT an hour.
       const valid = validateNick(body.nick);
       if (!valid.ok) return fail(valid);
       const limited = await store.rateLimit(pid, 'nick', NICK_LIMIT);

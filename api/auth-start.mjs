@@ -10,7 +10,8 @@ import { clientKey, redirect, reply } from '../lib/http.mjs';
 
 export const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 export const HOSTED_DOMAIN_HINT = 'dash0.com';
-const START_MAX = 20;
+const START_MAX = 100;
+const LIMITER_KEYS = 50_000; // many addresses in one window must not evict an over-limit one
 const START_WINDOW_MS = 10 * 60 * 1000;
 const UNAVAILABLE = '/?signin=unavailable';
 
@@ -22,7 +23,7 @@ export function createAuthStart({
   random = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n)),
   registry = null,
   log = (line) => console.log(JSON.stringify(line)),
-  limiter = createLimiter({ now, clientMax: START_MAX, clientWindowMs: START_WINDOW_MS, instanceMax: Infinity }), // per IP only
+  limiter = createLimiter({ now, clientMax: START_MAX, clientWindowMs: START_WINDOW_MS, instanceMax: Infinity, maxKeys: LIMITER_KEYS }), // per IP only
 } = {}) {
   const auth = createAuthContext({ env, redis, now, random, registry });
   const b64u = (bytes) => Buffer.from(bytes).toString('base64url');
