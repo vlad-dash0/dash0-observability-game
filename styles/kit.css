@@ -399,8 +399,16 @@
 .ui-help-chips { display: flex; flex-wrap: wrap; gap: 6px var(--space-2); align-items: center; font-size: 12px; color: var(--color-text-muted); }
 .ui-help-chips-title { white-space: nowrap; }
 @container level (max-width: 600px) {
-  .ui-help-chips { gap: 4px 6px; font-size: 11px; }
-  .ui-help-chips .ui-chip { padding: 1px 7px; font-size: 11px; gap: 4px; }
+  /* Two rows of chips under the title at 358px of content (11px mono is about 6.6px a glyph; a chip is its
+     text plus 10px padding and 2px border, no dot): hints, queue, tint = 69 + 155 + 102 + 8 gaps = 334px;
+     guide, instant = 149 + 142 + 4 = 295px. Hints is ordered third so the first row holds three. */
+  .ui-help-chips { gap: 4px; font-size: 11px; }
+  .ui-help-chips-title { flex-basis: 100%; }
+  .ui-help-chips .ui-chip { padding: 1px 4px; font-size: 11px; }
+  .ui-help-chips .ui-chip-dot { display: none; }
+  .ui-help-chips [data-help="hints"] { order: 1; }
+  .ui-help-chips [data-help="guide"] { order: 2; }
+  .ui-help-chips [data-help="instant"] { order: 3; }
 }
 .ui-side {
   display: grid; gap: 10px; align-content: start; min-width: 0; padding: 14px var(--space-4);

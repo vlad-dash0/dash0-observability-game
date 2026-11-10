@@ -1229,8 +1229,8 @@ test('a row shows its short span id only when another visible row has the same n
   ]);
   setup(spec);
   const sid = (id) => qa(`[data-span="${id}"] [data-sid]`).map((n) => n.textContent);
-  assert.deepEqual(sid('aaaaaaaaaaaaa1b2'), ['span …a1b2']);
-  assert.deepEqual(sid('aaaaaaaaaaaaa3c4'), ['span …a3c4']);
+  assert.deepEqual(sid('aaaaaaaaaaaaa1b2'), ['span id …a1b2']);
+  assert.deepEqual(sid('aaaaaaaaaaaaa3c4'), ['span id …a3c4']);
   assert.deepEqual(sid('aaaaaaaaaaaaa5d6'), [], 'a name that is unique needs no id');
   assert.equal(qa(`[data-span="aaaaaaaaaaaaa1b2"] [data-sid]`)[0].getAttribute('title'), 'span id aaaaaaaaaaaaa1b2');
 });
@@ -1238,7 +1238,7 @@ test('a row shows its short span id only when another visible row has the same n
 test('the span id of a twin whose last 4 digits collide is shown in full (#321)', () => {
   const T = '1111aaaa1111aaaa1111aaaa1111aaaa';
   setup(twinSpec([twin('aaaaaaaaaaaaaaaa', T), twin('ccccccccccccaaaa', T, 'retry', 4)]));
-  assert.deepEqual(qa('[data-sid]').map((n) => n.textContent), ['span aaaaaaaaaaaaaaaa', 'span ccccccccccccaaaa']);
+  assert.deepEqual(qa('[data-sid]').map((n) => n.textContent), ['span id aaaaaaaaaaaaaaaa', 'span id ccccccccccccaaaa']);
 });
 
 test('tickPlan: kept labels never overlap, the last one stays, and nothing is dropped when all fit (#321)', () => {
@@ -1308,6 +1308,9 @@ test('every issue code the board can show has a player word, none an internal co
     'cross-trace-parent', 'extra-link', 'log-no-active-span', 'log-not-attached', 'log-other-service', 'log-outside-span',
     'log-wrong-span', 'log-wrong-trace', 'missing-link', 'wrong-kind', 'wrong-parent', 'wrong-status',
   ]);
+  assert.equal(new Set(Object.values(ISSUE_LABELS)).size, Object.values(ISSUE_LABELS).length, 'no two problems share a word');
+  assert.equal(ISSUE_LABELS['cross-trace-parent'] === ISSUE_LABELS['log-wrong-trace'], false, 'a wrong parent trace and a record in another trace are different problems');
+  assert.equal([ISSUE_LABELS['missing-link'], ISSUE_LABELS['extra-link']].join('|'), 'Missing link|Extra link');
   for (const [code, word] of Object.entries(ISSUE_LABELS)) {
     assert.equal(/[-_]/.test(word) || word === code, false, `${code} reads as ${word}`);
     assert.equal(issueLabel(code), word);
@@ -1322,4 +1325,19 @@ test('a failed Check shows the player word for the issue, the code stays only in
   click('#b1-check');
   assert.deepEqual(qa('#b1-feedback li .ui-chip').map((c) => c.textContent), ['Wrong parent', 'Wrong parent']);
   assert.equal(q('#b1-feedback').textContent.includes('wrong-parent'), false);
+});
+
+test('on a phone the helps chips drop their dot, put the title on its own line and fit two rows of 358px (#324)', () => {
+  const kit = sheet('kit.css');
+  const block = /@container level \(max-width: 600px\) \{([^@]*?help-chips[^@]*?)\n\}/.exec(kit)[1];
+  assert.match(block, /\.ui-help-chips-title \{ flex-basis: 100%; \}/);
+  assert.match(block, /\.ui-chip-dot \{ display: none; \}/);
+  const order = Object.fromEntries([...block.matchAll(/\[data-help="(\w+)"\] \{ order: (\d+); \}/g)].map((m) => [m[1], +m[2]]));
+  assert.deepEqual(order, { hints: 1, guide: 2, instant: 3 });
+  // Rows in the resulting order (queue and tint stay 0): chip width = glyphs * 6.6 + 12.
+  const words = { queue: 'One span at a time off', tint: 'Trace tint off', hints: 'Hints off', guide: 'Time-window guide off', instant: 'Instant feedback off' };
+  const w = (k) => words[k].length * 6.6 + 12;
+  assert.equal(w('hints') + w('queue') + w('tint') + 2 * 4 <= 358, true, 'row one');
+  assert.equal(w('guide') + w('instant') + 4 <= 358, true, 'row two');
+  assert.equal(w('hints') + w('queue') + w('tint') + w('guide') + 3 * 4 > 358, true, 'a fourth chip would not fit, so exactly two rows');
 });

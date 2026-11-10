@@ -101,7 +101,7 @@ test('step 1: the traceparent in the intro is a valid W3C value and names the fe
   assert.match(plain(BUILD_STEP.intro), /Another visitor clicked Pay at the same moment, in trace 9d8c7b6a/);
   assert.match(plain(BUILD_STEP.intro), /server span for one of the two calls arrived as a root/);
   assert.doesNotMatch(plain(BUILD_STEP.intro), /first call|retry/, 'no word of the intro picks a twin or calls it a retry');
-  assert.match(plain(BUILD_STEP.intro), /code that sends the checkout call ran twice, so two identical calls left together; the board tells them apart by the end of their span id/);
+  assert.match(plain(BUILD_STEP.intro), /code that sends the checkout call ran twice, so two identical calls left together\.The board tells them apart by the end of their span id\. The twin rows show it\./);
   assert.match(plain(BUILD_STEP.intro), /share an origin/);
 });
 
@@ -312,9 +312,10 @@ test('claims: the CORS mechanics are only what the replies on screen show, scope
 
 test('step 1: the intro is short paragraphs, one idea each, and the board shows the span ids it points at (#321)', () => {
   const paras = BUILD_STEP.intro.split('</p>').filter((x) => x.includes('<p>'));
-  assert.equal(paras.length >= 4, true, 'the browser spans, the traceparent, the twin call, the other visitor');
+  assert.equal(paras.length >= 5, true, 'the browser spans, the traceparent, the twin call, the other visitor');
   assert.equal(paras.every((p) => plain(p).length < 300), true, 'no paragraph is a wall');
   assert.match(plain(paras[1]), /traceparent/);
-  assert.match(plain(paras[2]), /span id/);
-  assert.match(plain(paras[3]), /9d8c7b6a/);
+  assert.match(plain(paras[2]), /two identical calls/);
+  assert.match(plain(paras[3]), /end of their span id/);
+  assert.match(plain(paras[4]), /9d8c7b6a/);
 });
