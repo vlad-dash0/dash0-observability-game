@@ -18,6 +18,7 @@ function setup({
   controller = new AbortController(),
   onFinish,
   reportError,
+  onWidget,
 } = {}) {
   const dom = makeDom();
   const calls = [];
@@ -32,6 +33,7 @@ function setup({
     onFinish: onFinish ?? ((...args) => calls.push(args)),
     signal: controller.signal,
     reportError: reportError ?? ((e) => reported.push(e)),
+    onWidget,
   });
   return { dom, ctx, calls, controller, reported };
 }
@@ -350,4 +352,27 @@ test('#17 P3 an ask after finish is no charge and tells nobody', () => {
   assert.equal(heard, 0);
   assert.equal(result.stars, 5);
   assert.equal(calls.length, 1);
+});
+
+test('widget(key) tells onWidget which widget the step now shows; nothing after the signal aborts', () => {
+  const seen = [];
+  const { ctx, controller } = setup({ onWidget: (k) => seen.push(k) });
+  ctx.widget('choice');
+  ctx.widget('sort');
+  assert.deepEqual(seen, ['choice', 'sort']);
+  controller.abort();
+  ctx.widget('build');
+  assert.deepEqual(seen, ['choice', 'sort'], 'a stale step reports nothing');
+});
+
+test('widget(key) is a no-op without onWidget, and a throwing onWidget is reported, never thrown', () => {
+  const { ctx } = setup();
+  assert.doesNotThrow(() => ctx.widget('choice'));
+  const { ctx: bad, reported } = setup({ onWidget: () => { throw new Error('boom'); } });
+  assert.doesNotThrow(() => bad.widget('choice'));
+  assert.equal(reported.length, 1);
+});
+
+test('createLevelContext refuses an onWidget that is not a function', () => {
+  assert.throws(() => setup({ onWidget: 'nope' }), /onWidget/);
 });

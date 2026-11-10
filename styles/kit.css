@@ -141,8 +141,10 @@
   padding: var(--space-5); font-size: var(--text-md); line-height: 1.55; overflow-wrap: anywhere;
 }
 .ui-modal-body > p, .ui-modal-topic p { color: var(--color-text-muted); max-inline-size: var(--measure); }
+.ui-modal-guide { display: grid; gap: var(--space-4); }
 .ui-modal-topic { display: grid; gap: var(--space-2); }
 .ui-modal-topic + .ui-modal-topic { padding-block-start: var(--space-4); border-top: 1px solid var(--color-border); }
+.ui-modal-topic ul { margin: 0; padding-inline-start: var(--space-5); display: grid; gap: var(--space-1); color: var(--color-text-muted); max-inline-size: var(--measure); }
 .ui-modal-topic h3 { font-size: var(--text-base); font-weight: var(--weight-semibold); }
 .ui-modal-topic h3::before {
   content: ""; display: inline-block; inline-size: 7px; block-size: 7px; margin-inline-end: var(--space-2);

@@ -552,8 +552,10 @@ function openLevel(level, { telemetry = null } = {}) {
   const dom = makeDom();
   const calls = [];
   const steps = [];
+  const widgets = [];
   current = null;
   const ctx = createLevelContext({
+    onWidget: (key) => widgets.push(key),
     level,
     ovBody: dom.body,
     ovActions: dom.actions,
@@ -601,7 +603,7 @@ function openLevel(level, { telemetry = null } = {}) {
     end() {
       injected.push(...liveAlpineAttrs(dom.body, dom.actions));
       pageClasses(classes);
-      return { calls, steps, first, injected, classes, attrs: [...attrs] };
+      return { calls, steps, first, injected, classes, attrs: [...attrs], widgets };
     },
   };
 }
@@ -692,7 +694,10 @@ async function checkRunAsync(level, run) {
   return assertRun(level, run, await playLevelAsync(level, run.play, { telemetry: run.telemetry?.() }));
 }
 
-function assertRun(level, run, { calls, steps, first, injected, classes, attrs }) {
+function assertRun(level, run, { calls, steps, first, injected, classes, attrs, widgets }) {
+  // The How to play modal follows the step the player is on: every widget a level declares is
+  // reported as its step mounts, and nothing it does not declare (#316).
+  if (level.widgets) assert.deepEqual([...new Set(widgets)].sort(), [...new Set(level.widgets)].sort(), 'ctx.widget reports the level\'s declared widgets');
   assert.deepEqual(injected, [], 'the overlay holds an Alpine attribute (set outside renderStep)');
   assert.deepEqual(attrs, [], 'the page shows an Alpine attribute, style= or on*= on some step (CSP)');
   const missing = undefinedClasses(steps, classes);

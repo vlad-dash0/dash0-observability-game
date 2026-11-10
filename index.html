@@ -174,20 +174,25 @@
       <header class="ui-modal-head">
         <div class="ui-modal-heading">
           <p class="ui-eyebrow">Level guide</p>
-          <h2 id="ov-howto-title" tabindex="-1">How to play</h2>
+          <h2 id="ov-howto-title" tabindex="-1" x-text="howToTitle()">How to play</h2>
         </div>
         <button type="button" class="ui-btn ui-btn--icon" id="ov-howto-x" aria-label="Close how to play" @click="closeHowTo()"><span aria-hidden="true">&times;</span></button>
       </header>
       <div class="ui-modal-body">
-        <template x-for="topic in howTo.topics" :key="topic.key">
-          <section class="ui-modal-topic">
-            <h3 x-text="topic.title"></h3>
-            <p x-text="topic.play"></p>
-            <p x-show="topic.stars" x-text="topic.stars"></p>
-            <p x-text="topic.hints"></p>
-          </section>
+        <template x-for="topic in howToTopics()" :key="topic.key">
+          <div class="ui-modal-guide">
+            <template x-for="part in topic.parts" :key="part.label">
+              <section class="ui-modal-topic">
+                <h3 x-text="part.label"></h3>
+                <p x-show="part.text" x-text="part.text"></p>
+                <ul x-show="part.items.length > 0">
+                  <template x-for="item in part.items" :key="item"><li x-text="item"></li></template>
+                </ul>
+                <p x-show="part.note" x-text="part.note"></p>
+              </section>
+            </template>
+          </div>
         </template>
-        <p class="ui-modal-note" x-show="howTo.footer" x-text="howTo.footer"></p>
       </div>
       <footer class="ui-modal-foot">
         <button type="button" class="ui-btn ui-btn--ghost" id="ov-howto-close" @click="closeHowTo()">Close</button>

@@ -156,6 +156,7 @@ export default {
       const next = bar.querySelector('#nys-next');
       const say = (tone, html) => setFeedback(fb, tone, html);
       const tried = new Set(); // normalised failing configs, as in Configure it
+      ctx.widget?.('configure'); // this step is the env checker, a Configure it board (how to play follows it)
       const ladder = mountHintLadder(ctx, box, 'nys', {
         swirl: playSwirl,
         fallback: () => input,

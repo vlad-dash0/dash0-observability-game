@@ -1169,6 +1169,7 @@ test('a level with widgets opens its card the first time, focused; one without h
   assert.equal(s.game.openLevel('w'), true);
   assert.equal(s.game.howToOpen, true);
   assert.deepEqual(s.game.howTo.topics.map((t) => t.key), ['choice', 'sort']);
+  assert.deepEqual(s.game.howToTopics().map((t) => t.key), ['choice'], 'the modal shows one guide: the first step\'s type');
   assert.deepEqual(s.focused, ['#ov-howto-title']);
   s.game.closeOverlay();
   s.focused.length = 0;
@@ -1218,25 +1219,108 @@ test("Don't show again is stored per widget and respected later", () => {
   s.game.hideHowTo();
   assert.equal(s.game.howToOpen, false);
   assert.equal(s.focused.at(-1), '#ov-howto-open');
-  assert.equal(s.store.data.get(HELP_KEY), '{"v":1,"hidden":["choice","sort"]}');
+  assert.equal(s.store.data.get(HELP_KEY), '{"v":1,"hidden":["choice"]}', 'only the guide on show');
   const later = cardGame({ storage: () => s.store });
   later.game.openLevel('w');
   assert.equal(later.game.howToOpen, false);
   assert.deepEqual(later.game.howTo.topics.map((t) => t.key), ['choice', 'sort'], 'still listed');
   later.game.closeOverlay();
   later.game.openLevel('v');
+  assert.equal(later.game.howToOpen, false, 'its first step is choice, hidden');
+  ctxs.v.widget('build');
   assert.equal(later.game.howToOpen, true, 'build is new to this player');
 });
 
 test('a level opens its card unless every widget is seen or hidden', () => {
   const s = cardGame({ initial: { [HELP_KEY]: '{"v":1,"hidden":["choice"]}' } });
   s.game.openLevel('v');
-  assert.equal(s.game.howToOpen, true, 'one unseen widget is enough');
+  assert.equal(s.game.howToOpen, false, 'the first step is choice, which is hidden');
   s.game.closeOverlay();
   s.game.openLevel('w');
-  assert.equal(s.game.howToOpen, true, 'sort is not hidden');
   s.game.hideHowTo();
-  assert.deepEqual(JSON.parse(s.store.data.get(HELP_KEY)).hidden, ['choice', 'sort']);
+  assert.deepEqual(JSON.parse(s.store.data.get(HELP_KEY)).hidden, ['choice'], 'choice was already hidden; the guide on show is choice');
+});
+
+// ---- one guide per step type (#316) ----
+
+test('the guide follows the step: a new type opens its own guide, once, focused', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  s.game.closeHowTo();
+  s.focused.length = 0;
+  ctxs.w.widget('choice');
+  assert.equal(s.game.howToOpen, false, 'same type, nothing new');
+  ctxs.w.widget('sort');
+  assert.equal(s.game.howToOpen, true);
+  assert.deepEqual(s.game.howToTopics().map((t) => t.key), ['sort']);
+  assert.match(s.game.howToTitle(), /Sort it/);
+  assert.deepEqual(s.focused, ['#ov-howto-title']);
+  s.game.closeHowTo();
+  ctxs.w.widget('sort');
+  assert.equal(s.game.howToOpen, false, 'seen: it does not reopen');
+  ctxs.w.widget('choice');
+  assert.equal(s.game.howToOpen, false);
+  assert.deepEqual(s.game.howToTopics().map((t) => t.key), ['choice'], 'the header button now opens choice');
+  s.game.toggleHowTo();
+  assert.equal(s.game.howToOpen, true);
+  assert.deepEqual(s.game.howToTopics().map((t) => t.key), ['choice']);
+});
+
+test("Close and Don't show again apply to the guide on show only", () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  ctxs.w.widget('sort');
+  s.game.hideHowTo();
+  assert.equal(s.store.data.get(HELP_KEY), '{"v":1,"hidden":["sort"]}');
+  ctxs.w.widget('choice');
+  assert.equal(s.game.howToOpen, true, 'choice was never closed or hidden');
+  s.game.closeHowTo();
+  assert.equal(s.store.data.get(HELP_KEY), '{"v":1,"hidden":["sort"]}', 'Close stores nothing');
+});
+
+test('a hidden type does not auto-open mid-level, but the header button still shows it', () => {
+  const s = cardGame({ initial: { [HELP_KEY]: '{"v":1,"hidden":["choice","sort"]}' } });
+  s.game.openLevel('w');
+  ctxs.w.widget('sort');
+  assert.equal(s.game.howToOpen, false);
+  s.game.toggleHowTo();
+  assert.deepEqual(s.game.howToTopics().map((t) => t.key), ['sort']);
+  assert.equal(s.game.howToOpen, true);
+});
+
+test('a first step that reports a different type than the first declared one decides the opening card', () => {
+  const REG = buildRegistry(
+    [{ id: 'a0', no: 0, name: 'A', levels: [L('r', '0.1', {
+      mechanics: ['sort'], widgets: ['choice', 'sort'],
+      run(ctx) { ctxs.r = ctx; ctx.widget('sort'); ctx.renderStep('<p>r</p>', ''); },
+    })], boss: null }],
+    { deck: [], nodeIds: [] },
+  );
+  const s = setup({ registry: REG });
+  s.focused = [];
+  s.game.focusSoon = (sel) => s.focused.push(sel);
+  s.game.openLevel('r');
+  assert.deepEqual(s.game.howToTopics().map((t) => t.key), ['sort']);
+  assert.equal(s.game.howToOpen, true);
+  assert.deepEqual(s.focused, ['#ov-howto-title']);
+});
+
+test('a stale or unknown widget report changes nothing', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  s.game.closeHowTo();
+  const stale = ctxs.w;
+  ctxs.w.widget('quiz');
+  assert.equal(s.game.howToOpen, false, 'a type the level does not list is ignored');
+  s.game.closeOverlay();
+  stale.widget('sort');
+  assert.equal(s.game.howToOpen, false);
+  assert.deepEqual(s.game.howToTopics(), []);
+  s.game.openLevel('v');
+  s.game.closeHowTo();
+  stale.widget('build');
+  assert.equal(s.game.howToOpen, false, 'the old level cannot drive the new one');
+  assert.deepEqual(s.game.howToTopics().map((t) => t.key), ['choice']);
 });
 
 test('Escape with the card open closes the card, not the level', () => {
@@ -1332,7 +1416,7 @@ test('closing the level resets the card; stale Close and Hide are no-ops', () =>
   s.game.openLevel('w');
   s.game.closeOverlay();
   assert.equal(s.game.howToOpen, false);
-  assert.deepEqual(s.game.howTo, { topics: [], footer: '' });
+  assert.deepEqual(s.game.howTo, { topics: [] });
   s.focused.length = 0;
   s.game.closeHowTo();
   s.game.hideHowTo();
@@ -1598,12 +1682,16 @@ test('index.html: the How to play control and modal', () => {
   assert.equal(card.querySelector('#ov-howto-hide').textContent.trim(), "Don't show again");
   assert.equal(card.querySelector('#ov-howto-close').textContent.trim(), 'Close');
   assert.equal(card.querySelector('.ui-btn--primary') === null, true);
-  const loop = card.querySelector('template[x-for="topic in howTo.topics"]');
-  assert.ok(loop, 'one section per topic');
-  for (const field of ['title', 'play', 'stars', 'hints']) {
-    assert.ok(loop.content.querySelector(`[x-text="topic.${field}"]`), `topic.${field} by x-text`);
+  const loop = card.querySelector('template[x-for="topic in howToTopics()"]');
+  assert.ok(loop, 'one guide: the step on screen');
+  const parts = loop.content.querySelector('template[x-for="part in topic.parts"]');
+  assert.ok(parts, 'its labelled parts');
+  for (const field of ['label', 'text', 'note']) {
+    assert.ok(parts.content.querySelector(`[x-text="part.${field}"]`), `part.${field} by x-text`);
   }
-  assert.ok(card.querySelector('[x-text="howTo.footer"]'), 'the footer by x-text');
+  const items = parts.content.querySelector('template[x-for="item in part.items"]');
+  assert.ok(items?.content.querySelector('[x-text="item"]'), 'the list items by x-text');
+  assert.equal(card.querySelector('#ov-howto-title').getAttribute('x-text'), 'howToTitle()', 'the title names the type');
   assert.equal(card.innerHTML.includes('x-html'), false);
 });
 
