@@ -322,7 +322,7 @@ const DYNAMIC_ALLOW = {
     c1: ['confetti'], c2: ['confetti'], c3: ['confetti'], c4: ['confetti'], c5: ['confetti'], c6: ['confetti'],
     // app.mjs levelClasses(): the level state plus ' nudge'
     done: ['level-card'], locked: ['level-card'], nudge: ['level-card'],
-    // lib/globe-render.mjs `globe-probe ${role}` over COLOR_ROLES (lit and pulse are literal in index.html)
+    // lib/globe-render.mjs `globe-probe ${role}` over COLOR_ROLES (lit, pulse and resolved are literal in index.html)
     body: ['globe-probe'], dim: ['globe-probe'], rim: ['globe-probe'], sky: ['globe-probe'],
     // index.html Alpine :class (overlayOpen, rewardOpen, notice)
     show: ['notice', 'overlay', 'reward'],

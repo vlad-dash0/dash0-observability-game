@@ -182,10 +182,13 @@ always `MAX_STARS` glyphs, the reward label `n of 5 stars`) derive the maximum f
 The hub map is a dotted globe: act = world region, level = country, a boss pulses its whole
 region while it is open. Data: `hub/globe-map.mjs` (`ACT_REGIONS`, `LEVEL_COUNTRY`,
 `actOfCountry`), `hub/globe-data.mjs` (generated `DOTS`, `[lat, lon, iso3, subregion]`).
-State: `lib/globe.mjs` `globeState` (country lit when its level is completed; region
-`{done, total, pulse}`, pulse while the act's boss is `'open'`).
-View, pure (`lib/globe-view.mjs`): `dotStates` (per dot UNLIT / LIT / PULSE / SOON; a pulsing region
-outranks lit; a coming-soon region's dots are SOON, static and dim, and never lit), `currentActId` (lowest unlocked act not complete, else the last) and
+State: `lib/globe.mjs` `globeState` (country `{lit}`, lit when its level is completed; region
+`{region, done, total, pulse, resolved}`, pulse while the act's boss is `'open'`, resolved when
+`isActComplete`; a region is never both). The per-country `pulse` was an unread duplicate and is gone (#309).
+View, pure (`lib/globe-view.mjs`): `dotStates` (per dot UNLIT / LIT / PULSE / SOON / RESOLVED, precedence PULSE > SOON > RESOLVED > LIT:
+a fixed incident leaves its whole region RESOLVED, a static calm mint (`--color-globe-resolved`, `uResolved`, no `uTime`),
+and `globeLines` adds ", resolved", `globeLabel` "Resolved: ..." and leaves resolved regions out of "Lit:";
+a coming-soon region's dots are SOON, static and dim, and never lit), `currentActId` (lowest unlocked act not complete, else the last) and
 `globeTarget` (rotation facing that act's region centre), `globeLabel` (the accessible name)
 and `globeLines` (the no-WebGL text, one line per act), `readColors` (the `--color-globe-*`
 tokens via computed style), `createLoop` (rAF loop: stops while the tab is hidden or the
@@ -196,6 +199,8 @@ halos, slow spin, drag to rotate, pixel ratio capped at 2, canvas sized by CSS a
 disposes it while a level covers the hub and on `pagehide`, and shows the text fallback when
 three.js, the colours or WebGL are unavailable. Level `lights` stay level data, validated
 against `hub/map-data.mjs` `NODE_IDS`, and are no longer drawn.
+
+Debug (#309): `?mode=debug` draws the globe with every level done (`app.mjs` `globeProgress()`, read by `mapState()` and `globeView()`), so every mapped region is resolved; cards, stars, level states and storage still use the real progress.
 
 Island markers (#240). Fiji, Vanuatu and Samoa have no land dot on the 110m data, so `hub/globe-map.mjs` `ISLANDS` (hand-written, frozen: subregion and the capital's `[lat, lon]`) places each on its 3 nearest lattice points that are not land (`islandDots(k = 3)`, pure, deterministic, same `[lat, lon, iso3, subregion]` shape as `DOTS`). The one seam is `createGame`'s `dots` default in `app.mjs`, `[...DOTS, ...islandDots()]`; `dotStates`, `regionCentre` and ignite see them as ordinary dots, and `hub/globe-data.mjs` and its SHA pin are untouched. Polynesia is in `ACT_REGIONS['act-9']` so Samoa's markers belong to Oceania. A level PR for one of these countries adds it to `LEVEL_COUNTRY`; `test/globe-data.test.mjs` reads land plus island dots.
 

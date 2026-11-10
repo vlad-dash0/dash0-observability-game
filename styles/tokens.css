@@ -119,6 +119,8 @@
   --color-globe-lit: light-dark(var(--globe-amber), var(--globe-amber));
   /* The incident pulse is a dusty coral, not brand red: it reads as "open", not "alarm". */
   --color-globe-pulse: light-dark(var(--globe-coral), var(--globe-coral));
+  /* A fixed incident leaves its region a calm brand mint: plain srgb, so parseColor reads it (never oklab). */
+  --color-globe-resolved: light-dark(var(--d0-mint), var(--d0-mint));
   --color-globe-rim: light-dark(var(--globe-amber), var(--globe-amber));
   --color-globe-text: light-dark(var(--globe-night-text), var(--globe-night-text));
   /* The trace waterfall (#146): service fills, trace tints, and the highlight roles. */

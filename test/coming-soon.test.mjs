@@ -84,7 +84,9 @@ test('the live hub lists no soon act; acts 7 and 8 are playable, even a debug hu
   assert.equal(game.nudgeId, null);
   assert.equal(game.overlayOpen, false);
   assert.equal(store.data.has(STORAGE_KEY), false);
-  assert.equal(game.mapLabel(), `World map: 0 of ${liveRegistry().order.length} levels done.`);
+  // Debug draws the globe with everything finished (#309), so the name says so; nothing was saved.
+  const n = liveRegistry().order.length;
+  assert.match(game.mapLabel(), new RegExp(`^World map: ${n} of ${n} levels done\\. Resolved: Western Europe, .*Oceania\\.$`));
 });
 
 test('no live globe dot is SOON', () => {
