@@ -112,8 +112,8 @@
 .wf-row[data-error="true"] .wf-bar { stroke: var(--color-error); stroke-width: 2px; }
 .wf-row[data-waiting] .wf-bar { fill: transparent; stroke: var(--color-text-muted); stroke-dasharray: 4 3; }
 .wf-label-clip { overflow: hidden; } /* clips only the label, so connectors and bar strokes still reach past the cell */
-/* The halo (page colour) keeps a flipped label legible where it crosses the row connector. */
-.wf-bar-label { fill: var(--color-text); stroke: var(--color-bg); stroke-width: 3px; stroke-linejoin: round; paint-order: stroke; font-family: var(--font-mono); font-size: 11px; pointer-events: none; }
+/* The halo (the row fill, 5px to cover the gap between words) keeps a flipped label legible where it crosses the row connector. */
+.wf-bar-label { fill: var(--color-text); stroke: var(--color-surface-2); stroke-width: 5px; stroke-linejoin: round; paint-order: stroke; font-family: var(--font-mono); font-size: 11px; pointer-events: none; }
 .wf-dur { font-weight: 700; font-variant-numeric: tabular-nums; }
 .wf-row[data-waiting] .wf-bar-label { fill: var(--color-text-muted); }
 .wf-log { fill: var(--color-text); }
