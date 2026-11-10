@@ -100,7 +100,12 @@
   display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px;
   font-family: var(--font-mono); font-size: 11px; margin-top: 4px;
 }
-.globe-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.globe-legend { list-style: none; padding: 0; }
+.globe-legend li { display: inline-flex; align-items: center; gap: 7px; }
+.globe-caption {
+  margin: 0; padding: 10px 14px 0; text-align: center;
+  font-size: var(--text-md); color: var(--color-globe-text);
+}
 .globe-key {
   width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block;
   background: var(--color-globe-dim);
@@ -252,6 +257,8 @@
 .about-acts p { color: var(--color-text-muted); margin-bottom: 4px; }
 .about-acts .act-badges { margin-left: 0; margin-right: 0; }
 .about-sub { font-weight: 600; }
+.about-map { margin: var(--space-3) 0; }
+.about-map h3 { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
 .save-entry { padding: 0 16px 32px; }
 .save-entry-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 6px 10px; }
 .signin-notice {

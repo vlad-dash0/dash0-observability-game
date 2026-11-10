@@ -20,7 +20,7 @@ import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { HELP_KEY, hideHelp } from '../lib/help-prefs.mjs';
 import { createGame, liveRegistry } from '../app.mjs';
 import { endSentence } from '../lib/text.mjs';
-import { GAME_SUMMARY } from '../hub/about.mjs';
+import { GAME_SUMMARY, GLOBE_LOOP } from '../hub/about.mjs';
 import { litText } from '../lib/globe-ignite.mjs';
 import { MAX_STARS } from '../lib/scoring.mjs';
 import { createTelemetry } from '../lib/telemetry.mjs';
@@ -741,6 +741,7 @@ test('the About dialog: opens on the heading, Close returns focus to ?', () => {
   assert.equal(focused.at(-1), '#about-open');
   assert.equal(game.hubInert(), false);
   assert.equal(game.aboutSummary, GAME_SUMMARY);
+  assert.equal(game.aboutLoop, GLOBE_LOOP);
 });
 
 test('closeAbout is a no-op when About is not open (stale call)', () => {
@@ -1450,8 +1451,22 @@ test('index.html: the globe stage is a named image, with a legend and a text fal
   assert.equal(stage.getAttribute('role'), 'img');
   assert.equal(stage.getAttribute(':aria-label'), 'mapLabel()');
   assert.equal(shell.querySelector('.globe').getAttribute('x-show'), '!globeFallback');
-  const legend = shell.querySelector('.globe-legend').textContent.replace(/\s+/g, ' ').trim();
-  assert.equal(legend, 'Lit: level completed Pulsing: incident open Saved: all calm Not reached Coming soon');
+  const caption = shell.querySelector('.globe > p.globe-caption');
+  assert.ok(caption, 'the caption is a paragraph inside .globe');
+  assert.equal(caption.getAttribute('x-text'), 'captionText()');
+  assert.equal(caption.getAttribute('x-show'), "captionText() !== ''");
+  assert.equal(shell.querySelector('.globe').firstElementChild, caption, 'the caption comes first, before the stage');
+  for (const a of ['role', 'aria-live', 'aria-atomic']) assert.equal(caption.hasAttribute(a), false, `the caption is not a live region (${a})`);
+  const legend = shell.querySelector('ul.globe-legend');
+  assert.ok(legend, 'the legend is a list');
+  assert.equal(legend.getAttribute('aria-label'), 'Map key');
+  const each = legend.querySelector('template');
+  assert.equal(each.getAttribute('x-for'), 'e in globeLegend()');
+  assert.equal(each.getAttribute(':key'), 'e.key');
+  const swatch = each.content.querySelector('li > i');
+  assert.equal(swatch.getAttribute(':class'), 'legendKeyClass(e)');
+  assert.equal(swatch.getAttribute('aria-hidden'), 'true');
+  assert.equal(each.content.querySelector('li [x-text="e.text"]') !== null, true, 'the words come from the entry');
   const fallback = shell.querySelector('ul.globe-fallback');
   assert.equal(fallback.getAttribute('x-show'), 'globeFallback');
   assert.equal(fallback.querySelector('template').getAttribute('x-for'), 'line in globeLines()');
@@ -1460,7 +1475,7 @@ test('index.html: the globe stage is a named image, with a legend and a text fal
   }
 });
 
-test('index.html: a soon act shows the kit chip and teaser; the legend has a soon key', () => {
+test('index.html: a soon act shows the kit chip and teaser', () => {
   const soon = deepQuery(shell, '.act-soon');
   assert.ok(soon, '.act-soon in the act template');
   assert.equal(soon.getAttribute('x-show'), 'act.soon');
@@ -1469,9 +1484,6 @@ test('index.html: a soon act shows the kit chip and teaser; the legend has a soo
   assert.equal(chip.textContent.trim(), 'Coming soon');
   assert.ok(soon.querySelector('[x-text="act.teaser"]'), 'the teaser, escaped by x-text');
   assert.equal(deepQuery(shell, '.act').getAttribute(':class'), "act.soon ? 'soon' : ''");
-  const legend = shell.querySelector('.globe-legend').textContent.replace(/\s+/g, ' ').trim();
-  assert.equal(legend, 'Lit: level completed Pulsing: incident open Saved: all calm Not reached Coming soon');
-  assert.ok(shell.querySelector('.globe-legend .globe-key.soon'), 'the soon key has its swatch');
 });
 
 test('index.html: the hub act card and the About list render act.badges as kit chips with x-text', () => {
@@ -1687,10 +1699,39 @@ test('focusSoon: a target that is already shown is focused at once, with no fram
   assert.equal(rig.queue.length, 0);
 });
 
-test('hasSoon: false for the live registry, true with a coming-soon act; the legend key shows only then', () => {
-  assert.equal(setup({ registry: liveRegistry() }).game.hasSoon(), false);
-  assert.equal(setup({ registry: liveRegistry(), comingSoon: [S7] }).game.hasSoon(), true);
-  const m = read('index.html').match(/<span([^>]*)><i class="globe-key soon"[^>]*><\/i>Coming soon<\/span>/);
-  assert.ok(m, 'the legend has a Coming soon key');
-  assert.match(m[1], /x-show="hasSoon\(\)"/);
+test('the legend lists what the globe draws now, and hasSoon is gone', () => {
+  const keys = (o) => setup(o).game.globeLegend().map((e) => e.key);
+  assert.deepEqual(keys({}), ['dark']);
+  assert.deepEqual(keys({ initial: { [STORAGE_KEY]: v1({ x: { stars: 3, at: AT } }) } }), ['lit', 'dark']);
+  assert.deepEqual(keys({ debug: true }), ['resolved'], 'debug draws every mapped region resolved');
+  const withSoon = setup({ comingSoon: [S7], dots: [...DOTS, [20, 100, 'SSS', '']] }).game;
+  assert.deepEqual(withSoon.globeLegend().map((e) => e.key), ['dark', 'soon']);
+  assert.deepEqual(withSoon.globeLegend()[1], { key: 'soon', text: 'Coming soon' });
+  assert.equal(setup().game.hasSoon, undefined, 'nothing reads hasSoon any more');
+  assert.equal(setup().game.legendKeyClass({ key: 'incident' }), 'globe-key pulse');
+  assert.equal(setup().game.legendKeyClass({ key: 'dark' }), 'globe-key');
+  for (const k of ['lit', 'resolved', 'soon']) assert.equal(setup().game.legendKeyClass({ key: k }), `globe-key ${k}`);
+});
+
+test('the caption text follows the progress, and is empty when no region is mapped', () => {
+  assert.equal(setup().game.captionText(), 'The planet is dark. Shine the o11y light on your world.');
+  const after = setup({ initial: { [STORAGE_KEY]: v1({ x: { stars: 3, at: AT } }) } }).game;
+  assert.equal(after.captionText(), "You're building! Zero: 1 of 4 done.");
+  assert.equal(setup({ debug: true }).game.captionText(), 'Every region is calm. You saved the day.');
+  assert.equal(setup({ registry: EMPTY }).game.captionText(), '');
+});
+
+test('About: the map topic renders GLOBE_LOOP after the summary, and the summary no longer promises a whole region', () => {
+  assert.equal(GLOBE_LOOP.title, 'The map');
+  assert.match(GLOBE_LOOP.text, /production goes down there/);
+  assert.equal(GAME_SUMMARY.includes('whole region'), false);
+  assert.ok(GAME_SUMMARY.endsWith('lights up a country on the globe.'));
+  const body = shell.querySelector('#about-modal .ui-modal-body');
+  const topic = body.querySelector('.about-map');
+  assert.ok(topic, 'a map topic in the About body');
+  assert.equal(topic.querySelector('h3').getAttribute('x-text'), 'aboutLoop.title');
+  assert.equal(topic.querySelector('p').getAttribute('x-text'), 'aboutLoop.text');
+  const order = [...body.children];
+  assert.ok(order.indexOf(topic) > order.indexOf(body.querySelector('[x-text="aboutSummary"]')), 'after the summary');
+  assert.ok(order.indexOf(topic) < order.indexOf(body.querySelector('ol.about-acts')), 'before the act list');
 });
