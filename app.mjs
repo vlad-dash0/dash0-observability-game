@@ -37,7 +37,7 @@ import { buildRegistry } from './lib/registry.mjs';
 import { createSaveDialog } from './lib/save-dialog.mjs';
 import { loadProgress, saveProgress, STORAGE_KEY } from './lib/storage.mjs';
 import { readTheme, writeTheme } from './lib/theme.mjs';
-import { continueView } from './lib/hub-view.mjs';
+import { continueView, hubActs } from './lib/hub-view.mjs';
 import { levelState, lockReason } from './lib/unlock.mjs';
 
 // ?mode=debug shows the globe with everything finished (#309): a progress where every level is done.
@@ -224,6 +224,7 @@ export function createGame(deps) {
     overlayTitle: '',
     overlayNo: '',
     currentLevelId: null,
+    actOverrides: {}, // act id -> bool: the player's fold choice, memory only (never stored)
     openedFrom: 'card', // who opened the current level: 'card' or 'continue' (returnTarget)
     nudgeId: null,
     rewardOpen: false,
@@ -703,6 +704,34 @@ export function createGame(deps) {
     hubInert() {
       return this.dialogOpen();
     },
+    // ---------- act folds (lib/hub-view.mjs hubActs) ----------
+    // The row of a registry act (real progress, also in debug), or undefined for a coming-soon or unknown id.
+    actRow(id) {
+      return hubActs(registry, this.progress, { debug: this.debug, overrides: this.actOverrides }).find((r) => r.id === id);
+    },
+    // Folded or not: a registry act by its row, a coming-soon act unfolded unless toggled, an unknown id never.
+    actExpanded(id) {
+      const row = this.actRow(id);
+      if (row !== undefined) return row.expanded;
+      if (!this.acts.some((a) => a.id === id)) return false;
+      return Object.hasOwn(this.actOverrides, id) ? this.actOverrides[id] === true : true;
+    },
+    // aria-expanded needs the string: Alpine drops an attribute bound to false.
+    actExpandedAttr(id) {
+      return this.actExpanded(id) ? 'true' : 'false';
+    },
+    // The act heading's one line: "Act 2: Traces, 2 of 8", "..., saved, 4 of 4", "Act 7: Later, coming soon".
+    actLine(act) {
+      if (act.soon) return `${act.title}, coming soon`;
+      return this.actRow(act.id)?.line ?? act.title;
+    },
+    // Fold or unfold one act (memory only, debug included); returns whether it is now expanded.
+    toggleAct(id) {
+      if (!this.acts.some((a) => a.id === id)) return false;
+      const next = !this.actExpanded(id);
+      this.actOverrides = { ...this.actOverrides, [id]: next };
+      return next;
+    },
     // The About dialog: the game summary and one entry per act (live and coming soon), from act data.
     aboutActs() {
       return this.acts.map((a) => ({ id: a.id, title: a.title, sub: a.sub, teaser: a.teaser, soon: a.soon, badges: a.badges }));
@@ -1035,11 +1064,14 @@ export function createGame(deps) {
       const target = this.returnTarget();
       if (target) this.focusSoon(target);
     },
-    // Where focus goes when the level closes: Continue if it opened the level and is still shown, else the card.
+    // Where focus goes when the level closes: Continue if it opened the level and is still shown, else the card
+    // (its act's toggle when the act is folded and the card hidden).
     returnTarget() {
       const id = this.currentLevelId;
       if (!id) return null;
       if (this.openedFrom === 'continue' && this.continueLabel() !== '') return '#hub-continue';
+      const actId = registry.levels[id]?.actId;
+      if (actId !== undefined && !this.actExpanded(actId)) return `#act-toggle-${actId}`; // the card is hidden in a folded act
       return `[data-level-id="${id}"]`;
     },
     // Focus after Alpine has rendered (its $nextTick when running under Alpine), and only once the

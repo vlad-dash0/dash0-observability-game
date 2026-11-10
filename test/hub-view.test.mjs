@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { buildRegistry } from '../lib/registry.mjs';
 import { emptyProgress } from '../lib/progress.mjs';
 import { nextUp } from '../lib/unlock.mjs';
-import { continueView } from '../lib/hub-view.mjs';
+import { continueView, hubActs } from '../lib/hub-view.mjs';
 
 const L = (id, no) => ({ id, no, name: `Name ${id}`, icon: '*', rewardTitle: `t-${id}`, mechanics: ['query'], run() {} });
 const REG = buildRegistry([
@@ -42,4 +42,43 @@ test('C4 the button always opens the level nextUp names', () => {
     const v = continueView(REG, P(ids));
     assert.equal(v?.levelId ?? null, n?.levelId ?? null, ids.join());
   }
+});
+
+const rows = (progress, opts) => hubActs(REG, progress, opts).map((r) => [r.id, r.status, r.done, r.total, r.expanded, r.line]);
+
+test('H1 a fresh game: the first act is open and unfolded, the rest locked and folded', () => {
+  assert.deepEqual(rows(P([])), [
+    ['g0', 'open', 0, 3, true, 'Act 0: Zeroth, 0 of 3'],
+    ['g1', 'locked', 0, 4, false, 'Act 1: First, locked, 0 of 4'],
+    ['g2', 'locked', 0, 1, false, 'Act 2: Second, locked, 0 of 1'],
+  ]);
+});
+
+test('H2 a finished act is saved and folded, the next one unfolds', () => {
+  const r = rows(P(['a', 'b', 'boss0', 'c']));
+  assert.deepEqual(r[0], ['g0', 'saved', 3, 3, false, 'Act 0: Zeroth, saved, 3 of 3']);
+  assert.deepEqual(r[1], ['g1', 'open', 1, 4, true, 'Act 1: First, 1 of 4']);
+});
+
+test('H3 an open boss makes the act an incident and keeps it unfolded', () => {
+  assert.deepEqual(rows(P(['a', 'b']))[0], ['g0', 'incident', 2, 3, true, 'Act 0: Zeroth, incident open, 2 of 3']);
+});
+
+test('H4 a completion in a later act unlocks and unfolds it', () => {
+  const r = rows(P(['c']));
+  assert.equal(r[0][1], 'open');
+  assert.equal(r[0][4], true);
+  assert.deepEqual(r[1], ['g1', 'open', 1, 4, true, 'Act 1: First, 1 of 4']);
+  assert.deepEqual(r[2].slice(1, 5), ['locked', 0, 1, false]);
+});
+
+test('H5 the player\'s choice beats the default; ids that are not acts are ignored', () => {
+  const r = hubActs(REG, P(['a', 'b', 'boss0']), { overrides: { g0: true, g1: false, nope: true } });
+  assert.deepEqual(r.map((x) => x.expanded), [true, false, false]);
+  assert.equal(r.length, 3);
+});
+
+test('H6 debug unfolds every act and keeps the real statuses', () => {
+  const r = hubActs(REG, P(['a', 'b', 'boss0']), { debug: true });
+  assert.deepEqual(r.map((x) => [x.status, x.expanded]), [['saved', true], ['open', true], ['locked', true]]);
 });
