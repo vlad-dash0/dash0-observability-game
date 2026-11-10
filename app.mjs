@@ -36,7 +36,6 @@ import { runPlay, validatePlay } from './lib/play.mjs';
 import { buildRegistry } from './lib/registry.mjs';
 import { createSaveDialog } from './lib/save-dialog.mjs';
 import { loadProgress, saveProgress, STORAGE_KEY } from './lib/storage.mjs';
-import { readTheme, writeTheme } from './lib/theme.mjs';
 import { continueView, hubActs, nextView } from './lib/hub-view.mjs';
 import { levelState, lockReason } from './lib/unlock.mjs';
 
@@ -196,7 +195,6 @@ export function createGame(deps) {
     rewardDebug: false,
     progress: loaded.progress,
     notice: loaded.status === 'fresh' || loaded.status === 'ok' ? null : loaded.status,
-    theme: readTheme(storage),
     acts: [
       ...registry.acts.map((a) => ({
         id: a.id,
@@ -687,16 +685,6 @@ export function createGame(deps) {
       if (!globe) return;
       const view = this.globeView();
       globe.update(view.states, view.target);
-    },
-
-    // ---------- theme ----------
-    toggleTheme() {
-      this.theme = this.theme === 'light' ? 'dark' : 'light';
-      doc.documentElement.dataset.theme = this.theme;
-      writeTheme(storage, this.theme);
-    },
-    themeLabel() {
-      return this.theme === 'light' ? 'Switch to the dark theme' : 'Switch to the light theme';
     },
 
     // ---------- dialogs ----------

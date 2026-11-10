@@ -379,43 +379,36 @@ test('T7 retired classes: only LEGACY files emit them, and LEGACY has no stale e
   }
 });
 
-// ---- T13 contrast of the kit tokens, both themes ------------------------------------------
+// ---- T13 contrast of the kit tokens (dark only) ------------------------------------------
 
 test('T13 lesson text, muted text and the eyebrow reach 4.5:1 on the card and its glow corner; lesson code on code-bg', () => {
-  for (const theme of ['light', 'dark']) {
-    const surface = resolveColor('var(--color-surface)', theme);
-    const glow = overlay('--color-lesson-glow', '--color-surface', theme);
-    for (const fg of ['--color-lesson', '--color-text-muted', '--color-lesson-eyebrow']) {
-      const c = resolveColor(`var(${fg})`, theme);
-      for (const [name, bg] of [['surface', surface], ['glow corner', glow]]) {
-        const r = ratio(c, bg);
-        assert.ok(r >= 4.5, `${theme}: ${fg} on the lesson ${name} is ${r.toFixed(2)}, needs 4.5`);
-      }
+  const surface = resolveColor('var(--color-surface)');
+  const glow = overlay('--color-lesson-glow', '--color-surface');
+  for (const fg of ['--color-lesson', '--color-text-muted', '--color-lesson-eyebrow']) {
+    const c = resolveColor(`var(${fg})`);
+    for (const [name, bg] of [['surface', surface], ['glow corner', glow]]) {
+      const r = ratio(c, bg);
+      assert.ok(r >= 4.5, `${fg} on the lesson ${name} is ${r.toFixed(2)}, needs 4.5`);
     }
-    const code = contrast('--color-lesson-code', '--color-code-bg', theme);
-    assert.ok(code >= 4.5, `${theme}: --color-lesson-code on --color-code-bg is ${code.toFixed(2)}, needs 4.5`);
   }
-  // The prototype's light eyebrow (#a8650f) fails, which is why the kit has its own ink.
-  const proto = ratio([0xa8, 0x65, 0x0f], resolveColor('var(--color-surface)', 'light'));
-  assert.ok(proto < 4.5, `prototype eyebrow is ${proto.toFixed(2)}`);
+  const code = contrast('--color-lesson-code', '--color-code-bg');
+  assert.ok(code >= 4.5, `--color-lesson-code on --color-code-bg is ${code.toFixed(2)}, needs 4.5`);
 });
 
-test('T13 modal text reaches 4.5:1 on its card, glowed head, foot and the About act cards, both themes', () => {
+test('T13 modal text reaches 4.5:1 on its card, glowed head, foot and the About act cards', () => {
   const mix = (a, b, wa) => a.map((v, i) => Math.round(v * wa + b[i] * (1 - wa)));
-  for (const theme of ['light', 'dark']) {
-    const surface = resolveColor('var(--color-surface)', theme);
-    const bg = resolveColor('var(--color-bg)', theme);
-    const fills = {
-      card: surface,
-      head: overlay('--color-lesson-glow', '--color-surface', theme),
-      foot: mix(bg, surface, 0.45), // .ui-modal-foot: color-mix(in srgb, bg 45%, surface)
-      'about act card': mix(bg, surface, 0.35), // .about-acts li
-    };
-    for (const fg of ['--color-text', '--color-text-muted']) {
-      for (const [name, fill] of Object.entries(fills)) {
-        const r = ratio(resolveColor(`var(${fg})`, theme), fill);
-        assert.ok(r >= 4.5, `${theme}: ${fg} on the modal ${name} is ${r.toFixed(2)}, needs 4.5`);
-      }
+  const surface = resolveColor('var(--color-surface)');
+  const bg = resolveColor('var(--color-bg)');
+  const fills = {
+    card: surface,
+    head: overlay('--color-lesson-glow', '--color-surface'),
+    foot: mix(bg, surface, 0.45), // .ui-modal-foot: color-mix(in srgb, bg 45%, surface)
+    'about act card': mix(bg, surface, 0.35), // .about-acts li
+  };
+  for (const fg of ['--color-text', '--color-text-muted']) {
+    for (const [name, fill] of Object.entries(fills)) {
+      const r = ratio(resolveColor(`var(${fg})`), fill);
+      assert.ok(r >= 4.5, `${fg} on the modal ${name} is ${r.toFixed(2)}, needs 4.5`);
     }
   }
   const kit = read('styles/kit.css');
@@ -423,19 +416,15 @@ test('T13 modal text reaches 4.5:1 on its card, glowed head, foot and the About 
   assert.match(read('styles/hub.css'), /\.about-acts li \{[^}]*color-mix\(in srgb, var\(--color-bg\) 35%, var\(--color-surface\)\)/, 'the act card fill the test mixes');
 });
 
-test('T13 meter cells left and the alert red reach 3:1 (non-text) on surface and bg, both themes', () => {
-  for (const theme of ['light', 'dark']) {
-    for (const fg of ['--color-meter-left', '--color-alert']) {
-      for (const bg of ['--color-surface', '--color-bg']) {
-        const r = contrast(fg, bg, theme);
-        assert.ok(r >= 3, `${theme}: ${fg} on ${bg} is ${r.toFixed(2)}, needs 3`);
-      }
+test('T13 meter cells left and the alert red reach 3:1 (non-text) on surface and bg', () => {
+  for (const fg of ['--color-meter-left', '--color-alert']) {
+    for (const bg of ['--color-surface', '--color-bg']) {
+      const r = contrast(fg, bg);
+      assert.ok(r >= 3, `${fg} on ${bg} is ${r.toFixed(2)}, needs 3`);
     }
   }
   // D1: the alert is red, apart from the purple error.
-  for (const theme of ['light', 'dark']) {
-    assert.notDeepEqual(resolveColor('var(--color-alert)', theme), resolveColor('var(--color-error)', theme), theme);
-  }
+  assert.notDeepEqual(resolveColor('var(--color-alert)'), resolveColor('var(--color-error)'));
 });
 
 // A row is matched by its compound selector (class wf-row plus the attribute test), in any
@@ -503,19 +492,17 @@ test('T13 harness: a row fade is found in any quote, value or ancestor form; a f
 
 // Deferred from the PR #164 review: a faded waterfall row (the overflow mark, another trace)
 // faded the whole row, so its "its parent" text fell to about 2.2:1. The fade goes on the
-// marks and bars; the row's text keeps 4.5:1 in both themes.
-test('T13 faded waterfall rows fade the bars, not the text: row text keeps 4.5:1 on the board, both themes', () => {
+// marks and bars; the row's text keeps 4.5:1 on dark.
+test('T13 faded waterfall rows fade the bars, not the text: row text keeps 4.5:1 on the board', () => {
   const list = sheetRules('widgets.css');
   for (const [row, isRow] of Object.entries(FADED_ROWS)) {
     const alpha = textAlpha(list, isRow);
-    for (const theme of ['light', 'dark']) {
-      for (const bg of ['--color-surface', '--color-bg']) {
-        const under = resolveColor(`var(${bg})`, theme);
-        for (const fg of ['--color-text', '--color-text-muted', '--color-parent']) {
-          const seen = resolveColor(`var(${fg})`, theme).map((c, i) => c * alpha + under[i] * (1 - alpha));
-          const r = ratio(seen, under);
-          assert.ok(r >= 4.5, `${theme}: ${fg} in the ${row} row on ${bg} is ${r.toFixed(2)} (text opacity ${alpha}), needs 4.5`);
-        }
+    for (const bg of ['--color-surface', '--color-bg']) {
+      const under = resolveColor(`var(${bg})`);
+      for (const fg of ['--color-text', '--color-text-muted', '--color-parent']) {
+        const seen = resolveColor(`var(${fg})`).map((c, i) => c * alpha + under[i] * (1 - alpha));
+        const r = ratio(seen, under);
+        assert.ok(r >= 4.5, `${fg} in the ${row} row on ${bg} is ${r.toFixed(2)} (text opacity ${alpha}), needs 4.5`);
       }
     }
     const bar = barOpacities(list, isRow);
