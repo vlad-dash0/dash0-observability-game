@@ -309,3 +309,12 @@ test('claims: the CORS mechanics are only what the replies on screen show, scope
   const copy = plain(JSON.stringify(level.play));
   assert.doesNotMatch(copy, /always|every browser|all browsers|never allow/i, 'no universal claim in the copy');
 });
+
+test('step 1: the intro is short paragraphs, one idea each, and the board shows the span ids it points at (#321)', () => {
+  const paras = BUILD_STEP.intro.split('</p>').filter((x) => x.includes('<p>'));
+  assert.equal(paras.length >= 4, true, 'the browser spans, the traceparent, the twin call, the other visitor');
+  assert.equal(paras.every((p) => plain(p).length < 300), true, 'no paragraph is a wall');
+  assert.match(plain(paras[1]), /traceparent/);
+  assert.match(plain(paras[2]), /span id/);
+  assert.match(plain(paras[3]), /9d8c7b6a/);
+});

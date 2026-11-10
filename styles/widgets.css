@@ -16,6 +16,7 @@
 .wf-board { display: grid; gap: var(--space-3); min-width: 0; }
 .wf-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .wf-group { display: grid; gap: var(--space-2); }
+.wf-logs-wrap { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
 .wf-logs { list-style: none; display: grid; gap: var(--space-1); }
 .wf-logs li { display: grid; }
 .wf-attrs { list-style: none; font-family: var(--font-mono); font-size: 13px; overflow-wrap: anywhere; }
@@ -76,6 +77,7 @@
 .wf-sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
 .wf-elbow { display: inline-block; width: 9px; height: 9px; border-left: 1px solid var(--color-text-muted); border-bottom: 1px solid var(--color-text-muted); transform: translateY(-3px); flex: none; }
 .wf-l2 { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.wf-sid { border: 1px dashed var(--color-border); border-radius: 4px; padding: 0 5px; color: var(--color-text); }
 .wf-tid { border: 1px solid var(--color-border); border-radius: 4px; padding: 0 5px; }
 .wf-tid[data-tint="0"] { background: var(--color-trace-0); border-color: var(--color-trace-0-edge); color: var(--color-text); }
 .wf-tid[data-tint="1"] { background: var(--color-trace-1); border-color: var(--color-trace-1-edge); color: var(--color-text); }
@@ -91,6 +93,7 @@
 .wf-mark[data-mark-icon="no"] { color: var(--color-note); }
 
 /* The track: grid lines, the time-window band, connectors, the labelled bar, ticks and cursor. */
+.wf-tick-label[data-hide-wide] { display: none; } /* would touch its neighbour on a side-by-side track */
 .wf-grid { stroke: var(--color-border); stroke-width: 1px; stroke-dasharray: 2 3; opacity: .55; }
 .wf-band { fill: var(--color-band); }
 .wf-conn { stroke: var(--color-text-muted); stroke-width: 1px; opacity: .7; }
@@ -116,6 +119,7 @@
 /* The halo only on a label that ends left of its bar (build-it-view.mjs labelFlips): there it crosses the row
    connector, and the panel surface an idle row sits on, 8px wide to cover the 7.7px gap between words, hides it. */
 .wf-bar-label[text-anchor="end"] { stroke: var(--color-surface); stroke-width: 8px; stroke-linejoin: round; paint-order: stroke; }
+.wf-bar-label [data-cut="all"] { display: none; } /* no room even on the widest of the narrow tracks */
 .wf-dur { font-weight: 700; font-variant-numeric: tabular-nums; }
 .wf-row[data-waiting] .wf-bar-label { fill: var(--color-text-muted); }
 .wf-log { fill: var(--color-text); }
@@ -147,8 +151,12 @@
   .wf-axis-gap { display: none; }
   .wf-trackcell { min-height: 30px; }
   .wf-row { padding: 6px; }
-  /* Narrow tracks keep the first, middle and last tick labels so they never overlap. */
-  .wf-tick-label[data-tick="1"], .wf-tick-label[data-tick="3"], .wf-tick-label[data-tick="4"] { display: none; }
+  /* Stacked, the track is narrower or wider than the side-by-side one: the labels dropped for the
+     narrowest stacked track (build-it-view.mjs tickPlan) go, the ones only the side-by-side plan drops return. */
+  .wf-tick-label[data-hide-wide] { display: inline; }
+  .wf-tick-label[data-hide-narrow] { display: none; }
+  /* A bar label with no room on a phone-width track keeps its duration and loses its name. */
+  .wf-bar-label [data-cut] { display: none; }
 }
 
 /* Sort it (lib/widgets/sort-it-view.mjs, #156, #261): no boxes. The category choices are kit options;

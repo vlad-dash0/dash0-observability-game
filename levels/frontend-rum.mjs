@@ -125,10 +125,10 @@ export default {
     steps: [
       {
         intro:
-          'A browser can produce spans too, so a trace can start at the click. In Kettle &amp; Co\'s shop, the instrumentation records a span for the click on Pay and one for each fetch call the click makes. ' +
-          `In the lab, the shop and the checkout service share an origin, and the SDK adds <code>traceparent: 00-${T1}-${PAY}-01</code> to the call. ` +
-          'The code that sends the checkout call ran twice, so two identical calls left together; the board tells them apart by the end of their span id. ' +
-          'Another visitor clicked Pay at the same moment, in trace <code>9d8c7b6a</code>. Checkout\'s server span for one of the two calls arrived as a root.',
+          '<p>A browser can produce spans too, so a trace can start at the click. In Kettle &amp; Co\'s shop, the instrumentation records a span for the click on Pay and one for each fetch call the click makes.</p>' +
+          `<p>In the lab, the shop and the checkout service share an origin, and the SDK adds <code>traceparent: 00-${T1}-${PAY}-01</code> to the call.</p>` +
+          '<p>The code that sends the checkout call ran twice, so two identical calls left together; the board tells them apart by the end of their span id, which each row shows.</p>' +
+          '<p>Another visitor clicked Pay at the same moment, in trace <code>9d8c7b6a</code>. Checkout\'s server span for one of the two calls arrived as a root.</p>',
         question: 'Give checkout\'s server span its parent.',
         qid: 'frum-q-tree',
         build: TREE,
