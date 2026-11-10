@@ -415,7 +415,7 @@ saves the merged response locally, and never syncs in debug mode.
 
 **Three outcomes.** Every read gives ok, unavailable or not configured. A failed store operation returns
 `{ok:false, reason:'store'}`, never `[]` or 0. The client maps 502, 503, network errors and odd bodies to
-unavailable ("Leaderboard unavailable"; "Account unavailable; your progress is still saved in this browser") and says
+unavailable ("Leaderboard unavailable"; a failed account read says "Sign-in and the leaderboard are unavailable right now; your progress is still saved in this browser."; a failed action or sync says "Account unavailable; your progress is still saved in this browser") and says
 "No one on the board yet" only for an ok empty board.
 
 **Threat model.** Progress is client-asserted. The server enforces real Dash0 identities, totals computed on the server

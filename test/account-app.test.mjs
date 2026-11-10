@@ -274,7 +274,7 @@ test('GET /api/account failing shows the notice in the markup and changes nothin
   game.completeLevel('x', WIN);
   await settle();
   assert.deepEqual(calls, ['GET /api/account']);
-  assert.match(game.accountNotice, /Account unavailable/);
+  assert.equal(game.accountNotice, 'Sign-in and the leaderboard are unavailable right now; your progress is still saved in this browser.');
   assert.equal(game.accountEnabled, false);
   const line = hubLine('accountNotice');
   assert.ok(line, 'the hub binds the notice');
@@ -723,7 +723,8 @@ test('an anonymous visitor whose GET /api/account fails never sees the reward ca
   await initOf(game);
   game.completeLevel('x', WIN);
   await settle();
-  assert.match(game.accountNotice, /Account unavailable/);
+  assert.match(game.accountNotice, /Sign-in and the leaderboard are unavailable/);
+  assert.doesNotMatch(game.accountNotice, /Account unavailable/);
   assert.equal(shownIn(game, line), false);
 });
 
@@ -751,7 +752,7 @@ test('a nickname or listing answer that arrives after sign-out or delete changes
       const { game, dom } = setup({
         routes: {
           'GET /api/account': IN(), 'POST /api/progress': merged({}),
-          'POST /api/account': async () => { if (n++ === 0) await held; return res(200, { v: 1, ok: true, nick: 'neo', listed: false }); },
+          'POST /api/account': async () => { if (n++ === 0) await held; return res(200, { v: 1, ok: true, nick: 'neo', listed: true }); },
         },
       });
       await initOf(game);
@@ -762,7 +763,7 @@ test('a nickname or listing answer that arrives after sign-out or delete changes
       await pending;
       assert.equal(game.account.state, 'signedOut', `${act} ${leave}`);
       assert.equal(game.account.nick, '', `${act} ${leave}: nick not written`);
-      assert.equal(game.account.listed, false);
+      assert.equal(game.account.listed, false, `${act} ${leave}: the held listed: true is not written`);
       assert.doesNotMatch(dom.document.getElementById('account-body').innerHTML, /saved|hidden from/i, `${act} ${leave}`);
     }
   }
@@ -777,4 +778,43 @@ test('the hub count line is hidden while it has nothing to say', async () => {
   const ok = setup({ routes: { 'GET /api/account': IN(), 'POST /api/progress': merged({}) } });
   await initOf(ok.game);
   assert.equal(shownIn(ok.game, line), true);
+});
+
+test('a delete answer that fails after Sign out ended the session is dropped, not written into the closed modal', async () => {
+  let release;
+  const held = new Promise((r) => { release = r; });
+  const { game, dom } = setup({
+    routes: {
+      'GET /api/account': IN(), 'POST /api/progress': merged({}),
+      'POST /api/account': async (init) => { if (JSON.parse(init.body).action === 'delete') { await held; return res(502, {}); } return res(200, { v: 1, ok: true }); },
+    },
+  });
+  await initOf(game);
+  game.openAccount();
+  const pending = game.deleteAccount();
+  await game.signOut();
+  assert.equal(game.account.state, 'signedOut');
+  release();
+  await pending;
+  await settle();
+  assert.doesNotMatch(dom.document.getElementById('account-feedback')?.textContent ?? '', /unavailable/i);
+});
+
+test('a sign-out answer that arrives after the session ended is dropped too', async () => {
+  let release;
+  const held = new Promise((r) => { release = r; });
+  const { game, dom } = setup({
+    routes: {
+      'GET /api/account': IN(), 'POST /api/progress': merged({}),
+      'POST /api/account': async (init) => { if (JSON.parse(init.body).action === 'signout') { await held; return res(502, {}); } return res(200, { v: 1, ok: true }); },
+    },
+  });
+  await initOf(game);
+  game.openAccount();
+  const pending = game.signOut();
+  await game.deleteAccount();
+  release();
+  await pending;
+  await settle();
+  assert.doesNotMatch(dom.document.getElementById('account-feedback')?.textContent ?? '', /unavailable/i);
 });

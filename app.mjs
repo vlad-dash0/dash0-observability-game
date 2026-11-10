@@ -62,6 +62,8 @@ export const NOTICES = Object.freeze({
 
 // The wait before the one retry after a 429 is capped here.
 const MAX_RETRY_S = 60;
+// GET /api/account itself failed: said for everyone, including a browser that never signed in.
+const ACCOUNT_LOAD_FAILED = 'Sign-in and the leaderboard are unavailable right now; your progress is still saved in this browser.';
 const ACCOUNT_LIMITED = 'Too many changes just now. Wait up to an hour and try again.';
 const SYNC_PAUSED = 'Saving to your account is paused for a moment; your progress is safe in this browser';
 
@@ -300,7 +302,7 @@ export function createGame(deps) {
       const res = await accountClient.account();
       if (res.state === 'unavailable') {
         this.account = { state: 'unavailable', nick: '', listed: false };
-        this.accountNotice = ACCOUNT_UNAVAILABLE;
+        this.accountNotice = ACCOUNT_LOAD_FAILED;
         return;
       }
       this.account = { state: res.state, nick: res.nick ?? '', listed: res.listed ?? false };
@@ -505,12 +507,16 @@ export function createGame(deps) {
       this.accountSay('success', this.account.listed ? 'You are on the leaderboard.' : 'You are hidden from the leaderboard.');
     },
     async signOut() {
+      const epoch = this.accountEpoch;
       const res = await accountClient.signOut();
+      if (this.staleAnswer(epoch)) return;
       if (res.state !== 'ok') return this.accountRefused(res);
       this.endAccountSession();
     },
     async deleteAccount() {
+      const epoch = this.accountEpoch;
       const res = await accountClient.deleteAccount();
+      if (this.staleAnswer(epoch)) return;
       if (res.state !== 'ok') return this.accountRefused(res);
       this.endAccountSession();
     },
