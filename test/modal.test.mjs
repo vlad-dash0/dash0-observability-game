@@ -55,7 +55,7 @@ test('the shells take their look from the kit alone: no style attribute, no extr
 function fixture() {
   const { document } = parseHTML(`<!doctype html><body><button id="before">b</button>
     <div id="m"><h2 id="t" tabindex="-1">T</h2><button id="a">a</button><button id="off" disabled>x</button>
-    <div hidden><button id="gone">g</button></div><a id="b" href="#">b</a><button id="z">z</button></div></body>`);
+    <div hidden><button id="gone">g</button></div><a id="b" href="#">b</a><button id="z">z</button><div id="tail"></div></div></body>`);
   const modal = document.getElementById('m');
   // linkedom does not track focus: record it, and read it back as document.activeElement.
   let current = null;
@@ -101,6 +101,20 @@ test('Tab in the middle is left to the browser', () => {
   }
   at('t');
   assert.equal(trapTab(key(false), modal, document), false, 'Tab from the title goes to the first control natively');
+});
+
+test('an inside element that Tab does not list (a scroller, the tail) still wraps at the edges, so focus never reaches body', () => {
+  const { document, modal, key, at } = fixture();
+  at('tail');
+  const e = key();
+  assert.equal(trapTab(e, modal, document), true, 'Tab after the last control wraps');
+  assert.equal(e.prevented, true);
+  assert.equal(document.activeElement.id, 'a');
+  at('tail');
+  assert.equal(trapTab(key(true), modal, document), false, 'Shift+Tab from the tail goes back to the last control natively');
+  at('t');
+  assert.equal(trapTab(key(true), modal, document), true);
+  assert.equal(document.activeElement.id, 'z');
 });
 
 test('focus outside the modal is pulled back in', () => {
