@@ -1,7 +1,9 @@
 // The OTLP/HTTP sender and the one response classifier (lib/otlp/send.mjs).
-// Spec: docs/DASH0-LAB.md §Sender. Fake fetch and fake timers; nothing touches the network.
+// Spec: docs/DASH0-LAB.md §Sender. Fake fetch and fake timers, except the last two tests, which use Node's real fetch
+// against a server on loopback (127.0.0.1).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import { BODY_CAP, DATASET_HEADER, MESSAGE_CAP, TIMEOUT_MS, classifyResponse, sendTraces } from '../lib/otlp/send.mjs';
 
 const T = 'auth_Tk9secretValue42';
@@ -382,4 +384,75 @@ test('a response over 64 KiB is never inspected: no message on an error status, 
     auth: false,
     message: 'clean words',
   });
+});
+
+// Node's own fetch (undici) against a real local server: the init options the sender passes
+// (for example credentials, referrerPolicy, cache, redirect) must be accepted outside a browser too.
+async function withServer(handler, run) {
+  const server = createServer(handler);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    await run(`http://127.0.0.1:${server.address().port}`);
+  } finally {
+    server.closeAllConnections?.();
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+test("sendTraces over Node's own fetch: accepted, with the headers on the wire", async () => {
+  let seen;
+  await withServer(
+    (req, resp) => {
+      let data = '';
+      req.on('data', (c) => (data += c));
+      req.on('end', () => {
+        seen = { method: req.method, headers: req.headers, body: data };
+        resp.writeHead(200, { 'content-type': 'application/json' });
+        resp.end('{}');
+      });
+    },
+    async (base) => {
+      const out = await sendTraces({
+        fetch: globalThis.fetch,
+        tracesUrl: `${base}/v1/traces`,
+        token: 'auth_x12345678',
+        dataset: 'ds',
+        body: { a: 1 },
+        setTimeout,
+        clearTimeout,
+      });
+      assert.deepEqual(out, { kind: 'accepted' });
+    },
+  );
+  assert.equal(seen.method, 'POST');
+  assert.equal(seen.headers.authorization, 'Bearer auth_x12345678');
+  assert.equal(seen.headers['dash0-dataset'], 'ds');
+  assert.equal(seen.headers['content-type'], 'application/json');
+  assert.equal(seen.body, '{"a":1}');
+});
+
+test("sendTraces over Node's own fetch: a redirect fails the send", async () => {
+  let hits = 0;
+  await withServer(
+    (req, resp) => {
+      if (req.url === '/elsewhere') {
+        hits += 1;
+        resp.writeHead(200).end('{}');
+      } else {
+        resp.writeHead(302, { location: '/elsewhere' }).end();
+      }
+    },
+    async (base) => {
+      const out = await sendTraces({
+        fetch: globalThis.fetch,
+        tracesUrl: `${base}/v1/traces`,
+        token: 'auth_x12345678',
+        body: { a: 1 },
+        setTimeout,
+        clearTimeout,
+      });
+      assert.deepEqual(out, { kind: 'unreachable', cause: 'network' });
+    },
+  );
+  assert.equal(hits, 0);
 });
