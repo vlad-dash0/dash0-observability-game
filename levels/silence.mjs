@@ -100,7 +100,7 @@ const SCENARIO = {
       kind: 'clue',
       html:
         `<p>The log of the last terminated container of <code>${POD_A}</code>. A restart prints these two lines and nothing else, naming one of the three pipelines (traces, metrics or logs) each time:</p>` +
-        '<pre><code>Error: invalid configuration: service::pipelines::traces: references exporter "otlp_grpc/dash0" which is not configured\n' +
+        '<pre data-wrap><code>Error: invalid configuration: service::pipelines::traces: references exporter "otlp_grpc/dash0" which is not configured\n' +
         '2026/11/01 14:21:07 collector server run finished with error: invalid configuration: service::pipelines::traces: references exporter "otlp_grpc/dash0" which is not configured</code></pre>' +
         '<p>The Collector reads its configuration, finds it invalid and exits. It never gets as far as receiving data.</p>',
     },

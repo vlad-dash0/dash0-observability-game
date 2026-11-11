@@ -207,15 +207,18 @@ test('question, note, option and field label break inside a long unbreakable tok
 test('lesson code breaks inside a long token: the lesson card clips, so an unbreakable token would be cut off', () => {
   const pick = (sel) => Object.fromEntries(sheetRules('kit.css').filter((r) => r.selector === sel).flatMap((r) => decls(r.body)));
   assert.equal(pick('.ui-lesson').overflow, 'hidden', 'premise: the card clips');
-  assert.equal(pick('.ui-lesson code')['overflow-wrap'], 'anywhere');
+  assert.equal(pick('.ui-lesson code')['overflow-wrap'], 'break-word');
   assert.equal(pick('.ui-panel').overflow, 'hidden', 'premise: the panel clips too');
-  assert.equal(pick('.ui-panel code')['overflow-wrap'], 'anywhere', 'a long trace id in a panel breaks instead of clipping');
+  assert.equal(pick('.ui-panel code')['overflow-wrap'], 'break-word', 'a trace id wider than the panel breaks instead of clipping');
   assert.equal(pick('.ui-panel-sec')['overflow-wrap'], 'anywhere', 'long plain text in a panel section wraps at 320px instead of clipping');
 });
 
-test('inline code breaks inside a long token (a traceparent at 320px), but code blocks keep scrolling', () => {
+test('inline code is inline and breaks only a token wider than the line (a traceparent at 320px), but code blocks keep scrolling', () => {
   const pick = (sel) => Object.fromEntries(sheetRules('base.css').filter((r) => r.selector === sel).flatMap((r) => decls(r.body)));
-  assert.equal(pick('code, kbd')['overflow-wrap'], 'anywhere');
+  assert.equal(pick('code, kbd')['overflow-wrap'], 'break-word', 'anywhere would split short words mid-letter');
+  assert.equal(pick('code, kbd').display, undefined, 'inline code is inline text: an inline-block code span strands punctuation and leaves the prose ragged');
+  assert.equal(pick('code[data-token]').display, 'inline-block', 'an authored token (a traceparent) moves whole to the next line instead of splitting at a hyphen');
+  assert.equal(pick('code[data-token]')['max-inline-size'], '100%');
   assert.equal(pick('pre code')['overflow-wrap'], 'normal', 'a block under <pre> scrolls, it does not wrap');
 });
 
@@ -555,6 +558,24 @@ test('a code input never soft-wraps: it keeps its lines and scrolls sideways', (
   assert.equal(p['white-space'], 'pre');
   assert.equal(p['overflow-x'], 'auto');
   assert.equal(p['overflow-wrap'], 'normal', 'the card-wide anywhere rule must not break its lines');
+});
+
+test('code never draws ligatures: Martian Mono would open a gap in "http://" (#321)', () => {
+  const base = Object.fromEntries(sheetRules('base.css').filter((r) => splitTop(r.selector).includes('code')).flatMap((r) => decls(r.body)));
+  assert.equal(base['font-variant-ligatures'], 'none');
+  assert.match(base['font-feature-settings'], /"calt" 0/);
+  const input = Object.fromEntries(sheetRules('kit.css').filter((r) => splitTop(r.selector).includes('.ui-input--code')).flatMap((r) => decls(r.body)));
+  assert.equal(input['font-variant-ligatures'], 'none', 'the editor too');
+});
+
+test('log evidence wraps into view; a code input with wrap=soft wraps, a YAML one still scrolls (#321)', () => {
+  const kit = sheetRules('kit.css');
+  const pick = (sel) => Object.fromEntries(kit.filter((r) => splitTop(r.selector).includes(sel)).flatMap((r) => decls(r.body)));
+  assert.equal(pick('.ui-prose pre[data-wrap]')['white-space'], 'pre-wrap');
+  assert.equal(pick('.ui-prose pre[data-wrap]')['overflow-wrap'], 'break-word');
+  assert.equal(pick('.ui-prose pre')['overflow-x'], 'auto', 'a plain block (config) keeps scrolling: its indentation is the meaning');
+  assert.equal(pick('.ui-input--code[wrap="soft"]')['white-space'], 'pre-wrap');
+  assert.equal(pick('.ui-input--code')['white-space'], 'pre');
 });
 
 // ---- Kit follow-ups (#176) ---------------------------------------------------------------

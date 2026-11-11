@@ -6,7 +6,7 @@
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
 import { newBuildState } from '../lib/widgets/build-it.mjs';
-import { actions, finishButton, nextButton, prose, question, step } from '../lib/ui/index.mjs';
+import { actions, codeBlock, finishButton, nextButton, prose, question, step } from '../lib/ui/index.mjs';
 
 const CHARGE = '8f14e45fceea167a';
 const RETRY = '45c48cce2e2d7fbd';
@@ -116,10 +116,8 @@ export default {
         step({
           wide: false,
           bodyHtml: `${ctx.speech(
-          'In payments, a handler catches the provider\'s error, records it, and rethrows: ' +
-            '<code>catch (err) { span.recordException(err); throw err; } finally { span.end(); }</code>. ' +
-            'Nothing else touches the span.',
-          )}${question({ id: 'evl-q', html: 'What status does the span end with?' })}${choiceHtml(ctx, RECORDED, { id: 'evl', labelledBy: 'evl-q' })}`,
+          'In payments, a handler catches the provider\'s error, records it, and rethrows. Nothing else touches the span:',
+          )}${codeBlock('catch (err) {\n  span.recordException(err);\n  throw err;\n} finally {\n  span.end();\n}')}${question({ id: 'evl-q', html: 'What status does the span end with?' })}${choiceHtml(ctx, RECORDED, { id: 'evl', labelledBy: 'evl-q' })}`,
         }),
         actions({ wide: false, buttonsHtml: nextButton('evl-next') }),
       );

@@ -72,7 +72,7 @@ const row = (cells) => `<tr><th scope="row">${cells[0]}</th>${cells.slice(1).map
 
 const VERSIONS_VIEW =
   `<p>The agent was asked how the failed checkout requests of the last hour are spread over the versions. Version ${NEW.v} went live on 3 of the 6 pods at ${TABLE.releaseAt}.</p>` +
-  '<pre><code>spans where service.name = checkout and http.response.status_code = 500\n' +
+  '<pre data-wrap><code>spans where service.name = checkout and http.response.status_code = 500\n' +
   `group by service.version, ${TABLE.releaseAt} to ${TABLE.failuresFrom} and ${TABLE.failuresFrom} to ${TABLE.queryAt}</code></pre>` +
   '<table><caption>Failed requests per 1,000 requests</caption>' +
   `<thead><tr><th scope="col">Version</th><th scope="col">${TABLE.releaseAt} to ${TABLE.failuresFrom}</th><th scope="col">${TABLE.failuresFrom} to ${TABLE.queryAt}</th></tr></thead>` +
@@ -81,7 +81,7 @@ const VERSIONS_VIEW =
 
 const TRACE_VIEW =
   `<p>The agent opened one of the ${TABLE.sampledTraces} failing traces it found since ${TABLE.failuresFrom}; all ${TABLE.sampledTraces} end the same way. Checkout reserves stock first and takes the payment after.</p>` +
-  '<pre><code>POST /checkout   SERVER  500  1842 ms\n' +
+  '<pre data-wrap><code>POST /checkout   SERVER  500  1842 ms\n' +
   '  POST           CLIENT  503  1790 ms  server.address=inventory.kettle.example</code></pre>' +
   '<p>No span in the trace calls the payment provider.</p>';
 
@@ -104,7 +104,7 @@ const SERVICES_VIEW =
 
 const LEGACY_VIEW =
   `<p>The agent was asked how many checkout requests failed from ${TABLE.failuresFrom} to ${TABLE.queryAt}.</p>` +
-  '<pre><code>spans where service.name = checkout and http.status_code = 500\n' +
+  '<pre data-wrap><code>spans where service.name = checkout and http.status_code = 500\n' +
   'result: 0 spans</code></pre>' +
   `<p>The agent's answer: no failed checkout requests from ${TABLE.failuresFrom} to ${TABLE.queryAt}.</p>`;
 

@@ -548,3 +548,23 @@ test('a Collector that would not start for a reason outside every pipeline says 
   assert.equal(html(REF).includes(NOTE), false, 'a flowing config has nothing to point at');
   assert.equal(html(REF.replace('[otlp/dash0]', '[nope]')).includes(NOTE), false, 'the problem is inside the pipeline');
 });
+
+test('the YAML editor keeps its indentation (no soft wrap) and grows to its lines (#321)', () => {
+  const given = Array.from({ length: 20 }, (_, i) => `k${i}: v`).join('\n');
+  const { dom, mount } = setup({ ...fixture(), given });
+  mount();
+  const input = dom.body.querySelector('#cf-input') ?? dom.body.querySelector('textarea');
+  assert.equal(input.hasAttribute('wrap'), false);
+  assert.equal(input.getAttribute('rows'), '20');
+});
+
+test('a hint fill regrows the editor to the filled config (#326)', () => {
+  const { mount } = setup(fixture(HELPS));
+  mount();
+  assert.equal(q('#cf-input').getAttribute('rows'), '12');
+  click('#cf-hint');
+  click('#cf-hint');
+  click('#cf-hint');
+  assert.equal(q('#cf-input').value, REF);
+  assert.equal(q('#cf-input').getAttribute('rows'), String(REF.split('\n').length));
+});

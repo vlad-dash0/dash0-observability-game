@@ -97,7 +97,7 @@ const RULES_VIEW =
 
 const OUTSIDE_VIEW =
   `<p>A request from a laptop outside the network, at ${TABLE.outsideAt}, to the shop's public hostname (curl output, abridged):</p>` +
-  '<pre><code>$ curl -v -I https://shop.kettle.example/\n' +
+  '<pre data-wrap><code>$ curl -v -I https://shop.kettle.example/\n' +
   '* Host shop.kettle.example:443 was resolved.\n' +
   '* Connected to shop.kettle.example (203.0.113.10) port 443\n' +
   '[...]\n' +

@@ -75,6 +75,7 @@ const TREE = {
 
 const traceparent = (parentId) => `00-${T}-${parentId}-01`;
 const code = (text) => `<code>${text}</code>`;
+const header = (text) => `<code data-token>${text}</code>`; // a traceparent: kept whole on a line while it fits
 const row = (cells) => `<tr>${cells.map((c) => `<td>${c}</td>`).join('')}</tr>`;
 
 // Step 1 data: every span as received, and the header on each hop before and after its sidecar. Data text, authored constants.
@@ -82,8 +83,8 @@ const RECEIVED_ROWS = TREE.spans
   .map((s) => row([s.service, code(s.name), s.kind, code(s.spanId), s.parentId === null ? 'none' : code(s.parentId)]))
   .join('');
 const HOP_ROWS = [
-  row(['web to cart', code(traceparent(WEB_C)), code(traceparent(MESH1))]),
-  row(['cart to payments', code(traceparent(CART_C)), code(traceparent(MESH2))]),
+  row(['web to cart', header(traceparent(WEB_C)), header(traceparent(MESH1))]),
+  row(['cart to payments', header(traceparent(CART_C)), header(traceparent(MESH2))]),
 ].join('');
 
 // Step 2 data: the client spans' ids, so the header's parent-id can be looked up, and the headers once the sidecars pass them through.
@@ -91,7 +92,7 @@ const CLIENT_ROWS = TREE.spans
   .filter((s) => s.kind === 'CLIENT' && s.service !== 'payments')
   .map((s) => row([s.service, code(s.name), code(s.spanId)]))
   .join('');
-const PASS_ROWS = [row(['web to cart', code(traceparent(WEB_C))]), row(['cart to payments', code(traceparent(CART_C))])].join('');
+const PASS_ROWS = [row(['web to cart', header(traceparent(WEB_C))]), row(['cart to payments', header(traceparent(CART_C))])].join('');
 
 // Step 1: does the presenter's answer hold? `why` follows "Right." or "Not quite.".
 const VERDICT = [
@@ -103,7 +104,7 @@ const VERDICT = [
   {
     key: 'never-sent',
     label: 'It is wrong: web never sent a traceparent, so cart had nothing to continue',
-    why: `Web did send one: the "Left the caller" column shows ${code(traceparent(WEB_C))}, and cart's spans share its trace ID. The trace ID arrived. What changed on the way is the parent-ID.`,
+    why: `Web did send one: the "Left the caller" column shows ${header(traceparent(WEB_C))}, and cart's spans share its trace ID. The trace ID arrived. What changed on the way is the parent-ID.`,
   },
   {
     key: 'rewritten',

@@ -7,7 +7,7 @@
 import { actions, codeBlock, finishButton, helpChips, nextButton, prose, question, setFeedback, sideColumn, split, step } from '../lib/ui/index.mjs';
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { canFocus } from '../lib/widgets/focus.mjs';
-import { editorPanel, lockEditor } from '../lib/widgets/editor.mjs';
+import { editorPanel, fitEditor, lockEditor } from '../lib/widgets/editor.mjs';
 import { mountHintLadder, ruleText } from '../lib/widgets/help-ladder.mjs';
 import { normalizeConfig } from '../lib/widgets/configure-it.mjs';
 import { checkConfig, effectiveResource, parseEnv, renderIssues } from '../lib/widgets/env-config.mjs';
@@ -125,6 +125,7 @@ export default {
         inputId: 'nys-env',
         label: 'checkout .env',
         rows: 6,
+        wrap: true,
         value: GIVEN,
         noteHtml: ENV_NOTE,
         actionId: 'nys-check',
@@ -155,6 +156,7 @@ export default {
       const fb = body.querySelector('#nys-feedback');
       const next = bar.querySelector('#nys-next');
       const say = (tone, html) => setFeedback(fb, tone, html);
+      const fit = fitEditor(input, { max: 16, signal: ctx.signal });
       const tried = new Set(); // normalised failing configs, as in Configure it
       ctx.widget?.('configure'); // this step is the env checker, a Configure it board (how to play follows it)
       const ladder = mountHintLadder(ctx, box, 'nys', {
@@ -164,6 +166,7 @@ export default {
         hint: (tier) => hintFor(input.value, tier),
         fill: (text) => {
           input.value = text;
+          fit();
           run({ hinted: true });
         },
       });
