@@ -177,11 +177,12 @@ export default {
     steps: [
       {
         intro:
-          `Kettle &amp; Co's checkout makes ${n(TRACES)} traces a second through three services: <code>storefront</code> is the root, then <code>checkout</code> and <code>payments</code>. ` +
+          `<p>Kettle &amp; Co's checkout makes ${n(TRACES)} traces a second through three services: <code>storefront</code> is the root, then <code>checkout</code> and <code>payments</code>. ` +
           `A trace is ${WHOLE} spans (${SPANS.storefront} in storefront, ${SPANS.checkout} in checkout, ${SPANS.payments} in payments), so keeping everything is ${n(TRACES)} × ${WHOLE} = ${n(FULL)} spans a second, ` +
-          `and the backend takes ${n(CAP)} spans a second. Head sampling decides when the root span starts, from the trace ID and a ratio, and passes the decision to the children in the sampled flag of the <code>traceparent</code> header. ` +
-          `Storefront is already set to <code>${SAMPLER}=parentbased_traceidratio</code> and <code>${ARG}=0.1</code>: ${n(TEN)} traces a second, ${n(STOREFRONT)} spans, which leaves ${n(KIDS_CAP)} of the ${n(CAP)} for checkout and payments. ` +
-          'The arithmetic below is authored from this table, not run by a sampler.',
+          `and the backend takes ${n(CAP)} spans a second.</p>` +
+          '<p>Head sampling decides when the root span starts, from the trace ID and a ratio, and passes the decision to the children in the sampled flag of the <code>traceparent</code> header.</p>' +
+          `<p>Storefront is already set to <code>${SAMPLER}=parentbased_traceidratio</code> and <code>${ARG}=0.1</code>: ${n(TEN)} traces a second, ${n(STOREFRONT)} spans, which leaves ${n(KIDS_CAP)} of the ${n(CAP)} for checkout and payments.</p>` +
+          '<p>The numbers below come from this table. The game does not run a real sampler.</p>',
         question: 'Pick the sampler setting of checkout and of payments: keep what the team needs and stay within the budget.',
         qid: 'hs-q-plan',
         tradeoff: PLAN,

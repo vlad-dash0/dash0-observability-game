@@ -19,7 +19,7 @@ const signIns = [...doc.querySelectorAll('a[href="/api/auth-start"]')];
 test('the sign-in anchor is a kit button link to /api/auth-start, in the hub and in the nudge, and nowhere else', () => {
   assert.equal(signIns.length, 2);
   const [hub, nudge] = signIns;
-  assert.ok(hub.closest('#hub') && hub.closest('.save-entry'));
+  assert.ok(hub.closest('#hub') && hub.closest('.hub-header'));
   assert.ok(nudge.closest('.reward-card') && nudge.closest('[x-show="signinNudgeOpen"]'));
   for (const a of signIns) {
     assert.ok(a.classList.contains('ui-btn'));

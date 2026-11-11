@@ -13,7 +13,7 @@
 
 /* ---------- Header ---------- */
 .hub-header {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) 12px;
   padding: 18px 20px 12px;
 }
 .brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
@@ -24,7 +24,8 @@
 }
 .brand-name { font-weight: 700; font-size: 16px; white-space: nowrap; }
 .brand-name span { color: var(--color-text-muted); font-weight: 500; }
-.head-right { display: flex; align-items: center; gap: 8px; }
+.head-right { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.save-entry-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .debug-badge {
   font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 1px;
   color: var(--color-text-muted); border: 1px dashed var(--color-border);
@@ -51,7 +52,7 @@
 }
 @media (max-width: 360px) {
   .hub-header { padding-inline: 12px; }
-  .head-right { gap: 4px; }
+  .head-right, .save-entry-actions { gap: 4px; }
 }
 
 .notice {
@@ -172,12 +173,12 @@
 .act-title { font-size: 16px; font-weight: 700; margin: 0; }
 /* The act heading is one full-width button (a 44px target): the whole line folds and unfolds the act. */
 .act-toggle {
-  display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: 44px;
-  margin: 0; padding: 0 6px; border: 0; background: none; color: inherit; font: inherit;
+  display: flex; align-items: flex-start; gap: var(--space-2); width: 100%; min-height: 44px;
+  margin: 0; padding: 11px 6px; line-height: 22px; text-wrap: balance; border: 0; background: none; color: inherit; font: inherit;
   text-align: left; cursor: pointer;
 }
 .act-toggle::before {
-  content: ""; flex: none; width: 7px; height: 7px;
+  content: ""; flex: none; width: 7px; height: 7px; margin-top: 6px; /* centred on the first line of text */
   border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
   transform: rotate(-45deg); transition: transform .15s;
 }
@@ -198,10 +199,10 @@
    the ~70px status column and a text column of ~110px. A 527 to 551px column (1024px window) stays one
    per row; 768px (688px) and 1280px (~700px) are two-up. */
 @container levels (min-width: 600px) {
-  .level-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .level-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; }
 }
 .level-card {
-  display: flex; align-items: center; gap: 14px;
+  display: flex; align-items: center; gap: 14px; min-block-size: 92px; /* one height for a one- and a two-line title */
   background: var(--color-surface); border: 1px solid var(--color-border);
   border-radius: var(--radius-lg); padding: 14px 15px; cursor: pointer;
   transition: transform .18s ease, border-color .18s, box-shadow .18s;
@@ -224,12 +225,12 @@
   width: 50px; height: 50px; border-radius: var(--radius); flex-shrink: 0;
   display: grid; place-items: center; font-size: 26px; background: var(--color-surface-2);
 }
-.level-body { flex: 1; min-width: 0; }
+.level-body { flex: 1; min-width: 0; padding-inline-end: var(--space-1); }
 .level-no { font-size: 11px; font-weight: 700; color: var(--color-accent); letter-spacing: .5px; font-family: var(--font-mono); }
-.level-name { font-weight: 700; font-size: 16px; line-height: 1.2; overflow-wrap: break-word; }
+.level-name { font-weight: 700; font-size: 16px; line-height: 1.2; overflow-wrap: break-word; text-wrap: balance; /* no one-word second line: "Why / OpenTelemetry" */ }
 .level-sub { font-size: 13px; color: var(--color-text-muted); margin-top: 2px; overflow-wrap: break-word; }
 .level-status {
-  flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+  flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); white-space: nowrap; margin-inline-start: var(--space-1);
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
   color: var(--color-text-muted);
 }
@@ -308,8 +309,9 @@
 .about-sub { font-weight: 600; }
 .about-map { margin: var(--space-3) 0; }
 .about-map h3 { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
-.save-entry { padding: 0 16px 8px; }
-.save-entry-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 6px 10px; }
+.about-map p { color: var(--color-text-muted); max-inline-size: var(--measure); } /* as muted as every other About paragraph */
+.act-badges-label { font-size: 12px; color: var(--color-text-muted); align-self: center; }
+.save-entry { padding: 0 16px; }
 .signin-notice {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3);
   margin: 4px 16px 0; padding: 12px 14px; border-radius: var(--radius);

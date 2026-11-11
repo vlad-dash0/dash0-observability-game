@@ -642,3 +642,13 @@ test('the live star meter fills the stars still possible, so the current rating 
 test('a reason under a disabled button hides itself once the button is enabled; no JS needed, no :has()', () => {
   assert.ok(sheetRules('kit.css').some((r) => r.selector.replace(/\s+/g, ' ') === '.ui-btn:not(:disabled) + .ui-reason' && decls(r.body).some(([p, v]) => p === 'display' && v === 'none')));
 });
+
+test('a chip is as wide as its text, never stretched by a column parent (the status pill of connect-to-dash0 and its-us)', () => {
+  assert.equal(Object.fromEntries(kitDecls('.ui-chip'))['inline-size'], 'fit-content');
+});
+
+test('on a phone two action buttons share a row, but a lone one stays a pill (never full width, D2)', () => {
+  const r = sheetRules('kit.css').find((x) => x.at.some((a) => /max-width: 520px/.test(a)) && /\.ui-actions \.ui-btn:not\(:only-of-type\)/.test(x.selector));
+  assert.ok(r, 'the shared-row rule exists, and only for a button with a sibling button');
+  assert.match(Object.fromEntries(decls(r.body)).flex, /^1 1 \d+px$/);
+});

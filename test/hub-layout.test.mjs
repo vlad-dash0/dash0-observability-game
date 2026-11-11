@@ -67,3 +67,18 @@ test('L7: the map panel and the cards line up with the header inset, and long wo
   assert.equal(prop(at('.hub-header'), 'padding'), '18px 20px 12px');
   for (const sel of ['.level-name', '.level-sub']) assert.equal(prop(at(sel), 'overflow-wrap'), 'break-word');
 });
+
+test('L8 (#321): card titles balance, cards share one row height, the act heading keeps its chevron on the first line, the header wraps', () => {
+  assert.equal(prop(at('.level-name'), 'text-wrap'), 'balance');
+  assert.equal(prop(at('.level-list', '@container levels (min-width: 600px)'), 'grid-auto-rows'), '1fr');
+  assert.ok(prop(at('.level-card'), 'min-block-size'), 'a one-line card is as tall as a two-line one');
+  assert.equal(prop(at('.act-toggle'), 'align-items'), 'flex-start');
+  assert.equal(prop(at('.hub-header'), 'flex-wrap'), 'wrap');
+  assert.equal(prop(at('.level-status'), 'white-space'), 'nowrap', 'Next up and Start never break');
+});
+
+test('L9 (#321): the About map paragraph is as muted as the act paragraphs; the act tags carry a label', () => {
+  assert.equal(prop(at('.about-map p'), 'color'), 'var(--color-text-muted)');
+  const html = read('index.html');
+  assert.equal((html.match(/<span class="act-badges-label">Tags:<\/span>/g) ?? []).length, 2, 'the hub card list and About');
+});

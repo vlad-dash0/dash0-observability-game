@@ -78,6 +78,13 @@ test('H5 the player\'s choice beats the default; ids that are not acts are ignor
   assert.equal(r.length, 3);
 });
 
+test('H7 in debug an act that is locked for real reads as open, never "locked" (#321)', () => {
+  const r = hubActs(REG, P([]), { debug: true });
+  assert.deepEqual(r.map((x) => x.status), ['open', 'locked', 'locked'], 'the real status stays');
+  assert.deepEqual(r.map((x) => x.line), ['Act 0: Zeroth, 0 of 3', 'Act 1: First, open in debug, 0 of 4', 'Act 2: Second, open in debug, 0 of 1']);
+  assert.equal(hubActs(REG, P([])).some((x) => /open in debug/.test(x.line)), false, 'only in debug');
+});
+
 test('H6 debug unfolds every act and keeps the real statuses', () => {
   const r = hubActs(REG, P(['a', 'b', 'boss0']), { debug: true });
   assert.deepEqual(r.map((x) => [x.status, x.expanded]), [['saved', true], ['open', true], ['locked', true]]);
