@@ -67,6 +67,11 @@ function setup(spec = fixture(), { shuffle = (a) => [...a], ...opts } = {}) {
   return { ctx, dom, focus, counts, swirls, mount: (extra = {}) => mountSpot(ctx, spec, { onComplete, swirl, ...extra }) };
 }
 
+test('renderSpot: Check is a pill in a kit button row, like the other Check buttons (#321)', () => {
+  setup();
+  assert.equal(q('#bomb-check').parentElement.className, 'ui-btn-row');
+});
+
 const pressed = () => qa('[data-line]').filter((b) => b.getAttribute('aria-pressed') === 'true').map((b) => b.dataset.line);
 const hintedLines = () => qa('[data-line][data-hinted]').map((b) => b.dataset.line);
 const correctLines = () => qa('[data-line][data-state="correct"]').map((b) => b.dataset.line);

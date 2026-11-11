@@ -137,6 +137,7 @@ test('the-pager: the first screen shows the alert, a full budget and a disabled 
   assert.equal(q('#pager-escalate').hasAttribute('data-finish'), false, 'Escalate moves to part 2, it does not finish');
   assert.equal(qa('[data-finish]').length, 0, 'no Finish on the first screen');
   assert.equal(escalateDisabled(), true, 'Escalate waits for the first look');
+  assert.equal(q('#pager-escalate').nextElementSibling.textContent, 'Try one question first.', 'the reason sits beside the disabled Escalate (#321)');
   assert.equal(q('#pager-budget').getAttribute('role'), 'status');
   assert.equal(q('#pager-feedback').getAttribute('role'), 'status');
 });

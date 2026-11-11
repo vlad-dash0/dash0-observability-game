@@ -16,6 +16,7 @@ import {
   option,
   options,
   question,
+  reason,
   setFeedback,
   step,
 } from '../lib/ui/index.mjs';
@@ -158,7 +159,7 @@ export default {
           wide: false,
           bodyHtml: `${ctx.speech(LIT_INTRO)}${escalatedByBudget ? note(BUDGET_SPENT) : ''}${alert}${choices(ASKS, 'ask')}${rowsList('pager-answer-rows')}${feedbackRegion({ id: 'pager-answers' })}`,
         }),
-        actions({ wide: false, buttonsHtml: finishButton('pager-finish') }),
+        actions({ wide: false, buttonsHtml: finishButton('pager-finish', 'Ask every question to finish.') }),
       );
       const finish = ctx.ovActions.querySelector('#pager-finish');
       const answers = ctx.ovBody.querySelector('#pager-answers');
@@ -189,7 +190,8 @@ export default {
       }),
       actions({
         wide: false,
-        buttonsHtml: button({ id: 'pager-escalate', label: 'Escalate', variant: 'primary', disabled: true }),
+        buttonsHtml: button({ id: 'pager-escalate', label: 'Escalate', variant: 'primary', disabled: true }) +
+          reason({ id: 'pager-escalate-why', text: 'Try one question first.' }),
       }),
     );
     const body = ctx.ovBody;

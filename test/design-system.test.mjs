@@ -601,3 +601,44 @@ test('the swirl ring and canvas do not depend on the legacy .help-swirl block', 
   assert.deepEqual(decls(ring.body).find(([p]) => p === 'fill'), ['fill', 'currentColor']);
   assert.ok(!/help-swirl-canvas/.test(read('lib/swirl-render.mjs')), 'the unstyled canvas class is gone');
 });
+
+// ---- #321 P5b: disabled buttons, one layout, lesson dot, stars --------------------------------
+
+const kitDecls = (sel) => sheetRules('kit.css').filter((r) => splitTop(r.selector).includes(sel)).flatMap((r) => decls(r.body));
+
+test('a disabled button reads as inactive: muted label at 4.5:1, a dashed border, no red, no fade (every variant)', () => {
+  const d = Object.fromEntries(kitDecls('.ui-btn:disabled'));
+  assert.equal(d.opacity, undefined, 'the label is not faded');
+  assert.equal(d.color, 'var(--color-text-muted)');
+  assert.match(d.border, /dashed/);
+  assert.equal(d.background, 'var(--color-surface)');
+  assert.ok(contrast('--color-text-muted', '--color-surface') >= 4.5, 'muted on the surface');
+  for (const sel of ['.ui-btn--primary', '.ui-btn--hint', '.ui-btn--icon']) {
+    const spec = (s) => (s.match(/\./g) ?? []).length + (s.match(/:/g) ?? []).length;
+    assert.ok(spec('.ui-btn:disabled') >= spec(sel), `${sel} cannot override the disabled look`);
+  }
+});
+
+test('questions are always left-aligned, and the narrow step starts at the same edge as the wide one', () => {
+  assert.equal(kitDecls('.ui-question').some(([p, v]) => p === 'text-align' && v === 'center'), false);
+  assert.equal(sheetRules('kit.css').some((r) => /\.ui-step--wide \.ui-question/.test(r.selector)), false, 'no per-width alignment');
+  const step = Object.fromEntries(kitDecls('.ui-step'));
+  assert.match(step['margin-inline'], /^0\b/, 'a narrow step is start-aligned, not centred');
+  assert.equal(/margin-inline: auto/.test(read('styles/kit.css').match(/\.ui-actions \{[^}]*\}/)[0]), false);
+});
+
+test('the lesson card has no stray dot and no stale theme comment', () => {
+  const kit = read('styles/kit.css');
+  assert.equal(/lesson-dot/.test(kit), false, 'the 1px dot is gone');
+  assert.equal(/both themes/.test(kit), false);
+  assert.equal(/--color-lesson-dot/.test(read('styles/tokens.css')), false, 'its token goes with it');
+});
+
+test('the live star meter fills the stars still possible, so the current rating reads as earned', () => {
+  const d = Object.fromEntries(kitDecls('.ui-star[data-star="possible"] path'));
+  assert.match(d.fill ?? '', /--color-parent/);
+});
+
+test('a reason under a disabled button hides itself once the button is enabled; no JS needed, no :has()', () => {
+  assert.ok(sheetRules('kit.css').some((r) => r.selector.replace(/\s+/g, ' ') === '.ui-btn:not(:disabled) + .ui-reason' && decls(r.body).some(([p, v]) => p === 'display' && v === 'none')));
+});

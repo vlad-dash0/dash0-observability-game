@@ -27,7 +27,7 @@ import {
 } from '../lib/incident-lab.mjs';
 import { MODE, STATE } from '../lib/telemetry.mjs';
 import {
-  actions as actionsBar, button, chip, feedback, field, finishButton, note, panel, prose, radio, radioGroup, setFeedback, step, table,
+  actions as actionsBar, button, chip, feedback, field, finishButton, note, panel, prose, radio, radioGroup, reason, setFeedback, step, table,
 } from '../lib/ui/index.mjs';
 
 // Incidents already accepted by a Dash0 in this page's session (one per telemetry session), and the
@@ -165,7 +165,8 @@ export default {
         ),
         bar(
           button({ id: 'its-practice', label: 'Practice with a simulated Dash0', variant: 'primary' }) +
-            button({ id: 'its-live', label: 'Use my own Dash0', variant: 'ghost', disabled: true, describedBy: 'its-live-why' }),
+            button({ id: 'its-live', label: 'Use my own Dash0', variant: 'ghost', disabled: true, describedBy: 'its-live-why' }) +
+            reason({ id: 'its-live-reason', text: 'Use my own Dash0 needs the connection from level 9.3.' }),
         ),
       );
       actions.querySelector('#its-practice').onclick = () => stepFind(MODE.practice);

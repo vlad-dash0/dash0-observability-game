@@ -92,6 +92,17 @@ for (const level of LEVELS) {
     ran += 1;
   });
 
+  test(`${level.id}: a gated Next or Finish says why, right after it, until it is enabled (#321)`, () => {
+    playAll(level, (i) => {
+      const btn = q(advanceId(level, i));
+      const why = btn.nextElementSibling;
+      assert.equal(why?.className, 'ui-reason', `step ${i + 1}: the reason follows the button`);
+      assert.equal(why.id, `${btn.id}-why`);
+      assert.match(why.textContent, new RegExp(`to ${i === last ? 'finish the level' : 'continue'}\\.$`));
+    });
+    ran += 1;
+  });
+
   test(`${level.id}: the focus walk starts each step on its first control and ends on Finish`, () => {
     const { focus } = start(level);
     steps.forEach(({ key, driver, spec }, i) => {

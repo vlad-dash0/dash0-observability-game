@@ -15,7 +15,7 @@ retired CSS.
 Owner decisions (#158, 2026-11-04), cited as D1 to D7 here and in the code: **D1** wrong answers
 stay purple (`--color-error`); red `--color-alert` is only for the firing banner. **D2** the primary
 button is a red pill, 14px/600, no glow, not full width. **D3** the hub changes only its buttons; the
-reward card keeps its glow. **D4** questions are centred in narrow steps, left-aligned in wide ones.
+reward card keeps its glow. **D4** questions are left-aligned in every step (revised #321: they were centred in narrow steps).
 **D5** a new component needs an entry here, reviewer approval and screenshots the owner sees.
 **D6** #57 and #59 fold into #160. **D7** a wrong answer uses the error tone; info-only messages are
 neutral.
@@ -39,7 +39,7 @@ Two layers. **Primitives** are hex values and live only in `tokens.css`: `--d0-*
 `--globe-*`, `--wf-*`, `--kit-*`. **Semantic** tokens are `--color-*`, each a single dark value
 over primitives (the game is dark only, #322: no `light-dark()`, `color-scheme: dark` on `:root`); every other stylesheet uses only these (the hub confetti is the one exception).
 
-Kit colours: `--color-lesson`, `-lesson-eyebrow`, `-lesson-code`, `-lesson-glow`, `-lesson-dot` (the
+Kit colours: `--color-lesson`, `-lesson-eyebrow`, `-lesson-code`, `-lesson-glow` (the
 lesson card), `--color-meter-left`, `--color-alert` (the firing banner only; D1).
 
 Scale: `--space-1` to `--space-6` and `--space-8` (4N px); `--text-xs` 10.5, `-sm` 12.5, `-md` 14,
@@ -68,12 +68,12 @@ each function's JSDoc for the exact markup.
 | Call | Module | What |
 | --- | --- | --- |
 | `step({wide, bodyHtml})`, `split({mainHtml, sideHtml})`, `actions({wide, buttonsHtml})` | layout | Step frame (narrow or wide), board plus side column (inside a wide step), actions bar. |
-| `lesson(bodyHtml)` | text | The glow lesson card ("Lesson" eyebrow, glow top left, dot top right). |
+| `lesson(bodyHtml)` | text | The glow lesson card ("Lesson" eyebrow, glow top left). |
 | `question({id, html})`, `stepHead({step, titleHtml, noteHtml})`, `eyebrow(text)` | text | The step's question; "Step N" heading; mono label. |
 | `note(bodyHtml)`, `prose(bodyHtml)`, `codeBlock(text)` | text | Muted small print; classless authored content (a `<pre data-wrap>` inside prose wraps, for log and command output; any other `pre` scrolls sideways); escaped code. |
 | `panel({id, variant, headHtml, sections})` | panel | Card with sections; `inset`, `alert`, `drop` (dashed means drop zone only; Sort it no longer uses it, #261: it categorises with choice options and plain groups, no boxes). |
 | `chip({text, tone, dot, swatch, dashed})` | chip | Mono pill; `data-tone` neutral, success, error, hint, attention. |
-| `button({id, label, variant, disabled, finish, type, icon, describedBy})`, `nextButton(id)`, `finishButton(id)`, `linkButton({id, label, href, variant})` | button | Pill; `linkButton` is the same pill as an `<a>` for a navigation (the sign-in link; `primary`, `ghost`, `hint`; `href` a local path only); `primary` (red, D2), `ghost`, `hint`, `icon`; `describedBy` (an id) points a disabled button at its reason; Finish has `data-finish`. |
+| `button({id, label, variant, disabled, finish, type, icon, describedBy})`, `nextButton(id, why?)`, `finishButton(id, why?)`, `linkButton({id, label, href, variant})`, `reason({id, text})`, `buttonRow(buttonsHtml)` | button | Pill; `linkButton` is the same pill as an `<a>` for a navigation (the sign-in link; `primary`, `ghost`, `hint`; `href` a local path only); `primary` (red, D2), `ghost`, `hint`, `icon`; `describedBy` (an id) points a disabled button at its reason; Finish has `data-finish`. A disabled button of any variant is a muted label on the surface with a dashed border (no fade, no red). `reason` is one muted line under a disabled button that says why; CSS hides it once the button before it is enabled; `nextButton` and `finishButton` carry one. `buttonRow` keeps buttons pills in a grid parent (every Check, Run and Reset). |
 | `option({attr, value, labelHtml, metaHtml, kind, pressed, state, disabled, hinted, drop, name})`, `options({id, labelledBy, layout, itemsHtml})` | option | Selectable card and its group (list, grid, wrap, drops). `drop` (choice kind only) makes a category target: dashed, centred, legible while disabled (muted text, no fade); `drops` lays targets out as an equal-width row that wraps. Sort it's category row uses both. The `radio` kind is a label around a real `<input type="radio" name>`: the dot, the label, then the meta line beneath; a picked card carries `data-picked`. |
 | `feedback({id, bar})`, `setFeedback(el, tone, bodyHtml)`, `clearFeedback(el)` | feedback | The one feedback region; tones neutral, success, error (D7). |
 | `meter({id, label, value, max, cells, unit, previewCells, over})` | meter | Cells (20 by default) plus a text line that is the accessible value (en-US grouping, so 4800 reads 4,800). |
@@ -98,12 +98,12 @@ disabled each have one rule in `kit.css`; besides it, a disabled toggle option, 
 
 ## Layout
 
-`.ui-step` caps a step at `--layout-narrow` (760px, centred); `.ui-step--wide` at `--layout-wide`
-(1320px). The step type decides which (`STEP_TYPES[*].wide` in `lib/play.mjs`; hand-written levels
+`.ui-step` caps a step at `--layout-narrow` (760px, start-aligned, so it shares the wide step's left edge); `.ui-step--wide` at `--layout-wide`
+(1320px). The lesson card reads at `--measure` plus its padding in either. The step type decides which (`STEP_TYPES[*].wide` in `lib/play.mjs`; hand-written levels
 pass it); the level overlay is as wide as the widest step. Every step is the `level` container; a
 `.ui-split` inside it shows its side column (300px, sticky) from `@container level (min-width:
 960px)` and stacks below. The 960 is a literal: custom properties do not work in container
-conditions. Kit text inside a clipping container (`overflow: hidden`) must be able to break a long token: lesson `code` and `code` inside a `.ui-panel` (which clips too, and is no table cell) set `overflow-wrap: break-word` (inline `code` is an `inline-block` capped at the line, so a token moves whole to the next line and only one wider than the line breaks, #321); feedback, chips and options use `anywhere`. Questions are centred in narrow steps and left-aligned in wide ones (D4).
+conditions. Kit text inside a clipping container (`overflow: hidden`) must be able to break a long token: lesson `code` and `code` inside a `.ui-panel` (which clips too, and is no table cell) set `overflow-wrap: break-word` (inline `code` is an `inline-block` capped at the line, so a token moves whole to the next line and only one wider than the line breaks, #321); feedback, chips and options use `anywhere`. Questions are left-aligned everywhere (D4).
 
 ## Modal
 

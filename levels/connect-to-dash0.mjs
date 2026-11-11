@@ -17,7 +17,7 @@
 import { PRACTICE_HOSTS, REASONS, TOKEN_PREFIX } from '../lib/dash0/ingress.mjs';
 import { OUTCOME, TIMEOUT_MS } from '../lib/otlp/send.mjs';
 import { MODE, STATE } from '../lib/telemetry.mjs';
-import { actions as actionsBar, button, chip, feedback, field, note, panel, prose, radio, radioGroup, setFeedback, step } from '../lib/ui/index.mjs';
+import { actions as actionsBar, button, chip, feedback, field, note, panel, prose, radio, radioGroup, reason, setFeedback, step } from '../lib/ui/index.mjs';
 
 // The Permissions options of an auth token (glossary/auth-tokens). Only Ingesting is right. The
 // keys are the telemetry session's PRACTICE_SCOPE values (it mints the practice token per key).
@@ -161,7 +161,8 @@ export default {
         ),
         bar(
           button({ id: 'ctd-practice', label: 'Practice with a simulated Dash0', variant: 'primary' }) +
-            button({ id: 'ctd-live', label: 'Use my own Dash0', variant: 'ghost', disabled: !live, ...(live ? {} : { describedBy: 'ctd-live-why' }) }),
+            button({ id: 'ctd-live', label: 'Use my own Dash0', variant: 'ghost', disabled: !live, ...(live ? {} : { describedBy: 'ctd-live-why' }) }) +
+            (live ? '' : reason({ id: 'ctd-live-reason', text: 'Use my own Dash0 is not available in this browser.' })),
         ),
       );
       actions.querySelector('#ctd-practice').onclick = () => stepConnect(MODE.practice);
