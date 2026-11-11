@@ -1003,6 +1003,10 @@ export function createGame(deps) {
     rewardNote() {
       return this.rewardDebug ? 'Debug run: not saved.' : '';
     },
+    /** The reward text as paragraphs: a level's closing text may hold a blank line between the story and the Dash0 how-to. */
+    rewardParagraphs() {
+      return String(this.rewardText).split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+    },
     rewardStarsText() {
       return this.rewardStars == null ? '' : starGlyphs(this.rewardStars);
     },

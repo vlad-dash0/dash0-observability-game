@@ -226,7 +226,7 @@ export default {
     steps: [
       {
         intro:
-          'Orders are failing at the last step and you are asking an agent to run the queries. It shows each query and what came back. The agent is simulated: it calls no model and reaches no real MCP server, and every query and result was written for the game. Find out why orders fail.',
+          'Orders are failing at the last step and you are asking an agent to run the queries. It shows each query and what came back. Find out why orders fail.',
         incident: SCENARIO,
       },
       {
@@ -245,7 +245,7 @@ export default {
       },
     ],
     finish:
-      'You read an empty answer as a question about a name, not as proof of health. A query on an old attribute name matches nothing, so use the names the spans carry. ' +
-      'In Dash0, the MCP Server lets an assistant query your telemetry with read-only tools, Agent0 reads it in the semantic conventions it was produced in, and you check the keys present with getAttributeKeys on the Dash0 MCP Server before you ask for a name.',
+      'You read an empty answer as a question about a name, not as proof of health. A query on an old attribute name matches nothing, so use the names the spans carry.\n\n' +
+      'In Dash0, the MCP Server lets an assistant query your telemetry with read-only tools, Agent0 reads telemetry in the OpenTelemetry semantic conventions it was produced in, and you check the keys present with getAttributeKeys on the Dash0 MCP Server before you ask for a name.',
   },
 };

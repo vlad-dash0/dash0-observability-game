@@ -183,3 +183,7 @@
 
 /* Build it success swirl ring (lib/swirl.mjs, #176): the dots take the swirl colour from .ui-win-swirl. */
 .help-swirl-ring circle { fill: currentColor; }
+
+/* The pager (levels/the-pager.mjs): earlier rows, full width like the feedback box that holds the newest. */
+.pager-rows { padding-inline-start: 43px; /* the feedback box's border, padding, icon and gap, so the text edges line up */ display: grid; gap: var(--space-3); font-size: var(--text-md); line-height: 1.5; overflow-wrap: anywhere; }
+.pager-rows:empty { display: none; }

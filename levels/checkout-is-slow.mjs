@@ -142,7 +142,7 @@ const FINISH =
   'You found an N+1 query: inventory 2.4.0 runs one query per item, 40 sequential database CLIENT spans under one request. ' +
   'The trace showed where the time goes, and comparing slow with normal requests showed what changed.';
 
-// The scenario line on the lesson card (incidentLesson adds the generic "How this board works").
+// The scenario line on the lesson card (incidentLesson adds one short rules line).
 const INTRO = 'Checkout is slow and the alert names no cause. Find where the time goes and what changed.';
 
 /** The boss's data (pinned by test/checkout-is-slow.test.mjs). */
