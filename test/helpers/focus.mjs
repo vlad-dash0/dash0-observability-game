@@ -22,11 +22,13 @@ export function focusName(el) {
  */
 export function recordFocus(window) {
   const log = [];
-  window.HTMLElement.prototype.focus = function focus() {
-    log.push({ name: focusName(this), focusable: canFocus(this) });
+  window.HTMLElement.prototype.focus = function focus(opts) {
+    log.push({ name: focusName(this), focusable: canFocus(this), preventScroll: opts?.preventScroll === true });
   };
   return {
     names: () => log.map((f) => f.name),
+    /** Whether each focus call asked not to scroll (focus({preventScroll: true})). */
+    prevented: () => log.map((f) => f.preventScroll),
     last: () => log.at(-1)?.name ?? 'body',
     unfocusable: () => log.filter((f) => !f.focusable).map((f) => f.name),
   };
