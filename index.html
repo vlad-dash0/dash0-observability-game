@@ -58,7 +58,7 @@
       </div>
     </header>
 
-    <section class="save-entry" aria-labelledby="save-entry-title" x-show="!debug" x-cloak>
+    <section class="save-entry" aria-labelledby="save-entry-title" x-show="!debug &amp;&amp; (accountEnabled || accountNotice !== '')" x-cloak>
       <h2 id="save-entry-title" class="visually-hidden">Your progress</h2>
       <div id="account-entry" x-show="accountEnabled" x-cloak>
         <p class="save-entry-text" x-show="signedIn" x-text="signedInText()"></p>

@@ -26,13 +26,13 @@
   display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-2) var(--space-3);
 }
 /* Why the button before it is disabled, on a line under the row; gone once that button is enabled (no script involved). */
-.ui-reason { flex: 1 1 100%; margin: 0; min-width: 0; font-size: 13.5px; line-height: 1.4; color: var(--color-text-muted); text-align: right; }
-.ui-btn:not(:disabled) + .ui-reason { display: none; }
+.ui-reason { flex: 1 1 100%; margin: 0; min-width: 0; font-size: 13.5px; line-height: 1.4; color: var(--color-text-muted); text-align: right; text-wrap: balance; }
+.ui-btn:not(:disabled) + .ui-reason { visibility: hidden; } /* keeps its box, so the button never moves under the cursor; hidden also drops it from speech */
 /* Buttons side by side as pills; a grid parent would stretch a lone one to the full width. */
 .ui-btn-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 @media (max-width: 520px) {
   /* Two buttons share a row (labels may wrap) instead of stacking; the reason takes a row of its own. */
-  .ui-actions .ui-btn:not(:only-of-type) { flex: 1 1 140px; padding-inline: var(--space-3); text-align: center; }
+  .ui-actions .ui-btn:not(:only-of-type) { align-self: stretch; flex: 1 1 140px; padding-inline: var(--space-3); text-align: center; }
 }
 .ui-actions--wide { max-inline-size: var(--layout-wide); }
 
@@ -410,7 +410,7 @@
 /* ---------- Side column (side.mjs) ---------- */
 /* The helps chips, then the column: the success card (the globe's night,
    hidden until success; its heading takes focus by script and shows no ring), the score card
-   and the hint tools. Stars are outlines until success, then the earned ones fill. */
+   and the hint tools. The stars still possible are filled; lost ones are dashed outlines; earned ones are solid. */
 .ui-help-chips { display: flex; flex-wrap: wrap; gap: 6px var(--space-2); align-items: center; font-size: 12px; color: var(--color-text-muted); }
 .ui-help-chips-title { white-space: nowrap; }
 @container level (max-width: 600px) {

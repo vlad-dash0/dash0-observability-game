@@ -161,8 +161,8 @@ export default {
         ),
         bar(
           button({ id: 'ctd-practice', label: 'Practice with a simulated Dash0', variant: 'primary' }) +
-            button({ id: 'ctd-live', label: 'Use my own Dash0', variant: 'ghost', disabled: !live, ...(live ? {} : { describedBy: 'ctd-live-why' }) }) +
-            (live ? '' : reason({ id: 'ctd-live-reason', text: 'Use my own Dash0 is not available in this browser.' })),
+            button({ id: 'ctd-live', label: 'Use my own Dash0', variant: 'ghost', disabled: !live }) +
+            (live ? '' : reason({ id: 'ctd-live-reason', text: 'Not available in this browser.' })),
         ),
       );
       actions.querySelector('#ctd-practice').onclick = () => stepConnect(MODE.practice);

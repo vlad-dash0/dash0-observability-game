@@ -308,7 +308,7 @@ export function createGame(deps) {
     },
     dismissSigninNotice() {
       this.signinStatus = null;
-      this.focusSoon('#save-open'); // the dismissed notice held focus; the hub's progress area is stable
+      this.focusSoon('#save-open'); // the dismissed notice held focus; the Save code button in the header is stable
     },
     // GET /api/account, once per page (init); the only request an anonymous or unconfigured visit makes.
     async loadAccount() {

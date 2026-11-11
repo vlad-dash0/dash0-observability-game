@@ -2213,6 +2213,7 @@ test('index.html: the progress strip sits under the header, the map and levels s
   const title = strip.querySelector('#save-entry-title');
   assert.equal(title.classList.contains('visually-hidden'), true, 'the heading is spoken, not shown');
   assert.equal(strip.getAttribute('aria-labelledby'), 'save-entry-title');
+  assert.match(strip.getAttribute('x-show'), /accountEnabled/, 'the strip is hidden while it holds nothing (account off), so no empty heading is announced');
   assert.equal(strip.textContent.includes('Copy it to another browser'), false, 'the old sentence is gone');
 });
 

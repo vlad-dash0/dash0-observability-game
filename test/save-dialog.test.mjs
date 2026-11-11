@@ -120,7 +120,7 @@ test('home: your code is shown and decodes to your progress; Close is wired', ()
 test('the paste field says what a code is and where it comes from (#321)', () => {
   const { game } = setup();
   game.openSave();
-  assert.equal(q('label[for="save-code-in"]').textContent, 'Paste a save code from another device');
+  assert.equal(q('label[for="save-code-in"]').textContent, 'Paste a save code from another browser');
 });
 
 test('home with no progress says there is nothing to save and offers no code', () => {

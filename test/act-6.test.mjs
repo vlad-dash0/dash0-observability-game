@@ -583,6 +583,6 @@ test('head sampling: the lesson is short paragraphs, and it says plainly that no
   const paras = [...intro.matchAll(/<p>(.*?)<\/p>/g)].map((m) => plain(m[1]));
   assert.equal(paras.length, 4);
   for (const p of paras) assert.ok(p.length <= 330, `a short paragraph: ${p.length}`);
-  assert.equal(paras.at(-1), 'The numbers below come from this table. The game does not run a real sampler.');
+  assert.equal(paras.at(-1), 'The numbers on this page are worked out from these figures. The game does not run a real sampler.');
   assert.equal(intro.replace(/<p>.*?<\/p>/g, ''), '', 'nothing outside a paragraph');
 });
