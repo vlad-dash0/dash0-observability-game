@@ -16,6 +16,7 @@ import { STORAGE_KEY } from '../lib/storage.mjs';
 import { sideColumn } from '../lib/ui/index.mjs';
 import { mountSide } from '../lib/widgets/help-ladder.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
+import { focusables } from '../lib/modal-focus.mjs';
 import { HELP_KEY, hideHelp } from '../lib/help-prefs.mjs';
 import { createGame, liveRegistry } from '../app.mjs';
 import { endSentence } from '../lib/text.mjs';
@@ -290,6 +291,128 @@ test('openLevel while the reward card is open is refused', () => {
   assert.equal(ctxs.y === undefined, true);
   game.closeReward();
   assert.equal(game.openLevel('y'), true);
+});
+
+// ---- "Next" on the reward dialog (#321) ----
+
+test("the reward's Continue button reads exactly as the hub's Continue and opens the same level", () => {
+  const { game } = setup();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  assert.equal(game.rewardContinueLabel(), 'Continue: 0.2 Level y');
+  assert.equal(game.rewardContinueLabel(), game.continueLabel(), 'one wording, one rule');
+  assert.equal(game.rewardFocus(), '#reward-continue');
+});
+
+test('Continue on the reward closes it and opens that level; closing the level returns focus to the hub Continue', () => {
+  const { game } = setup();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  assert.equal(game.continueFromReward(), true);
+  assert.equal(game.rewardOpen, false);
+  assert.equal(game.overlayOpen, true);
+  assert.equal(game.currentLevelId, 'y');
+  assert.equal(game.openedFrom, 'continue');
+  assert.equal(game.continueFromReward(), false, 'with no reward open it does nothing');
+  assert.equal(game.currentLevelId, 'y');
+  const f = [];
+  game.focusSoon = (sel) => f.push(sel);
+  game.closeOverlay();
+  assert.deepEqual(f, [], 'x was lit and is still pending: the reveal takes focus to the map, not Continue');
+  assert.equal(game.continueNext(), true, 'the hub Continue opens y again');
+  f.length = 0;
+  game.closeOverlay();
+  assert.deepEqual(f, ['#hub-continue'], 'nothing pending now: focus goes back to the hub Continue');
+});
+
+test('Continue from the reward keeps the globe reveal pending: it plays when the player next reaches the map', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game } = setup({ globe: mount, reduceMotion: false });
+  game.init();
+  await tick();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  game.continueFromReward();
+  await tick();
+  assert.equal(log.ignites.length, 0, 'nothing plays behind the next level');
+  assert.equal(game.litNote, '', 'and nothing is announced yet');
+  game.closeOverlay();
+  await tick();
+  assert.equal(log.ignites.length, 1, 'back on the map: the country lights');
+  assert.equal(log.ignites[0].view.target.key, 'country:XXX');
+  assert.equal(game.litNote, 'Xland is now lit: Level x.');
+  game.openLevel('y');
+  game.closeOverlay();
+  assert.equal(log.ignites.length, 1, 'and only once');
+});
+
+test('Continue twice keeps both reveals: the next reward\'s Back to the map plays them together', async () => {
+  const { mount, log } = fakeGlobe();
+  const { game } = setup({ globe: mount, reduceMotion: false });
+  game.init();
+  await tick();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  game.continueFromReward();
+  ctxs.y.finish({ text: 'y is finished now' });
+  assert.equal(log.ignites.length, 0);
+  game.closeReward();
+  await tick();
+  assert.equal(log.ignites.length, 1);
+  assert.deepEqual([...log.ignites[0].view.flare], [1, 1, 1, 0, 0, 0], 'x and y both flare');
+});
+
+test('the reward overlay scrolls when the card is taller than the screen, the card centred by margin: auto', () => {
+  const css = read('styles/hub.css');
+  const reward = css.match(/\n\.reward \{([^}]*)\}/)[1];
+  assert.match(reward, /overflow-y: auto/);
+  assert.doesNotMatch(reward, /align-items: center|justify-content: center/, 'centring by the container would cut the top off');
+  assert.match(css.match(/\n\.reward-card \{([^}]*)\}/)[1], /margin: auto/);
+});
+
+test('Back to the map stays and behaves as before', () => {
+  const { game } = setup();
+  game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  game.closeReward();
+  assert.equal(game.rewardOpen, false);
+  assert.equal(game.overlayOpen, false);
+  assert.equal(game.currentLevelId, 'x');
+});
+
+test('no Continue on the reward when there is no next level, and none in debug', () => {
+  const dbg = setup({ debug: true });
+  dbg.game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  assert.equal(dbg.game.rewardContinueLabel(), '');
+  assert.equal(dbg.game.rewardFocus(), '#reward-close');
+  assert.equal(dbg.game.continueFromReward(), false);
+  assert.equal(dbg.game.rewardOpen, true, 'a refused Continue leaves the dialog');
+  const ONE = buildRegistry([{ id: 'a0', no: 0, name: 'A', levels: [L('x', '0.1')], boss: null }], { deck: [], nodeIds: [] });
+  const last = setup({ registry: ONE });
+  last.game.openLevel('x');
+  ctxs.x.finish({ text: 'x is finished now' });
+  assert.equal(last.game.rewardContinueLabel(), '', 'every act complete: nothing next');
+  assert.equal(last.game.rewardFocus(), '#reward-close');
+});
+
+test('index.html: the reward dialog has the primary Continue, the ghost Back, and the lone primary Back when none is next', () => {
+  const next = shell.querySelector('#reward-continue');
+  assert.equal(next.getAttribute('@click'), 'continueFromReward()');
+  assert.match(next.getAttribute('class'), /ui-btn--primary/);
+  assert.equal(next.getAttribute('x-show'), "rewardContinueLabel() !== ''");
+  assert.match(shell.querySelector('#reward-back').getAttribute('class'), /ui-btn--ghost/);
+  assert.equal(shell.querySelector('#reward-back').getAttribute('@click'), 'closeReward()');
+  assert.equal(shell.querySelector('#reward-close').getAttribute('x-show'), "rewardContinueLabel() === ''");
+  assert.equal(shell.querySelector('#reward-close').textContent.trim(), 'Back to the map');
+});
+
+test('index.html: the header button carries the flag, an accessible name and a polite status', () => {
+  const btn = shell.querySelector('#ov-howto-open');
+  assert.equal(btn.getAttribute(':aria-label'), 'howToLabel()');
+  assert.equal(shell.querySelector('#ov-howto-new').getAttribute('x-show'), 'howToFlagged()');
+  const note = shell.querySelector('.lesson-top [role="status"]');
+  assert.equal(note.getAttribute('x-text'), 'howToNote');
 });
 
 test('Escape closes the reward, or the level unless the player is typing', () => {
@@ -1348,7 +1471,8 @@ test("Don't show again is stored per widget and respected later", () => {
   later.game.openLevel('v');
   assert.equal(later.game.howToOpen, false, 'its first step is choice, hidden');
   ctxs.v.widget('build');
-  assert.equal(later.game.howToOpen, true, 'build is new to this player');
+  assert.equal(later.game.howToOpen, false, 'mid-level: no pop-up');
+  assert.equal(later.game.howToFlagged(), true, 'build is new to this player: the button says so');
 });
 
 test('a level opens its card unless every widget is seen or hidden', () => {
@@ -1363,7 +1487,7 @@ test('a level opens its card unless every widget is seen or hidden', () => {
 
 // ---- one guide per step type (#316) ----
 
-test('the guide follows the step: a new type opens its own guide, once, focused', () => {
+test('the guide follows the step: a new type flags the button, never opens mid-level, and the note is said once', () => {
   const s = cardGame();
   s.game.openLevel('w');
   s.game.closeHowTo();
@@ -1371,13 +1495,26 @@ test('the guide follows the step: a new type opens its own guide, once, focused'
   ctxs.w.widget('choice');
   assert.equal(s.game.howToOpen, false, 'same type, nothing new');
   ctxs.w.widget('sort');
-  assert.equal(s.game.howToOpen, true);
+  assert.equal(s.game.howToOpen, false, 'mid-level: no pop-up over the step');
+  assert.deepEqual(s.focused, [], 'and focus does not move');
   assert.deepEqual(s.game.howToTopics().map((t) => t.key), ['sort']);
   assert.match(s.game.howToTitle(), /Sort it/);
-  assert.deepEqual(s.focused, ['#ov-howto-title']);
+  assert.equal(s.game.howToFlagged(), true, 'the header button is flagged');
+  assert.equal(s.game.howToLabel(), 'How to play: new guide');
+  assert.equal(s.game.howToNote, 'New guide: Sort it. Open How to play to read it.');
+  ctxs.w.widget('choice');
+  assert.equal(s.game.howToNote, '', 'the flag went away, so does the note');
+  ctxs.w.widget('sort');
+  assert.equal(s.game.howToNote, '', 'an A, C, A sequence does not say it twice');
+  assert.equal(s.game.howToFlagged(), true);
+  s.game.toggleHowTo();
+  assert.equal(s.game.howToOpen, true, 'the button opens that type\'s guide');
+  assert.equal(s.game.howToFlagged(), false, 'and clears the flag');
+  assert.equal(s.game.howToNote, '');
   s.game.closeHowTo();
   ctxs.w.widget('sort');
   assert.equal(s.game.howToOpen, false, 'seen: it does not reopen');
+  assert.equal(s.game.howToFlagged(), false, 'seen: no flag');
   ctxs.w.widget('choice');
   assert.equal(s.game.howToOpen, false);
   assert.deepEqual(s.game.howToTopics().map((t) => t.key), ['choice'], 'the header button now opens choice');
@@ -1389,20 +1526,58 @@ test('the guide follows the step: a new type opens its own guide, once, focused'
 test("Close and Don't show again apply to the guide on show only", () => {
   const s = cardGame();
   s.game.openLevel('w');
+  s.game.closeHowTo();
   ctxs.w.widget('sort');
+  s.game.toggleHowTo();
   s.game.hideHowTo();
   assert.equal(s.store.data.get(HELP_KEY), '{"v":1,"hidden":["sort"]}');
   ctxs.w.widget('choice');
-  assert.equal(s.game.howToOpen, true, 'choice was never closed or hidden');
+  assert.equal(s.game.howToOpen, false, 'mid-level: no pop-up');
+  assert.equal(s.game.howToFlagged(), false, 'choice was closed at the start: seen, so no flag');
+  s.game.toggleHowTo();
   s.game.closeHowTo();
   assert.equal(s.store.data.get(HELP_KEY), '{"v":1,"hidden":["sort"]}', 'Close stores nothing');
 });
 
-test('a hidden type does not auto-open mid-level, but the header button still shows it', () => {
+test('a flagged button clears when the guide is hidden elsewhere, and a hidden type is never flagged', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  s.game.closeHowTo();
+  ctxs.w.widget('sort');
+  assert.equal(s.game.howToFlagged(), true);
+  s.store.data.set(HELP_KEY, '{"v":1,"hidden":["sort"]}'); // another tab: Don't show again
+  assert.equal(s.game.howToFlagged(), false, 'hidden for good: no flag');
+  const h = cardGame({ initial: { [HELP_KEY]: '{"v":1,"hidden":["sort"]}' } });
+  h.game.openLevel('w');
+  h.game.closeHowTo();
+  ctxs.w.widget('sort');
+  assert.equal(h.game.howToFlagged(), false, 'a hidden type is never flagged');
+  assert.equal(h.game.howToNote, '', 'and nothing is announced');
+  assert.equal(h.game.howToLabel(), 'How to play');
+});
+
+test('the flag follows the step, not the level: back on a seen type it is gone, and a new level starts clean', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  s.game.closeHowTo();
+  ctxs.w.widget('sort');
+  assert.equal(s.game.howToFlagged(), true);
+  ctxs.w.widget('choice');
+  assert.equal(s.game.howToFlagged(), false, 'the step on screen is the seen type');
+  ctxs.w.widget('sort');
+  assert.equal(s.game.howToFlagged(), true, 'back on the unseen type: flagged again');
+  s.game.closeOverlay();
+  assert.equal(s.game.howToNote, '');
+  s.game.openLevel('w');
+  assert.equal(s.game.howToFlagged(), false, 'a new run starts without a flag');
+});
+
+test('a hidden type is neither opened nor flagged mid-level, but the header button still shows it', () => {
   const s = cardGame({ initial: { [HELP_KEY]: '{"v":1,"hidden":["choice","sort"]}' } });
   s.game.openLevel('w');
   ctxs.w.widget('sort');
   assert.equal(s.game.howToOpen, false);
+  assert.equal(s.game.howToFlagged(), false);
   s.game.toggleHowTo();
   assert.deepEqual(s.game.howToTopics().map((t) => t.key), ['sort']);
   assert.equal(s.game.howToOpen, true);
@@ -1478,17 +1653,78 @@ test('Escape with the card open closes the card, not the level', () => {
   assert.equal(typing.game.overlayOpen, true);
 });
 
-test('the open How to play modal traps Tab; with none open nothing is trapped', () => {
+test('the open How to play modal traps Tab; with none open the level overlay does', () => {
   const s = cardGame();
   s.game.openLevel('w');
   assert.equal(s.game.openModalSelector(), '#howto-modal');
-  const modal = s.dom.document.querySelector('#howto-modal');
+  assert.equal(s.game.trapSelector(), '#howto-modal');
   const key = (shiftKey) => ({ key: 'Tab', shiftKey, preventDefault() {} });
   assert.equal(s.game.trapTab(key(true)), true, 'focus is outside the modal here, so it is pulled in');
   s.game.closeHowTo();
   assert.equal(s.game.openModalSelector(), null);
-  assert.equal(s.game.trapTab(key(false)), false);
-  assert.ok(modal);
+  assert.equal(s.game.trapSelector(), '.overlay');
+  s.game.closeOverlay();
+  assert.equal(s.game.trapSelector(), null);
+  assert.equal(s.game.trapTab(key(false)), false, 'on the hub nothing is trapped');
+});
+
+// ---- Tab stays inside an open level (#327) ----
+
+// linkedom has no focus model: track focus() calls and serve them as document.activeElement.
+function trackFocus(dom) {
+  let active = dom.document.body;
+  Object.defineProperty(dom.document, 'activeElement', { get: () => active, configurable: true });
+  dom.window.HTMLElement.prototype.focus = function focus() { active = this; };
+  return { set: (el) => { active = el; }, get: () => active };
+}
+
+test('Tab and Shift+Tab wrap inside an open level, and never reach the hub or body', () => {
+  const s = setup();
+  const doc = s.dom.document;
+  const f = trackFocus(s.dom);
+  s.game.openLevel('x');
+  const overlay = doc.querySelector('.overlay');
+  const stops = focusables(overlay);
+  assert.ok(stops.length >= 2, 'the level has controls to tab through');
+  const hubStop = doc.querySelector('#hub button');
+  assert.ok(hubStop, 'premise: the hub has focusable controls behind the level');
+  const tab = (shiftKey) => {
+    const e = { key: 'Tab', shiftKey, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+    s.game.trapTab(e);
+    return e;
+  };
+  const first = stops[0];
+  const last = stops[stops.length - 1];
+  f.set(last);
+  assert.equal(tab(false).defaultPrevented, true, 'Tab past the last control is taken over');
+  assert.ok(f.get() === first, 'and wraps to the first');
+  assert.equal(tab(true).defaultPrevented, true, 'Shift+Tab before the first is taken over');
+  assert.ok(f.get() === last, 'and wraps to the last');
+  f.set(first);
+  assert.equal(tab(false).defaultPrevented, false, 'a Tab in the middle is left to the browser');
+  f.set(hubStop);
+  tab(false);
+  assert.ok(overlay.contains(f.get()), 'focus that strayed to the hub is pulled back in');
+  f.set(doc.body);
+  tab(true);
+  assert.ok(overlay.contains(f.get()), 'focus on body is pulled back in');
+  s.game.closeOverlay();
+});
+
+test('the How to play modal and the reward still trap Tab over an open level', () => {
+  const s = cardGame();
+  const doc = s.dom.document;
+  const f = trackFocus(s.dom);
+  s.game.openLevel('w');
+  const modal = doc.querySelector('#howto-modal');
+  const e = () => ({ key: 'Tab', shiftKey: false, preventDefault() {} });
+  s.game.trapTab(e());
+  assert.ok(modal.contains(f.get()), 'the guide takes Tab');
+  s.game.closeHowTo();
+  ctxs.w.finish({ text: 'a reward long enough' });
+  assert.equal(s.game.rewardOpen, true);
+  s.game.trapTab(e());
+  assert.ok(doc.querySelector('.reward-card').contains(f.get()), 'the reward card takes Tab');
 });
 
 test('the page scroll is locked while How to play, About or Save code is open, and only then', () => {
@@ -1624,8 +1860,8 @@ test('index.html: each element the game focuses on opening a level and the rewar
   assert.equal(game.openLevel('x'), true);
   ctxs.x.finish({ text: 'whatever text here' });
   assert.equal(game.rewardOpen, true);
-  assert.deepEqual(focused, ['#ov-back', '#reward-close'], 'the back button on open, the reward close on finish');
-  for (const sel of [...focused, '#ov-howto-title', '#ov-howto-open']) {
+  assert.deepEqual(focused, ['#ov-back', '#reward-continue'], 'the back button on open, the primary Continue on finish');
+  for (const sel of [...focused, '#reward-close', '#ov-howto-title', '#ov-howto-open']) {
     assert.equal(shell.querySelectorAll(sel).length, 1, `${sel} matches one element in index.html`);
   }
 });
@@ -2026,4 +2262,18 @@ test('M5 every name the Continue and Next up markup binds exists on the game', (
     }
   }
   for (const k of ['continueLabel', 'continueNext', 'isNextUp', 'actLine', 'toggleAct', 'actExpandedAttr', 'actExpanded']) assert.ok(seen.has(k), `the markup binds ${k}`);
+});
+
+test('another tab hiding a guide clears the flag and the note (storage event)', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  s.game.closeHowTo();
+  ctxs.w.widget('sort');
+  assert.equal(s.game.howToFlagged(), true);
+  const rev = s.game.helpRev;
+  s.store.data.set(HELP_KEY, '{"v":1,"hidden":["sort"]}');
+  s.game.onStorage({ key: HELP_KEY });
+  assert.equal(s.game.helpRev, rev + 1, 'Alpine is told to re-read');
+  assert.equal(s.game.howToFlagged(), false);
+  assert.equal(s.game.howToNote, '');
 });

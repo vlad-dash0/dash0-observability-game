@@ -20,7 +20,7 @@ import { endSentence } from './lib/text.mjs';
 import { globeState } from './lib/globe.mjs';
 import { freshlyLit, igniteView, litText } from './lib/globe-ignite.mjs';
 import { dotStates, globeCaption, globeLabel, globeLegend, globeLines, globeTarget } from './lib/globe-view.mjs';
-import { hideHelp, readHiddenHelp } from './lib/help-prefs.mjs';
+import { HELP_KEY, hideHelp, readHiddenHelp } from './lib/help-prefs.mjs';
 import { howToView } from './lib/how-to-play.mjs';
 import { createGuideClient } from './lib/guide/client.mjs';
 import { createAccountClient } from './lib/account/client.mjs';
@@ -233,6 +233,9 @@ export function createGame(deps) {
     aboutLoop: GLOBE_LOOP,
     howTo: NO_HOW_TO,
     howToOpen: false,
+    howToFlagKey: null, // a type that turned up mid-level with an unseen guide: the header button says so (#321)
+    helpRev: 0, // bumped when another tab changes the stored help choices (onStorage)
+    howToNote: '', // the polite announcement of that flag
     howToKey: null, // the widget of the step on screen: the one guide the modal shows (#316)
     rewardTitle: '',
     rewardText: '',
@@ -395,7 +398,7 @@ export function createGame(deps) {
     dismissSigninNudge() {
       nudgeAsked++;
       this.signinNudgeOpen = false;
-      this.focusSoon('#reward-close'); // the nudge's own button held focus
+      this.focusSoon(this.rewardFocus()); // the nudge's own button held focus
     },
     // Don't ask again: stored under hideHelp, and always hidden for this visit.
     hideSigninNudge() {
@@ -791,7 +794,6 @@ export function createGame(deps) {
       }
       this.endSession();
       this.hideGlobe();
-      pendingLit = null;
       this.litNote = '';
       this.nudgeId = null;
       const level = registry.levels[id];
@@ -809,15 +811,21 @@ export function createGame(deps) {
       this.howToKey = this.howTo.topics[0]?.key ?? null;
       this.howToOpen = this.howToKey !== null && this.howToNew(this.howToKey);
       let starting = true;
+      const announced = new Set();
       const onWidget = (key) => {
         if (session !== controller || key === this.howToKey) return;
         if (!this.howTo.topics.some((t) => t.key === key)) return;
         this.howToKey = key;
+        this.howToNote = '';
         const fresh = this.howToNew(key);
         if (starting) this.howToOpen = fresh;
         else if (fresh) {
-          this.howToOpen = true;
-          this.focusSoon('#ov-howto-title');
+          // Mid-level: never a pop-up over the step. The header button is flagged; the note is said once per type.
+          this.howToFlagKey = key;
+          if (!announced.has(key)) {
+            announced.add(key);
+            this.howToNote = `New guide: ${this.howTo.topics.find((t) => t.key === key).title}. Open How to play to read it.`;
+          }
         }
       };
       try {
@@ -870,12 +878,22 @@ export function createGame(deps) {
     },
     // True when this type's guide is neither seen this visit nor hidden for good.
     howToNew(key) {
+      void this.helpRev; // read so Alpine re-checks after another tab changes the stored choice
       return !seenHelp.has(key) && !readHiddenHelp(storage).hidden.has(key);
+    },
+    // The header button's flag: this step's type is new to the player and its guide not yet opened.
+    howToFlagged() {
+      return this.howToFlagKey !== null && this.howToFlagKey === this.howToKey && this.howToNew(this.howToKey);
+    },
+    howToLabel() {
+      return this.howToFlagged() ? 'How to play: new guide' : 'How to play';
     },
     toggleHowTo() {
       if (!this.overlayOpen || this.howToKey === null) return false;
       if (this.howToOpen) this.closeHowTo();
       else {
+        this.howToFlagKey = null;
+        this.howToNote = '';
         this.howToOpen = true;
         this.focusSoon('#ov-howto-title');
       }
@@ -885,6 +903,7 @@ export function createGame(deps) {
     closeHowTo() {
       if (!this.overlayOpen || !this.howToOpen) return;
       seenHelp.add(this.howToKey);
+      this.howToNote = '';
       this.howToOpen = false;
       this.focusSoon('#ov-howto-open');
     },
@@ -894,6 +913,7 @@ export function createGame(deps) {
       if (!this.overlayOpen || !this.howToOpen) return;
       seenHelp.add(this.howToKey);
       if (!this.debug) hideHelp(storage, [this.howToKey]);
+      this.howToNote = '';
       this.howToOpen = false;
       this.focusSoon('#ov-howto-open');
     },
@@ -904,6 +924,8 @@ export function createGame(deps) {
       session = null;
       this.howTo = NO_HOW_TO;
       this.howToKey = null;
+      this.howToFlagKey = null;
+      this.howToNote = '';
       this.howToOpen = false;
       for (const id of ['ov-body', 'ov-actions']) {
         const el = doc.getElementById(id);
@@ -915,7 +937,8 @@ export function createGame(deps) {
       this.endSession();
       this.overlayOpen = false;
       this.showGlobe();
-      this.returnFocus();
+      if (pendingLit) this.revealLit(); // a country lit before Continue from the reward: shown now
+      else this.returnFocus();
     },
 
     // Called by the ctx with the id it captured at creation, never the level open now.
@@ -933,7 +956,16 @@ export function createGame(deps) {
       // A debug run saves nothing, so nothing is freshly lit and no ignite plays.
       const fresh = this.debug ? null : freshlyLit(before, this.progress, registry, globeMap);
       const text = fresh ? litText(fresh, level, globeMap) : null;
-      pendingLit = text ? { fresh, text } : null;
+      // A reveal still pending (Continue from the reward skipped the map) joins this one; it plays when the player next reaches the map.
+      if (text && pendingLit) {
+        pendingLit = {
+          fresh: {
+            countryIds: [...new Set([...pendingLit.fresh.countryIds, ...fresh.countryIds])],
+            regionIds: [...new Set([...pendingLit.fresh.regionIds, ...fresh.regionIds])],
+          },
+          text: `${pendingLit.text} ${text}`,
+        };
+      } else if (text) pendingLit = { fresh, text };
       this.endSession();
       this.overlayOpen = false;
       this.showGlobe();
@@ -943,7 +975,7 @@ export function createGame(deps) {
       this.rewardStars = level?.scored ? result.stars : null; // this run's stars
       this.rewardCards = rec.newCards.map((c) => cardFront[c] ?? c);
       this.rewardOpen = true;
-      this.focusSoon('#reward-close');
+      this.focusSoon(this.rewardFocus());
       this.recordTelemetry(levelId, level, result);
       this.signinNudgeOpen = false;
       if (!this.debug) {
@@ -973,6 +1005,24 @@ export function createGame(deps) {
       }
     },
 
+    // The reward dialog's Continue button: the hub's Continue, same words and same level (continueView).
+    rewardContinueLabel() {
+      return this.continueLabel();
+    },
+    // Where focus starts in the reward dialog: Continue when it is offered, else Back to the map.
+    rewardFocus() {
+      return this.rewardContinueLabel() !== '' ? '#reward-continue' : '#reward-close';
+    },
+    // Straight to the next level: the dialog closes without the map reveal (it stays pending and plays when the
+    // player next returns to the map), then the level opens like the hub's Continue.
+    continueFromReward() {
+      const next = this.continueView();
+      if (!this.rewardOpen || next === null) return false;
+      this.rewardOpen = false;
+      nudgeAsked++;
+      this.signinNudgeOpen = false;
+      return this.openLevel(next.levelId, 'continue');
+    },
     closeReward() {
       this.rewardOpen = false;
       nudgeAsked++; // a board reply still on its way must not open the nudge on a later card
@@ -1016,6 +1066,10 @@ export function createGame(deps) {
 
     // Another tab saved: merge its progress in (progress only goes up, never replaced).
     onStorage(e) {
+      if (e && (e.key === HELP_KEY || e.key === null)) {
+        this.helpRev++;
+        if (!this.howToFlagged()) this.howToNote = '';
+      }
       if (e && e.key !== STORAGE_KEY && e.key !== null) return;
       const { status, progress: other } = loadProgress(storage, registry);
       if (status === 'future') this.notice = 'future';
@@ -1032,7 +1086,7 @@ export function createGame(deps) {
       doc.documentElement.classList.toggle('modal-open', this.scrollLocked());
     },
     // Tab (and Shift+Tab) wrap inside the open kit modal; the page behind is inert, so without this
-    // focus would fall out to the browser's own controls. Not a modal (the level, the reward): untouched.
+    // focus would fall out to the browser's own controls. The level overlay and the reward card are trapped too (trapSelector).
     openModalSelector() {
       if (this.howToOpen) return '#howto-modal';
       if (this.saveOpen) return '#save-modal';
@@ -1041,8 +1095,16 @@ export function createGame(deps) {
       if (this.aboutOpen) return '#about-modal';
       return null;
     },
+    // An open level (or the reward) keeps Tab too, at any width (#327): the hub behind is inert, and
+    // without a trap Tab would leave for the browser's own controls and come back on the hub or body.
+    trapSelector() {
+      const modal = this.openModalSelector();
+      if (modal !== null) return modal;
+      if (this.rewardOpen) return '.reward-card';
+      return this.overlayOpen ? '.overlay' : null;
+    },
     trapTab(e) {
-      const sel = this.openModalSelector();
+      const sel = this.trapSelector();
       return sel === null ? false : trapTab(e, doc.querySelector(sel), doc);
     },
 

@@ -161,7 +161,9 @@
         <h2 x-text="overlayTitle"></h2>
       </div>
       <button type="button" class="ui-btn ui-btn--ghost" id="ov-howto-open" x-show="howTo.topics.length > 0" x-cloak
-              aria-haspopup="dialog" :aria-expanded="howToExpanded()" aria-controls="ov-howto" @click="toggleHowTo()">How to play</button>
+              aria-haspopup="dialog" :aria-expanded="howToExpanded()" :aria-label="howToLabel()" aria-controls="ov-howto" @click="toggleHowTo()">How to play
+        <span class="ui-chip" data-tone="attention" id="ov-howto-new" x-show="howToFlagged()" x-cloak aria-hidden="true">New</span></button>
+      <p class="visually-hidden" role="status" x-text="howToNote"></p>
     </div>
     <div class="level-host" x-ignore>
       <div class="lesson-scroll" id="ov-body"></div>
@@ -232,7 +234,12 @@
           <button type="button" class="ui-btn ui-btn--ghost" @click="hideSigninNudge()">Don't ask again</button>
         </div>
       </div>
-      <button type="button" class="ui-btn ui-btn--primary" id="reward-close" @click="closeReward()">Back to the map</button>
+      <div class="reward-actions">
+        <button type="button" class="ui-btn ui-btn--primary" id="reward-continue" x-show="rewardContinueLabel() !== ''" x-cloak
+                x-text="rewardContinueLabel()" @click="continueFromReward()"></button>
+        <button type="button" class="ui-btn ui-btn--ghost" id="reward-back" x-show="rewardContinueLabel() !== ''" x-cloak @click="closeReward()">Back to the map</button>
+        <button type="button" class="ui-btn ui-btn--primary" id="reward-close" x-show="rewardContinueLabel() === ''" @click="closeReward()">Back to the map</button>
+      </div>
     </div>
   </div>
 
