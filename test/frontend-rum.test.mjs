@@ -101,7 +101,7 @@ test('step 1: the traceparent in the intro is a valid W3C value and names the fe
   assert.match(plain(BUILD_STEP.intro), /Another visitor clicked Pay at the same moment, in trace 9d8c7b6a/);
   assert.match(plain(BUILD_STEP.intro), /server span for one of the two calls arrived as a root/);
   assert.doesNotMatch(plain(BUILD_STEP.intro), /first call|retry/, 'no word of the intro picks a twin or calls it a retry');
-  assert.match(plain(BUILD_STEP.intro), /code that sends the checkout call ran twice, so two identical calls left together; the board tells them apart by the end of their span id/);
+  assert.match(plain(BUILD_STEP.intro), /code that sends the checkout call ran twice, so two identical calls left together\.The board tells them apart by the end of their span id\. The twin rows show it\./);
   assert.match(plain(BUILD_STEP.intro), /share an origin/);
 });
 
@@ -308,4 +308,24 @@ test('claims: the CORS mechanics are only what the replies on screen show, scope
   assert.match(finish, /the telemetry endpoint must allow the page's origin, and the API must allow the traceparent header\.$/);
   const copy = plain(JSON.stringify(level.play));
   assert.doesNotMatch(copy, /always|every browser|all browsers|never allow/i, 'no universal claim in the copy');
+});
+
+test('step 1: the intro is short paragraphs, one idea each, and the board shows the span ids it points at (#321)', () => {
+  const paras = BUILD_STEP.intro.split('</p>').filter((x) => x.includes('<p>'));
+  assert.equal(paras.length >= 5, true, 'the browser spans, the traceparent, the twin call, the other visitor');
+  assert.equal(paras.every((p) => plain(p).length < 300), true, 'no paragraph is a wall');
+  assert.match(plain(paras[1]), /traceparent/);
+  assert.match(plain(paras[2]), /two identical calls/);
+  assert.match(plain(paras[3]), /end of their span id/);
+  assert.match(plain(paras[4]), /9d8c7b6a/);
+});
+
+test('step 1: only the two same-trace POST /checkout calls show a span id pill (#324)', async () => {
+  const { renderBuild } = await import('../lib/widgets/build-it-view.mjs');
+  const { escapeHtml } = await import('../lib/lesson-kit.mjs');
+  const html = renderBuild(tree, newBuildState(tree), { escapeHtml });
+  const pills = [...html.matchAll(/data-sid title="span id (\w+)">span id ([^<]+)</g)].map((m) => `${m[1]} ${m[2]}`).sort();
+  const calls = tree.spans.filter((s) => s.kind === 'CLIENT' && s.name === 'POST /checkout' && s.traceId.startsWith('a3f1c9e2')).map((s) => `${s.spanId} …${s.spanId.slice(-4)}`).sort();
+  assert.equal(calls.length, 2);
+  assert.deepEqual(pills, calls);
 });
