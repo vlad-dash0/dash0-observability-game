@@ -36,8 +36,8 @@ neutral.
 ## Tokens
 
 Two layers. **Primitives** are hex values and live only in `tokens.css`: `--d0-*` (dash0.com brand),
-`--globe-*`, `--wf-*`, `--kit-*`. **Semantic** tokens are `--color-*`, each `light-dark(<light>, <dark>)`
-over primitives; every other stylesheet uses only these (the hub confetti is the one exception).
+`--globe-*`, `--wf-*`, `--kit-*`. **Semantic** tokens are `--color-*`, each a single dark value
+over primitives (the game is dark only, #322: no `light-dark()`, `color-scheme: dark` on `:root`); every other stylesheet uses only these (the hub confetti is the one exception).
 
 Kit colours: `--color-lesson`, `-lesson-eyebrow`, `-lesson-code`, `-lesson-glow`, `-lesson-dot` (the
 lesson card), `--color-meter-left`, `--color-alert` (the firing banner only; D1).
@@ -142,9 +142,9 @@ A level opens with focus on Back (`#ov-back`, set by `openLevel` in `app.mjs` af
 ## Adding a component or a token
 
 The set is closed (D5). A new component needs an entry in this file, reviewer approval and
-screenshots the owner sees (375 and 1280px, light and dark). Add the helper to `lib/ui/`, its
+screenshots the owner sees (375 and 1280px). Add the helper to `lib/ui/`, its
 export to `lib/ui/index.mjs`, its CSS to `kit.css`, and rows to `test/ui.test.mjs` (exact markup,
-the contract table and invalid inputs). A new colour is a primitive plus a `light-dark()` semantic
+the contract table and invalid inputs). A new colour is a primitive plus a semantic
 token with a contrast check.
 
 ## Guards
@@ -163,7 +163,7 @@ token with a contrast check.
 | T12 | play, design-system | The step frame is the kit's, wide by `STEP_TYPES[*].wide`; one `level` container. |
 | T10 | ui | Exact markup, escaping, TypeErrors, CSP-safe output, every class defined in `kit.css`. |
 | T11 | ui | `setFeedback` / `clearFeedback`. |
-| T13 | design-system | Contrast of the kit tokens in both themes; faded waterfall rows keep 4.5:1 text. |
+| T13 | design-system | Contrast of the kit tokens on dark; faded waterfall rows keep 4.5:1 text. |
 | T14 | design-system | Tone colours colour only markers. |
 
 `LEGACY`, `UNDEFINED_ALLOW` (T8) and `CONTAINER_ALLOW` (T12) are empty and asserted empty: the
@@ -178,7 +178,7 @@ muted notes, the `build` layout and the `help-*` column. (`show` stays in `hub.c
 the overlay, reward card and notice.)
 
 Review only: visual quality against the prototypes, spacing, closed-set membership, and
-screenshots at 375 and 1280px in both themes on every UI PR.
+screenshots at 375 and 1280px on every UI PR.
 
 ## Prototypes
 

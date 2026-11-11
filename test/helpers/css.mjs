@@ -1,6 +1,6 @@
 // Stylesheets read as text for the theme and design-system guards (test/theme.test.mjs,
 // test/design-system.test.mjs, test/ui.test.mjs): a tiny block parser, var() /
-// light-dark() / color-mix() resolution, WCAG contrast, and class scanners for CSS
+// color-mix() resolution, WCAG contrast, and class scanners for CSS
 // selectors and for markup in .mjs and .html sources. Plain JS, no CSS engine.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -92,20 +92,15 @@ export const ROOT_DECLS = rootRule ? decls(rootRule.body) : [];
 /** Every custom property tokens.css declares on :root, name -> value. */
 export const VARS = Object.fromEntries(ROOT_DECLS.filter(([k]) => k.startsWith('--')));
 
-/** Resolve a value to [r,g,b] (0-255) for one theme, following var() and light-dark(). */
-export function resolveColor(value, theme, seen = new Set()) {
+/** Resolve a value to [r,g,b] (0-255), following var() and color-mix(). The game is dark only (#322). */
+export function resolveColor(value, seen = new Set()) {
   const v = value.trim();
   const ref = call('var', v);
   if (ref !== null) {
     const name = splitTop(ref)[0];
     assert.ok(!seen.has(name), `var() cycle at ${name}`);
     assert.ok(name in VARS, `undefined token ${name}`);
-    return resolveColor(VARS[name], theme, new Set(seen).add(name));
-  }
-  const ld = call('light-dark', v);
-  if (ld !== null) {
-    const [light, dark] = splitTop(ld);
-    return resolveColor(theme === 'light' ? light : dark, theme, seen);
+    return resolveColor(VARS[name], new Set(seen).add(name));
   }
   const mix = call('color-mix', v);
   if (mix !== null) {
@@ -119,8 +114,8 @@ export function resolveColor(value, theme, seen = new Set()) {
     const [cb, pb] = part(b);
     assert.ok(pa === null || pb === null, `give one percentage only (no normalising): ${v}`);
     const wa = pa ?? (pb === null ? 0.5 : 1 - pb);
-    const A = resolveColor(ca, theme, seen);
-    const B = resolveColor(cb, theme, seen);
+    const A = resolveColor(ca, seen);
+    const B = resolveColor(cb, seen);
     return A.map((x, i) => x * wa + B[i] * (1 - wa));
   }
   const hex = v.match(/^#([0-9a-f]{6})$/i);
@@ -130,9 +125,9 @@ export function resolveColor(value, theme, seen = new Set()) {
 
 /**
  * A see-through token (`color-mix(in srgb, <colour> p%, transparent)`, possibly behind
- * var() and light-dark()) laid over the opaque `under` token, as [r,g,b] for `theme`.
+ * var()) laid over the opaque `under` token, as [r,g,b].
  */
-export function overlay(token, under, theme) {
+export function overlay(token, under) {
   let v = `var(${token})`;
   for (;;) {
     const ref = call('var', v);
@@ -140,17 +135,12 @@ export function overlay(token, under, theme) {
       v = VARS[splitTop(ref)[0]];
       continue;
     }
-    const ld = call('light-dark', v);
-    if (ld !== null) {
-      v = splitTop(ld)[theme === 'light' ? 0 : 1];
-      continue;
-    }
     break;
   }
   const m = /^color-mix\(in srgb, (.+) ([\d.]+)%, transparent\)$/.exec(v.trim());
   assert.ok(m, `${token} is not a tint over transparent: ${v}`);
-  const top = resolveColor(m[1], theme);
-  const u = resolveColor(`var(${under})`, theme);
+  const top = resolveColor(m[1]);
+  const u = resolveColor(`var(${under})`);
   const a = Number(m[2]) / 100;
   return top.map((c, i) => c * a + u[i] * (1 - a));
 }
@@ -170,8 +160,8 @@ export function ratio(a, b) {
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 
-/** WCAG contrast of tokens `fg` on `bg` in `theme`. */
-export const contrast = (fg, bg, theme) => ratio(resolveColor(`var(${fg})`, theme), resolveColor(`var(${bg})`, theme));
+/** WCAG contrast of tokens `fg` on `bg`. */
+export const contrast = (fg, bg) => ratio(resolveColor(`var(${fg})`), resolveColor(`var(${bg})`));
 
 /** Class names a selector (or selector list) mentions, outside attribute brackets and strings. */
 export function classesInSelector(selector) {

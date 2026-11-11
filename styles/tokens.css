@@ -1,7 +1,7 @@
 /* Dash0 theme tokens (F2, #10). The only file with hex colours: brand primitives
    (--d0-*) come from dash0.com production CSS; everything else refers to them.
-   Semantic colours (--color-*) are light-dark(<light>, <dark>): dark by default,
-   light when <html data-theme="light"> (lib/theme.mjs stores the choice).
+   Semantic colours (--color-*) are the dark values: the game is dark only (#322), and
+   color-scheme: dark on :root makes form controls and scrollbars dark too.
    Provisional (#16): success = mint, error = purple (brand deck: purple = error).
    Fonts: system sans for text; Martian Mono for code, self-hosted under the OFL
    (fonts/OFL.txt). Source: github.com/evilmartians/mono release v1.1.0,
@@ -43,8 +43,7 @@
   --d0-purple: #ad46ff;
 
   /* Globe primitives (#150, from the look study the owner approved on 2026-11-04; not
-     dash0.com brand values). The globe keeps a dark night sky in both themes, so its
-     lights read the same on either. */
+     dash0.com brand values). */
   --globe-night: #0c0c0c;
   --globe-body: #131211;
   --globe-dim: #4d4a47;
@@ -54,116 +53,86 @@
 
   /* Trace waterfall primitives (#146, from the Build it prototype the owner approved on
      2026-11-04; not dash0.com brand values). Services get muted fills, one per service in the
-     order a step names them, cycling after six: darker on dark, paler on light, so bar text
-     (--color-text) reads on both. Two pale trace tints tell trace ids apart. Hint violet,
-     parent amber and note orange are the prototype's light-theme values; their dark sides
-     reuse --d0-orange-soft and --globe-amber. */
+     order a step names them, cycling after six, so bar text (--color-text) reads on them. Two
+     trace tints tell trace ids apart. Parent amber and note orange reuse --globe-amber and
+     --d0-orange-soft. */
   --wf-svc-0-dark: #3f556b;
   --wf-svc-1-dark: #335b58;
   --wf-svc-2-dark: #455941;
   --wf-svc-3-dark: #5e5135;
   --wf-svc-4-dark: #694944;
   --wf-svc-5-dark: #5e4b62;
-  --wf-svc-0-light: #c5d8ed;
-  --wf-svc-1-light: #bddedb;
-  --wf-svc-2-light: #cadcc6;
-  --wf-svc-3-light: #e0d5bc;
-  --wf-svc-4-light: #eccec8;
-  --wf-svc-5-light: #e1cfe5;
   --wf-trace-0-dark: #3e3729;
   --wf-trace-0-edge-dark: #726852;
   --wf-trace-1-dark: #43323d;
   --wf-trace-1-edge-dark: #816577;
-  --wf-trace-0-light: #f0e7d6;
-  --wf-trace-0-edge-light: #b0a389;
-  --wf-trace-1-light: #f7e1ee;
-  --wf-trace-1-edge-light: #b593a8;
-  --wf-parent-light: #995b0c;
   --wf-hint-dark: #c9b6ff;
-  --wf-hint-light: #6a4fc2;
-  --wf-note-light: #b34a22;
   --wf-win-text: #e9e6e1;
   --wf-win-muted: #b8b3ac;
 
   /* Kit primitives (#158, from the lesson and incident prototypes the owner approved on
-     2026-11-04; not dash0.com brand values). Lesson text is softer than full white or
-     black; the light amber ink replaces the prototype's #a8650f, which fails AA on the
-     light surface; the light alert red is for the firing banner only (D1). */
+     2026-11-04; not dash0.com brand values). Lesson text is softer than full white. */
   --kit-lesson-dark: #d9d6d1;
-  --kit-lesson-light: #3a3836;
-  --kit-ink-amber-light: #7a4a08;
-  --kit-alert-light: #d42a2e;
 
-  /* Semantic colours: light-dark(<light>, <dark>). */
-  --color-bg: light-dark(var(--d0-white), var(--d0-grey-900));
-  --color-surface: light-dark(color-mix(in srgb, var(--d0-grey-400) 10%, var(--d0-white)), var(--d0-grey-800));
-  --color-surface-2: light-dark(color-mix(in srgb, var(--d0-grey-400) 20%, var(--d0-white)), var(--d0-grey-700));
-  --color-border: light-dark(var(--d0-grey-400), var(--d0-grey-600));
-  --color-text: light-dark(var(--d0-grey-900), var(--d0-white));
-  --color-text-muted: light-dark(var(--d0-grey-600), var(--d0-grey-400));
-  --color-primary: light-dark(var(--d0-red), var(--d0-red));
+  /* Semantic colours (dark only). */
+  --color-bg: var(--d0-grey-900);
+  --color-surface: var(--d0-grey-800);
+  --color-surface-2: var(--d0-grey-700);
+  --color-border: var(--d0-grey-600);
+  --color-text: var(--d0-white);
+  --color-text-muted: var(--d0-grey-400);
+  --color-primary: var(--d0-red);
   /* White on red is 3.5:1 (fails AA for normal text); near-black is 5.5:1. */
-  --color-primary-contrast: light-dark(var(--d0-grey-900), var(--d0-grey-900));
-  --color-accent: light-dark(var(--d0-orange), var(--d0-orange));
-  /* Brand orange as small text: plain orange on the light card is 2.56:1, so light is orange
-     darkened with grey-900 (5.0:1 on surface, 4.6:1 on surface-2, 5.5:1 on bg); dark stays orange.
-     The plain accent stays for borders, strokes and glows (non-text). */
-  --color-accent-text: light-dark(color-mix(in srgb, var(--d0-orange) 65%, var(--d0-grey-900)), var(--d0-orange));
-  /* Plain mint on white is 1.2:1, so light success is mint darkened with grey-900
-     (4.2:1 on bg, 3.8:1 on surface: WCAG 1.4.11 for borders and markers). */
-  --color-success: light-dark(color-mix(in srgb, var(--d0-mint) 50%, var(--d0-grey-900)), var(--d0-mint));
-  /* Success as small text: plain light success is 3.8:1 on the card, so light is mint darkened
-     further (5.3:1 on surface, 4.8:1 on surface-2, 5.7:1 on bg); dark stays mint. Borders, dots and
-     check glyphs keep --color-success (non-text, 3:1). */
-  --color-success-text: light-dark(color-mix(in srgb, var(--d0-mint) 40%, var(--d0-grey-900)), var(--d0-mint));
-  --color-error: light-dark(var(--d0-purple), var(--d0-purple));
-  /* Orange on white is under 3:1, so the light-theme ring is near-black. */
-  --color-focus: light-dark(var(--d0-grey-900), var(--d0-orange));
-  --color-code-bg: light-dark(var(--color-surface-2), var(--d0-grey-900));
-  /* The globe (lib/globe-render.mjs reads these at mount): the same night in both themes. */
-  --color-globe-sky: light-dark(var(--globe-night), var(--globe-night));
-  --color-globe-body: light-dark(var(--globe-body), var(--globe-body));
-  --color-globe-dim: light-dark(var(--globe-dim), var(--globe-dim));
-  --color-globe-lit: light-dark(var(--globe-amber), var(--globe-amber));
+  --color-primary-contrast: var(--d0-grey-900);
+  --color-accent: var(--d0-orange);
+  --color-success: var(--d0-mint);
+  --color-error: var(--d0-purple);
+  --color-focus: var(--d0-orange);
+  --color-code-bg: var(--d0-grey-900);
+  /* The globe (lib/globe-render.mjs reads these at mount). */
+  --color-globe-sky: var(--globe-night);
+  --color-globe-body: var(--globe-body);
+  --color-globe-dim: var(--globe-dim);
+  --color-globe-lit: var(--globe-amber);
   /* The incident pulse is a dusty coral, not brand red: it reads as "open", not "alarm". */
-  --color-globe-pulse: light-dark(var(--globe-coral), var(--globe-coral));
+  --color-globe-pulse: var(--globe-coral);
   /* A fixed incident leaves its region a calm brand mint: plain srgb, so parseColor reads it (never oklab). */
-  --color-globe-resolved: light-dark(var(--d0-mint), var(--d0-mint));
-  --color-globe-rim: light-dark(var(--globe-amber), var(--globe-amber));
-  --color-globe-text: light-dark(var(--globe-night-text), var(--globe-night-text));
+  --color-globe-resolved: var(--d0-mint);
+  --color-globe-rim: var(--globe-amber);
+  --color-globe-text: var(--globe-night-text);
   /* The trace waterfall (#146): service fills, trace tints, and the highlight roles. */
-  --color-svc-0: light-dark(var(--wf-svc-0-light), var(--wf-svc-0-dark));
-  --color-svc-1: light-dark(var(--wf-svc-1-light), var(--wf-svc-1-dark));
-  --color-svc-2: light-dark(var(--wf-svc-2-light), var(--wf-svc-2-dark));
-  --color-svc-3: light-dark(var(--wf-svc-3-light), var(--wf-svc-3-dark));
-  --color-svc-4: light-dark(var(--wf-svc-4-light), var(--wf-svc-4-dark));
-  --color-svc-5: light-dark(var(--wf-svc-5-light), var(--wf-svc-5-dark));
-  --color-trace-0: light-dark(var(--wf-trace-0-light), var(--wf-trace-0-dark));
-  --color-trace-0-edge: light-dark(var(--wf-trace-0-edge-light), var(--wf-trace-0-edge-dark));
-  --color-trace-1: light-dark(var(--wf-trace-1-light), var(--wf-trace-1-dark));
-  --color-trace-1-edge: light-dark(var(--wf-trace-1-edge-light), var(--wf-trace-1-edge-dark));
+  --color-svc-0: var(--wf-svc-0-dark);
+  --color-svc-1: var(--wf-svc-1-dark);
+  --color-svc-2: var(--wf-svc-2-dark);
+  --color-svc-3: var(--wf-svc-3-dark);
+  --color-svc-4: var(--wf-svc-4-dark);
+  --color-svc-5: var(--wf-svc-5-dark);
+  --color-trace-0: var(--wf-trace-0-dark);
+  --color-trace-0-edge: var(--wf-trace-0-edge-dark);
+  --color-trace-1: var(--wf-trace-1-dark);
+  --color-trace-1-edge: var(--wf-trace-1-edge-dark);
   /* Its current parent, the arriving span, the time-window band and the stars. */
-  --color-parent: light-dark(var(--wf-parent-light), var(--globe-amber));
-  --color-band: light-dark(color-mix(in srgb, var(--wf-parent-light) 8%, transparent), color-mix(in srgb, var(--globe-amber) 9%, transparent));
-  --color-hint: light-dark(var(--wf-hint-light), var(--wf-hint-dark));
-  --color-note: light-dark(var(--wf-note-light), var(--d0-orange-soft));
-  /* The success card keeps the globe's night in both themes, like the globe. */
-  --color-win-bg: light-dark(var(--globe-night), var(--globe-night));
-  --color-win-text: light-dark(var(--wf-win-text), var(--wf-win-text));
-  --color-win-muted: light-dark(var(--wf-win-muted), var(--wf-win-muted));
-  --color-swirl-dot: light-dark(var(--globe-amber), var(--globe-amber));
-  --color-shadow: light-dark(color-mix(in srgb, var(--d0-grey-900) 15%, transparent), color-mix(in srgb, var(--d0-grey-900) 60%, transparent));
+  --color-parent: var(--globe-amber);
+  --color-band: color-mix(in srgb, var(--globe-amber) 9%, transparent);
+  --color-hint: var(--wf-hint-dark);
+  --color-note: var(--d0-orange-soft);
+  /* The success card keeps the globe's night, like the globe. */
+  --color-win-bg: var(--globe-night);
+  --color-win-text: var(--wf-win-text);
+  --color-win-muted: var(--wf-win-muted);
+  --color-swirl-dot: var(--globe-amber);
+  --color-shadow: color-mix(in srgb, var(--d0-grey-900) 60%, transparent);
   /* The UI kit (#158, docs/DESIGN-SYSTEM.md). The lesson card: its text, the "Lesson"
      eyebrow, inline code, the amber glow top left and the dot top right. */
-  --color-lesson: light-dark(var(--kit-lesson-light), var(--kit-lesson-dark));
-  --color-lesson-eyebrow: light-dark(var(--kit-ink-amber-light), color-mix(in srgb, var(--globe-amber) 82%, var(--d0-grey-800)));
-  --color-lesson-code: light-dark(var(--kit-ink-amber-light), var(--globe-amber));
-  --color-lesson-glow: light-dark(color-mix(in srgb, var(--wf-parent-light) 11%, transparent), color-mix(in srgb, var(--globe-amber) 13%, transparent));
-  --color-lesson-dot: light-dark(color-mix(in srgb, var(--wf-parent-light) 28%, transparent), color-mix(in srgb, var(--globe-amber) 28%, transparent));
+  --color-lesson: var(--kit-lesson-dark);
+  --color-lesson-eyebrow: color-mix(in srgb, var(--globe-amber) 82%, var(--d0-grey-800));
+  --color-lesson-code: var(--globe-amber);
+  --color-lesson-glow: color-mix(in srgb, var(--globe-amber) 13%, transparent);
+  --color-lesson-dot: color-mix(in srgb, var(--globe-amber) 28%, transparent);
   /* Meter cells still left (3:1 on surface); the firing banner's red (D1: wrong answers
      stay --color-error purple). */
-  --color-meter-left: light-dark(color-mix(in srgb, var(--d0-mint) 40%, var(--d0-grey-600)), color-mix(in srgb, var(--d0-mint) 50%, var(--d0-grey-600)));
-  --color-alert: light-dark(var(--kit-alert-light), var(--d0-red));
+  --color-meter-left: color-mix(in srgb, var(--d0-mint) 50%, var(--d0-grey-600));
+  --color-alert: var(--d0-red);
 
   /* Type and shape. */
   --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -200,8 +169,4 @@
   --measure: 72ch;
   --opacity-disabled: .45;
   --dur-fast: .15s;
-}
-
-:root[data-theme="light"] {
-  color-scheme: light;
 }

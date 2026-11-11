@@ -36,7 +36,7 @@
   padding: 6px 11px; border-radius: 20px; font-weight: 700; font-size: 13px;
 }
 .star-count span:first-child { color: var(--color-parent); }
-/* The theme, ?, Back and reward buttons are kit buttons (index.html; D3: the hub changes only its buttons). */
+/* The ?, Back and reward buttons are kit buttons (index.html; D3: the hub changes only its buttons). */
 /* Header widths (brand ~97px without "by Dash0", chip ~66px, two 44px buttons): "by Dash0" goes at
    430px and under, and at 360px and under the padding and button gap tighten, so 320px leaves
    296 - (88 + 66 + 8) - 12 = 122px for a ~97px brand. */
@@ -78,7 +78,7 @@
 #map-title:focus { outline: none; }
 
 /* ---------- World map: the globe (lib/globe-render.mjs) ---------- */
-/* A night panel in both themes: the lights need a dark sky. The stage is square and capped,
+/* A night panel: the lights need a dark sky. The stage is square and capped,
    so the hub keeps its levels near the top; the canvas fills it (no style attributes). */
 .map-panel { margin: 0 16px; }
 /* The map and the levels: stacked below 1024px; side by side from there (the map left, at 5fr
@@ -217,7 +217,7 @@
 }
 .level-card.next { border-color: var(--color-accent); box-shadow: 0 0 0 1px var(--color-accent); }
 .level-card.nudge { opacity: .9; animation: nudge .45s ease; }
-.level-card.nudge .level-sub { color: var(--color-accent-text); font-weight: 700; }
+.level-card.nudge .level-sub { color: var(--color-accent); font-weight: 700; }
 @keyframes nudge { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 @media (prefers-reduced-motion: reduce) { .level-card.nudge { animation: none; } }
 .level-ico {
@@ -225,7 +225,7 @@
   display: grid; place-items: center; font-size: 26px; background: var(--color-surface-2);
 }
 .level-body { flex: 1; min-width: 0; }
-.level-no { font-size: 11px; font-weight: 700; color: var(--color-accent-text); letter-spacing: .5px; font-family: var(--font-mono); }
+.level-no { font-size: 11px; font-weight: 700; color: var(--color-accent); letter-spacing: .5px; font-family: var(--font-mono); }
 .level-name { font-weight: 700; font-size: 16px; line-height: 1.2; overflow-wrap: break-word; }
 .level-sub { font-size: 13px; color: var(--color-text-muted); margin-top: 2px; overflow-wrap: break-word; }
 .level-status {
@@ -233,7 +233,7 @@
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
   color: var(--color-text-muted);
 }
-.level-card.done .level-status { color: var(--color-success-text); }
+.level-card.done .level-status { color: var(--color-success); }
 .level-stars { font-size: 15px; letter-spacing: 1px; color: var(--color-parent); }
 
 /* ---------- Level overlay: header, scrolling body, pinned actions ---------- */
