@@ -75,7 +75,7 @@ const SCENARIO = {
       kind: 'clue',
       html:
         '<p>Pod <code>notifications-7c5d8f6b9-q4m2x</code> in namespace comms, container command <code>node dist/server.js</code>, env:</p>' +
-        '<pre>NODE_ENV=production\n' +
+        '<pre data-wrap>NODE_ENV=production\n' +
         'OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318\n' +
         'OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=production,service.namespace=comms,service.version=5.2.0</pre>' +
         '<p><code>OTEL_SERVICE_NAME</code> is not set and <code>service.name</code> is not in <code>OTEL_RESOURCE_ATTRIBUTES</code>, ' +

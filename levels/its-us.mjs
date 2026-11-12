@@ -27,7 +27,7 @@ import {
 } from '../lib/incident-lab.mjs';
 import { MODE, STATE } from '../lib/telemetry.mjs';
 import {
-  actions as actionsBar, button, chip, feedback, field, finishButton, note, panel, prose, radio, radioGroup, reason, setFeedback, step, table,
+  actions as actionsBar, button, buttonRow, chip, feedback, field, finishButton, note, panel, prose, radio, radioGroup, reason, setFeedback, step, table,
 } from '../lib/ui/index.mjs';
 
 // Incidents already accepted by a Dash0 in this page's session (one per telemetry session), and the
@@ -291,14 +291,15 @@ export default {
         radioGroup({ legend: 'Filter: operator', itemsHtml: ops }) +
         field({ id: 'its-fvalue', label: 'Filter: value', autocompleteOff: true, value: form.value }) +
         feedback({ id: 'its-filter-feedback' }) +
-        bar(
+        buttonRow(
           button({ id: 'its-filter-apply', label: 'Apply filter', variant: 'primary' }) +
             (applied ? button({ id: 'its-filter-clear', label: 'Clear filter', variant: 'ghost' }) : ''),
         );
     };
 
     // The heading text is focusable (tabindex -1) so a screen-reader or keyboard user lands where the task is.
-    const explorerHead = (what, id) => `${chip({ text: 'Simulated', tone: 'attention' })} <span id="${id}" tabindex="-1">${what}</span>. Nothing here is your account.`;
+    // The title and its sentence are one flex item, so the header's gap does not open a space before the period.
+    const explorerHead = (what, id) => `${chip({ text: 'Simulated', tone: 'attention' })} <span><span id="${id}" tabindex="-1">${what}</span>. Nothing here is your account.</span>`;
 
     const showList = () => {
       const shown = applied ? matchTraces(traces, applied) : traces;
@@ -328,7 +329,7 @@ export default {
                 rows,
                 numeric: [0, 2, 3, 4],
               }) +
-              bar(shown.map((_, i) => button({ id: `its-open-trace-${i}`, label: `Open trace ${i + 1}`, variant: 'ghost' })).join('')),
+              buttonRow(shown.map((_, i) => button({ id: `its-open-trace-${i}`, label: `Open trace ${i + 1}`, variant: 'ghost' })).join('')),
         ],
       });
       $('#its-filter-apply').onclick = () => {
@@ -380,9 +381,9 @@ export default {
             rows,
             numeric: [2, 3],
           }),
-          bar(opens),
+          buttonRow(opens),
           `<div id="its-detail" aria-live="polite" tabindex="-1">${note('Open a span to see its attributes and events.')}</div>`,
-          bar(button({ id: 'its-back', label: 'Back to the trace list', variant: 'ghost' })),
+          buttonRow(button({ id: 'its-back', label: 'Back to the trace list', variant: 'ghost' })),
         ],
       });
       $('#its-trace-title').focus();
@@ -457,7 +458,7 @@ export default {
           feedback({ id: 'its-feedback' }),
         ),
         bar(
-          button({ id: 'its-check', label: 'Check my answers', variant: 'ghost' }) +
+          button({ id: 'its-check', label: 'Check my answers', variant: 'primary' }) +
             finishButton('its-finish'),
         ),
       );

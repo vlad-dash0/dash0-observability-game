@@ -11,7 +11,7 @@ import { decls, definedClasses, read, ROOT, rules, splitTop } from './helpers/cs
 import * as ui from '../lib/ui/index.mjs';
 
 const {
-  actions, button, buttonRow, checkbox, chip, clearFeedback, codeBlock, dots, eyebrow, feedback, field, finishButton, fold,
+  actions, button, buttonRow, checkbox, chip, clearFeedback, codeBlock, dots, eyebrow, feedback, field, finishButton, fold, hintHead,
   helpChips, lesson, linkButton, meter, nextButton, note, option, options, panel, prose, question, radio, radioGroup, reason, setFeedback,
   sideColumn, split, stars, stats, step, stepHead, table,
   BUTTON_VARIANTS, DOTS_TONES, FEEDBACK_TONES, LINK_VARIANTS, OPTION_KINDS, OPTION_STATES, OPTIONS_LAYOUTS, PANEL_VARIANTS, TONES,
@@ -56,6 +56,9 @@ test('text: lesson, question, eyebrow, stepHead, note, prose, codeBlock', () => 
   assert.equal(prose('<p>x</p><table><tr><td>1</td></tr></table><pre>t</pre><table class="k"><tr><td>2</td></tr></table>'),
     '<div class="ui-prose"><p>x</p><div class="ui-table-wrap"><table><tr><td>1</td></tr></table></div><pre>t</pre>' +
     '<div class="ui-table-wrap"><table class="k"><tr><td>2</td></tr></table></div></div>', 'each table sits in the kit scroller; nothing else is wrapped');
+  assert.equal(hintHead('Hint 1 of 3'), '<p class="ui-eyebrow">Hint 1 of 3</p>');
+  assert.equal(hintHead('Hint 2 of 3', '"Cart" <x>'), '<p class="ui-eyebrow">Hint 2 of 3</p><p><b>&quot;Cart&quot; &lt;x&gt;</b></p>', '#332 the subject is escaped and outside the upper-cased eyebrow');
+  assert.equal(codeBlock('a', { wrap: true }), '<pre class="ui-code" data-wrap><code>a</code></pre>', '#332 wrap soft-wraps an env block');
   assert.equal(codeBlock('a < b && "c"'), '<pre class="ui-code"><code>a &lt; b &amp;&amp; &quot;c&quot;</code></pre>');
 });
 
@@ -288,6 +291,7 @@ const CASES = [
   ['lesson', null, (h) => lesson(h)],
   ['question', null, (h) => question({ id: 'q', html: h })],
   ['eyebrow', (t) => eyebrow(t), null],
+  ['hintHead', (t) => hintHead(t, t), null],
   ['stepHead', null, (h) => stepHead({ step: 1, titleHtml: h, noteHtml: h })],
   ['note', null, (h) => note(h)],
   ['prose', null, (h) => prose(h)],
@@ -432,6 +436,7 @@ const INVALID = [
   ['question', () => question({ id: '1q', html: 'x' })],
   ['question', () => question({ id: 'a b', html: 'x' })],
   ['eyebrow', () => eyebrow('')],
+  ['hintHead', () => hintHead('Hint 1 of 3', '')],
   ['stepHead', () => stepHead({ step: 0, titleHtml: 'x' })],
   ['stepHead', () => stepHead({ step: 1.5, titleHtml: 'x' })],
   ['note', () => note(5)],

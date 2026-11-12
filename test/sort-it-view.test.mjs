@@ -12,7 +12,7 @@ import { recordFocus } from './helpers/focus.mjs';
 import { decls, read, rules } from './helpers/css.mjs';
 import { escapeHtml } from '../lib/lesson-kit.mjs';
 import { newSortState, place } from '../lib/widgets/sort-it.mjs';
-import { mountSort, renderSort, sortView } from '../lib/widgets/sort-it-view.mjs';
+import { mountSort, quoted, renderSort, sortView } from '../lib/widgets/sort-it-view.mjs';
 import { withGuide } from './helpers/guide-ctx.mjs';
 
 // The core's fixture: i1 -> metric, i2 -> log, i3 -> trace, i4 -> metric.
@@ -1192,4 +1192,20 @@ test('#323 breakable adds soft breaks to text runs only, never inside a nested t
 
 test('#323 the guide tells the player to pick the item again after a wrong placement', () => {
   assert.equal(HOW_TO.sort.play[1].endsWith('Pick it again and try another place.'), true);
+});
+
+test('#332 feedback never doubles or nests the quotes around an item or bucket', () => {
+  assert.equal(quoted('Stack trace text'), '"Stack trace text"', 'plain text gets one pair');
+  assert.equal(quoted('"Payment declined by provider"'), '"Payment declined by provider"', 'a label with its own quotes keeps them, no second pair');
+  assert.equal(quoted('<code>{severity_text:"ERROR", body:"x"}</code>'), '<code>{severity_text:"ERROR", body:"x"}</code>', 'a lone code chip marks the name; the quotes inside it are not wrapped again');
+  assert.equal(quoted('<code>a</code> in <code>b</code>'), '"<code>a</code> in <code>b</code>"', 'mixed text is still quoted');
+});
+
+test('#332 the feedback for a label that carries its own quotes has one pair', () => {
+  const spec = fixture();
+  spec.items[1].label = '"Payment declined by provider"';
+  const { mount } = setup(spec);
+  mount();
+  sortTo('i2', 'metric');
+  assert.equal(feedback(), 'Not quite. "Payment declined by provider" does not go in "Metric". Not a number.');
 });
