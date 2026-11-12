@@ -43,12 +43,12 @@ const WHERE = [
   },
   {
     key: 'per-service',
-    label: 'In each service, with its own SDK setup, one service at a time',
+    label: 'In each service, with its own SDK setup and <code>OTEL_RESOURCE_ATTRIBUTES</code>, one service at a time',
     why: 'It can work, but every service and every language needs the same setup, and a process only knows what it is told about its pod. Adding it once in the Collector is simpler and covers them all.',
   },
   {
     key: 'span-processor',
-    label: 'On every span, with a custom span processor in each service',
+    label: 'On every span, as a <code>k8s.pod.name</code> attribute from a custom span processor in each service',
     why: 'Pod metadata describes the producer, so it belongs on the Resource, not on each span (level 1.1). It also leaves metrics and logs without it.',
   },
 ];
@@ -127,12 +127,12 @@ const RBAC = [
   },
   {
     key: 'api-key',
-    label: 'A Dash0 auth token in the processor settings, the same one the exporter uses, for looking pods up in Dash0',
+    label: 'A Dash0 auth token in the processor settings, the same one the exporter sends in its <code>Authorization</code> header, for looking pods up in Dash0',
     why: 'The processor talks to the Kubernetes API of the cluster, not to Dash0. Its access is Kubernetes access, granted with RBAC. A Dash0 token belongs to the exporter.',
   },
   {
     key: 'nothing',
-    label: 'Nothing: it reads the pod name and namespace off the telemetry that arrives, with no lookup against the cluster or its API',
+    label: 'Nothing: it reads <code>k8s.pod.name</code> and <code>k8s.namespace.name</code> off the telemetry that arrives, with no lookup against the cluster or its API',
     why: 'The processor looks the pod up: it keeps a record of the cluster\'s pods, and matches telemetry to one, by default through the IP address of the incoming connection. That lookup uses the Kubernetes API, which needs permissions.',
   },
 ];
@@ -147,12 +147,12 @@ const DASH0 = [
   },
   {
     key: 'nothing',
-    label: 'Nothing, until you add an SDK to each app and set its Kubernetes attributes yourself in each app\'s configuration',
+    label: 'Nothing, until you add an SDK to each app and set <code>k8s.pod.name</code> and <code>k8s.namespace.name</code> yourself in each app\'s configuration',
     why: 'That is the work the operator takes off you: it instruments supported runtimes and sets the Kubernetes resource attributes for the workload.',
   },
   {
     key: 'logs-only',
-    label: 'It only collects pod logs and metrics; the resource attributes stay yours to set by hand in each app\'s environment',
+    label: 'It only collects pod logs and metrics; the <code>k8s.*</code> resource attributes stay yours to set by hand in each app\'s environment',
     why: 'The operator does collect pod logs, and metrics too, but it also instruments workloads and adds Kubernetes resource attributes to them.',
   },
 ];

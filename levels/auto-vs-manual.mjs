@@ -74,7 +74,7 @@ const SORT = {
 const WHY = [
   {
     key: 'retries',
-    label: 'Cart retries every fetch call once, and each attempt is recorded as a span',
+    label: 'Cart retries every <code>fetch</code> call once, and each attempt is recorded as its own span',
     why: 'A retry would show two spans with different start times, and cart does not retry. Here each call has a twin, and the twins start together.',
   },
   {
@@ -85,7 +85,7 @@ const WHY = [
   },
   {
     key: 'collector',
-    label: 'The Collector copies each span on its way to Dash0, and sends both copies',
+    label: 'The Collector copies each span on its way to Dash0, and its <code>otlp_grpc</code> exporter sends both copies',
     why: 'A Collector forwards the spans it receives. Both copies were already in what cart exported.',
   },
 ];

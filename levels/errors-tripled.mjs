@@ -194,14 +194,14 @@ const RULE = [
   },
   {
     key: 'uniform-sampling',
-    label: `Sampling ${KEEP_PCT}% of traces thins errors and requests alike, so the ratio is unchanged and ${AFTER} is a dashboard fault, not a real change`,
+    label: `Sampling ${KEEP_PCT}% of traces thins errors and requests alike, so the <code>span_metrics</code> ratio is unchanged and ${AFTER} is a dashboard fault, not a real change`,
     why:
       `That is true of a sampler that keeps the same share of both, like the head sampler in 6.1: ${KEEP_PCT}% of ${ERRORS} over ${KEEP_PCT}% of ${n(REQUESTS)} is still ${BEFORE}. ` +
       `This policy keeps every error and ${KEEP_PCT}% of the rest, so the shares differ, and the dashboard shows what the connector counted.`,
   },
   {
     key: 'errors-undercounted',
-    label: `The error count is flat because the sampler keeps only ${KEEP_PCT}% of errors, so the real count is higher and the ratio on the dashboard is wrong too`,
+    label: `The error count is flat because <code>tail_sampling</code> keeps only ${KEEP_PCT}% of errors, so the real count is higher and the ratio on the dashboard is wrong too`,
     why: `The <code>status_code</code> policy keeps every error, so the ${ERRORS} a second is the full count. It is the requests that are missing from the count.`,
   },
 ];

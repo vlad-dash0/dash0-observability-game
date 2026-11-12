@@ -155,12 +155,12 @@ const LINK = [
   },
   {
     key: 'time-only',
-    label: 'Only the clock: the errors, the trace and the deploy all happened around 03:00, and the time lines them up',
+    label: 'Only the clock: the errors, the trace and the deploy all happened around 03:00, and the <code>timestamp</code> lines them up',
     why: 'Time is the most basic form of correlation, and a fragile one: many things happen in the same minute. The trace ID and the resource are what tie these three views to each other exactly.',
   },
   {
     key: 'message-text',
-    label: 'The message text: the same words appear in the log, the trace and the deploy notes, and a text search lines them up',
+    label: 'The message text: the same words appear in the log <code>body</code>, the trace and the deploy notes, and a text search lines them up',
     why: 'Words in a message are not a link. A record is tied to a trace through its TraceId field, and to a producer through its Resource.',
   },
 ];

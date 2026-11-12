@@ -116,7 +116,7 @@ const CONFIG = {
 const EXTENSION = [
   {
     key: 'in-pipeline',
-    label: 'It is not listed in a pipeline, next to the receivers',
+    label: 'It is not listed in a pipeline under <code>service.pipelines</code>, next to the receivers',
     why: 'Extensions are not part of a pipeline: they sit beside the data path. A pipeline lists receivers, processors and exporters (and connectors), not extensions.',
   },
   {
@@ -127,7 +127,7 @@ const EXTENSION = [
   },
   {
     key: 'start-order',
-    label: 'Extensions start only after the exporters, and the Collector has not finished starting',
+    label: 'Extensions start only after the <code>otlp_grpc</code> exporter, and the Collector has not finished starting',
     why: 'An extension that is listed under <code>service.extensions</code> starts with the Collector. Nothing about the order of components keeps it from answering.',
   },
 ];
