@@ -1440,10 +1440,11 @@ test('a level with widgets opens its card the first time, focused; one without h
   s.game.closeOverlay();
   s.focused.length = 0;
   const none = cardGame();
+  const noneFocus = recordFocus(none.dom.window);
   assert.equal(none.game.openLevel('x'), true);
   assert.equal(none.game.howToOpen, false);
   assert.deepEqual(none.game.howTo.topics, []);
-  assert.deepEqual(none.focused, ['#ov-back']);
+  assert.deepEqual(noneFocus.names(), ['#ov-back'], 'a step with no control in its body: Back (focusFirst fallback)');
   assert.equal(none.game.toggleHowTo(), false, 'no card to toggle');
   assert.equal(none.game.howToOpen, false);
 });
@@ -1662,10 +1663,12 @@ test('a first step on a hidden type leaves the guide closed, focus on Back, the 
   const s = setup({ registry: REG, initial: { [HELP_KEY]: '{"v":1,"hidden":["sort"]}' } });
   s.focused = [];
   s.game.focusSoon = (sel) => s.focused.push(sel);
+  const focus = recordFocus(s.dom.window);
   s.game.openLevel('r');
   assert.equal(s.game.howToOpen, false, 'choice (the first declared) is new, but the first step is the hidden sort');
   assert.deepEqual(s.game.howToTopics().map((t) => t.key), ['sort']);
-  assert.deepEqual(s.focused, ['#ov-back']);
+  assert.deepEqual(s.focused, [], 'no how-to title focus');
+  assert.deepEqual(focus.names(), ['#ov-back'], 'the step has no control: Back');
 });
 
 test('a stale or unknown widget report changes nothing', () => {
@@ -1911,8 +1914,8 @@ test('index.html: each element the game focuses on opening a level and the rewar
   assert.equal(game.openLevel('x'), true);
   ctxs.x.finish({ text: 'whatever text here' });
   assert.equal(game.rewardOpen, true);
-  assert.deepEqual(focused, ['#ov-back', '#reward-continue'], 'the back button on open, the primary Continue on finish');
-  for (const sel of [...focused, '#reward-close', '#ov-howto-title', '#ov-howto-open']) {
+  assert.deepEqual(focused, ['#reward-continue'], 'the primary Continue on finish');
+  for (const sel of [...focused, '#ov-back', '#reward-close', '#ov-howto-title', '#ov-howto-open']) {
     assert.equal(shell.querySelectorAll(sel).length, 1, `${sel} matches one element in index.html`);
   }
 });
@@ -1939,9 +1942,22 @@ test('opening a level with no help card puts focus on Back, even when its widget
   const { game, dom } = setup({ registry });
   const focus = recordFocus(dom.window);
   assert.equal(game.openLevel('sp'), true);
-  assert.deepEqual(focus.names(), ['line:s1', '#ov-back'], 'the widget focuses its first line on mount, then the app moves focus to Back');
-  assert.equal(focus.last(), '#ov-back', 'Back holds focus, not the first Spot line');
+  assert.deepEqual(focus.names(), ['line:s1', 'line:s1'], 'the widget focuses its first line on mount, then the app focuses the first control through focusFirst: the same line');
+  assert.equal(focus.last(), 'line:s1', 'the first control holds focus, not Back (#353)');
   assert.equal(dom.document.querySelectorAll('[data-line]').length, 2, 'the Spot board did mount');
+});
+
+test('opening a level focuses the first step\'s first control, Back only when it has none (#353)', () => {
+  const REG1 = buildRegistry(
+    [{ id: 'a0', no: 0, name: 'A', levels: [L('c', '0.1', {
+      run(ctx) { ctx.renderStep('<p>c</p><button id="first-ctl">One</button><button>Two</button>', '<button data-finish disabled>Finish</button>'); },
+    })], boss: null }],
+    { deck: [], nodeIds: [] },
+  );
+  const { game, dom } = setup({ registry: REG1 });
+  const focus = recordFocus(dom.window);
+  assert.equal(game.openLevel('c'), true);
+  assert.deepEqual(focus.names(), ['#first-ctl']);
 });
 
 test('index.html: the level overlay elements live inside an x-ignore wrapper', () => {

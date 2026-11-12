@@ -80,9 +80,10 @@
 .wf-tid { border: 1px solid var(--color-border); border-radius: 4px; padding: 0 5px; }
 .wf-tid[data-tint="0"] { background: var(--color-trace-0); border-color: var(--color-trace-0-edge); color: var(--color-text); }
 .wf-tid[data-tint="1"] { background: var(--color-trace-1); border-color: var(--color-trace-1-edge); color: var(--color-text); }
-.wf-cmp { color: var(--color-text); border: 1px dashed var(--color-parent); border-radius: 4px; padding: 0 5px; }
-.wf-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+/* The tags a pick adds (selected, its parent, other trace) straddle the row's top edge at the right, out of flow, in the gap the rows leave above their text, so none can change a row's height (#353). */
+.wf-tags { position: absolute; top: -10px; right: 6px; z-index: 1; display: inline-flex; gap: 4px; pointer-events: none; }
 .wf-tag { font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em; padding: 0 6px; border-radius: 999px; border: 1px solid var(--color-border); color: var(--color-text-muted); white-space: nowrap; }
+.wf-tags .wf-tag { background: var(--color-bg); } /* opaque, so the row border behind it does not strike through the text */
 .wf-tag[data-tag="sel"] { color: var(--color-text); border-color: var(--color-text); }
 .wf-tag[data-tag="par"] { color: var(--color-parent); border-color: var(--color-parent); }
 .wf-tag[data-tag="wait"] { border-style: dashed; }
