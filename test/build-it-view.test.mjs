@@ -1472,16 +1472,17 @@ test('#353 a finished Build it board has no empty bordered panel', () => {
   assert.equal(q('[data-build-panel]').textContent.trim(), '');
 });
 
-test('#353 picking a span fills slots the rows already have, so no row changes height', () => {
+test('#353 picking a span adds only a tag to the rows, taken out of the flow so no row changes height', () => {
   const { mount } = setup(withHelps({ ...ALL, queue: false }));
   mount();
+  const css = readFileSync(new URL('../styles/widgets.css', import.meta.url), 'utf8');
+  assert.match(css, /\.wf-tags \{[^}]*position: absolute/, 'the tag slot is out of flow');
   const rows = qa('[data-span]');
-  assert.equal(rows.every((r) => r.querySelector('[data-cmp]').hasAttribute('data-reserve') && r.querySelector('[data-cmp]').hidden && r.querySelector('[data-cmp]').textContent.startsWith('moving: ')), true, 'each row holds a hidden, sized "moving" slot');
-  assert.equal(rows.every((r) => r.querySelector('[data-tags]').hasAttribute('data-reserve')), true, 'and a tag slot with reserved room');
+  assert.equal(rows.every((r) => r.querySelector('[data-tags]').textContent === ''), true, 'idle rows carry no tag text');
   click(`[data-span="${B}"]`);
-  const same = qa('[data-span]');
-  assert.equal(same.length, rows.length);
-  for (const r of same) assert.equal(r.querySelectorAll('[data-cmp]').length, 1, 'the chip fills its slot, no element is added');
+  assert.equal(qa('[data-span]').every((r) => r.querySelector('[data-cmp]') === null), true, 'no "moving: trace" chip');
+  assert.equal(q(`[data-span="${B}"] [data-tags]`).textContent, 'selected');
+  assert.equal(qa('[data-span]').length, rows.length);
 });
 
 test('#339 a Build it board says Check only when it renders a Check button (one source for both)', async () => {
