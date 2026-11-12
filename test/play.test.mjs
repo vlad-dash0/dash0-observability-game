@@ -13,6 +13,7 @@ import { RESERVED, runPlay, STEP_TYPES, validatePlay } from '../lib/play.mjs';
 import { buildRegistry, RegistryError, validateRegistry } from '../lib/registry.mjs';
 import { liveRegistry } from '../app.mjs';
 import { playFixture, FIXTURE_CARD } from './fixtures/play-level.mjs';
+import { buildReason } from '../lib/widgets/build-it-help.mjs';
 import { logsSpec } from './fixtures/build-logs.mjs';
 
 const NOW = 1767225600000;
@@ -58,7 +59,7 @@ function playAll(level, during = () => {}, run = start(level)) {
 
 /** The exact stem of each step type's reason (the sentence is "<stem> to continue." or "... to finish the level."). */
 const REASONS = {
-  choice: 'Pick the right answer', sort: 'Sort every item', build: 'Solve the board and press Check', incident: 'Find the cause',
+  choice: 'Pick the right answer', sort: 'Sort every item', build: buildReason, incident: 'Name the cause',
   spot: 'Pick every line that matches and press Check', tradeoff: 'Pick a plan that fits and press Check',
   query: 'Run a query that passes', configure: 'Fix the config and press Check',
 };
@@ -109,7 +110,7 @@ for (const level of LEVELS) {
       const why = btn.nextElementSibling;
       assert.equal(why?.className, 'ui-reason', `step ${i + 1}: the reason follows the button`);
       assert.equal(why.id, `${btn.id}-why`);
-      assert.equal(why.textContent, `${REASONS[entry.key]} to ${i === last ? 'finish the level' : 'continue'}.`);
+      assert.equal(why.textContent, `${typeof REASONS[entry.key] === 'function' ? REASONS[entry.key](entry.spec) : REASONS[entry.key]} to ${i === last ? 'finish the level' : 'continue'}.`);
     });
     ran += 1;
   });
@@ -631,4 +632,19 @@ test('#156 a sort step may declare its helps and a hint; a typo is named with a 
     ['step 2 (sort "fx-sort"): unknown key "hnit" on spec (did you mean "hint"?)']);
   assert.deepEqual(problems((p) => { p.steps[1].sort.helps = { hints: 'yes' }; }), ['step 2 (sort "fx-sort"): helps: "hints" is not true or false']);
   assert.deepEqual(problems((p) => { p.steps[1].sort.hint = 'Never shown.'; }), ['step 2 (sort "fx-sort"): hint: shown only when helps.hints is on']);
+});
+
+test('#339 a hand-written Build it step with instant feedback does not promise a Check button', () => {
+  for (const id of ['span-kinds', 'spans-and-traces']) {
+    const src = readFileSync(new URL(`../levels/${id}.mjs`, import.meta.url), 'utf8');
+    assert.equal(/press Check/.test(src), false, `${id} names no Check`);
+    assert.match(src, /buildReason\(/);
+  }
+});
+
+test('#339 the solved side column drops the star rule and the hint tools so the win card fits under the cap', () => {
+  const css = readFileSync(new URL('../styles/kit.css', import.meta.url), 'utf8');
+  assert.match(css, /\.ui-side\[data-solved\] :is\(\.ui-score-rule, \.ui-hints\) \{ display: none; \}/);
+  const help = readFileSync(new URL('../lib/widgets/help-ladder.mjs', import.meta.url), 'utf8');
+  assert.match(help, /setAttribute\('data-solved'/);
 });

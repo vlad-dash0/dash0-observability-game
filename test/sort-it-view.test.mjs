@@ -1157,7 +1157,7 @@ test('#323 after a placement focus does not scroll (the one reveal does); pickin
   const { focus, mount } = setup();
   mount();
   click('[data-item="i2"]');
-  assert.equal(focus.prevented().at(-1), false, 'select: plain focus');
+  assert.equal(focus.prevented().at(-1), true, 'select: a pick never jumps the page (#339)');
   click('[data-bucket="metric"]');
   assert.equal(focus.last(), 'bucket:log');
   assert.equal(focus.prevented().at(-1), true, 'wrong: no focus scroll');
@@ -1208,4 +1208,31 @@ test('#332 the feedback for a label that carries its own quotes has one pair', (
   mount();
   sortTo('i2', 'metric');
   assert.equal(feedback(), 'Not quite. "Payment declined by provider" does not go in "Metric". Not a number.');
+});
+
+test('#339 picking an item and the prompt after it never scroll; a wrong placement and a right one do', () => {
+  const { mount } = setup();
+  mount();
+  const calls = spyScroll();
+  click('[data-item="i2"]');
+  assert.deepEqual(calls, [], 'a pick does not scroll');
+  click('[data-bucket="metric"]');
+  assert.equal(calls.length, 1, 'a wrong placement scrolls');
+  click('[data-bucket="log"]');
+  assert.equal(calls.length, 2, 'a right one scrolls');
+});
+
+test('#339 Escape with an item picked clears the pick and is handled; with none it is left to the app', () => {
+  const { mount } = setup();
+  mount();
+  const esc = () => {
+    const e = { key: 'Escape', defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
+    q('[data-sort]').onkeydown(e);
+    return e.defaultPrevented;
+  };
+  assert.equal(esc(), false, 'nothing picked');
+  click('[data-item="i2"]');
+  assert.equal(q('[data-item="i2"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(esc(), true);
+  assert.equal(q('[data-item="i2"]').getAttribute('aria-pressed'), 'false');
 });
