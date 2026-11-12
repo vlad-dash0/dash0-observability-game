@@ -57,7 +57,7 @@ const SORT = {
       bucket: 'contrib-k8s',
       why: 'It is in the contrib distribution and in k8s, which is made for running in a cluster, but not core.',
       whyNot: {
-        'all-three': 'The core distribution does not ship it. Its Distributions row lists contrib and k8s only.',
+        'all-three': 'One of the three does not ship it. Its Distributions row lists only the other two.',
         'contrib-only': 'The k8s distribution is for monitoring Kubernetes, and enriching telemetry with pod metadata is what it is for, so it ships it too.',
         none: 'Two of the pre-built distributions ship it, so no custom build is needed.',
       },
@@ -68,9 +68,9 @@ const SORT = {
       bucket: 'all-three',
       why: 'It is part of the core distribution, so it is in contrib and k8s as well.',
       whyNot: {
-        'contrib-k8s': 'It is in core too, so it is not limited to contrib and k8s.',
-        'contrib-only': 'It is in core and k8s as well as contrib.',
-        none: 'The pre-built distributions ship it, core included.',
+        'contrib-k8s': 'A third distribution ships it too, so the pair is not the whole list.',
+        'contrib-only': 'More than one distribution ships it, so it is not exclusive to a single one.',
+        none: 'The pre-built distributions ship it, so no custom build is needed.',
       },
     },
     {
@@ -81,7 +81,7 @@ const SORT = {
       whyNot: {
         'all-three': 'The core distribution has a short exporter list (otlp_grpc, debug, file and a few more), and this is not on it.',
         'contrib-k8s': 'The k8s distribution ships a short list of exporters (otlp_grpc, otlp_http, otelarrow, load_balancing, nop, debug and file), so a vendor exporter is not in it.',
-        none: 'The contrib distribution ships it, so it is not a custom build.',
+        none: 'A pre-built distribution ships it, so it is not a custom build.',
       },
     },
     {
@@ -90,9 +90,9 @@ const SORT = {
       bucket: 'all-three',
       why: 'It is part of the core distribution, so it is in contrib and k8s as well.',
       whyNot: {
-        'contrib-k8s': 'It is in core too, so it is not limited to contrib and k8s.',
-        'contrib-only': 'It is in core and k8s as well as contrib.',
-        none: 'The pre-built distributions ship it, core included.',
+        'contrib-k8s': 'A third distribution ships it too, so the pair is not the whole list.',
+        'contrib-only': 'More than one distribution ships it, so it is not exclusive to a single one.',
+        none: 'The pre-built distributions ship it, so no custom build is needed.',
       },
     },
     {
@@ -101,8 +101,8 @@ const SORT = {
       bucket: 'contrib-k8s',
       why: 'It is in contrib and k8s, but not core: the processor that masks PII is not in the core distribution.',
       whyNot: {
-        'all-three': 'The core distribution does not ship it. Its Distributions row lists contrib and k8s.',
-        'contrib-only': 'The k8s distribution ships it too, so it is not contrib only.',
+        'all-three': 'One of the three does not ship it. Its Distributions row lists only the other two.',
+        'contrib-only': 'The k8s distribution ships it too, so it is not exclusive to a single distribution.',
         none: 'Two of the pre-built distributions ship it, so no custom build is needed.',
       },
     },
@@ -112,7 +112,7 @@ const SORT = {
       bucket: 'none',
       why: 'No pre-built distribution can contain a component the project has never heard of. To run it, build a distribution with OCB that includes it.',
       whyNot: {
-        'all-three': 'The project builds these distributions from its own repositories. A component your team wrote is not in them.',
+        'all-three': 'The project builds these distributions from its own repositories. A component your team wrote is never part of those builds.',
         'contrib-k8s': 'The k8s distribution only includes components from core and contrib, and this is in neither.',
         'contrib-only': 'The contrib distribution only includes components from the Collector repositories, and this is in neither.',
       },
@@ -123,8 +123,8 @@ const SORT = {
       bucket: 'contrib-k8s',
       why: 'It is in contrib and k8s, but not core.',
       whyNot: {
-        'all-three': 'The core distribution does not ship it. Its Distributions row lists contrib and k8s.',
-        'contrib-only': 'The k8s distribution ships it too, so it is not contrib only.',
+        'all-three': 'One of the three does not ship it. Its Distributions row lists only the other two.',
+        'contrib-only': 'The k8s distribution ships it too, so it is not exclusive to a single distribution.',
         none: 'Two of the pre-built distributions ship it, so no custom build is needed.',
       },
     },
@@ -134,9 +134,9 @@ const SORT = {
       bucket: 'all-three',
       why: 'The OTLP exporter is in core, so contrib and k8s have it too (the otlp distribution ships it as well).',
       whyNot: {
-        'contrib-k8s': 'It is in core too, so it is not limited to contrib and k8s.',
-        'contrib-only': 'It is in core and k8s as well as contrib.',
-        none: 'The pre-built distributions ship it, core included.',
+        'contrib-k8s': 'A third distribution ships it too, so the pair is not the whole list.',
+        'contrib-only': 'More than one distribution ships it, so it is not exclusive to a single one.',
+        none: 'The pre-built distributions ship it, so no custom build is needed.',
       },
     },
     {
@@ -147,7 +147,7 @@ const SORT = {
       whyNot: {
         'all-three': 'The core distribution has a short exporter list (otlp_grpc, debug, file and a few more), and this is not on it.',
         'contrib-k8s': 'The k8s distribution ships a short list of exporters (otlp_grpc, otlp_http, otelarrow, load_balancing, nop, debug and file), so a vendor exporter is not in it.',
-        none: 'The contrib distribution ships it, so it is not a custom build.',
+        none: 'A pre-built distribution ships it, so it is not a custom build.',
       },
     },
   ],

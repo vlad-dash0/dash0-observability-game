@@ -79,7 +79,7 @@ const SORT = {
       why: 'Whether a trace has an error is known only once its spans are in. A <code>status_code</code> policy decides on the whole trace and keeps every span of it.',
       whyNot: {
         filter: 'A filter keeps the spans with status Error and drops the healthy spans of the same trace, as in step 1.',
-        both: 'Nothing has to go from inside the kept traces, so the sampler alone does it.',
+        both: 'Every span of a kept trace stays, so there is no span to drop.',
       },
     },
     {
@@ -118,8 +118,8 @@ const SORT = {
       bucket: 'filter',
       why: 'Each log record carries its own severity, so a filter can drop it alone.',
       whyNot: {
-        tail: 'The tail sampling processor works on traces. Log records never pass through it.',
-        both: 'Log records never pass through a tail sampler, so only the filter does anything here.',
+        tail: 'Tail sampling works on traces. Log records never pass through it.',
+        both: 'Log records never pass through a tail sampler, so there is no sampling to do.',
       },
     },
     {
@@ -139,7 +139,7 @@ const SORT = {
       why: 'The environment (<code>deployment.environment.name</code>) is a resource attribute, so every span from the load test carries it. Dropping span by span drops those traces whole anyway.',
       whyNot: {
         tail: 'It would work, but every span already says where it came from, so holding each trace for the decision wait buys nothing.',
-        both: 'One attribute on every span decides it, so the filter alone is enough.',
+        both: 'One attribute on every span decides it, so a sampler adds nothing.',
       },
     },
     {
@@ -149,7 +149,7 @@ const SORT = {
       why: 'Only the payments spans name payments, so the decision needs the whole trace: a <code>string_attribute</code> policy on <code>service.name</code> keeps the whole trace when one of its spans matches.',
       whyNot: {
         filter: 'A filter on <code>service.name</code> keeps the payments spans and drops the storefront and checkout spans of the same trace.',
-        both: 'Nothing has to go from inside the kept traces, so the sampler alone does it.',
+        both: 'Every span of a kept trace stays, so there is no span to drop.',
       },
     },
     {
