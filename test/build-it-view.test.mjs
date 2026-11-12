@@ -511,6 +511,21 @@ test('Reset puts the board back but keeps what was paid', () => {
   assert.equal(status(), 'Reset. The first span is placed; the rest arrive one at a time.');
 });
 
+test('#351 Reset clears the failed Check verdict but still replies in the status line', () => {
+  const { mount } = setup(withHelps(CHECK));
+  mount();
+  pick(B, A);
+  click('#b1-check');
+  assert.equal(q('#b1-feedback').hasAttribute('hidden'), false, 'the verdict is showing');
+  const calls = spyScrolls();
+  click('#b1-reset');
+  assert.equal(q('#b1-feedback').hasAttribute('hidden'), true, 'the verdict is gone with the board it described');
+  assert.equal(feedback(), '');
+  assert.equal(status(), 'Reset: every span is as it arrived.');
+  assert.equal(tone(), 'neutral');
+  assert.equal(calls.length, 1, 'the reset reply still scrolls into view');
+});
+
 // ---- hints -----------------------------------------------------------------------------
 
 test('hint tiers: each costs one ctx.hint(); tier 2 outlines two candidates, tier 3 places the span with a reason and no mistake', () => {
