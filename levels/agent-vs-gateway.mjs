@@ -23,7 +23,7 @@
 const PATTERN = [
   {
     key: 'agent',
-    label: 'A Collector next to the workload: a sidecar, or a <code>DaemonSet</code> pod on each node that the apps on that node send to',
+    label: 'A Collector next to the workload: a sidecar, or a <code>DaemonSet</code> pod on each node that the apps on that node send to, one endpoint per node',
     why: 'That is the agent pattern. An agent runs close to the application or on the same host, takes its telemetry and forwards it to a backend or to a gateway.',
   },
   {
@@ -34,7 +34,7 @@ const PATTERN = [
   },
   {
     key: 'embedded',
-    label: 'A Collector built into each application\'s process, so no separate Collector runs',
+    label: 'A Collector built into each application\'s process, with no separate Collector process to run',
     why: 'Neither deployment pattern is a Collector inside the application. The application\'s SDK sends OTLP to a Collector that runs beside it (an agent) or to a central one (a gateway).',
   },
 ];
@@ -133,7 +133,7 @@ const KEY = [
   },
   {
     key: 'service',
-    label: '<code>routing_key: service</code>: every span of a service goes to the same replica',
+    label: '<code>routing_key: service</code>: every span of one service goes to the same gateway replica',
     why: 'That keeps a service together, which suits something like the span metrics connector. A trace crosses services, so its spans still land on different replicas and the trace is split.',
   },
   {

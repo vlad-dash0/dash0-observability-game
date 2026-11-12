@@ -2,6 +2,7 @@
 // Collector, semantic conventions), then picks what a shared library depends on: only
 // the API, a no-op until the application installs an SDK. Spec: docs/M1-DESIGN.md §6 Act 0.
 // Spec: https://opentelemetry.io/docs/concepts/instrumentation/libraries/#opentelemetry-api
+// Docs (package names in the options: `@opentelemetry/sdk-node` and the OTLP HTTP trace exporter `@opentelemetry/exporter-trace-otlp-http`): https://opentelemetry.io/docs/languages/js/getting-started/nodejs/ , https://opentelemetry.io/docs/languages/js/exporters/
 import { actions, finishButton, nextButton, question, step } from '../lib/ui/index.mjs';
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
@@ -57,23 +58,23 @@ const PARTS = {
 const DEPENDS_ON = [
   {
     key: 'sdk',
-    label: 'The SDK (<code>@opentelemetry/sdk-node</code>), so tracing works out of the box',
+    label: 'The SDK (<code>@opentelemetry/sdk-node</code>), which gives the library tracing out of the box',
     why: 'The SDK is the application\'s choice: how to sample, batch and export. A library that brings it makes those choices for all 30 services.',
   },
   {
     key: 'api',
-    label: 'The API (<code>@opentelemetry/api</code>), with no SDK installed by the library',
+    label: 'The API (<code>@opentelemetry/api</code>), with the SDK left for each application to install',
     right: true,
     why: 'Libraries depend only on the OTel API; only the application installs the SDK. Without an SDK, API calls are no-ops: they record nothing and cost almost nothing. Each of the 30 services picks its own SDK.',
   },
   {
     key: 'exporter',
-    label: 'An OTLP exporter (<code>@opentelemetry/exporter-trace-otlp-http</code>), so spans reach a backend',
+    label: 'An OTLP exporter (<code>@opentelemetry/exporter-trace-otlp-http</code>), to send its spans to a backend',
     why: 'Exporting is SDK work, set up by the application. A library that exports on its own decides for all 30 services where their telemetry goes.',
   },
   {
     key: 'collector',
-    label: 'The Collector, bundled with the library, so spans get filtered before export',
+    label: 'A Collector client package, to filter its spans before the library exports them',
     why: 'The Collector is a separate process, not a package a library depends on.',
   },
 ];

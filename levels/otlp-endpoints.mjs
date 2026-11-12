@@ -50,7 +50,7 @@ const SIGNAL = [
   },
   {
     key: 'adds-path',
-    label: 'To <code>http://collector:4318/v1/traces</code>, as it does for the general variable',
+    label: 'To <code>http://collector:4318/v1/traces</code>, as it does for the general endpoint variable',
     why: 'The exporter adds <code>/v1/traces</code> only for the general variable, <code>OTEL_EXPORTER_OTLP_ENDPOINT</code>. A per-signal variable takes precedence over it and its URL is used without any change.',
   },
   {
@@ -127,12 +127,12 @@ const TOKEN = [
   },
   {
     key: 'url',
-    label: 'In the endpoint URL, as a query parameter on the address the exporter sends to',
+    label: 'In the endpoint URL, as a query parameter appended to the address the exporter sends every batch to',
     why: 'The endpoint is only an address. Dash0 reads the token from the <code>Authorization</code> header, and a token in a URL tends to end up in logs and config files.',
   },
   {
     key: 'resource',
-    label: 'As a resource attribute on the service\'s Resource, so it travels with every batch',
+    label: 'As a resource attribute on the service\'s Resource, and it travels with every batch of telemetry',
     why: 'Resource attributes describe what produces the telemetry and travel with it as data, so the token would be sent along with every batch. Authentication is a header on the request, not part of the data.',
   },
 ];

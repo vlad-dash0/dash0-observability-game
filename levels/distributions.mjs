@@ -157,7 +157,7 @@ const SORT = {
 const BUILD = [
   {
     key: 'contrib-config',
-    label: 'Run the contrib distribution and list <code>acme_scrubber</code> in the config: contrib ships every component, so it is already there',
+    label: 'Run the contrib distribution and list <code>acme_scrubber</code> in the config: contrib ships every component, and it is already there',
     why: 'The contrib distribution holds the components of the Collector repositories, not every component that exists. A config can only enable what is compiled in, and your processor is not.',
   },
   {

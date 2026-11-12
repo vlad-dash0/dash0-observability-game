@@ -117,7 +117,7 @@ const POD = [
 const DASH0 = [
   {
     key: 'by-hand',
-    label: 'From a list you register in Dash0 by hand, one entry per pod and host',
+    label: 'From a list you register in Dash0 by hand, one entry per pod and host, kept up to date as pods change',
     why: 'Nothing to register: what Dash0 lists comes from the telemetry itself, and the names and types in its Resources table are derived from OpenTelemetry attributes.',
   },
   {
@@ -128,7 +128,7 @@ const DASH0 = [
   },
   {
     key: 'span-attributes',
-    label: 'From whichever span attribute happens to hold a pod or host name',
+    label: 'From whichever span attribute happens to hold a pod or host name, read from the spans you send',
     why: 'A span attribute describes one span. The identity of the thing that produced the telemetry is what the Resource is for, and that is what Dash0 reads.',
   },
 ];

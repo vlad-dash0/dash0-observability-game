@@ -105,6 +105,9 @@ test('noteFor: several missing links on one span read as one line with a count',
   const line = (n) => text(noteFor(all, st, { code: 'missing-link', spanId: E, count: n }, escapeHtml));
   assert.equal(line(1), 'GET /products (storefront): it should also point at a related span that is not its parent.');
   assert.equal(line(3), 'GET /products (storefront): it should also point at 3 related spans that are not its parent.');
+  const extra = (n) => text(noteFor(all, st, { code: 'extra-link', spanId: E, count: n }, escapeHtml));
+  assert.equal(extra(1), 'GET /products (storefront): one of its links points at a span it is not related to.');
+  assert.equal(extra(5), 'GET /products (storefront): 5 of its links point at spans it is not related to.');
 });
 
 test('a specific note per logs-mode code, from the chosen span, never the expected one', () => {

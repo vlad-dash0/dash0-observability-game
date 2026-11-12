@@ -184,17 +184,17 @@ const FIX = [
   },
   {
     key: 'export-less',
-    label: 'Export metrics every 5 minutes instead of every minute, so the volume drops to a fifth',
+    label: 'Export metrics every 5 minutes instead of every minute, to cut the number of series to a fifth',
     why: `The number of series is the number of unique attribute combinations, not how often they are sent. Exporting every 5 minutes sends one point in five for every metric alike, the ${SERIES_BEFORE} useful series included, and leaves all ${n(SERIES_AFTER)} series, the user_id label and the query load of that many series in place. It also makes every graph coarser.`,
   },
   {
     key: 'cap-and-keep',
-    label: 'Set a cardinality limit in the SDK and keep the label, so the series stop at the limit',
+    label: 'Set a cardinality limit in the SDK and keep the label, to stop the series at the limit',
     why: 'The specification says SDKs SHOULD support a cardinality limit, with a default of 2000 per metric that SHOULD be used when none is set, and measurements past it are folded into one point marked otel.metric.overflow. That bounds the volume, but the label stays useless: the user ids seen first keep their series and every other user, and any bounded combination not yet seen, lands in the one overflow point, so a per-user answer is wrong. A limit is a safety net for a mistake, not a design.',
   },
   {
     key: 'spam-flag',
-    label: 'Flag <code>checkout_attempts_total</code> as spam in Dash0 so it is dropped at ingestion',
+    label: 'Flag <code>checkout_attempts_total</code> as spam in Dash0, to drop it at ingestion',
     why: 'A spam filter drops the data points that match its criteria before they are stored, and what it drops cannot be recovered. It does not remove one label and keep the rest: the counter checkout needs, with its 228 useful series, would be dropped along with the new ones, and the filter reduces what Dash0 indexes, not what the service sends. The label is the thing to remove.',
   },
 ];

@@ -75,7 +75,7 @@ const SPOT = {
 const WHY = [
   {
     key: 'errors-only',
-    label: 'SDKs only keep exemplars for slow or failing requests, so ordinary points have none',
+    label: 'SDKs only keep exemplars for slow or failing requests, and ordinary points have none',
     why: 'The filters an SDK has to support are AlwaysOn, AlwaysOff and TraceBased, and none of them looks at errors or at how slow a measurement is. The first exemplar on the list is an ordinary 0.28 s charge, and a spike point has none.',
   },
   {
@@ -86,7 +86,7 @@ const WHY = [
   },
   {
     key: 'backend-dropped',
-    label: 'The backend dropped the exemplars after the points arrived, to keep the metric small',
+    label: 'The backend dropped the exemplars after the points arrived, to keep the metric small and cheap',
     why: 'Exemplars are chosen in the SDK while measurements are recorded: the filter decides which measurements are eligible and the reservoir which are kept, and the kept ones leave the SDK in the metric data point. A point that left the SDK with none has none to lose.',
   },
 ];

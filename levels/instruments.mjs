@@ -105,7 +105,7 @@ const ASYNC = [
   },
   {
     key: 'async-gauge',
-    label: 'An asynchronous Gauge: register a callback that reads the heap size when the SDK collects',
+    label: 'An asynchronous Gauge: register a callback that reads the current heap size in use when the SDK collects',
     why: 'The callback part is right, but a Gauge is for values that make no sense to add up. Heap sizes from several processes add up to the total heap in use, so the API points additive values to an asynchronous UpDownCounter.',
   },
 ];
@@ -119,13 +119,13 @@ const GAUGE = [
   },
   {
     key: 'sampled-not-sum',
-    label: 'The meaning: the backend sees sampled values, so rate math built for counts does not apply',
+    label: 'The meaning: the backend sees sampled values, and rate math built for counts does not apply',
     right: true,
     why: 'A gauge point is a sampled value with no aggregation semantic. A monotonic Sum also carries a start time, which lets a backend compute a rate that notices restarts, and a sum can be added across series. Report orders with a Counter and call <code>add(1)</code> per order.',
   },
   {
     key: 'lost-between',
-    label: 'Orders: a gauge keeps one value per interval, so orders between two samples are lost',
+    label: 'Orders: a gauge keeps one value per interval, and orders between two samples are lost',
     why: 'Nothing is lost that way: the value recorded is the running total, so the last sample still includes every earlier order. What the gauge lacks is meaning, not data.',
   },
 ];

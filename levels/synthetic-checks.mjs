@@ -79,7 +79,7 @@ const SORT = {
       bucket: 'spans',
       why: 'The requests arrive and run, slowly, and the trace shows 30 client spans under one server span.',
       whyNot: {
-        probe: 'The requests arrive and run, so the trace shows 30 client spans under one server span.',
+        probe: 'The slowness is inside your service, after each request has arrived, and the 30 client spans are where it shows.',
       },
     },
     {
@@ -115,7 +115,7 @@ const SORT = {
       bucket: 'spans',
       why: 'The requests reach the new code, which fails them, so each one becomes a server span with an error status.',
       whyNot: {
-        probe: 'The requests reach the new code, which fails them, so each one becomes a server span with an error status.',
+        probe: 'Your own code returns the 500s after the requests get in, so the error status is already on your server spans.',
       },
     },
     {

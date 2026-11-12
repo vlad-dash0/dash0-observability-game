@@ -35,7 +35,7 @@ const RENAME = [
   },
   {
     key: 'delete-then-set',
-    label: 'Two statements, the other way round: <code>delete_key</code> the old key, then <code>set</code> the new key from it',
+    label: 'Two statements, the other way round: <code>delete_key</code> the old key, then <code>set</code> the new key from the old value',
     why: 'Statements run in the order listed. After the delete there is nothing left to copy, so the value is lost.',
   },
 ];
@@ -176,7 +176,7 @@ const BACKEND = [
   },
   {
     key: 'spam-drop-all',
-    label: 'Add a spam filter for those spans: they are dropped, so nothing about the customer is kept, and dropped data costs nothing',
+    label: 'Add a spam filter for those spans: they are dropped, and nothing about the customer is kept, and dropped data costs nothing',
     why: 'The spans have already reached Dash0, and filtered telemetry still passes through ingest and carries the ingest charge: a spam filter reduces what is stored, not what you send. It also drops the whole span, not only the email.',
   },
 ];

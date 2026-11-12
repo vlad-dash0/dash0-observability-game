@@ -194,7 +194,7 @@ const DASH0 = [
   },
   {
     key: 'spam-free',
-    label: 'Add a spam filter on the metric: dropped data is free, so the volume stops costing anything',
+    label: 'Add a spam filter on the metric: dropped data is free, and the ingest volume stops costing anything at all',
     why: 'Dropped data is not stored, but it still passes through SignalControl and carries the ingest charge. A spam filter reduces what is stored, not what you send.',
   },
   {

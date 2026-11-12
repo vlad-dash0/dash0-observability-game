@@ -56,7 +56,7 @@ const WHY = [
   },
   {
     key: 'any-position',
-    label: 'It does not matter: it only watches memory, so it works anywhere in the processor list',
+    label: 'It does not matter: it only watches memory, and works anywhere in the processor list',
     why: 'It watches memory, but it can only refuse what passes through it. Placed after other processors, those handle and may hold the data first, which makes it likelier that data is dropped when the limiter triggers.',
   },
 ];
@@ -65,7 +65,7 @@ const WHY = [
 const BATCH = [
   {
     key: 'early',
-    label: 'Early, right after memory_limiter, so everything after it handles fewer, bigger batches',
+    label: 'Early, right after memory_limiter in the list, so everything after it handles fewer, bigger batches',
     why: 'Batching before the processors that drop or change data batches telemetry that may be discarded or changed straight afterwards. It also clears the request context, which a processor like k8sattributes reads.',
   },
   {

@@ -72,7 +72,7 @@ const BUILD = {
 const WHY = [
   {
     key: 'stripped',
-    label: 'Something in the pipeline stripped them: OpenTelemetry stamps a trace ID on every log record',
+    label: 'Something in the pipeline stripped them: OpenTelemetry stamps a trace ID on every log record it exports',
     why: 'It does not. A record carries ids only when it was emitted with a context that holds a span. Outside any span there is nothing to stamp, so there is nothing to strip.',
   },
   {
@@ -83,7 +83,7 @@ const WHY = [
   },
   {
     key: 'errors-only',
-    label: 'Only records at ERROR or above get trace IDs, so these records have none',
+    label: 'Only records at ERROR or above get trace IDs, and these records have none',
     why: 'Severity plays no part. The ids come from the context at the moment of the call, so an INFO or DEBUG record written inside a span carries them, and an ERROR written outside one does not.',
   },
 ];
@@ -92,7 +92,7 @@ const WHY = [
 const FIX = [
   {
     key: 'zeros',
-    label: 'Fill the two fields with all-zero values in the log appender, so they are never empty',
+    label: 'Fill the two fields with all-zero values in the log appender, to keep them from being empty',
     why: 'All zeros is the invalid value: W3C Trace Context treats an all-zero trace ID and an all-zero span id as invalid. A record of zeros links to nothing, and it hides that the context is missing.',
   },
   {
@@ -103,7 +103,7 @@ const FIX = [
   },
   {
     key: 'in-message',
-    label: 'Write the trace ID and span ID into the message text of every log call by hand',
+    label: 'Write the trace ID and span ID into the message text of every log call by hand and search the text for them',
     why: 'A backend links records through the TraceId and SpanId fields of the record, or for non-OTLP logs through recognised attribute names. Text inside the Body is neither, so the record stays unlinked.',
   },
 ];
@@ -112,7 +112,7 @@ const FIX = [
 const DASH0 = [
   {
     key: 'by-time',
-    label: 'Yes: by default the tab lists every log from the same service around the same time, so the record shows up',
+    label: 'Yes: by default the tab lists every log from the same service around the same time, and the record shows up in the list',
     why: 'By default the tab lists the logs and span events of the same trace as the span. Listing by resource, within 30 minutes of the span, is a mode you switch to.',
   },
   {
@@ -123,7 +123,7 @@ const DASH0 = [
   },
   {
     key: 'by-text',
-    label: 'Yes: Dash0 reads the trace ID out of the message text, so the record joins the span\'s trace',
+    label: 'Yes: Dash0 reads the trace ID out of the message text, and the record joins the span\'s trace',
     why: 'Dash0 takes the ids from the TraceId and SpanId fields of an OTLP record or, for other paths, from recognised attribute names such as <code>trace_id</code>. Text in the message is not one of them.',
   },
 ];

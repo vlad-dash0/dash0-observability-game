@@ -788,12 +788,12 @@ test('a recheck with the same links in another order is free', () => {
   click(`[data-link="${C}"]`);
   click('#b1-check');
   assert.equal(counts.mistakes, 1);
-  assert.equal(fbHead('b1'), 'Not quite: 3 problems.');
+  assert.equal(fbHead('b1'), 'Not quite: 2 problems.', 'one missing link, and the two extra links merged into one line');
   click(`[data-link="${B}"]`);
   click(`[data-link="${B}"]`);
   click('#b1-check');
   assert.equal(counts.mistakes, 1, 'links {B, C} added as C then B are the same graded state');
-  assert.equal(fbHead('b1'), 'Same as last time: 3 problems.');
+  assert.equal(fbHead('b1'), 'Same as last time: 2 problems.');
 });
 
 test('V5 a recheck after attaching the same records in another order is free', () => {

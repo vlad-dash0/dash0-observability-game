@@ -89,6 +89,7 @@ test('hintCost follows the star rule: what one more penalty would cost now', () 
   assert.equal(hintCost(5, 4), 'costs 1 penalty');
   assert.equal(hintCost(2, 2), 'costs 1 penalty, no star yet');
   assert.equal(hintCost(3, 1), 'costs 1 penalty');
+  assert.equal(hintCost(1, 1), 'costs 1 penalty, no star left to lose', 'at the 1 star floor no later hint costs a star');
 });
 
 /** The right column on a fresh DOM; its stars come from the board's own counts passed to score(). */

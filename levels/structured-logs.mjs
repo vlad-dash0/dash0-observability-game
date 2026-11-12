@@ -174,7 +174,7 @@ const ATTRS = [
 const SEVERITY = [
   {
     key: 'text',
-    label: 'Filter on <code>SeverityText</code> equal to <code>WARN</code>',
+    label: 'Filter on <code>SeverityText</code> equal to <code>WARN</code> in uppercase',
     why: 'SeverityText is the original string from the source: one library writes <code>WARN</code>, another <code>warning</code>, another <code>Warn</code>. A filter on one spelling misses the others.',
   },
   {
