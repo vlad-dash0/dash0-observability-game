@@ -365,7 +365,16 @@ test('the-pager: when the budget runs out, part 2 opens with a line that says so
   assert.equal(qa('.ui-note').length, 0, 'no budget line after a manual Escalate');
 });
 
-test('the-pager: earlier rows are inset like the text of the feedback box they came from', () => {
+test('#332 the-pager: every answer has one style: an earlier row is a copy of the feedback card, not live, with no id', () => {
+  start();
+  click('[data-look="trace"]');
+  click('[data-look="since"]');
+  const older = q('#pager-said-rows .ui-feedback');
+  assert.ok(older, 'the older row is a kit feedback card');
+  assert.equal(older.getAttribute('data-tone'), 'neutral');
+  assert.deepEqual(['id', 'role', 'aria-live', 'tabindex'].filter((a) => older.hasAttribute(a)), [], 'a copy is not a second live region');
+  assert.equal(older.contains(q('[data-said="trace"]')), true);
+  assert.equal(q('#pager-feedback').contains(q('[data-said="since"]')), true, 'the newest stays in the live region');
   const css = readFileSync(new URL('../styles/widgets.css', import.meta.url), 'utf8');
-  assert.match(css, /\.pager-rows \{[^}]*padding-inline-start: 43px/);
+  assert.doesNotMatch(css, /\.pager-rows \{[^}]*padding-inline-start/, 'no inset: the cards are full width like the newest');
 });

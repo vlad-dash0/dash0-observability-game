@@ -259,24 +259,26 @@ test('the pipeline view is drawn from the checker result alone: names, stages, s
   check('anything: 1');
   assert.deepEqual(qa('#cf-pipelines [data-pipeline]').map((el) => el.getAttribute('data-pipeline')), ['alpha', 'beta']);
   assert.equal(stateOf('alpha'), 'Stalled');
-  assert.equal(stateOf('beta'), 'Flowing');
+  assert.equal(stateOf('beta'), 'Not running', '#332 wired right, but the Collector would not start with alpha broken');
   assert.equal(flowOf('alpha'), 'Receivers: r1 → Processors: p1, p2 (not defined) → Exporters: e1');
   assert.equal(flowOf('beta'), 'Receivers: r2 → Processors: none → Exporters: e2');
   assert.deepEqual(items('#cf-pipelines [data-pipeline="alpha"] [data-part="reasons"] li'), ['service.pipelines.alpha.processors[1]: "p2" is gone']);
   assert.equal(qa('#cf-pipelines [data-pipeline="beta"] [data-part="reasons"]').length, 0);
   assert.equal(q('[data-part="inactive"]').textContent, 'Defined but not used by any pipeline: receivers/zed, exporters/otlp/old');
   assert.equal(pipe('alpha').getAttribute('data-state'), 'stalled');
-  assert.equal(pipe('beta').getAttribute('data-state'), 'flowing');
+  assert.equal(pipe('beta').getAttribute('data-state'), 'blocked');
 });
 
-test('a pipeline with nothing wrong in it is Flowing even when the config has errors elsewhere', () => {
+test('#332 a pipeline with nothing wrong in it reads Not running, not Flowing, when the config has errors elsewhere', () => {
   const doc = { service: { pipelines: { alpha: { receivers: ['r1'], exporters: ['e1'] } } } };
   const verdict = { flowing: false, pipelines: [{ name: 'alpha', flowing: true, reasons: [] }], inactive: [] };
   const err = { kind: 'unknown-key', path: 'zz', message: 'unknown key "zz"', allowed: [] };
   const { mount } = setup(fixture(), { mount: { check: () => ({ ok: false, errors: [err], doc, verdict }) } });
   mount();
   check('x: 1');
-  assert.equal(stateOf('alpha'), 'Flowing');
+  assert.equal(stateOf('alpha'), 'Not running');
+  assert.equal(pipe('alpha').getAttribute('data-state'), 'blocked');
+  assert.equal(pipe('alpha').querySelector('.ui-chip').getAttribute('data-tone'), 'attention');
   assert.equal(q('[data-part="overall"]').textContent, 'The Collector would not start.');
   const none = setup(fixture(), { mount: { check: () => ({ ok: false, errors: [err], doc: {}, verdict: { flowing: false, pipelines: [], inactive: [] } }) } });
   none.mount();
@@ -407,7 +409,7 @@ test('each pipeline carries a chip in words: Flowing for one that flows, Stalled
   assert.equal(pipe('traces').querySelector('.ui-chip').getAttribute('data-tone'), 'error');
   assert.equal(stateOf('traces'), 'Stalled');
   check(REF);
-  assert.equal(pipe('traces').querySelector('.ui-chip').getAttribute('data-tone'), 'neutral');
+  assert.equal(pipe('traces').querySelector('.ui-chip').getAttribute('data-tone'), 'success', '#332 a pipeline that runs is not grey');
   assert.equal(stateOf('traces'), 'Flowing');
   assert.equal(qa('#cf-pipelines [data-pipeline]').length, 1);
 });

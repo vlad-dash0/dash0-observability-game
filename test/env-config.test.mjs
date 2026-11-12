@@ -369,3 +369,12 @@ test('checkConfig: with the SDK disabled, a missing name does not claim what it 
   assert.deepEqual(codes(r), ['sdk-disabled', 'service-name-missing']);
   assert.equal(r.issues[1].message, 'No service name set.');
 });
+
+test('#332 renderIssues shows attribute keys and OTEL variables as code, like the lesson, and keeps the sentence period out of them', () => {
+  const r = checkConfig('OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production,service.name=checkout,service.version=1', WANT);
+  const html = renderIssues(r.issues, escapeHtml);
+  assert.match(html, /<code>deployment\.environment<\/code> is deprecated; use <code>deployment\.environment\.name<\/code>\./);
+  const sdk = renderIssues([{ code: 'sdk-disabled', message: 'OTEL_SDK_DISABLED=true turns the SDK off.' }], escapeHtml);
+  assert.match(sdk, /<code>OTEL_SDK_DISABLED<\/code>=true/);
+  assert.equal(renderIssues([{ code: 'x', message: 'Version 1.5 is fine.' }], escapeHtml).includes('<code>'), false, 'a number is not a key');
+});
