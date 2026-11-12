@@ -18,36 +18,54 @@ const SORT = {
       label: 'The HTTP SERVER spans, one per <code>express</code> route',
       bucket: 'auto',
       why: 'The HTTP server instrumentation starts a span for every request that reaches an Express route, with no code of yours.',
+      whyNot: {
+        manual: 'The HTTP server instrumentation starts these spans for each request. You write no code for it.',
+      },
     },
     {
       id: 'loyalty',
       label: 'INTERNAL spans around <code>applyLoyaltyDiscount()</code> calls',
       bucket: 'manual',
       why: 'Instrumentation knows nothing about your business functions. You start that span yourself with the API. Its span kind defaults to INTERNAL, though instrumentation libraries may emit INTERNAL spans too.',
+      whyNot: {
+        auto: 'Instrumentation knows nothing about <code>applyLoyaltyDiscount()</code>. It is your own function, so no library wraps it for you.',
+      },
     },
     {
       id: 'redis',
       label: 'A span for each Redis command',
       bucket: 'auto',
       why: 'The Redis instrumentation wraps the client and starts a span for each command.',
+      whyNot: {
+        manual: 'The Redis instrumentation wraps the client for you, so you write nothing to get a span per command.',
+      },
     },
     {
       id: 'coupon',
       label: '<code>app.coupon.code</code> on the checkout span',
       bucket: 'manual',
       why: 'Only your code knows which coupon the customer used, so you set that attribute on the span yourself.',
+      whyNot: {
+        auto: 'Instrumentation cannot know which coupon the customer used. That value lives in your code.',
+      },
     },
     {
       id: 'client',
       label: 'Outgoing <code>fetch</code> CLIENT spans',
       bucket: 'auto',
       why: 'The HTTP client instrumentation starts a CLIENT span for each outgoing call, with no code of yours.',
+      whyNot: {
+        manual: 'The HTTP client instrumentation starts a CLIENT span for each outgoing call. You write nothing.',
+      },
     },
     {
       id: 'item-count',
       label: '<code>app.cart.item_count</code>',
       bucket: 'manual',
       why: 'That is a business number only your code can read, so you add it as an attribute yourself.',
+      whyNot: {
+        auto: 'Instrumentation does not know your cart\'s item count. It is a business value only your code reads.',
+      },
     },
   ],
 };

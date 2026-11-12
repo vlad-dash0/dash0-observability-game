@@ -22,30 +22,45 @@ const SORT = {
       label: '<code>experiment.variant=redesign-B</code>',
       bucket: 'ok',
       why: 'An experiment arm is no secret, and every service on the path can use it, for example to tag its own spans with the variant.',
+      whyNot: {
+        never: 'An experiment arm names no person and unlocks nothing. Nothing in it is private or reusable, and downstream services can use it.',
+      },
     },
     {
       id: 'email',
       label: '<code>user.email=ana@example.com</code>',
       bucket: 'never',
       why: 'An email address identifies a person. Baggage goes out in a plain <code>baggage</code> header to every downstream, third-party APIs included, and anyone inspecting the traffic can read it.',
+      whyNot: {
+        ok: 'An email address identifies a person. Baggage goes out in a plain header to every downstream service, third parties too, and anyone watching the traffic can read it.',
+      },
     },
     {
       id: 'tier',
       label: '<code>tenant.tier=gold</code>',
       bucket: 'ok',
       why: 'A coarse tier says nothing about one person, and downstream services can use it, for example to route or prioritise.',
+      whyNot: {
+        never: 'A coarse tier says nothing about one person, and nobody can reuse it. There is nothing here to protect.',
+      },
     },
     {
       id: 'token',
       label: '<code>session.token=eyJhbGciOiJIUzI1NiJ9</code>',
       bucket: 'never',
       why: 'A session token is a credential. Anyone who reads the <code>baggage</code> header, a third party included, could reuse it.',
+      whyNot: {
+        ok: 'A session token is a credential. In a plain header it goes to every downstream service, and anyone who reads it could reuse it.',
+      },
     },
     {
       id: 'last4',
       label: '<code>card.last4=4242</code>',
       bucket: 'never',
       why: 'Even part of a card number is payment data. Baggage can be passed on outside your network by downstream services, so keep it out.',
+      whyNot: {
+        ok: 'Even the last digits are payment data. Baggage can reach services outside your network, so it is a poor place for them.',
+      },
     },
   ],
 };
