@@ -2,6 +2,7 @@
 // Collector, semantic conventions), then picks what a shared library depends on: only
 // the API, a no-op until the application installs an SDK. Spec: docs/M1-DESIGN.md §6 Act 0.
 // Spec: https://opentelemetry.io/docs/concepts/instrumentation/libraries/#opentelemetry-api
+// Docs (package names in the options: `@opentelemetry/sdk-node` and the OTLP HTTP trace exporter `@opentelemetry/exporter-trace-otlp-http`): https://opentelemetry.io/docs/languages/js/getting-started/nodejs/ , https://opentelemetry.io/docs/languages/js/exporters/
 import { actions, finishButton, nextButton, question, step } from '../lib/ui/index.mjs';
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
@@ -57,24 +58,24 @@ const PARTS = {
 const DEPENDS_ON = [
   {
     key: 'sdk',
-    label: 'The SDK',
+    label: 'The SDK (<code>@opentelemetry/sdk-node</code>), which gives the library tracing out of the box',
     why: 'The SDK is the application\'s choice: how to sample, batch and export. A library that brings it makes those choices for all 30 services.',
   },
   {
     key: 'api',
-    label: 'Only the API (<code>@opentelemetry/api</code>)',
+    label: 'The API (<code>@opentelemetry/api</code>), with the SDK left for each application to install',
     right: true,
     why: 'Libraries depend only on the OTel API; only the application installs the SDK. Without an SDK, API calls are no-ops: they record nothing and cost almost nothing. Each of the 30 services picks its own SDK.',
   },
   {
     key: 'exporter',
-    label: 'An OTLP exporter',
+    label: 'An OTLP exporter (<code>@opentelemetry/exporter-trace-otlp-http</code>), to send its spans to a backend',
     why: 'Exporting is SDK work, set up by the application. A library that exports on its own decides for all 30 services where their telemetry goes.',
   },
   {
     key: 'collector',
-    label: 'The Collector',
-    why: 'The Collector is a separate process, not a package a library depends on.',
+    label: 'The Collector, added as a dependency, to filter the library\'s spans before it exports them',
+    why: 'There is no Collector package for a library to depend on: the Collector is a separate process that runs between your services and a backend.',
   },
 ];
 
@@ -107,7 +108,7 @@ export default {
             'instrument anything, learn which part does what.',
         )}${question({ id: 'otel-q-parts', html: 'Which part of OpenTelemetry is each one?' })}${renderSort(PARTS, newSortState(PARTS), { escapeHtml: ctx.escapeHtml, labelledBy: 'otel-q-parts' })}`,
         }),
-        actions({ wide: true, buttonsHtml: nextButton('otel-next') }),
+        actions({ wide: true, buttonsHtml: nextButton('otel-next', 'Sort every item to continue.') }),
       );
       const next = bar.querySelector('#otel-next');
       mountSort(ctx, PARTS, {
@@ -128,7 +129,7 @@ export default {
             'services. They want it to emit spans.',
         )}${question({ id: 'otel-q-dep', html: 'Which OpenTelemetry package should the library depend on?' })}${choiceHtml(ctx, DEPENDS_ON, { id: 'otel', labelledBy: 'otel-q-dep' })}`,
         }),
-        actions({ wide: false, buttonsHtml: finishButton('otel-finish') }),
+        actions({ wide: false, buttonsHtml: finishButton('otel-finish', 'Pick the right answer to finish the level.') }),
       );
       const finish = bar.querySelector('#otel-finish');
       mountChoice(ctx, DEPENDS_ON, {

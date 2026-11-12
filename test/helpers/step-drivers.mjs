@@ -48,13 +48,13 @@ const buildLogs = {
     // span context. Later clicks of solve() overwrite every record, so the slip leaves no trace.
     const first = s.logs.find((l) => s.answer[l.id] !== null);
     return [
-      { name: 'check', clicks: [`#${s.id}-check`], says: /^Not yet:/ },
+      { name: 'check', clicks: [`#${s.id}-check`], says: /^Not quite:/ },
       ...(first === undefined
         ? []
         : [{
             name: 'orphan',
             clicks: [...s.logs.flatMap((l) => attachClicks(l.id, l === first ? null : s.answer[l.id])), `#${s.id}-check`],
-            says: /^Not yet: 1 problem\./,
+            says: /^Not quite: 1 problem\./,
           }]),
       ...(s.hint === undefined ? [] : [{ name: 'hint', clicks: [`#${s.id}-hint`], says: /\S/, at: `#${s.id}-hint-text` }]),
     ];
@@ -85,7 +85,7 @@ const buildSpans = {
     return [...roots, ...edits, `#${s.id}-check`];
   },
   slips: (s) => [
-    { name: 'check', clicks: [`#${s.id}-check`], says: /^Not yet:/ },
+    { name: 'check', clicks: [`#${s.id}-check`], says: /^Not quite:/ },
     ...(s.hint === undefined ? [] : [{ name: 'hint', clicks: [`#${s.id}-hint`], says: /\S/, at: `#${s.id}-hint-text` }]),
   ],
   first: (s) => `span:${waterfall(s.spans).rows[0].spanId}`,

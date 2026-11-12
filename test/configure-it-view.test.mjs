@@ -484,11 +484,11 @@ test('the hint cost follows the failed Checks, and the success line counts both'
   const { mount } = setup(fixture(HELPS));
   mount();
   check(GIVEN);
-  assert.equal(q('#cf-hint-cost').textContent, 'costs 1 star');
+  assert.equal(q('#cf-hint-cost').textContent, 'costs 1 penalty');
   check(`${GIVEN}zz: 1\n`);
   assert.equal(q('#cf-wrong-label').textContent, 'failed Checks');
   check(`${GIVEN}yy: 1\n`);
-  assert.equal(q('#cf-hint-cost').textContent, 'costs no star now');
+  assert.equal(q('#cf-hint-cost').textContent, 'costs 1 penalty, no star yet');
   click('#cf-hint');
   check(REF);
   assert.equal(q('#cf-win-stars').textContent, '2 of 5 stars: 3 failed Checks, 1 hint.');

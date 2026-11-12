@@ -23,7 +23,7 @@
 const PATTERN = [
   {
     key: 'agent',
-    label: 'A Collector next to the workload: a sidecar, or a <code>DaemonSet</code> pod on each node that the apps on that node send to',
+    label: 'A Collector next to the workload: a sidecar in the pod, or a <code>DaemonSet</code> pod on each node that the apps on that node send to',
     why: 'That is the agent pattern. An agent runs close to the application or on the same host, takes its telemetry and forwards it to a backend or to a gateway.',
   },
   {
@@ -34,7 +34,7 @@ const PATTERN = [
   },
   {
     key: 'embedded',
-    label: 'A Collector built into each application\'s process, so no separate Collector runs',
+    label: 'A Collector built into each application\'s process, with no separate Collector process to run',
     why: 'Neither deployment pattern is a Collector inside the application. The application\'s SDK sends OTLP to a Collector that runs beside it (an agent) or to a central one (a gateway).',
   },
 ];
@@ -43,18 +43,18 @@ const PATTERN = [
 const WHY = [
   {
     key: 'same-instance',
-    label: 'Tail sampling decides per trace, and all spans of a trace must reach the same Collector instance. The Service splits them between replicas',
+    label: 'Tail sampling decides per trace, so all spans of a trace must reach one Collector, and the Service splits them',
     right: true,
     why: 'The <code>tail_sampling</code> processor keeps spans in memory until it can decide on the whole trace, so all spans of a trace must reach the same Collector instance. An ordinary load balancer, or a Service that spreads requests, sends the spans of one trace to different replicas, and each replica decides on the part it has.',
   },
   {
     key: 'wait',
-    label: '<code>decision_wait</code> is too short, so the replicas decide before the spans arrive',
+    label: '<code>decision_wait</code> is too short, so each replica decides before the late spans of a trace arrive',
     why: '<code>decision_wait</code> is how long the processor waits before it decides on a trace, and a longer wait helps with late spans. It does not help when the spans are not at that Collector at all because they went to another replica.',
   },
   {
     key: 'unsupported',
-    label: '<code>tail_sampling</code> cannot run in a gateway, only in agents',
+    label: '<code>tail_sampling</code> cannot run in a gateway, because only agents can hold spans in memory',
     why: 'The processor runs in any Collector that includes it, such as the contrib and Kubernetes distributions. An agent only sees the spans of the pods on its own node, which does not help.',
   },
 ];
@@ -133,7 +133,7 @@ const KEY = [
   },
   {
     key: 'service',
-    label: '<code>routing_key: service</code>: every span of a service goes to the same replica',
+    label: '<code>routing_key: service</code>: every span of one service goes to the same gateway replica',
     why: 'That keeps a service together, which suits something like the span metrics connector. A trace crosses services, so its spans still land on different replicas and the trace is split.',
   },
   {

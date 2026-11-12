@@ -97,9 +97,9 @@ test('what costs a star is built from the widget\'s own PENALTY: its costs, then
   }
   assert.equal(part(howToView(level({ widgets: ['choice'] })).topics[0], 'What costs a star').text, 'A wrong pick costs one penalty.');
   const text = (w) => part(howToView(level({ widgets: [w] })).topics[0], 'What costs a star').text;
-  assert.equal(text('sort'), 'Each of these costs one penalty: a wrong placement and a hint. Retrying is free.');
-  assert.equal(text('build'), 'Each of these costs one penalty: a wrong drop, a failed Check, a wrong pick and a hint. Retrying is free.');
-  assert.ok(text('tradeoff').startsWith('Each of these costs one penalty: a failed Check (over the cap, or a need dropped) and a hint. '), 'a comma inside parentheses is not a split');
+  assert.equal(text('sort'), 'Each of these costs one penalty: a wrong placement or a hint. Retrying is free.');
+  assert.equal(text('build'), 'Each of these costs one penalty: a wrong drop, a failed Check, a wrong pick or a hint. Retrying is free.');
+  assert.ok(text('tradeoff').startsWith('Each of these costs one penalty: a failed Check (over the cap, or a need dropped) or a hint. '), 'a comma inside parentheses is not a split');
 });
 
 test('Your stars lists the ladder rung by rung, then the par sentence (with a par time) and REPLAY', () => {
@@ -133,8 +133,8 @@ test('a widget in the level\'s hintless list says no hints; the others keep thei
 
 test('the hint lines are plain sentences about one penalty per hint', () => {
   assert.equal(NO_HINTS, 'This step has no Hint button.');
-  assert.equal(HOW_TO.sort.hints, 'Each hint costs one penalty. The Hint button shows what the next one costs.');
-  assert.equal(HOW_TO.query.hints, 'A hint costs one penalty. Some steps have no Hint button.');
+  assert.equal(HOW_TO.sort.hints, 'The Hint button shows what the next one costs.');
+  assert.equal(HOW_TO.query.hints, 'Some steps have no Hint button.');
   assert.equal(HOW_TO.configure.hints, HOW_TO.query.hints);
 });
 

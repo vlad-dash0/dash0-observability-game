@@ -270,7 +270,7 @@ export default {
       },
     ],
     finish:
-      'You found why green meant nothing: every number counted requests that arrived, and the check ran from inside, while the failure sat in front of the service. ' +
+      'Green meant nothing here: every number counted requests that arrived, and the check ran from inside, while the failure sat in front of the service. ' +
       'Spans and an SLI tell you how the requests that arrive are doing; a probe from outside tells you whether a visitor can arrive at all.',
   },
 };

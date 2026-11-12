@@ -85,7 +85,7 @@ export default {
   id: 'naming-your-service',
   no: '1.2',
   name: 'Naming your service',
-  sub: 'Who is unknown_service:node?',
+  sub: 'Why can nobody find checkout?',
   icon: '\u{1F3F7}\u{FE0F}',
   rewardTitle: 'Service namer',
   mechanics: ['configure'],
@@ -107,7 +107,7 @@ export default {
               'is all its SDK has to go on. The process is started as <code>node</code>.',
           )}<div id="nys-config">${codeBlock(GIVEN, { wrap: true })}</div>${question({ id: 'nys-q-name', html: 'What service name does its telemetry show up under?' })}${choiceHtml(ctx, SHOWS_UP_AS, { id: 'nys', labelledBy: 'nys-q-name' })}`,
         }),
-        actions({ wide: false, buttonsHtml: nextButton('nys-next') }),
+        actions({ wide: false, buttonsHtml: nextButton('nys-next', 'Pick the right answer to continue.') }),
       );
       const next = bar.querySelector('#nys-next');
       mountChoice(ctx, SHOWS_UP_AS, {
@@ -148,7 +148,7 @@ export default {
               'deprecated <code>deployment.environment</code>.',
           )}<div data-env-config>${split({ mainHtml: chips + editor, sideHtml: side })}</div>`,
         }),
-        actions({ wide: true, buttonsHtml: nextButton('nys-next') }),
+        actions({ wide: true, buttonsHtml: nextButton('nys-next', 'Fix the config and press Check to continue.') }),
       );
       const box = body.querySelector('[data-env-config]');
       const input = body.querySelector('#nys-env');
@@ -187,7 +187,7 @@ export default {
           const issues = prose(renderIssues(result.issues, ctx.escapeHtml));
           if (same) return void say('neutral', `You already checked this config. Nothing new was counted.${issues}`);
           ladder.miss();
-          say('error', `Not yet: ${n}.${issues}`);
+          say('error', `Not quite: ${n}.${issues}`);
           return;
         }
         const { attributes: attrs, source } = effectiveResource(parseEnv(text).vars, PROCESS);
@@ -226,7 +226,7 @@ export default {
               'service into the deploy, and now both are set.',
           )}${codeBlock(CLASH_ENV, { wrap: true })}${question({ id: 'nys-q-wins', html: 'Which service name does the SDK report?' })}${choiceHtml(ctx, WHO_WINS, { id: 'nys', labelledBy: 'nys-q-wins' })}`,
         }),
-        actions({ wide: false, buttonsHtml: finishButton('nys-finish') }),
+        actions({ wide: false, buttonsHtml: finishButton('nys-finish', 'Pick the right answer to finish the level.') }),
       );
       const finish = bar.querySelector('#nys-finish');
       mountChoice(ctx, WHO_WINS, {

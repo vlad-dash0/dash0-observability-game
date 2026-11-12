@@ -62,31 +62,31 @@ const SPOT = {
     'pay-0914-45': 'This point is on the spike and its exemplar field says none. A high value does not bring an exemplar with it, so there is no trace to jump to from this point.',
     'pay-0915-15': 'The spike is over and the field says none: no exemplar, so no link from this point.',
     'refund-batch': 'A job started by a scheduler, not by a request, and its point says none: no exemplar, so no link.',
-    'pay-label': 'The trace id and span id here are labels of the series, not an exemplar: a label makes a series of its own for every value, and an exemplar sits beside the point, in its own field. This point\'s field says none.',
+    'pay-label': 'The trace ID and span id here are labels of the series, not an exemplar: a label makes a series of its own for every value, and an exemplar sits beside the point, in its own field. This point\'s field says none.',
   },
   explain:
     'Three points carry exemplars. Each exemplar is one measurement recorded in that window, with its value, the <code>trace_id</code> and the ' +
     '<code>span_id</code> of the span it was recorded in, and a point can carry more than one: two of the spike points carry two and three. The value is one measurement, not the point\'s sum, and an exemplar can sit on an ' +
     'ordinary point as well as on the spike: the point at 09:14:15 has one, and the spike point at 09:14:45, with ten charges and a 7.35s slowest one, has none. The ' +
-    'trace id and span id in series labels do not link anything, and the scheduled job has no exemplar either.',
+    'trace ID and span id in series labels do not link anything, and the scheduled job has no exemplar either.',
 };
 
 // Step 2: why the other points have none. `why` follows "Right." or "Not quite.".
 const WHY = [
   {
     key: 'errors-only',
-    label: 'SDKs only keep exemplars for slow or failing requests',
+    label: 'SDKs only keep exemplars for slow or failing requests, and ordinary points have none',
     why: 'The filters an SDK has to support are AlwaysOn, AlwaysOff and TraceBased, and none of them looks at errors or at how slow a measurement is. The first exemplar on the list is an ordinary 0.28 s charge, and a spike point has none.',
   },
   {
     key: 'unsampled-or-no-span',
-    label: 'No measurement in those points was recorded inside a sampled span: it ran outside any span, or inside a span that was not sampled',
+    label: 'Those measurements were recorded outside any span, or inside a span that was not sampled',
     right: true,
     why: 'Exemplar sampling is on by default with the TraceBased filter: only a measurement recorded in the context of a sampled span is eligible to become an exemplar. A measurement from a scheduled job has no active span, and one from a request whose trace was not sampled has a span that is not sampled, so neither is eligible. The reservoir then makes the final decision and may keep fewer still. <code>OTEL_METRICS_EXEMPLAR_FILTER</code> can be set to <code>always_on</code> or <code>always_off</code>, and the default is <code>trace_based</code>.',
   },
   {
     key: 'backend-dropped',
-    label: 'The backend dropped them after the points arrived',
+    label: 'The backend dropped the exemplars after the points arrived, to keep the metric small and cheap',
     why: 'Exemplars are chosen in the SDK while measurements are recorded: the filter decides which measurements are eligible and the reservoir which are kept, and the kept ones leave the SDK in the metric data point. A point that left the SDK with none has none to lose.',
   },
 ];

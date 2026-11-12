@@ -16,13 +16,13 @@ const KIND = [
   },
   {
     key: 'exponential',
-    label: 'Exponential: the boundaries follow a growth factor set by a scale, so one histogram covers a wide range with small relative error',
+    label: 'Exponential: the boundaries follow a growth factor set by a scale, and one histogram covers a wide range with small relative error',
     right: true,
     why: 'Bucket boundaries sit at powers of a base set by the scale, so there is no list to pick, and a higher scale means finer buckets. The SDK adjusts the scale to the data it sees. Support varies by backend: the Prometheus text formats cannot carry exponential histograms, so there they are dropped or converted to fixed buckets.',
   },
   {
     key: 'exact',
-    label: 'Exponential: it keeps every value, so a percentile read from it is exact',
+    label: 'Exponential: it keeps every value, and a percentile read from it is exact, with no estimate and no bucket error',
     why: 'Both kinds count observations into buckets and keep a count, a sum and, by default, a min and max. A percentile read from either is an estimate. The exponential one is just built to keep the error small across a wide range.',
   },
 ];
@@ -31,18 +31,18 @@ const KIND = [
 const BUCKETS = [
   {
     key: 'exact-p99',
-    label: 'The slowest 1% of /pay requests take 2.5 seconds',
+    label: 'The slowest 1% of /pay requests take exactly 2.5 seconds',
     why: 'It would be a coincidence. 2.5 is the upper bound of the highest bucket before +Inf, and histogram_quantile has nothing to interpolate with beyond it.',
   },
   {
     key: 'top-bucket',
-    label: 'Only that they take at least 2.5 seconds: the buckets stop before the tail does',
+    label: 'Only that they take at least 2.5 seconds: the buckets stop before the tail',
     right: true,
     why: 'The p99 falls inside the +Inf bucket, and for a quantile there Prometheus returns the upper bound of the second highest bucket, here 2.5. The real p99 is higher, and these buckets cannot say by how much. Add boundaries above your slowest requests, or use an exponential histogram. The OpenTelemetry SDK default boundaries run from 0 to 10000, which suits large values, so a duration metric in seconds with no better boundaries puts everything under 5 seconds into one bucket, (0, 5]. For http.server.request.duration, the semantic conventions advise boundaries in seconds from 0.005 to 10, which the SDK uses; for your own duration metrics, set the boundaries yourself.',
   },
   {
     key: 'trust-average',
-    label: 'Nothing: the 0.79 second average is the number to trust',
+    label: 'Nothing: the 0.79 second average is the number to trust, as it uses every request',
     why: 'The average is the one that hid the problem. A mean is a sum divided by a count, so a few very slow requests are diluted by every fast one.',
   },
 ];

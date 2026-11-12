@@ -74,7 +74,7 @@ const SORT = {
     },
     {
       id: 'cloud-region',
-      label: 'cloud.region = eu-west-1',
+      label: 'cloud.region = eu-central-1',
       bucket: 'resource',
       why: 'The region the process runs in does not change per request. It says where the producer lives, so it is a resource attribute.',
       whyNot: {
@@ -83,7 +83,7 @@ const SORT = {
     },
     {
       id: 'url-path',
-      label: 'url.path = /cart/8841',
+      label: 'url.path = /checkout/8841',
       bucket: 'signal',
       why: 'The path of this one request, with its real id in it. A different request has a different path, so it is a span attribute.',
       whyNot: {
@@ -97,18 +97,18 @@ const SORT = {
 const POD = [
   {
     key: 'same-thing',
-    label: 'Nothing: a span attribute and a resource attribute are the same thing',
+    label: 'Nothing: a span attribute and a resource attribute are the same thing, set in two places',
     why: 'They are not. A Resource is attached to the provider once, and every span, metric and log from it carries the Resource. A span attribute belongs to that one span.',
   },
   {
     key: 'set-once',
-    label: 'It describes the pod that produces the telemetry, so it belongs on the Resource: set once, carried by every span, metric and log',
+    label: 'It describes the pod that produces the telemetry, so it belongs on the Resource, set once',
     right: true,
     why: 'The pod does not change from span to span, so it describes the entity producing the telemetry. The SDK attaches a Resource to its provider when the provider is created, and every span, metric and log from that provider carries it. Setting <code>k8s.pod.name</code> as a span attribute repeats one value on every span, and leaves your metrics and logs without it.',
   },
   {
     key: 'cardinality',
-    label: 'A pod name has too many different values to be an attribute at all',
+    label: 'A pod name has too many different values to be an attribute at all, on a span or on a Resource',
     why: 'The value is not the problem: <code>k8s.pod.name</code> is a standard attribute with an agreed meaning, and a Resource carries it fine. The problem is where it is set.',
   },
 ];
@@ -117,7 +117,7 @@ const POD = [
 const DASH0 = [
   {
     key: 'by-hand',
-    label: 'From a list you register in Dash0 by hand, one entry per pod and host',
+    label: 'From a list you register in Dash0 by hand, one entry per pod and host, kept up to date as pods change',
     why: 'Nothing to register: what Dash0 lists comes from the telemetry itself, and the names and types in its Resources table are derived from OpenTelemetry attributes.',
   },
   {
@@ -128,7 +128,7 @@ const DASH0 = [
   },
   {
     key: 'span-attributes',
-    label: 'From whichever span attribute happens to hold a pod or host name',
+    label: 'From whichever span attribute happens to hold a pod or host name, read from the spans you send',
     why: 'A span attribute describes one span. The identity of the thing that produced the telemetry is what the Resource is for, and that is what Dash0 reads.',
   },
 ];
@@ -137,7 +137,7 @@ export default {
   id: 'resources',
   no: '1.1',
   name: 'Resources',
-  sub: 'What is it about',
+  sub: 'What is it about?',
   icon: '\u{1F3F7}\u{FE0F}',
   rewardTitle: 'Resource spotter',
   cards: ['resource-not-span-attribute'],
@@ -150,7 +150,7 @@ export default {
         intro:
           'Every span, metric and log is about something: a service, a pod, a host, a cloud region. ' +
           'OpenTelemetry keeps that in the <b>Resource</b>, attached once. Each signal also carries ' +
-          'attributes of its own about one operation. Recommendations at Kettle &amp; Co just started ' +
+          'attributes of its own about one operation. Checkout at Kettle &amp; Co just started ' +
           'sending telemetry with both kinds mixed up.',
         question: 'Pick an attribute, then say where it belongs.',
         qid: 'res-q-sort',

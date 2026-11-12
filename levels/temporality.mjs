@@ -39,7 +39,7 @@ const SPOT = {
 const CONVERT = [
   {
     key: 'gauge',
-    label: 'Turn them into gauges',
+    label: 'Turn them into gauges, to report a plain value each time',
     why: 'A gauge has no aggregation semantic, so you would swap the temporality problem for lost rate math. Counts and durations should stay Sums and Histograms.',
   },
   {
@@ -50,7 +50,7 @@ const CONVERT = [
   },
   {
     key: 'suffix',
-    label: 'Rename them with a <code>_total</code> suffix',
+    label: 'Rename them with a <code>_total</code> suffix, to make the backend treat them as counters',
     why: 'A name is only a name. The points are still the change since the last report.',
   },
   {
@@ -64,18 +64,18 @@ const CONVERT = [
 const RESTART = [
   {
     key: 'negative',
-    label: 'A drop of 8,365 orders',
+    label: 'A drop of 8,365 orders, as that many orders were lost in the restart',
     why: 'A monotonic sum never goes down, so a drop is a restart, not lost orders. A backend that read it as negative would get the rate wrong.',
   },
   {
     key: 'reset',
-    label: 'A reset: the sum started over, and the new start time says so',
+    label: 'A reset: the sum started over, and the new start time marks it',
     right: true,
     why: 'A cumulative sum lives in the process, so after a restart it begins again from zero, with a new start time. A backend that reads start times treats that as a reset and counts the rate from zero, not as a drop.',
   },
   {
     key: 'survives',
-    label: 'Nothing: a cumulative counter survives a restart',
+    label: 'Nothing: a cumulative counter survives a restart and keeps counting from 8,400',
     why: 'The running total lives in the process\'s memory, so a restart ends it. The new process starts again from zero.',
   },
 ];
@@ -95,7 +95,7 @@ const DASH0 = [
   },
   {
     key: 'processor',
-    label: 'Yes: put the <code>deltatocumulative</code> processor in front of Dash0',
+    label: 'Yes: put the <code>deltatocumulative</code> processor in front of Dash0 in the Collector',
     why: 'Dash0 accepts both, so you would add a stateful component that keeps every series in memory for no gain. Add it where a backend needs it.',
   },
 ];

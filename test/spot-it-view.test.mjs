@@ -364,7 +364,7 @@ test('three hint tiers after picking a decoy: the rule, two outlined lines, then
   mount();
   pickAll('s1'); // a decoy, not checked
   assert.equal(text('#bomb-hint'), 'Hint 1 of 3');
-  assert.equal(text('#bomb-hint-cost'), 'costs 1 star');
+  assert.equal(text('#bomb-hint-cost'), 'costs 1 penalty');
   assert.equal(q('#bomb-hint').disabled, false);
 
   click('#bomb-hint'); // tier 1: the rule

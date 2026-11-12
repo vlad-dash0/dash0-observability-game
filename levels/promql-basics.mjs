@@ -56,18 +56,18 @@ const TOTAL = [
 const DASH0 = [
   {
     key: 'translated-only',
-    label: 'Only the translated names work, so you have to learn the mapping',
+    label: 'Only the translated names work, and you have to learn how each OpenTelemetry name is translated first',
     why: 'Dash0 keeps the original name too. Every metric carries an <code>otel_metric_name</code> label, so you can select it without knowing how it was translated.',
   },
   {
     key: 'both-names',
-    label: 'The OpenTelemetry name works through <code>otel_metric_name</code>, the translated name works too, and logs and spans are queryable as metrics',
+    label: 'The OpenTelemetry name works through <code>otel_metric_name</code>, and logs and spans are queryable as metrics',
     right: true,
     why: 'Dash0 exposes each metric under both names, and <code>otel_metric_name</code> keeps a query stable whatever the translation does. It also derives metrics such as <code>dash0.logs</code> and <code>dash0.spans</code> from logs and spans on demand, so the same PromQL reaches them.',
   },
   {
     key: 'metrics-only',
-    label: 'PromQL is for metrics only: logs and spans need a different language',
+    label: 'PromQL is for metrics only: logs and spans need a different query language, learned separately',
     why: 'Dash0 turns logs and spans into synthetic metrics such as <code>dash0.logs</code> and <code>dash0.spans</code>, and you query those with the same PromQL.',
   },
 ];

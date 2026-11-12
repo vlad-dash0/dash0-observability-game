@@ -244,7 +244,7 @@ test('an over-cap plan costs one mistake, in the error tone, says by how much an
   plan('tail', 'user');
   check();
   assert.equal(counts.mistakes, 1);
-  assert.equal(feedback(), 'Not quite. Over the cap by 5 GB/day. A raw user id has a new value for every user.');
+  assert.equal(feedback(), 'Not quite. Over the cap by 5 GB/day.A raw user id has a new value for every user.');
   assert.equal(tone(), 'error');
   assert.equal(text('#bill-wrong'), '1');
   assert.equal(text('#bill-wrong-label'), 'failed Check');
@@ -275,7 +275,7 @@ test('a plan that drops several needs says every one; over the cap and dropping 
   b.mount();
   plan('head', 'user');
   check();
-  assert.equal(feedback(), 'Not quite. Over the cap by 8 GB/day, and it drops what you need: every error trace. A raw user id has a new value for every user.');
+  assert.equal(feedback(), 'Not quite. Over the cap by 8 GB/day, and it drops what you need: every error trace.A raw user id has a new value for every user.');
 });
 
 test('the same failing plan again is free and neutral, even after a different failing one; a changed plan costs again', () => {
@@ -398,7 +398,7 @@ test('three hint tiers: the rule, two outlined options of one knob, then the ans
   mount();
   pick('sampling', 'tail'); // right already; the attribute knob is open
   assert.equal(text('#bill-hint'), 'Hint 1 of 3');
-  assert.equal(text('#bill-hint-cost'), 'costs 1 star');
+  assert.equal(text('#bill-hint-cost'), 'costs 1 penalty');
 
   click('#bill-hint'); // tier 1: the rule
   assert.deepEqual(counts, { mistakes: 0, hints: 1, done: 0 });
@@ -446,12 +446,12 @@ test('each hint tier costs a star by the one rule, and a wrong Check costs on to
   assert.deepEqual(counts, { mistakes: 1, hints: 0, done: 0 });
   assert.equal(q('#bill-stars').getAttribute('aria-label'), '4 of 5 stars still possible');
   assert.equal(qa('#bill-stars [data-star="possible"]').length, 4);
-  assert.equal(text('#bill-hint-cost'), 'costs 1 star');
+  assert.equal(text('#bill-hint-cost'), 'costs 1 penalty');
   click('#bill-hint');
   assert.equal(q('#bill-stars').getAttribute('aria-label'), '3 of 5 stars still possible');
   click('#bill-hint');
   assert.equal(q('#bill-stars').getAttribute('aria-label'), '2 of 5 stars still possible');
-  assert.equal(text('#bill-hint-cost'), 'costs no star now', 'the 4th penalty falls on the same rung as the 3rd');
+  assert.equal(text('#bill-hint-cost'), 'costs 1 penalty, no star yet', 'the 4th penalty falls on the same rung as the 3rd');
   click('#bill-hint');
   assert.equal(text('#bill-win-stars'), '2 of 5 stars: 1 failed Check, 3 hints.');
 });

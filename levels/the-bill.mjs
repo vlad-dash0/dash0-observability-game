@@ -178,23 +178,23 @@ const FIX = [
   {
     key: 'drop-the-label',
     label:
-      'Stop recording <code>user.id</code> on the counter (or filter it out with a view while the fix ships), and keep the per-user detail on spans or logs',
+      'Stop recording <code>user.id</code> on the counter, and keep the per-user detail on spans or logs',
     right: true,
     why: 'Series are the unique combinations of attribute values, so the only fix that works is fewer values: remove the attribute that has one value for each user. A per-customer lookup is what spans and logs are for, where one value for each request is normal and a user.id attribute costs no series; the 228 series that dashboards need stay. In Dash0, the Metric Explorer tree map and the metric sidebar show which metric and which attributes were behind the volume, and the guidance for random or unbounded values is to reduce them at the instrumentation layer. The same is true of <code>http.route</code> against a raw URL: a bounded template, never the raw value.',
   },
   {
     key: 'export-less',
-    label: 'Export metrics every 5 minutes instead of every minute',
+    label: 'Export metrics every 5 minutes instead of every minute, to cut the number of series to a fifth',
     why: `The number of series is the number of unique attribute combinations, not how often they are sent. Exporting every 5 minutes sends one point in five for every metric alike, the ${SERIES_BEFORE} useful series included, and leaves all ${n(SERIES_AFTER)} series, the user_id label and the query load of that many series in place. It also makes every graph coarser.`,
   },
   {
     key: 'cap-and-keep',
-    label: 'Set a cardinality limit in the SDK and keep the label',
+    label: 'Set a cardinality limit in the SDK and keep the label, to stop the series at the limit',
     why: 'The specification says SDKs SHOULD support a cardinality limit, with a default of 2000 per metric that SHOULD be used when none is set, and measurements past it are folded into one point marked otel.metric.overflow. That bounds the volume, but the label stays useless: the user ids seen first keep their series and every other user, and any bounded combination not yet seen, lands in the one overflow point, so a per-user answer is wrong. A limit is a safety net for a mistake, not a design.',
   },
   {
     key: 'spam-flag',
-    label: 'Flag <code>checkout_attempts_total</code> as spam in Dash0 so it is dropped at ingestion',
+    label: 'Flag <code>checkout_attempts_total</code> as spam in Dash0, to drop it at ingestion',
     why: 'A spam filter drops the data points that match its criteria before they are stored, and what it drops cannot be recovered. It does not remove one label and keep the rest: the counter checkout needs, with its 228 useful series, would be dropped along with the new ones, and the filter reduces what Dash0 indexes, not what the service sends. The label is the thing to remove.',
   },
 ];
@@ -226,8 +226,8 @@ export default {
       },
     ],
     finish:
-      `You followed the volume to its source: one counter went from ${SERIES_BEFORE} to ${n(SERIES_AFTER)} series at a deploy, its label breakdown showed ` +
-      `user_id with ${n(USERS)} values, and checkout 5.12.0 had added user.id to its attributes. The fix is to remove the attribute and keep per-user detail on spans or logs.\n\n` +
+      `The volume came from one counter that went from ${SERIES_BEFORE} to ${n(SERIES_AFTER)} series at a deploy: ` +
+      `user_id had ${n(USERS)} values, because checkout 5.12.0 had added user.id to its attributes. The fix is to remove the attribute and keep per-user detail on spans or logs.\n\n` +
       'In Dash0, the Metric Explorer tree map sized by cardinality shows which metric is large and its sidebar shows the attributes behind it, ' +
       'and for random or unbounded values the advice is to cut them down at the instrumentation layer.',
   },

@@ -139,11 +139,11 @@ const SCENARIO = {
 };
 
 const FINISH =
-  'You found an N+1 query: inventory 2.4.0 runs one query per item, 40 sequential database CLIENT spans under one request. ' +
-  'The trace showed where the time goes, and comparing slow with normal requests showed what changed.';
+  'The cause was an N+1 query: inventory 2.4.0 runs one query per item, 40 sequential database CLIENT spans under one request. ' +
+  'A trace shows where one request spends its time, and comparing slow with normal requests shows what changed.';
 
 // The scenario line on the lesson card (incidentLesson adds one short rules line).
-const INTRO = 'Checkout is slow and the alert names no cause. Find where the time goes and what changed.';
+const INTRO = 'Checkout is slow. Find where the time goes and what changed.';
 
 /** The boss's data (pinned by test/checkout-is-slow.test.mjs). */
 export const CONTENT = { scenario: SCENARIO, triage: TRIAGE, finish: FINISH, intro: INTRO };

@@ -144,7 +144,7 @@ export default {
             '<code>traceparent</code> header.',
           )}${prose(`<p>Headers on each hop:</p><ul>${hops}</ul><p>Root spans for the request:</p><ul>${roots}</ul>`)}${question({ id: 'prop-q-where', html: 'Where did the trace break?' })}${choiceHtml(ctx, WHERE, { id: 'prop', labelledBy: 'prop-q-where' })}`,
         }),
-        actions({ wide: false, buttonsHtml: nextButton('prop-next') }),
+        actions({ wide: false, buttonsHtml: nextButton('prop-next', 'Pick the right answer to continue.') }),
       );
       const btn = next(stepValid);
       mountChoice(ctx, WHERE, {
@@ -166,7 +166,7 @@ export default {
             'ignores a header that breaks the rules.',
           )}${question({ id: 'prop-q-tp', html: 'Which traceparent would checkout accept?' })}${choiceHtml(ctx, VALID, { id: 'prop-tp', labelledBy: 'prop-q-tp' })}`,
         }),
-        actions({ wide: false, buttonsHtml: nextButton('prop-next') }),
+        actions({ wide: false, buttonsHtml: nextButton('prop-next', 'Pick the right answer to continue.') }),
       );
       const btn = next(stepTree);
       mountChoice(ctx, VALID, {
@@ -188,7 +188,7 @@ export default {
             'the parent that the header\'s parent-id names.',
           )}${question({ html: 'Join checkout to the request.' })}${renderBuild(TREE, newBuildState(TREE), { escapeHtml: e })}`,
         }),
-        actions({ wide: true, buttonsHtml: finishButton('prop-finish') }),
+        actions({ wide: true, buttonsHtml: finishButton('prop-finish', 'Solve the board and press Check to finish the level.') }),
       );
       const finish = bar.querySelector('#prop-finish');
       mountBuild(ctx, TREE, {

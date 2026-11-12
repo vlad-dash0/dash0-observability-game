@@ -101,7 +101,7 @@ export default {
             'further down can use them.',
         )}${question({ id: 'bag-q-sort', html: 'Pick an entry, then say whether it belongs in baggage.' })}${renderSort(SORT, newSortState(SORT), { escapeHtml: ctx.escapeHtml, labelledBy: 'bag-q-sort' })}`,
         }),
-        actions({ wide: true, buttonsHtml: nextButton('bag-next') }),
+        actions({ wide: true, buttonsHtml: nextButton('bag-next', 'Sort every item to continue.') }),
       );
       const next = bar.querySelector('#bag-next');
       mountSort(ctx, SORT, {
@@ -122,7 +122,7 @@ export default {
             'recommendations, which runs the usual SDK setup with automatic instrumentation.',
         )}${question({ id: 'bag-q-spans', html: 'Do recommendations\' spans carry <code>tenant.tier</code> from baggage?' })}${choiceHtml(ctx, ON_SPANS, { id: 'bag', labelledBy: 'bag-q-spans' })}`,
         }),
-        actions({ wide: false, buttonsHtml: finishButton('bag-finish') }),
+        actions({ wide: false, buttonsHtml: finishButton('bag-finish', 'Pick the right answer to finish the level.') }),
       );
       const finish = bar.querySelector('#bag-finish');
       mountChoice(ctx, ON_SPANS, {

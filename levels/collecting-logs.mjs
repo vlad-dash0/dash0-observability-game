@@ -51,7 +51,7 @@ const ROUTE = [
   {
     key: 'tail-adds-context',
     label: 'Tail its stdout file with <code>filelog</code>: the Collector can tell which trace each line belongs to',
-    why: 'A line in a file has no execution context of its own. The Collector can add resource attributes such as the pod, but a trace id is there only if the application wrote it into the line, as a <code>trace_id</code> field in the JSON, and the Collector then parses it out. Matching by time alone is the most basic form of correlation, not the trace context.',
+    why: 'A line in a file has no execution context of its own. The Collector can add resource attributes such as the pod, but a trace ID is there only if the application wrote it into the line, as a <code>trace_id</code> field in the JSON, and the Collector then parses it out. Matching by time alone is the most basic form of correlation, not the trace context.',
   },
   {
     key: 'otlp-no-logs',
@@ -159,12 +159,12 @@ const MULTILINE = [
   },
   {
     key: 'frame-pattern',
-    label: 'Set <code>line_start_pattern</code> to the stack frames: <code>^\\s+at </code>',
+    label: 'Set <code>multiline</code> with a <code>line_start_pattern</code> that matches the stack frames: <code>^\\s+at </code>, one entry for each frame of the trace',
     why: 'The start pattern has to match the line an entry begins with, and a frame is not where an entry begins. A pattern that matches frames starts a new entry at every frame, so the trace is still cut into pieces, and the next record\'s timestamp line is glued onto the last frame.',
   },
   {
     key: 'parser-joins',
-    label: 'Add a <code>regex_parser</code> operator for the first line, and the lines under it will follow',
+    label: 'Add a <code>regex_parser</code> operator for the first line, and the lines under it will follow it into the same entry',
     why: 'Operators work on entries that are already split. With no <code>multiline</code>, every line is an entry of its own by the time a parser sees it, so a parser cannot join them.',
   },
 ];
@@ -173,13 +173,13 @@ const MULTILINE = [
 const PARSE = [
   {
     key: 'collector-regex',
-    label: 'In the Collector: add a <code>regex_parser</code> operator to the receiver, with a <code>severity</code> block that reads the level from a named group',
+    label: 'In the Collector: add a <code>regex_parser</code> operator to the receiver, with a <code>severity</code> block',
     right: true,
     why: 'Operators run on each entry inside the receiver. The named groups of the regular expression become attributes, and the <code>severity</code> block sets the record\'s severity from the group it names, here the level. The entry is several lines long, so the expression turns on the <code>s</code> flag, <code>(?s)</code>, to let <code>.</code> match a newline; without it the message group stops at the first line break. Shipping\'s agent cannot be changed, so the Collector is the only place to parse it. Where you own the code, the better place is the source: write JSON, or export over OTLP with the severity already set.',
   },
   {
     key: 'agent-config',
-    label: 'In the vendor\'s agent: change its log format to JSON',
+    label: 'In the vendor\'s agent: change its log format to JSON, then read the level as a field',
     why: 'Nobody can change the vendor\'s agent, which is why the Collector reads its file at all. Where you do own the code, writing JSON, or exporting over OTLP, beats parsing text back into fields.',
   },
   {
@@ -204,7 +204,7 @@ const DASH0 = [
   },
   {
     key: 'needs-parser',
-    label: 'Nothing: without a parser in the Collector the records stay plain text with no severity until someone writes one',
+    label: 'Nothing: without a parser in the Collector the records stay plain text with no severity until someone writes a parser for them',
     why: 'Dash0 does not wait for a parser. Log AI infers a severity and extracts patterns from unstructured messages as they are ingested. A parser in the Collector is still the better fix when you can write one.',
   },
 ];

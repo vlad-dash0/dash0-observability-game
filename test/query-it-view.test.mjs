@@ -115,7 +115,7 @@ test('the supported subset is listed in the widget, every item read from SUPPORT
   setup();
   const box = q('[data-fold="supported"]');
   assert.equal(box.localName, 'details');
-  assert.equal(q('[data-fold="supported"] summary').textContent.trim(), 'Supported here');
+  assert.equal(q('[data-fold="supported"] summary').textContent.trim(), 'Supported PromQL: selectors, functions, aggregations, operators');
   const text = box.textContent;
   for (const g of SUPPORTED) {
     assert.ok(text.includes(g.title), g.title);
@@ -156,7 +156,7 @@ test('an equivalent query written differently passes too', () => {
 
 test('wrong answers cost one mistake each and name the category in plain words, never the reference', () => {
   const cases = [
-    ['sum(rate(http_server_requests_total[5m]))', 'Not quite. Different series than expected: the number of series is not right.'],
+    ['sum(rate(http_server_requests_total[5m]))', 'Not quite. The number of series is not right.'],
     ['sum by (service) (increase(http_server_requests_total[5m]))', 'Not quite. Right shape, wrong values.'],
     ['rate(nothing_here[5m])', 'Not quite. Your query returned no data.'],
   ];
@@ -177,7 +177,7 @@ test('wrong answers cost one mistake each and name the category in plain words, 
   const { counts, mount } = setup({ ...fixture(), reference: 'sum by (route) (rate(http_server_requests_total{service="checkout"}[5m]))' });
   mount();
   ask('sum by (status) (rate(http_server_requests_total{service="checkout"}[5m]))');
-  assert.equal(feedback(), 'Not quite. Different series than expected: the labels are not right.');
+  assert.equal(feedback(), 'Not quite. The labels of the series are not right.');
   assert.equal(counts.mistakes, 1);
 });
 
@@ -186,11 +186,11 @@ test('the wrong count label is plural from two; the hint cost follows the wrong 
   mount();
   ask('sum(rate(http_server_requests_total[5m]))');
   assert.equal(q('#qa-wrong-label').textContent, 'wrong query');
-  assert.equal(q('#qa-hint-cost').textContent, 'costs 1 star');
+  assert.equal(q('#qa-hint-cost').textContent, 'costs 1 penalty');
   ask('sum by (service) (increase(http_server_requests_total[5m]))');
   assert.equal(q('#qa-wrong-label').textContent, 'wrong queries');
   ask('rate(nothing_here[5m])');
-  assert.equal(q('#qa-hint-cost').textContent, 'costs no star now');
+  assert.equal(q('#qa-hint-cost').textContent, 'costs 1 penalty, no star yet');
 });
 
 test('a wrong query shows its own result as a table', () => {

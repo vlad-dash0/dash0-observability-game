@@ -56,7 +56,7 @@ const SORT = {
 const WHY = [
   {
     key: 'retries',
-    label: 'Cart retries every fetch call once',
+    label: 'Cart retries every fetch call once, and each attempt is recorded as a span',
     why: 'A retry would show two spans with different start times, and cart does not retry. Here each call has a twin, and the twins start together.',
   },
   {
@@ -67,7 +67,7 @@ const WHY = [
   },
   {
     key: 'collector',
-    label: 'The Collector copies each span on its way to Dash0',
+    label: 'The Collector copies each span on its way to Dash0, and sends both copies',
     why: 'A Collector forwards the spans it receives. Both copies were already in what cart exported.',
   },
 ];
@@ -76,7 +76,7 @@ const WHY = [
 const FIX = [
   {
     key: 'sample',
-    label: 'Sample 50% of traces',
+    label: 'Sample 50% of traces, to keep fewer duplicate spans',
     why: 'Sampling drops whole traces. In the traces you keep, each fetch call still has two CLIENT spans.',
   },
   {
@@ -87,7 +87,7 @@ const FIX = [
   },
   {
     key: 'dedupe',
-    label: 'Dedupe the spans in the Collector',
+    label: 'Dedupe the twin spans in the Collector before they reach Dash0',
     why: 'That hides the symptom and keeps both setups running, with twice the instrumentation work in every cart request.',
   },
 ];

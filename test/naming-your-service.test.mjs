@@ -64,7 +64,7 @@ test('a failed check says so in words and lists each problem', () => {
   start();
   toEditor();
   click('#nys-check');
-  assert.match(feedback(), /^Not yet: 2 problems\./);
+  assert.match(feedback(), /^Not quite: 2 problems\./);
   assert.match(feedback(), /shows up as unknown_service:node/);
   assert.equal(q('#nys-feedback').querySelectorAll('li').length, 2);
   assert.ok(q('#nys-next').disabled);
@@ -321,11 +321,11 @@ test('step 2 fails a config that names checkout twice, or that turns the SDK off
   toEditor();
   q('#nys-env').value = GOOD.replace('=service.version', '=service.name=cart,service.version');
   click('#nys-check');
-  assert.match(feedback(), /^Not yet: 1 problem\./);
+  assert.match(feedback(), /^Not quite: 1 problem\./);
   assert.equal(q('#nys-feedback [data-code="service-name-conflict"]') !== null, true);
   q('#nys-env').value = `${GOOD}\nOTEL_SDK_DISABLED=true`;
   click('#nys-check');
-  assert.match(feedback(), /^Not yet: 1 problem\./);
+  assert.match(feedback(), /^Not quite: 1 problem\./);
   assert.match(feedback(), /turns the SDK off/);
   assert.equal(q('#nys-next').disabled, true);
 });
@@ -370,7 +370,7 @@ test('re-checking the same failed config costs nothing more; a new failing one d
   click('#nys-check');
   q('#nys-env').value = `${q('#nys-env').value}\nOTEL_SERVICE_NAME=cart`;
   click('#nys-check');
-  assert.match(feedback(), /^Not yet:/);
+  assert.match(feedback(), /^Not quite:/);
   q('#nys-env').value = GOOD;
   click('#nys-check');
   click('#nys-next');

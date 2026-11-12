@@ -61,7 +61,7 @@ const status = () => q('[id$="-status"]').textContent;
 const tone = () => q('[id$="-status"]').getAttribute('data-tone');
 const feedback = () => q('#b1-feedback').textContent;
 const fbTone = () => q('#b1-feedback').getAttribute('data-tone');
-/** The first paragraph of a failed Check's feedback ("Not yet: N problems."). */
+/** The first paragraph of a failed Check's feedback ("Not quite: N problems."). */
 const fbHead = (id) => q(`#${id}-feedback p`).textContent;
 const label = (id) => q(`[data-span="${id}"]`).getAttribute('aria-label');
 // getAttribute, not dataset: linkedom's dataset does not see attributes set after its first read.
@@ -139,11 +139,11 @@ test('a bar label is placed by labelFlips and drawn inside its own clip, so only
   assert.equal(q(`[data-span="${D}"] .wf-track`).querySelectorAll('.wf-label-clip').length, 1);
 });
 
-test('rows: name and service first, kind, status and timing secondary; 8-char trace ids with the full id in a tooltip, no ellipsis', () => {
+test('rows: name and service first, kind, status and timing secondary; 8-char trace IDs with the full id in a tooltip, no ellipsis', () => {
   setup(withHelps({}));
   assert.deepEqual(placedIds(), [A, B, C, D, E], 'every span a root, trace 4bf9 then 0af7, by start');
   assert.equal(label(B), 'POST, storefront, CLIENT, UNSET, 10 to 90 ms, trace 4bf92f35, root');
-  assert.deepEqual(qa(`[data-span="${E}"] [data-trace]`).map((t) => `${t.textContent}|${t.getAttribute('title')}`), ['trace 0af76519|trace id 0af7651916cd43dd8448eb211c80319c']);
+  assert.deepEqual(qa(`[data-span="${E}"] [data-trace]`).map((t) => `${t.textContent}|${t.getAttribute('title')}`), ['trace 0af76519|trace ID 0af7651916cd43dd8448eb211c80319c']);
   assert.equal(q(`[data-span="${B}"] .wf-name`).textContent, 'POST');
   assert.equal(q(`[data-span="${B}"] .wf-svc`).textContent, 'storefront');
   assert.equal(q('[data-build="b1"]').textContent.includes('…'), false);
@@ -234,7 +234,7 @@ test('a wrong drop costs one mistake, says a specific note and stays; the same d
   assert.deepEqual([counts.mistakes, q(`[data-span="${B}"]`).dataset.verdict], [1, 'ok'], 'retrying is free');
 });
 
-test('a cross-trace drop names both trace ids', () => {
+test('a cross-trace drop names both trace IDs', () => {
   const { counts, mount } = setup(withHelps(ALL));
   mount();
   drag(B, A);
@@ -242,7 +242,7 @@ test('a cross-trace drop names both trace ids', () => {
   drag(D, C);
   drag(E, C);
   assert.equal(counts.mistakes, 1);
-  assert.equal(status().includes('GET /products (storefront) carries trace id 0af76519, POST /checkout (api-gateway) carries 4bf92f35. Different trace ids, so it can\'t be the parent.'), true);
+  assert.equal(status().includes('GET /products (storefront) carries trace ID 0af76519, POST /checkout (api-gateway) carries 4bf92f35. Different trace IDs, so it can\'t be the parent.'), true);
 });
 
 test('while a span moves: itself and its descendants are refused, a drop there is free and says it would loop', () => {
@@ -282,7 +282,7 @@ test('the time-window guide: a band at the moving span\'s window on every placed
   assert.deepEqual([qa('[data-band]').length, marks()[0]], [0, `${A}:valid`]);
 });
 
-test('trace tint: one tint per trace id; while moving, candidates from another trace fade and say so', () => {
+test('trace tint: one tint per trace ID; while moving, candidates from another trace fade and say so', () => {
   const { mount } = setup(withHelps(ALL));
   mount();
   for (const [s, p] of [[B, A], [C, B], [D, C]]) drag(s, p);
@@ -464,7 +464,7 @@ test('Check mode: moves are free and unmarked; a failed Check costs one, an unch
   assert.equal(q(`[data-span="${B}"]`).hasAttribute('data-verdict'), false, 'no tick without instant feedback');
   click('#b1-check');
   assert.equal(counts.mistakes, 1);
-  assert.equal(fbHead('b1'), 'Not yet: 2 problems.');
+  assert.equal(fbHead('b1'), 'Not quite: 2 problems.');
   assert.equal(fbTone(), 'error', 'D7: a failed Check costs a star, so it is the error tone');
   assert.deepEqual(qa('#b1-feedback li').map((li) => li.dataset.code), ['wrong-parent', 'wrong-parent']);
   assert.equal(qa('#b1-feedback li')[1].textContent.startsWith('validate cart (api-gateway) is a root now'), true, 'the specific note, not the generic message');
@@ -517,7 +517,7 @@ test('hint tiers: each costs one ctx.hint(); tier 2 outlines two candidates, tie
   const { counts, focus, mount } = setup(withHelps(ALL));
   mount();
   assert.equal(q('#b1-hint').textContent, 'Hint 1 of 3');
-  assert.equal(q('#b1-hint-cost').textContent, 'costs 1 star');
+  assert.equal(q('#b1-hint-cost').textContent, 'costs 1 penalty');
   // The decorative pips (kit dots, aria-hidden) follow the words after a space.
   assert.equal(q('#b1-hint-tier').textContent.trim(), 'For POST (storefront): 0 of 3 used');
   assert.equal(q('#b1-hint-tier [aria-hidden="true"]').getAttribute('data-tone'), 'hint');
@@ -694,7 +694,7 @@ test('stars are this board only: a penalty on an earlier step is not counted, th
   drag(B, 'root');
   assert.equal(q('#b1-stars').getAttribute('aria-label'), '4 of 5 stars still possible');
   click('#b1-hint');
-  assert.equal(q('#b1-hint-cost').textContent, 'costs 1 star', 'the hint cost is read from the board too');
+  assert.equal(q('#b1-hint-cost').textContent, 'costs 1 penalty', 'the hint cost is read from the board too');
   drag(B, A);
   drag(C, B);
   drag(D, C);
@@ -788,12 +788,12 @@ test('a recheck with the same links in another order is free', () => {
   click(`[data-link="${C}"]`);
   click('#b1-check');
   assert.equal(counts.mistakes, 1);
-  assert.equal(fbHead('b1'), 'Not yet: 3 problems.');
+  assert.equal(fbHead('b1'), 'Not quite: 2 problems.', 'one missing link, and the two extra links merged into one line');
   click(`[data-link="${B}"]`);
   click(`[data-link="${B}"]`);
   click('#b1-check');
   assert.equal(counts.mistakes, 1, 'links {B, C} added as C then B are the same graded state');
-  assert.equal(fbHead('b1'), 'Same as last time: 3 problems.');
+  assert.equal(fbHead('b1'), 'Same as last time: 2 problems.');
 });
 
 test('V5 a recheck after attaching the same records in another order is free', () => {
@@ -984,7 +984,7 @@ test('V5 penalties: a failing Check costs one with a specific note per record, t
   attach('l-cart', S2);
   click('#l1-check');
   assert.equal(counts.mistakes, 1);
-  assert.equal(fbHead('l1'), 'Not yet: 2 problems.');
+  assert.equal(fbHead('l1'), 'Not quite: 2 problems.');
   assert.deepEqual(qa('#l1-feedback li').map((li) => li.dataset.code), ['log-not-attached', 'log-not-attached']);
   assert.equal(qa('#l1-feedback li')[0].textContent.startsWith('"Order accepted" (checkout, 60 ms) has no span context yet'), true);
   click('#l1-check');

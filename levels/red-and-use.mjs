@@ -7,6 +7,7 @@
 // Spec: https://opentelemetry.io/docs/collector/components/connector/ , https://opentelemetry.io/docs/specs/semconv/http/http-spans/
 // Spec: https://opentelemetry.io/docs/specs/otel/compatibility/prometheus_and_openmetrics/#otlp-metric-points-to-prometheus , https://prometheus.io/docs/prometheus/latest/querying/functions/#histogram_quantile
 // Source (spanmetrics connector README, names, dimensions, units, status codes and the feature gates): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/connector/spanmetricsconnector/README.md
+// Docs (component type at v0.164.0: `span_metrics`; `spanmetrics` is the deprecated alias): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.164.0/connector/spanmetricsconnector/metadata.yaml
 // Source (USE method, Brendan Gregg): https://www.brendangregg.com/usemethod.html
 // Source (RED method, Tom Wilkie, as presented at GrafanaCon EU 2018): https://grafana.com/blog/2018/08/02/the-red-method-how-to-instrument-your-services/
 // Dash0 docs: https://www.dash0.com/docs/dash0/monitoring/services/built-in-metrics , https://www.dash0.com/docs/dash0/telemetry/metrics/understand-synthetic-metrics
@@ -15,18 +16,18 @@
 const METHODS = [
   {
     key: 'red-services-use-resources',
-    label: 'RED for each service: Rate, Errors, Duration of its requests. USE for each resource, such as a CPU or a disk: Utilisation, Saturation, Errors',
+    label: 'RED for each service: Rate, Errors, Duration. USE for each resource, such as a CPU or a disk: Utilisation, Saturation, Errors',
     right: true,
     why: 'RED asks how many requests a service gets, how many of them fail and how long they take. USE asks, of a resource, how busy it is, how much work waits for it and how many errors it throws. RED was made for request-driven services, and USE for resources such as CPUs, disks and network interfaces.',
   },
   {
     key: 'swapped',
-    label: 'USE for each service, RED for each resource',
+    label: 'USE for each service: Utilisation, Saturation, Errors. RED for each resource, such as a CPU or a disk: Rate, Errors, Duration',
     why: 'Swapped. A CPU or a disk has no request to count the rate or duration of, and a service is not "busy" the way a resource is. RED reads requests, USE reads resources.',
   },
   {
     key: 'red-everything',
-    label: 'RED for everything, because every component takes requests',
+    label: 'RED for everything: Rate, Errors, Duration fit a service, a CPU or a disk alike, as every component takes requests',
     why: 'RED came out of microservices, because the USE method does not fit a service. The reverse holds too: a CPU, disk or interface is checked by how busy it is and how much work queues for it, which RED does not ask.',
   },
 ];
@@ -55,23 +56,23 @@ const SATURATION = [
 const CONNECTOR = [
   {
     key: 'spanmetrics',
-    label: 'Add the <code>spanmetrics</code> connector: it exports from a traces pipeline into a metrics pipeline, as a calls counter and a duration histogram',
+    label: 'Add the <code>span_metrics</code> connector: traces pipeline in, metrics pipeline out, as calls and duration',
     right: true,
     why: 'It counts the spans passing through it into <code>traces.span.metrics.calls</code>, by default for each service.name, span.name, span.kind and status.code, so rate is the calls and errors are the calls with an error status. It records span durations into <code>traces.span.metrics.duration</code>, in milliseconds by default. A feature gate, <code>connector.spanmetrics.legacyMetricNames</code>, brings back the legacy names, and the component is now spelled <code>span_metrics</code>, so check what your version emits.',
   },
   {
     key: 'processor',
-    label: 'Add the <code>spanmetrics</code> processor to the traces pipeline',
+    label: 'Add the <code>spanmetrics</code> processor to the traces pipeline, writing the metrics beside the spans',
     why: 'The connector replaced that processor. A processor stays inside one pipeline, and turning traces into metrics means crossing from a traces pipeline into a metrics one, which is what a connector does.',
   },
   {
     key: 'errors-metric',
-    label: 'Read the errors from a separate errors metric that the connector emits',
+    label: 'Read the errors from a separate errors metric that the connector emits beside calls and duration',
     why: 'There is no separate errors metric. An error is a call whose status code dimension is an error: <code>status.code</code> with the value <code>STATUS_CODE_ERROR</code>, or <code>otel.status_code</code> with <code>ERROR</code> when a feature gate is on.',
   },
   {
     key: 'raw-url',
-    label: 'Name the spans with the full URL, so every request path gets its own metric series',
+    label: 'Name the spans with the full URL, giving every request path its own metric series',
     why: 'Every distinct span name is a new series in each metric, which is the cardinality of 3.5. HTTP server span names are the method and <code>http.route</code>, and instrumentation must not default to the URI path. The connector README names raw URIs in span names as the usual cause of exploding span metrics, and offers an <code>aggregation_cardinality_limit</code> as a circuit breaker, not a fix.',
   },
 ];
@@ -80,18 +81,18 @@ const CONNECTOR = [
 const DASH0 = [
   {
     key: 'derived',
-    label: 'Dash0 derives RED metrics from the spans it receives, so nobody has to run a connector or emit them',
+    label: 'Dash0 derives RED metrics from the spans it receives, and nobody has to run a connector or emit them',
     right: true,
     why: 'Dash0 generates a metric, <code>dash0.spans.red</code>, from your spans to power its Service Catalog and Service Map. It is not billed as a custom metric. Rate is its count over time, errors are the spans with the status code ERROR, and duration is its bucket distribution. It is grouped by operation name, which turns <code>GET /users/123</code> into <code>GET /users/{id}</code> to keep the cardinality bounded, and you can group, filter and alert on its attributes.',
   },
   {
     key: 'connector-needed',
-    label: 'They come from a spanmetrics connector that Dash0 asks you to run in your Collector',
+    label: 'They come from a span_metrics connector that Dash0 asks you to run in your Collector',
     why: 'Dash0 does that derivation itself, from the spans it ingests. A connector in your own Collector is how you would get span metrics into a backend that does not.',
   },
   {
     key: 'service-metrics',
-    label: 'They come from each service\'s own metrics, so a service with no metrics instrumentation shows nothing',
+    label: 'They come from each service\'s own metrics, and a service with no metrics instrumentation shows nothing',
     why: 'The service views are built from spans. A service that sends traces and no metrics still gets rate, errors and duration.',
   },
 ];
@@ -130,7 +131,7 @@ export default {
         intro:
           'Cart and checkout send traces but no metrics, and the team wants RED for each service now. Spans have ' +
           'what RED needs: each one is a request with a start, an end and a status. The Collector\'s ' +
-          '<code>spanmetrics</code> connector is in the contrib distribution.',
+          '<code>span_metrics</code> connector (formerly <code>spanmetrics</code>) is in the contrib distribution.',
         question: 'How do you get RED out of the traces?',
         qid: 'ru-q-connector',
         choice: { id: 'ru-connector', choices: CONNECTOR },
@@ -206,6 +207,6 @@ export default {
       },
     ],
     finish:
-      'You can read a service with RED and a resource with USE, you know saturation is not utilisation, you can get RED from spans with the spanmetrics connector, and Dash0 derives it from your spans.',
+      'You can read a service with RED and a resource with USE, you know saturation is not utilisation, you can get RED from spans with the span_metrics connector, and Dash0 derives it from your spans.',
   },
 };

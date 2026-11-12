@@ -187,21 +187,21 @@ const RULE = [
   {
     key: 'counted-after-sampling',
     label:
-      `The <code>span_metrics</code> connector counts what <code>tail_sampling</code> keeps: all ${ERRORS} errors but only ${KEPT} of ${n(REQUESTS)} requests, ` +
+      `The <code>span_metrics</code> connector counts what <code>tail_sampling</code> keeps: all ${ERRORS} errors but ${KEPT} of ${n(REQUESTS)} requests, ` +
       `so the ratio is ${ERRORS} / ${KEPT} = ${AFTER}, not ${ERRORS} / ${n(REQUESTS)} = ${BEFORE}`,
     right: true,
     why: 'The numerator is complete and the denominator is not, so the ratio is biased up. Compute span metrics before sampling, in a pipeline with no sampling processor.',
   },
   {
     key: 'uniform-sampling',
-    label: `Sampling ${KEEP_PCT}% of traces thins errors and requests alike, so the ratio is unchanged and ${AFTER} is a dashboard fault`,
+    label: `Sampling ${KEEP_PCT}% of traces thins errors and requests alike, so the ratio is unchanged and ${AFTER} is a dashboard fault, not a real change`,
     why:
       `That is true of a sampler that keeps the same share of both, like the head sampler in 6.1: ${KEEP_PCT}% of ${ERRORS} over ${KEEP_PCT}% of ${n(REQUESTS)} is still ${BEFORE}. ` +
       `This policy keeps every error and ${KEEP_PCT}% of the rest, so the shares differ, and the dashboard shows what the connector counted.`,
   },
   {
     key: 'errors-undercounted',
-    label: `The error count is flat because the sampler keeps only ${KEEP_PCT}% of errors, so the real count is higher`,
+    label: `The error count is flat because the sampler keeps only ${KEEP_PCT}% of errors, so the real count is higher and the ratio is wrong`,
     why: `The <code>status_code</code> policy keeps every error, so the ${ERRORS} a second is the full count. It is the requests that are missing from the count.`,
   },
 ];
@@ -232,7 +232,7 @@ export default {
       },
     ],
     finish:
-      'You followed a ratio that tripled while the error count and the load balancer did not move, to a tail_sampling processor placed ahead of the span_metrics connector. ' +
+      'The ratio tripled while the error count and the load balancer did not move: a tail_sampling processor sat ahead of the span_metrics connector. ' +
       'A sampler that keeps every error and a share of the rest leaves the numerator complete and the denominator small, so compute span metrics before sampling.',
   },
 };

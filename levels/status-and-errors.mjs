@@ -102,7 +102,7 @@ export default {
             'span\'s kind. Check five spans from this morning.',
         )}${question({ id: 'status-q-sort', html: 'Pick a span, then say whether its status is right.' })}${renderSort(SORT, newSortState(SORT), { escapeHtml: ctx.escapeHtml, labelledBy: 'status-q-sort' })}`,
         }),
-        actions({ wide: true, buttonsHtml: nextButton('status-next') }),
+        actions({ wide: true, buttonsHtml: nextButton('status-next', 'Sort every item to continue.') }),
       );
       const next = bar.querySelector('#status-next');
       mountSort(ctx, SORT, {
@@ -124,7 +124,7 @@ export default {
             'a helper calls <code>span.setStatus({ code: SpanStatusCode.ERROR })</code>.',
         )}${question({ id: 'status-q-final', html: 'What status does the span end with?' })}${choiceHtml(ctx, OK_THEN_ERROR, { id: 'status', labelledBy: 'status-q-final' })}`,
         }),
-        actions({ wide: false, buttonsHtml: finishButton('status-finish') }),
+        actions({ wide: false, buttonsHtml: finishButton('status-finish', 'Pick the right answer to finish the level.') }),
       );
       const finish = bar.querySelector('#status-finish');
       mountChoice(ctx, OK_THEN_ERROR, {

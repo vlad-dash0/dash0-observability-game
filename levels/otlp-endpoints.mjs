@@ -35,7 +35,7 @@ const PORT = [
   },
   {
     key: 'needs-path',
-    label: 'The endpoint has to end in <code>/v1/traces</code>',
+    label: 'The endpoint has to end in <code>/v1/traces</code>, because the exporter does not add a path',
     why: 'With <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> an OTLP/HTTP exporter adds the signal path itself, so the general variable is a base URL. The wrong port is the problem here.',
   },
 ];
@@ -50,7 +50,7 @@ const SIGNAL = [
   },
   {
     key: 'adds-path',
-    label: 'To <code>http://collector:4318/v1/traces</code>, as it does for the general variable',
+    label: 'To <code>http://collector:4318/v1/traces</code>, as it does for the general endpoint variable',
     why: 'The exporter adds <code>/v1/traces</code> only for the general variable, <code>OTEL_EXPORTER_OTLP_ENDPOINT</code>. A per-signal variable takes precedence over it and its URL is used without any change.',
   },
   {
@@ -121,18 +121,18 @@ const CONFIG = {
 const TOKEN = [
   {
     key: 'header',
-    label: 'In an <code>Authorization: Bearer</code> header: <code>OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer auth_token_example</code> in an SDK, the <code>headers_setter</code> extension in a Collector',
+    label: 'In an <code>Authorization: Bearer</code> header: <code>OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer auth_token_example</code> in an SDK',
     right: true,
     why: 'Dash0 reads the auth token from an <code>Authorization: Bearer</code> header. The OTLP exporter has a headers setting for exactly this: <code>OTEL_EXPORTER_OTLP_HEADERS</code> in an SDK, a list of key=value pairs, and the <code>headers_setter</code> extension with the exporter\'s <code>auth</code> setting in a Collector. Read the value from an environment variable or a secret instead of writing it into a file.',
   },
   {
     key: 'url',
-    label: 'In the endpoint URL, for example as a query parameter',
+    label: 'In the endpoint URL, as a query parameter appended to the address the exporter sends every batch to',
     why: 'The endpoint is only an address. Dash0 reads the token from the <code>Authorization</code> header, and a token in a URL tends to end up in logs and config files.',
   },
   {
     key: 'resource',
-    label: 'As a resource attribute on the service\'s Resource',
+    label: 'As a resource attribute on the service\'s Resource, and it travels with every batch of telemetry',
     why: 'Resource attributes describe what produces the telemetry and travel with it as data, so the token would be sent along with every batch. Authentication is a header on the request, not part of the data.',
   },
 ];

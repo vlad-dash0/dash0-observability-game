@@ -119,7 +119,7 @@ export default {
           'In payments, a handler catches the provider\'s error, records it, and rethrows. Nothing else touches the span:',
           )}${codeBlock('catch (err) {\n  span.recordException(err);\n  throw err;\n} finally {\n  span.end();\n}')}${question({ id: 'evl-q', html: 'What status does the span end with?' })}${choiceHtml(ctx, RECORDED, { id: 'evl', labelledBy: 'evl-q' })}`,
         }),
-        actions({ wide: false, buttonsHtml: nextButton('evl-next') }),
+        actions({ wide: false, buttonsHtml: nextButton('evl-next', 'Pick the right answer to continue.') }),
       );
       const btn = next(stepErrors);
       mountChoice(ctx, RECORDED, {
@@ -142,7 +142,7 @@ export default {
             `<ul>${stories}</ul>`,
           )}${question({ html: 'Give each span the status its outcome calls for.' })}${renderBuild(ERRORS, newBuildState(ERRORS), { escapeHtml: e })}`,
         }),
-        actions({ wide: true, buttonsHtml: nextButton('evl-next') }),
+        actions({ wide: true, buttonsHtml: nextButton('evl-next', 'Solve the board and press Check to continue.') }),
       );
       const btn = next(stepBatch);
       mountBuild(ctx, ERRORS, {
@@ -164,7 +164,7 @@ export default {
             'have only one parent, so it stays a root.',
           )}${question({ html: 'Connect <code>send batch</code> to every message it handled.' })}${renderBuild(BATCH, newBuildState(BATCH), { escapeHtml: e })}`,
         }),
-        actions({ wide: true, buttonsHtml: finishButton('evl-finish') }),
+        actions({ wide: true, buttonsHtml: finishButton('evl-finish', 'Solve the board and press Check to finish the level.') }),
       );
       const finish = bar.querySelector('#evl-finish');
       mountBuild(ctx, BATCH, {

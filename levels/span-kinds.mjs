@@ -109,7 +109,7 @@ export default {
             'out and SERVER handles the call; PRODUCER sends a message and CONSUMER processes it.',
           )}${question({ html: 'Give each span its kind.' })}${renderBuild(MAP, newBuildState(MAP), { escapeHtml: e })}${feedback({ id: 'kinds-edges' })}`,
         }),
-        actions({ wide: true, buttonsHtml: nextButton('kinds-next') }),
+        actions({ wide: true, buttonsHtml: nextButton('kinds-next', 'Solve the board and press Check to continue.') }),
       );
       const next = bar.querySelector('#kinds-next');
       const line = ctx.ovBody.querySelector('#kinds-edges');
@@ -136,7 +136,7 @@ export default {
             '<code>POST /charge</code> as INTERNAL.',
           )}${question({ id: 'kinds-q', html: 'What happens to the map if <code>POST /charge</code> is INTERNAL?' })}${choiceHtml(ctx, WRONG_KIND, { id: 'kinds', labelledBy: 'kinds-q' })}`,
         }),
-        actions({ wide: false, buttonsHtml: finishButton('kinds-finish') }),
+        actions({ wide: false, buttonsHtml: finishButton('kinds-finish', 'Pick the right answer to finish the level.') }),
       );
       const finish = bar.querySelector('#kinds-finish');
       mountChoice(ctx, WRONG_KIND, {
