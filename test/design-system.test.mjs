@@ -673,3 +673,13 @@ test('#332 a table cell never breaks a word mid-letter, a scrolling code block s
   assert.equal(cause['font-weight'], choice['font-weight']);
   assert.equal(cause['font-size'], choice['font-size']);
 });
+
+test('#340 the value cell of a two-column table wraps at any character, the other columns keep whole words', () => {
+  const kit = sheetRules('kit.css');
+  const hit = (sel) => kit.find((r) => r.selector.split(',').map((x) => x.trim()).includes(sel));
+  for (const sel of ['.ui-table td:nth-child(2):last-child', '.ui-table td:nth-child(2):last-child code', '.ui-prose table td:nth-child(2):last-child', '.ui-prose table td:nth-child(2):last-child code']) {
+    assert.equal(Object.fromEntries(decls(hit(sel).body))['overflow-wrap'], 'anywhere', sel);
+  }
+  const all = kit.find((r) => r.selector === '.ui-table th, .ui-table td, .ui-prose th, .ui-prose td');
+  assert.equal(Object.fromEntries(decls(all.body))['overflow-wrap'], 'normal', 'a cell in a wider table still never splits a word (#332)');
+});

@@ -30,12 +30,12 @@ const PORT = [
   },
   {
     key: 'same-port',
-    label: 'Nothing: port 4317 serves both protocols, so the cause is somewhere else',
+    label: 'Nothing: port 4317 serves both OTLP/gRPC and OTLP/HTTP on every Collector, so the cause is somewhere else',
     why: 'Each OTLP transport has its own default port, 4317 for gRPC and 4318 for HTTP. A client has to use the one that matches its protocol.',
   },
   {
     key: 'needs-path',
-    label: 'The endpoint has to end in <code>/v1/traces</code>, because the exporter does not add a path',
+    label: 'The endpoint has to end in <code>/v1/traces</code>: the exporter does not add a path to the base URL you give it',
     why: 'With <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> an OTLP/HTTP exporter adds the signal path itself, so the general variable is a base URL. The wrong port is the problem here.',
   },
 ];
@@ -127,7 +127,7 @@ const TOKEN = [
   },
   {
     key: 'url',
-    label: 'In the endpoint URL, as a query parameter appended to the address the exporter sends every batch to',
+    label: 'In the endpoint URL, as a query parameter appended to the address the exporter sends every batch of spans, metrics and logs to',
     why: 'The endpoint is only an address. Dash0 reads the token from the <code>Authorization</code> header, and a token in a URL tends to end up in logs and config files.',
   },
   {

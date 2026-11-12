@@ -36,7 +36,7 @@ const METHODS = [
 const SATURATION = [
   {
     key: 'utilisation',
-    label: 'Utilisation: 60% means the CPU has room, so something else is slow',
+    label: 'Utilisation: 60% busy on average means the CPU has room, so something else is slow',
     why: 'A long average hides bursts. Brendan Gregg\'s own example is a CPU that sat at 100% for seconds at a time inside a five-minute average that never passed 80%, with latency from CPU saturation all the same.',
   },
   {
@@ -47,7 +47,7 @@ const SATURATION = [
   },
   {
     key: 'errors',
-    label: 'Errors: the count of error events on that machine',
+    label: 'Errors: the count of error events on that machine, such as disk faults',
     why: 'Errors matter, since a failed and retried operation can slow things down without being noticed. But nothing failed here: the requests wait, and waiting is what saturation measures.',
   },
 ];

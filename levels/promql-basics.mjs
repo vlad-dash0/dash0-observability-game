@@ -15,9 +15,9 @@ const UNIT = [
     why: 'A bare PromQL metric name cannot contain dots. With the classic translation each one becomes an underscore.',
   },
   {
-    key: 'no-unit',
-    label: '<code>http_server_request_duration_bucket</code>',
-    why: 'The unit is missing. The translation adds the unit as a word after the name, here <code>_seconds</code>, before any suffix for the type.',
+    key: 'wrong-unit',
+    label: '<code>http_server_request_duration_milliseconds_bucket</code>',
+    why: 'The unit is wrong. The metric\'s unit is <code>s</code>, so the translation adds <code>_seconds</code>, not <code>_milliseconds</code>, before any suffix for the type.',
   },
   {
     key: 'seconds-bucket',

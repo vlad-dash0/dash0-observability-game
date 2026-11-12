@@ -127,7 +127,7 @@ const RBAC = [
   },
   {
     key: 'api-key',
-    label: 'A Dash0 API key in the processor settings, for looking the pods up in Dash0',
+    label: 'A Dash0 auth token in the processor settings, the same one the exporter uses, for looking pods up in Dash0',
     why: 'The processor talks to the Kubernetes API of the cluster, not to Dash0. Its access is Kubernetes access, granted with RBAC. A Dash0 token belongs to the exporter.',
   },
   {

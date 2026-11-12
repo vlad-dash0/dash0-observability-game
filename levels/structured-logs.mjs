@@ -194,7 +194,7 @@ const SEVERITY = [
 const BRIDGE = [
   {
     key: 'call-bridge',
-    label: 'Replace the logging calls with direct calls to the Logs Bridge API',
+    label: 'Replace the logging calls with direct calls to the Logs Bridge API, in each file that logs through your library today',
     why: 'The Logs Bridge API is provided for logging library authors, to build appenders. As an application developer you are not meant to call it directly for ordinary log lines.',
   },
   {

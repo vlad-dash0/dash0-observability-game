@@ -214,12 +214,12 @@ const RULE = [
   },
   {
     key: 'defined-not-listed',
-    label: 'The new <code>otlp_grpc/dash0-eu</code> exporter is defined but listed in no pipeline, so it does nothing and the pipelines run without it',
+    label: 'The new <code>otlp_grpc/dash0-eu</code> exporter is defined but listed in no pipeline, so it does nothing and the pipelines keep running without it',
     why: 'The first half is true: a component that is defined but not listed does nothing (level 5.1). It is not what stopped the data. The pipelines also list <code>otlp_grpc/dash0</code>, which nothing defines, and an id that is listed but not defined is an error that stops the Collector, not an exporter that is skipped.',
   },
   {
     key: 'same-exporter',
-    label: 'The part after the slash is only a label, so <code>otlp_grpc/dash0</code> and <code>otlp_grpc/dash0-eu</code> are the same exporter and the rename changes nothing',
+    label: 'The part after the slash is only a label, so <code>otlp_grpc/dash0</code> and <code>otlp_grpc/dash0-eu</code> are the same exporter and the rename changes nothing for the pipelines or for the config check',
     why: 'Ids follow <code>type[/name]</code>, and the full id is what identifies a component: the same type can be defined many times as long as the ids are different. <code>otlp_grpc/dash0</code> and <code>otlp_grpc/dash0-eu</code> are different exporters, and only the second is defined.',
   },
 ];

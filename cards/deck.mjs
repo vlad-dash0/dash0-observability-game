@@ -288,7 +288,7 @@ export const DECK = [
       'of them that fail; Duration, how long they take, as a distribution. USE is Brendan Gregg\'s checklist for each ' +
       'resource, such as a CPU or a disk: Utilisation, how busy it is; Saturation, how much work waits for it, often a ' +
       'queue; Errors, the count of error events. A burst can saturate a resource while its average utilisation looks ' +
-      'low. When a service sends traces but no metrics, the Collector\'s spanmetrics connector (contrib) turns the spans ' +
+      'low. When a service sends traces but no metrics, the Collector\'s span_metrics connector (contrib) turns the spans ' +
       'into a calls counter and a duration histogram: rate is the calls, errors are the calls with an error status, and ' +
       'the metric names and the duration unit depend on the version, so check yours. Count a service\'s own requests ' +
       'from its SERVER spans, and keep span names low-cardinality, because every distinct name is a series.',

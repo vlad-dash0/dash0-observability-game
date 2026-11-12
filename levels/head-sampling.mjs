@@ -146,7 +146,7 @@ const PLAN = {
 const WHY = [
   {
     key: 'header-lost',
-    label: 'Setting a sampler on a service stops it propagating <code>traceparent</code>, so the children cannot see the root',
+    label: 'Setting a sampler on a service stops it propagating <code>traceparent</code> to its callees, so the children cannot see the root\'s decision',
     why: 'The sampler decides whether a span is recorded and exported, and propagation is separate: the sampled flag still travels in <code>traceparent</code> to the children. The children saw the root\'s decision and did not use it.',
   },
   {
@@ -157,7 +157,7 @@ const WHY = [
   },
   {
     key: 'ratio-stacks',
-    label: 'Each service applies its own ratio on top of the root\'s, so the chances multiply and the children keep too little',
+    label: 'Each service applies its own ratio on top of the root\'s, so the chances multiply down each hop and the children keep too little of the traces',
     why: 'Ratios do not multiply. Under ParentBased the ratio belongs to the root sampler, which never runs for a span that has a parent, so a child follows the flag. A child set to <code>always_on</code> keeps too much, not too little.',
   },
 ];

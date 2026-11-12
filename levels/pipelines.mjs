@@ -19,7 +19,7 @@
 const JOIN = [
   {
     key: 'processor',
-    label: 'A processor, listed in the traces pipeline, that converts its spans into metrics',
+    label: 'A processor, listed in the traces pipeline, that converts its spans into metrics for the metrics pipeline',
     why: 'A processor changes or filters data inside one pipeline. It cannot hand traces to a different pipeline as metrics.',
   },
   {

@@ -45,7 +45,7 @@ const SPOT = {
 const WHY = [
   {
     key: 'cleans-data',
-    label: 'So it can clean up the data before the other processors see it, and free memory early',
+    label: 'So it can clean up the data before the other processors see it, and free memory held by old spans',
     why: 'The memory limiter does not change telemetry. It checks the Collector\'s memory use at intervals and, when it is too high, refuses data.',
   },
   {

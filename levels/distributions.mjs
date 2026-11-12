@@ -22,7 +22,7 @@
 const UNKNOWN = [
   {
     key: 'ignored',
-    label: 'It starts, and the pipeline that lists <code>k8sattributes</code> just passes data through',
+    label: 'It starts, and the pipeline that lists <code>k8sattributes</code> just passes the data through unchanged',
     why: 'The Collector checks every component id in the config against the components compiled into the binary. A component it does not have is an error, not something to skip.',
   },
   {
@@ -33,7 +33,7 @@ const UNKNOWN = [
   },
   {
     key: 'loads-on-demand',
-    label: 'It starts, and downloads the processor from the contrib repository the first time a pipeline needs it',
+    label: 'It starts, and downloads the processor from the opentelemetry-collector-contrib repository the first time a pipeline needs it',
     why: 'The Collector does not fetch components at run time. Everything it can run is compiled in, so a missing one means a different distribution or a custom build.',
   },
 ];

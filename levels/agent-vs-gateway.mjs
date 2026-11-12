@@ -23,7 +23,7 @@
 const PATTERN = [
   {
     key: 'agent',
-    label: 'A Collector next to the workload: a sidecar in the pod, or a <code>DaemonSet</code> pod on each node that the apps on that node send to',
+    label: 'A Collector next to the workload: a sidecar in the pod, or a <code>DaemonSet</code> pod on each node that the apps on that node send to, forwarding it onward',
     why: 'That is the agent pattern. An agent runs close to the application or on the same host, takes its telemetry and forwards it to a backend or to a gateway.',
   },
   {
@@ -34,7 +34,7 @@ const PATTERN = [
   },
   {
     key: 'embedded',
-    label: 'A Collector built into each application\'s process, with no separate Collector process to run',
+    label: 'A Collector built into each application\'s process as a library, with no separate Collector process to run, upgrade or scale',
     why: 'Neither deployment pattern is a Collector inside the application. The application\'s SDK sends OTLP to a Collector that runs beside it (an agent) or to a central one (a gateway).',
   },
 ];
@@ -49,12 +49,12 @@ const WHY = [
   },
   {
     key: 'wait',
-    label: '<code>decision_wait</code> is too short, so each replica decides before the late spans of a trace arrive',
+    label: '<code>decision_wait</code> is too short for slow requests, so each replica decides before the late spans of a trace arrive',
     why: '<code>decision_wait</code> is how long the processor waits before it decides on a trace, and a longer wait helps with late spans. It does not help when the spans are not at that Collector at all because they went to another replica.',
   },
   {
     key: 'unsupported',
-    label: '<code>tail_sampling</code> cannot run in a gateway, because only agents can hold spans in memory',
+    label: '<code>tail_sampling</code> cannot run in a gateway Collector, because only agent Collectors can hold spans in memory for a time',
     why: 'The processor runs in any Collector that includes it, such as the contrib and Kubernetes distributions. An agent only sees the spans of the pods on its own node, which does not help.',
   },
 ];
