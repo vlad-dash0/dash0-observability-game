@@ -171,7 +171,7 @@ const BACKEND = [
   },
   {
     key: 'filter-processor',
-    label: 'Add the filter processor to the Collector with a condition on <code>user.email</code>: it removes the attribute from the matching spans and keeps the spans intact',
+    label: 'Add the filter processor to the Collector with a condition on <code>user.email</code>: it removes the attribute from the matching spans and keeps the spans',
     why: 'The filter processor is the Collector-side drop: it drops whole spans, logs or data points that match its conditions, before anything is sent. It does not edit one attribute, so the spans would be lost with the email. Changing an attribute is the transform processor\'s job.',
   },
   {

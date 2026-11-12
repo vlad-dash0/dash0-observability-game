@@ -47,7 +47,7 @@ const SATURATION = [
   },
   {
     key: 'errors',
-    label: 'Errors: the count of error events on that machine, such as disk faults',
+    label: 'Errors: the count of error events on that machine, such as failed disk writes',
     why: 'Errors matter, since a failed and retried operation can slow things down without being noticed. But nothing failed here: the requests wait, and waiting is what saturation measures.',
   },
 ];

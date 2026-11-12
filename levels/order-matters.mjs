@@ -45,7 +45,7 @@ const SPOT = {
 const WHY = [
   {
     key: 'cleans-data',
-    label: 'So it can clean up the data before the other processors see it, and free memory held by old spans',
+    label: 'So it can clean up the data before the other processors see it, and free memory early',
     why: 'The memory limiter does not change telemetry. It checks the Collector\'s memory use at intervals and, when it is too high, refuses data.',
   },
   {
@@ -65,7 +65,7 @@ const WHY = [
 const BATCH = [
   {
     key: 'early',
-    label: 'Early, right after memory_limiter in the list, so everything after it handles fewer, bigger batches',
+    label: 'Early, right after memory_limiter in the list',
     why: 'Batching before the processors that drop or change data batches telemetry that may be discarded or changed straight afterwards. It also clears the request context, which a processor like k8sattributes reads.',
   },
   {

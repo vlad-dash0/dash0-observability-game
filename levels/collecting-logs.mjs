@@ -159,7 +159,7 @@ const MULTILINE = [
   },
   {
     key: 'frame-pattern',
-    label: 'Set <code>multiline</code> with a <code>line_start_pattern</code> that matches the stack frames: <code>^\\s+at </code>, one entry for each frame of the trace',
+    label: 'Set <code>multiline</code> with a <code>line_start_pattern</code> that matches the stack frames: <code>^\\s+at </code>',
     why: 'The start pattern has to match the line an entry begins with, and a frame is not where an entry begins. A pattern that matches frames starts a new entry at every frame, so the trace is still cut into pieces, and the next record\'s timestamp line is glued onto the last frame.',
   },
   {
@@ -204,7 +204,7 @@ const DASH0 = [
   },
   {
     key: 'needs-parser',
-    label: 'Nothing: without a parser in the Collector the records stay plain text with no severity until someone writes a parser for them',
+    label: 'Nothing: without a parser in the Collector the records stay plain text with no severity',
     why: 'Dash0 does not wait for a parser. Log AI infers a severity and extracts patterns from unstructured messages as they are ingested. A parser in the Collector is still the better fix when you can write one.',
   },
 ];

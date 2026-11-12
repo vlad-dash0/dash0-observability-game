@@ -214,7 +214,7 @@ const RULE = [
   },
   {
     key: 'defined-not-listed',
-    label: 'The new <code>otlp_grpc/dash0-eu</code> exporter is defined but listed in no pipeline, so it does nothing and the pipelines keep running without it',
+    label: 'The new <code>otlp_grpc/dash0-eu</code> exporter is defined but listed in no pipeline, so it does nothing and the pipelines keep running without it, sending nothing to Dash0 until it is listed',
     why: 'The first half is true: a component that is defined but not listed does nothing (level 5.1). It is not what stopped the data. The pipelines also list <code>otlp_grpc/dash0</code>, which nothing defines, and an id that is listed but not defined is an error that stops the Collector, not an exporter that is skipped.',
   },
   {

@@ -56,7 +56,7 @@ const TOTAL = [
 const DASH0 = [
   {
     key: 'translated-only',
-    label: 'Only the translated names work, and you have to learn how each OpenTelemetry name is translated first',
+    label: 'Only the translated names work, and you have to learn the translation first',
     why: 'Dash0 keeps the original name too. Every metric carries an <code>otel_metric_name</code> label, so you can select it without knowing how it was translated.',
   },
   {

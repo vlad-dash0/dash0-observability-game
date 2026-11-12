@@ -45,6 +45,11 @@ const maxOf = (labels) => Math.max(...labels.map((x) => x.length));
 const STRATEGIES = {
   longest: (labels) => labels.map((l) => l.length === maxOf(labels)),
   shortest: (labels) => labels.map((l) => l.length === Math.min(...labels.map((x) => x.length))),
+  // The middle length: neither the longest nor the shortest option (a two-option question has none, so every option is marked).
+  middle: (labels) => {
+    const [lo, hi] = [Math.min(...labels.map((x) => x.length)), maxOf(labels)];
+    return labels.map((l) => l.length > lo && l.length < hi);
+  },
   noTail: (labels) => labels.map((l) => !TAIL.test(l)),
   longestNoTail: (labels) => {
     const ok = labels.map((l) => !TAIL.test(l));
@@ -64,18 +69,32 @@ const score = (qs, mark) =>
     return sum + (m[right] ? 1 / m.filter(Boolean).length : 0);
   }, 0);
 
-const CAP_OVER_CHANCE = 3; // points above chance a blind rule may reach
+const BAND = 3; // points a blind rule may sit above or below chance: a rule far below is the same tell, read backwards
 
-test('no blind option-shape rule beats chance by more than a few points', async () => {
+test('no blind option-shape rule strays from chance by more than a few points, either way', async () => {
   const qs = await allQuestions();
   assert.ok(qs.length >= 77, `found ${qs.length} questions`);
   const chance = qs.reduce((s, q) => s + 1 / q.choices.length, 0);
-  const over = Object.entries(STRATEGIES)
+  const off = Object.entries(STRATEGIES)
     .map(([name, mark]) => [name, score(qs, mark)])
-    .filter(([, got]) => got > chance + CAP_OVER_CHANCE)
-    .map(([name, got]) => `${name}: ${got.toFixed(1)} of ${qs.length} first try (chance ${chance.toFixed(1)}, cap ${(chance + CAP_OVER_CHANCE).toFixed(1)})`);
+    .filter(([, got]) => Math.abs(got - chance) > BAND)
+    .map(([name, got]) => `${name}: ${got.toFixed(1)} of ${qs.length} first try (chance ${chance.toFixed(1)}, band ${(chance - BAND).toFixed(1)} to ${(chance + BAND).toFixed(1)})`);
   if (process.env.TELLS) for (const [name, mark] of Object.entries(STRATEGIES)) console.log(`TELLS ${name} ${score(qs, mark).toFixed(1)} of ${qs.length} (chance ${chance.toFixed(1)})`);
-  assert.deepEqual(over, []);
+  assert.deepEqual(off, []);
+});
+
+test('the right option is not concentrated at one length rank: shortest, middle and longest each hold at most 45% of the three-option questions', async () => {
+  const qs = (await allQuestions()).filter((q) => q.choices.length === 3);
+  const rank = { shortest: 0, middle: 0, longest: 0 };
+  for (const q of qs) {
+    const lens = q.choices.map((c) => plain(c.label).length);
+    const mine = lens[q.choices.findIndex((c) => c.right)];
+    if (mine <= Math.min(...lens)) rank.shortest++;
+    else if (mine >= Math.max(...lens)) rank.longest++;
+    else rank.middle++;
+  }
+  if (process.env.TELLS) console.log(`TELLS ranks ${JSON.stringify(rank)} of ${qs.length}`);
+  for (const [name, n] of Object.entries(rank)) assert.ok(n <= 0.45 * qs.length, `${name}: ${n} of ${qs.length} three-option questions`);
 });
 
 test('the scorer has teeth: a question whose right option is the longest and has no tail is caught', () => {

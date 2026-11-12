@@ -55,7 +55,7 @@ const SIGNAL = [
   },
   {
     key: 'rejected',
-    label: 'Nowhere: the exporter refuses a URL without a path',
+    label: 'Nowhere: the exporter refuses a URL without a path and logs an error at startup',
     why: 'Nothing requires a path. The exporter accepts the URL and sends to it as it is, and a URL with no path means the root path.',
   },
 ];
@@ -132,7 +132,7 @@ const TOKEN = [
   },
   {
     key: 'resource',
-    label: 'As a resource attribute on the service\'s Resource, and it travels with every batch of telemetry',
+    label: 'As a resource attribute such as <code>auth.token</code> on the service\'s Resource, and it travels with every batch of telemetry',
     why: 'Resource attributes describe what produces the telemetry and travel with it as data, so the token would be sent along with every batch. Authentication is a header on the request, not part of the data.',
   },
 ];

@@ -28,7 +28,7 @@ const WHEN = [
   },
   {
     key: 'in-backend',
-    label: 'In the backend, from the IP address and the port that the telemetry arrives from',
+    label: 'In the backend, from the IP address that the telemetry arrives from',
     why: 'A backend can only read the resource attributes that arrive with the telemetry. Detection happens before that, in the SDK when it starts.',
   },
 ];
@@ -132,7 +132,7 @@ const RBAC = [
   },
   {
     key: 'nothing',
-    label: 'Nothing: it reads the pod name and namespace off the telemetry that arrives, with no lookup',
+    label: 'Nothing: it reads the pod name and namespace off the telemetry that arrives, with no lookup against the cluster or its API',
     why: 'The processor looks the pod up: it keeps a record of the cluster\'s pods, and matches telemetry to one, by default through the IP address of the incoming connection. That lookup uses the Kubernetes API, which needs permissions.',
   },
 ];

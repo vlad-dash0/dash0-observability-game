@@ -165,7 +165,7 @@ const ATTRS = [
   },
   {
     key: 'on-resource',
-    label: 'As resource attributes, so every record has them',
+    label: 'As resource attributes, set once on the Resource, so every record of the service has them',
     why: 'A Resource is fixed for a source: every record from it has the same Resource. An order and a payment method differ from record to record, so they cannot be set once on the source.',
   },
 ];
@@ -185,7 +185,7 @@ const SEVERITY = [
   },
   {
     key: 'body',
-    label: 'Search the Body for the word <code>warn</code>',
+    label: 'Search the Body for the word <code>warn</code>, in any letter case',
     why: 'The Body is the message, which can be any text and can say "warn" about something harmless, or not say it at all. Severity has fields of its own.',
   },
 ];
@@ -194,7 +194,7 @@ const SEVERITY = [
 const BRIDGE = [
   {
     key: 'call-bridge',
-    label: 'Replace the logging calls with direct calls to the Logs Bridge API, in each file that logs through your library today',
+    label: 'Replace the logging calls with direct calls to the Logs Bridge API',
     why: 'The Logs Bridge API is provided for logging library authors, to build appenders. As an application developer you are not meant to call it directly for ordinary log lines.',
   },
   {

@@ -157,7 +157,7 @@ const WHY = [
   },
   {
     key: 'ratio-stacks',
-    label: 'Each service applies its own ratio on top of the root\'s, so the chances multiply down each hop and the children keep too little of the traces',
+    label: 'Each service applies its own ratio on top of the root\'s, so the chances multiply and the children keep too little',
     why: 'Ratios do not multiply. Under ParentBased the ratio belongs to the root sampler, which never runs for a span that has a parent, so a child follows the flag. A child set to <code>always_on</code> keeps too much, not too little.',
   },
 ];

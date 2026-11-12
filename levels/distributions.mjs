@@ -33,7 +33,7 @@ const UNKNOWN = [
   },
   {
     key: 'loads-on-demand',
-    label: 'It starts, and downloads the processor from the opentelemetry-collector-contrib repository the first time a pipeline needs it',
+    label: 'It starts, and downloads the processor from the contrib repository the first time a pipeline needs it',
     why: 'The Collector does not fetch components at run time. Everything it can run is compiled in, so a missing one means a different distribution or a custom build.',
   },
 ];

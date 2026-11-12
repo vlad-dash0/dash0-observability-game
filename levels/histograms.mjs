@@ -11,7 +11,7 @@
 const KIND = [
   {
     key: 'fixed',
-    label: 'Explicit: you give a list of boundaries once, such as 5, 10, 25 and 50 ms, and the histogram adapts them as the data changes',
+    label: 'Explicit: you give a list of boundaries once and the histogram adapts them as the data changes',
     why: 'An explicit bucket histogram keeps the boundaries you gave it (or the default or advisory ones the SDK falls back on). Values outside them pile up in the first or last bucket, which is why picking them well matters.',
   },
   {
@@ -22,7 +22,7 @@ const KIND = [
   },
   {
     key: 'exact',
-    label: 'Exponential: it keeps every individual value in memory, and a percentile read from it is exact, with no estimate and no bucket error',
+    label: 'Exponential: it keeps every value, and a percentile read from it is exact, with no estimate and no bucket error',
     why: 'Both kinds count observations into buckets and keep a count, a sum and, by default, a min and max. A percentile read from either is an estimate. The exponential one is just built to keep the error small across a wide range.',
   },
 ];
@@ -42,7 +42,7 @@ const BUCKETS = [
   },
   {
     key: 'trust-average',
-    label: 'Nothing: the 0.79 second average is the number to trust, as it uses every request',
+    label: 'Nothing: the 0.79 second average is the number to trust',
     why: 'The average is the one that hid the problem. A mean is a sum divided by a count, so a few very slow requests are diluted by every fast one.',
   },
 ];

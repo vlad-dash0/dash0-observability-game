@@ -23,7 +23,7 @@
 const PATTERN = [
   {
     key: 'agent',
-    label: 'A Collector next to the workload: a sidecar in the pod, or a <code>DaemonSet</code> pod on each node that the apps on that node send to, forwarding it onward',
+    label: 'A Collector next to the workload: a sidecar in the pod, or a <code>DaemonSet</code> pod on each node that the apps on that node send to',
     why: 'That is the agent pattern. An agent runs close to the application or on the same host, takes its telemetry and forwards it to a backend or to a gateway.',
   },
   {
