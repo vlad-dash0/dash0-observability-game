@@ -10,7 +10,7 @@
    step's own width (a literal: custom properties do not work in container conditions). */
 .ui-step {
   container: level / inline-size;
-  inline-size: 100%; max-inline-size: var(--layout-narrow); margin-inline: auto;
+  inline-size: 100%; max-inline-size: var(--layout-narrow); margin-inline: 0 auto; /* start-aligned: a narrow and a wide step share one left edge */
   display: flex; flex-direction: column; gap: var(--space-5);
 }
 .ui-step--wide { max-inline-size: var(--layout-wide); }
@@ -22,20 +22,28 @@
   .ui-split-side { position: sticky; top: 0; }
 }
 .ui-actions {
-  inline-size: 100%; max-inline-size: var(--layout-narrow); margin-inline: auto;
-  display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-3);
+  inline-size: 100%; max-inline-size: var(--layout-narrow); margin-inline: 0 auto;
+  display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-2) var(--space-3);
+}
+/* Why the button before it is disabled, on a line under the row; gone once that button is enabled (no script involved). */
+.ui-reason { flex: 1 1 100%; margin: 0; min-width: 0; font-size: 13.5px; line-height: 1.4; color: var(--color-text-muted); text-align: right; text-wrap: balance; }
+.ui-btn:not(:disabled) + .ui-reason { visibility: hidden; } /* keeps its box, so the button never moves under the cursor; hidden also drops it from speech */
+/* Buttons side by side as pills; a grid parent would stretch a lone one to the full width. */
+.ui-btn-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+@media (max-width: 520px) {
+  /* Two buttons share a row (labels may wrap) instead of stacking; the reason takes a row of its own. */
+  .ui-actions .ui-btn:not(:only-of-type) { align-self: stretch; flex: 1 1 140px; padding-inline: var(--space-3); text-align: center; }
 }
 .ui-actions--wide { max-inline-size: var(--layout-wide); }
 
 /* ---------- Lesson glow card (text.mjs) ---------- */
-/* A hairline edge, an amber glow top left and a dot top right over the surface; the eyebrow is
+/* A hairline edge and an amber glow top left over the surface; the eyebrow is
    decoration (empty alt text), so screen readers read the lesson only. */
 .ui-lesson {
   position: relative; overflow: hidden; border-radius: var(--radius); padding: var(--space-5) var(--space-5) 22px;
   border: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
   font-size: var(--text-lesson); line-height: 1.6; font-weight: var(--weight-regular); color: var(--color-lesson);
   background:
-    radial-gradient(circle at 1.5px 1.5px, var(--color-lesson-dot) 1px, transparent 1.5px) right 14px top 14px / 14px 14px no-repeat,
     radial-gradient(120% 110% at 0% 0%, var(--color-lesson-glow), transparent 62%),
     var(--color-surface);
 }
@@ -45,6 +53,7 @@
   color: var(--color-lesson-eyebrow);
 }
 .ui-lesson p, .ui-lesson ul, .ui-lesson ol { max-inline-size: var(--measure); }
+.ui-lesson { max-inline-size: calc(var(--measure) + 2 * var(--space-5)); } /* one reading width in a narrow and a wide step, from the same left edge */
 .ui-lesson p + p, .ui-lesson p + ul, .ui-lesson p + ol { margin-top: var(--space-3); }
 .ui-lesson ul, .ui-lesson ol { padding-left: 1.4em; }
 .ui-lesson code {
@@ -62,9 +71,8 @@
 }
 
 /* ---------- Question, step heading, eyebrow, note, prose, code (text.mjs) ---------- */
-/* D4: centred in a narrow step, left-aligned in a wide one. */
-.ui-question { font-size: var(--text-q); font-weight: var(--weight-semibold); line-height: 1.35; text-align: center; overflow-wrap: anywhere; /* a long word or code name wraps at 320px */ }
-.ui-step--wide .ui-question { text-align: left; }
+/* D4 (revised, #321): questions are left-aligned in every step. */
+.ui-question { font-size: var(--text-q); font-weight: var(--weight-semibold); line-height: 1.35; text-align: left; overflow-wrap: anywhere; /* a long word or code name wraps at 320px */ }
 .ui-eyebrow {
   font-family: var(--font-mono); font-size: 11px; font-weight: var(--weight-semibold); letter-spacing: .08em;
   text-transform: uppercase; color: var(--color-text-muted);
@@ -175,7 +183,7 @@
 
 /* ---------- Chip (chip.mjs, side.mjs) ---------- */
 .ui-chip {
-  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%; inline-size: fit-content; /* never stretched by a column parent */
   font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.6; font-variant-numeric: tabular-nums;
   padding: 1px var(--space-2); border-radius: var(--radius-pill); border: 1px solid var(--color-border);
   color: var(--color-text-muted); white-space: normal; overflow-wrap: anywhere;
@@ -400,9 +408,9 @@
 .ui-dots[data-tone="hint"] i[data-on="true"] { background: var(--color-hint); }
 
 /* ---------- Side column (side.mjs) ---------- */
-/* The helps chips, then the column: the success card (the globe's night in both themes,
+/* The helps chips, then the column: the success card (the globe's night,
    hidden until success; its heading takes focus by script and shows no ring), the score card
-   and the hint tools. Stars are outlines until success, then the earned ones fill. */
+   and the hint tools. The stars still possible are filled; lost ones are dashed outlines; earned ones are solid. */
 .ui-help-chips { display: flex; flex-wrap: wrap; gap: 6px var(--space-2); align-items: center; font-size: 12px; color: var(--color-text-muted); }
 .ui-help-chips-title { white-space: nowrap; }
 @container level (max-width: 600px) {
@@ -431,6 +439,11 @@
 }
 .ui-win-swirl canvas, .ui-win-swirl svg { display: block; inline-size: 100%; block-size: 100%; }
 .ui-win-text { display: grid; padding: 0 14px 14px; }
+@container level (max-width: 959px) {
+  /* Stacked under the board: a short row (swirl left, text right), so the board's result stays in view. */
+  .ui-win:not([hidden]) { grid-template-columns: 96px minmax(0, 1fr); align-items: center; }
+  .ui-win-text { padding: 14px 14px 14px 0; }
+}
 .ui-win-title { font-size: 18px; font-weight: var(--weight-semibold); }
 .ui-win-title:focus { outline: none; }
 .ui-win-stars { margin-top: 10px; font-size: var(--text-md); color: var(--color-win-muted); }
@@ -443,7 +456,7 @@
 .ui-score-stars { display: flex; gap: 3px; }
 .ui-star svg { display: block; inline-size: 13px; block-size: 13px; }
 .ui-star path { fill: none; stroke: var(--color-parent); stroke-width: 1.1; stroke-linejoin: round; }
-.ui-star[data-star="possible"] path { stroke: color-mix(in srgb, var(--color-parent) 75%, transparent); }
+.ui-star[data-star="possible"] path { fill: color-mix(in srgb, var(--color-parent) 55%, transparent); stroke: var(--color-parent); }
 .ui-star[data-star="lost"] path { stroke: var(--color-text-muted); stroke-dasharray: 1.6 1.4; }
 .ui-star[data-star="earned"] path { fill: var(--color-parent); }
 .ui-score-rule { font-size: 11.5px; color: var(--color-text-muted); }
@@ -468,4 +481,7 @@
 .ui-btn:focus-visible, .ui-option:focus-visible, .ui-fold-summary:focus-visible, .ui-fold-title:focus-visible, .ui-input:focus-visible, .ui-check-input:focus-visible, .ui-option-input:focus-visible {
   outline: 2px solid var(--color-focus); outline-offset: 2px;
 }
-.ui-btn:disabled, .ui-input:disabled, .ui-check-input:disabled, .ui-option-input:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
+.ui-btn:disabled {
+  cursor: not-allowed; background: var(--color-surface); color: var(--color-text-muted); border: 1px dashed var(--color-text-muted);
+}
+.ui-input:disabled, .ui-check-input:disabled, .ui-option-input:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }

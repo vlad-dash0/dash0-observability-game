@@ -54,21 +54,21 @@ const span = (spanId, traceId, service, name, kind, startMs, endMs, parentId = n
 const FIX = [
   {
     key: 'lower-delay',
-    label: `Set OTEL_BSP_SCHEDULE_DELAY to ${LOWER_MS} ms in the function\'s environment`,
+    label: `Set <code>OTEL_BSP_SCHEDULE_DELAY</code> to ${LOWER_MS} ms in the function\'s environment`,
     why:
       `A shorter delay is still a timer. The invocation takes ${HANDLER_MS} ms and the root span ends as the handler returns, so the timer cannot fire before the last span exists, ` +
       `and from then on the environment is suspended. ${LOWER_MS} ms is longer than the whole invocation, and no value of the delay changes the order: span ends, handler returns, environment suspended, timer due. (This is reasoning from the numbers, not a quote.)`,
   },
   {
     key: 'shutdown',
-    label: 'Call Shutdown on the tracer provider at the end of each request',
+    label: 'Call <code>Shutdown</code> on the tracer provider at the end of each request',
     why:
       'Shutdown does export what is pending (a SpanProcessor\'s Shutdown "MUST include the effects of ForceFlush"), but the SDK spec says it "MUST be called only once for each TracerProvider instance" and that after it "subsequent attempts to get a Tracer are not allowed". ' +
       'The same environment serves the next request, and a shut-down provider can no longer give it a tracer. (The last part is reasoning from the scenario, not a quote.)',
   },
   {
     key: 'force-flush',
-    label: 'Call ForceFlush on the tracer provider before each handler returns',
+    label: 'Call <code>ForceFlush</code> on the tracer provider before each handler returns',
     right: true,
     why:
       'ForceFlush on the provider exports every span that has not been exported yet, so the spans are out before the handler returns and before the platform suspends the environment, and the provider stays usable for the next request. ' +

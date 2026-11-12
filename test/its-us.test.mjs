@@ -177,10 +177,9 @@ test('not connected, live available: the boss says to connect in 9.3, offers pra
   assert.ok(q('#its-practice') && !q('#its-practice').disabled);
   const live = q('#its-live');
   assert.ok(live.disabled, 'live needs the 9.3 connection first');
-  const why = live.getAttribute('aria-describedby');
-  assert.ok(why && q(`#${why}`), 'a disabled button points at its reason');
-  assert.match(q(`#${why}`).textContent, /Connect there, then come back\./);
-  assert.doesNotMatch(q(`#${why}`).textContent, /not available in this browser/);
+  assert.equal(live.hasAttribute('aria-describedby'), false, 'the reason is spoken once: the line under the button');
+  assert.equal(live.nextElementSibling.textContent, 'Connect in level 9.3 first.');
+  assert.match(q('#its-live-why').textContent, /Connect there, then come back\./);
   assert.equal(qa('[data-finish]').filter((b) => !b.disabled).length, 0);
   assert.equal(sent.length, 0);
 });
@@ -193,9 +192,8 @@ test('not connected, no live in this browser (the no-fetch fallback): the disabl
   assert.ok(q('#its-practice') && !q('#its-practice').disabled);
   const live = q('#its-live');
   assert.ok(live.disabled);
-  const why = live.getAttribute('aria-describedby');
-  assert.ok(why && q(`#${why}`), 'a disabled button points at its reason');
-  assert.match(q(`#${why}`).textContent, /not available in this browser/);
+  assert.equal(live.nextElementSibling.textContent, 'Not available in this browser.');
+  assert.match(q('#its-live-why').textContent, /not available in this browser/);
   assert.equal(qa('[data-finish]').filter((b) => !b.disabled).length, 0);
   assert.equal(sent.length, 0);
 });

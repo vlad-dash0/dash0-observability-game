@@ -577,3 +577,12 @@ test('no em dash in the two level files or the two new cards', () => {
   for (const f of ['head-sampling', 'tail-sampling']) assert.equal(read(`levels/${f}.mjs`).includes(dash), false, f);
   for (const c of DECK.filter((d) => Object.keys(CARDS).includes(d.id))) assert.equal(JSON.stringify(c).includes(dash), false, c.id);
 });
+
+test('head sampling: the lesson is short paragraphs, and it says plainly that no real sampler runs (#321)', () => {
+  const intro = LIVE.levels['head-sampling'].play.steps[0].intro;
+  const paras = [...intro.matchAll(/<p>(.*?)<\/p>/g)].map((m) => plain(m[1]));
+  assert.equal(paras.length, 4);
+  for (const p of paras) assert.ok(p.length <= 330, `a short paragraph: ${p.length}`);
+  assert.equal(paras.at(-1), 'The numbers on this page are worked out from these figures. The game does not run a real sampler.');
+  assert.equal(intro.replace(/<p>.*?<\/p>/g, ''), '', 'nothing outside a paragraph');
+});

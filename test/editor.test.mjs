@@ -24,7 +24,7 @@ test('editorPanel: a code textarea, one action, a hidden status region, no hint 
   assert.equal(go.textContent, 'Check it');
   assert.equal(go.getAttribute('type'), 'button');
   assert.equal(go.disabled, false);
-  assert.ok(q('.editor-actions #ed-go'));
+  assert.ok(q('.ui-btn-row #ed-go'));
   const fb = q('#ed-fb');
   assert.equal(fb.getAttribute('role'), 'status');
   assert.ok(fb.hasAttribute('hidden'));

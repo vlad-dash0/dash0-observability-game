@@ -50,6 +50,10 @@ test('step 1: three choices, exactly one right (ForceFlush), each label naming i
   for (const c of choices) assert.equal(/^(It holds|It is wrong|Right|Wrong)/.test(plain(c.label)), false, 'no verdict opener on a label');
 });
 
+test('step 1: the code names in the options are code chips, like the other levels (#321)', () => {
+  assert.deepEqual(choices.map((c) => /<code>([\w]+)<\/code>/.exec(c.label)?.[1]), ['OTEL_BSP_SCHEDULE_DELAY', 'Shutdown', 'ForceFlush']);
+});
+
 test('step 1: labels are of one length (within 5 characters), and the right one is neither the longest nor the shortest', () => {
   const len = choices.map((c) => plain(c.label).length);
   assert.equal(Math.max(...len) - Math.min(...len) <= 5, true, len.join(', '));

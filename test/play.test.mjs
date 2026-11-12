@@ -56,6 +56,17 @@ function playAll(level, during = () => {}, run = start(level)) {
   return run;
 }
 
+/** The exact stem of each step type's reason (the sentence is "<stem> to continue." or "... to finish the level."). */
+const REASONS = {
+  choice: 'Pick the right answer', sort: 'Sort every item', build: 'Solve the board and press Check', incident: 'Find the cause',
+  spot: 'Pick every line that matches and press Check', tradeoff: 'Pick a plan that fits and press Check',
+  query: 'Run a query that passes', configure: 'Fix the config and press Check',
+};
+
+test('every step type has a reason stem, and it is the pinned one', () => {
+  assert.deepEqual(Object.fromEntries(Object.entries(STEP_TYPES).map(([k, t]) => [k, t.reason])), REASONS);
+});
+
 const stars = (level) => (level.scored ? 5 : 0);
 /** The step types with a side column (a wide split and a success card). */
 const SIDE = ['sort', 'build', 'incident', 'spot', 'tradeoff', 'query', 'configure'];
@@ -89,6 +100,17 @@ for (const level of LEVELS) {
     const [{ driver, spec }] = steps;
     for (const sel of driver.solve(spec)) click(sel);
     assert.equal(q(advanceId(level, 0)).disabled, false, 'solved: enabled');
+    ran += 1;
+  });
+
+  test(`${level.id}: a gated Next or Finish says why, right after it, in the step type's exact words (#321)`, () => {
+    playAll(level, (i, entry) => {
+      const btn = q(advanceId(level, i));
+      const why = btn.nextElementSibling;
+      assert.equal(why?.className, 'ui-reason', `step ${i + 1}: the reason follows the button`);
+      assert.equal(why.id, `${btn.id}-why`);
+      assert.equal(why.textContent, `${REASONS[entry.key]} to ${i === last ? 'finish the level' : 'continue'}.`);
+    });
     ran += 1;
   });
 

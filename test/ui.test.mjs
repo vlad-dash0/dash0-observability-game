@@ -11,8 +11,8 @@ import { decls, definedClasses, read, ROOT, rules, splitTop } from './helpers/cs
 import * as ui from '../lib/ui/index.mjs';
 
 const {
-  actions, button, checkbox, chip, clearFeedback, codeBlock, dots, eyebrow, feedback, field, finishButton, fold,
-  helpChips, lesson, linkButton, meter, nextButton, note, option, options, panel, prose, question, radio, radioGroup, setFeedback,
+  actions, button, buttonRow, checkbox, chip, clearFeedback, codeBlock, dots, eyebrow, feedback, field, finishButton, fold,
+  helpChips, lesson, linkButton, meter, nextButton, note, option, options, panel, prose, question, radio, radioGroup, reason, setFeedback,
   sideColumn, split, stars, stats, step, stepHead, table,
   BUTTON_VARIANTS, DOTS_TONES, FEEDBACK_TONES, LINK_VARIANTS, OPTION_KINDS, OPTION_STATES, OPTIONS_LAYOUTS, PANEL_VARIANTS, TONES,
 } = ui;
@@ -29,6 +29,16 @@ test('layout: step, split, actions', () => {
     '<div class="ui-split"><div class="ui-split-main">m</div><div class="ui-split-side">s</div></div>');
   assert.equal(actions({ buttonsHtml: 'b' }), '<div class="ui-actions">b</div>');
   assert.equal(actions({ wide: true, buttonsHtml: 'b' }), '<div class="ui-actions ui-actions--wide">b</div>');
+});
+
+test('reason, buttonRow: a muted line before a disabled button, and a row that keeps buttons pills (#321)', () => {
+  assert.equal(reason({ id: 'x-why', text: 'Pick <one>.' }), '<p class="ui-reason" id="x-why">Pick &lt;one&gt;.</p>');
+  assert.equal(buttonRow('b'), '<div class="ui-btn-row">b</div>');
+  const next = nextButton('lv-next', 'Pick an answer to continue.');
+  assert.equal(next, '<button type="button" class="ui-btn ui-btn--primary" id="lv-next" disabled>Next</button>' +
+    '<p class="ui-reason" id="lv-next-why">Pick an answer to continue.</p>');
+  assert.match(finishButton('lv-finish', 'Why.'), /<\/button><p class="ui-reason" id="lv-finish-why">Why\.<\/p>$/);
+  assert.throws(() => reason({ id: 'x', text: '' }), /reason/);
 });
 
 test('text: lesson, question, eyebrow, stepHead, note, prose, codeBlock', () => {
@@ -72,9 +82,10 @@ test('button: variants are exclusive modifiers; next and finish start disabled; 
   assert.equal(button({ id: 'h', label: 'Hint', variant: 'hint' }), '<button type="button" class="ui-btn ui-btn--hint" id="h">Hint</button>');
   assert.equal(button({ id: 'back', label: 'Back to the map', variant: 'icon', icon: '←' }),
     '<button type="button" class="ui-btn ui-btn--icon" id="back" aria-label="Back to the map"><span aria-hidden="true">←</span></button>');
-  assert.equal(nextButton('lv-next'), '<button type="button" class="ui-btn ui-btn--primary" id="lv-next" disabled>Next</button>');
-  assert.equal(finishButton('lv-finish'),
-    '<button type="button" class="ui-btn ui-btn--primary" id="lv-finish" disabled data-finish>Finish</button>');
+  assert.equal(nextButton('lv-next'), '<button type="button" class="ui-btn ui-btn--primary" id="lv-next" disabled>Next</button>' +
+    '<p class="ui-reason" id="lv-next-why">Finish this step to continue.</p>');
+  assert.equal(finishButton('lv-finish'), '<button type="button" class="ui-btn ui-btn--primary" id="lv-finish" disabled data-finish>Finish</button>' +
+    '<p class="ui-reason" id="lv-finish-why">Finish this step to complete the level.</p>');
   for (const variant of ['primary', 'ghost', 'hint']) {
     const mods = button({ label: 'x', variant }).match(/ui-btn--[a-z]+/g);
     assert.deepEqual(mods, [`ui-btn--${variant}`], 'one variant modifier, never two');
@@ -284,6 +295,8 @@ const CASES = [
   ['chip', (t) => chip({ text: t, dot: true }), null],
   ['button', (t) => button({ label: t }), null],
   ['linkButton', (t) => linkButton({ label: t, href: '/x' }), null],
+  ['reason', (t) => reason({ id: 'r', text: t }), null],
+  ['buttonRow', null, (h) => buttonRow(h)],
   ['nextButton', null, null, () => nextButton('n')],
   ['finishButton', null, null, () => finishButton('f')],
   ['option', (t) => option({ attr: 'pick', value: t, labelHtml: 'l' }), (h) => option({ attr: 'pick', value: 'v', labelHtml: h, metaHtml: h })],
@@ -437,6 +450,8 @@ const INVALID = [
   ['button', () => button({ label: 'x', variant: 'icon' })],
   ['button', () => button({ label: 'x', icon: '<' })],
   ['button', () => button({ label: 'x', disable: true })],
+  ['reason', () => reason({ id: 'r', text: '' })],
+  ['buttonRow', () => buttonRow(5)],
   ['nextButton', () => nextButton()],
   ['finishButton', () => finishButton('fin ish')],
   ['option', () => option({ attr: 'Pick', value: 'v', labelHtml: 'l' })],

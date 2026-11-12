@@ -308,7 +308,7 @@ export function createGame(deps) {
     },
     dismissSigninNotice() {
       this.signinStatus = null;
-      this.focusSoon('#save-open'); // the dismissed notice held focus; the hub's progress area is stable
+      this.focusSoon('#save-open'); // the dismissed notice held focus; the Save code button in the header is stable
     },
     // GET /api/account, once per page (init); the only request an anonymous or unconfigured visit makes.
     async loadAccount() {
@@ -716,7 +716,8 @@ export function createGame(deps) {
     // The act heading's one line: "Act 2: Traces, 2 of 8", "..., saved, 4 of 4", "Act 7: Later, coming soon".
     actLine(act) {
       if (act.soon) return `${act.title}, coming soon`;
-      return this.actRow(act.id)?.line ?? act.title;
+      // No break inside "2 of 4": the count stays on one line when the title wraps.
+      return (this.actRow(act.id)?.line ?? act.title).replace(/(\d+) of (\d+)$/, '$1\u00a0of\u00a0$2');
     },
     // Fold or unfold one act (memory only, debug included); returns whether it is now expanded.
     toggleAct(id) {

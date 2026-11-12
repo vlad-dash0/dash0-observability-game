@@ -720,13 +720,13 @@ test('the endpoint table is a labelled scroll region', () => {
   assert.equal(region.getAttribute('aria-label'), 'Endpoints of this organization');
 });
 
-test('a disabled live button points at the paragraph that says why', () => {
+test('a disabled live button has its reason right under it, spoken once (no describedBy); enabled, it has none', () => {
   open(practiceTelemetry({ hosts: [] }).tele);
-  const why = q('#ctd-live').getAttribute('aria-describedby');
-  assert.equal(why, 'ctd-live-why');
-  assert.match(q(`#${why}`).textContent, /not available in this browser/);
+  assert.equal(q('#ctd-live').hasAttribute('aria-describedby'), false);
+  assert.equal(q('#ctd-live').nextElementSibling.textContent, 'Not available in this browser.');
+  assert.match(q('#ctd-live-why').textContent, /not available in this browser/);
   open(liveTelemetry([ok()]).tele);
-  assert.equal(q('#ctd-live').hasAttribute('aria-describedby'), false, 'enabled: nothing to explain');
+  assert.equal(q('#ctd-live').nextElementSibling, null, 'enabled: nothing to explain');
 });
 
 test('focus lands on the connected screen heading after an accepted Connect, in both modes', async () => {

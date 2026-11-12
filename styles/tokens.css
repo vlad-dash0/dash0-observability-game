@@ -123,12 +123,11 @@
   --color-swirl-dot: var(--globe-amber);
   --color-shadow: color-mix(in srgb, var(--d0-grey-900) 60%, transparent);
   /* The UI kit (#158, docs/DESIGN-SYSTEM.md). The lesson card: its text, the "Lesson"
-     eyebrow, inline code, the amber glow top left and the dot top right. */
+     eyebrow, inline code and the amber glow top left. */
   --color-lesson: var(--kit-lesson-dark);
   --color-lesson-eyebrow: color-mix(in srgb, var(--globe-amber) 82%, var(--d0-grey-800));
   --color-lesson-code: var(--globe-amber);
   --color-lesson-glow: color-mix(in srgb, var(--globe-amber) 13%, transparent);
-  --color-lesson-dot: color-mix(in srgb, var(--globe-amber) 28%, transparent);
   /* Meter cells still left (3:1 on surface); the firing banner's red (D1: wrong answers
      stay --color-error purple). */
   --color-meter-left: color-mix(in srgb, var(--d0-mint) 50%, var(--d0-grey-600));

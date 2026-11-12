@@ -68,7 +68,7 @@ test('index.html: a kit entry on the hub, hidden in debug, and a dialog outside 
   assert.deepEqual(open.getAttribute('class').split(' '), ['ui-btn', 'ui-btn--ghost']);
   assert.equal(open.getAttribute('type'), 'button');
   assert.equal(open.getAttribute('@click'), 'openSave()');
-  assert.equal(open.closest('section').getAttribute('x-show'), '!debug');
+  assert.equal(open.closest('.save-entry-actions').getAttribute('x-show'), '!debug');
   const dlg = shell.querySelector('#save-modal.ui-modal');
   assert.equal(dlg.getAttribute('role'), 'dialog');
   assert.equal(dlg.getAttribute('aria-modal'), 'true');
@@ -115,6 +115,12 @@ test('home: your code is shown and decodes to your progress; Close is wired', ()
   assert.deepEqual(JSON.parse(JSON.stringify(decodeProgress(code, REG).progress)), LOCAL);
   click('#save-close');
   assert.equal(game.saveOpen, false);
+});
+
+test('the paste field says what a code is and where it comes from (#321)', () => {
+  const { game } = setup();
+  game.openSave();
+  assert.equal(q('label[for="save-code-in"]').textContent, 'Paste a save code from another browser');
 });
 
 test('home with no progress says there is nothing to save and offers no code', () => {

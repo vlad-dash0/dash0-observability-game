@@ -35,6 +35,15 @@
       </div>
       <div class="head-right">
         <span class="debug-badge" x-show="debug" x-cloak>DEBUG</span>
+        <div class="save-entry-actions" role="group" aria-labelledby="save-entry-title" x-show="!debug" x-cloak>
+          <button type="button" class="ui-btn ui-btn--ghost" id="save-open" @click="openSave()">Save code</button>
+          <button type="button" class="ui-btn ui-btn--ghost" id="board-open" x-show="accountEnabled" x-cloak
+                  aria-haspopup="dialog" @click="openBoard()">Leaderboard</button>
+          <button type="button" class="ui-btn ui-btn--ghost" id="account-open" x-show="signedIn" x-cloak
+                  aria-haspopup="dialog" @click="openAccount()">Account</button>
+          <!-- A kit button that navigates: the markup lib/ui/button.mjs linkButton makes. -->
+          <a class="ui-btn ui-btn--ghost" href="/api/auth-start" x-show="accountEnabled &amp;&amp; !signedIn" x-cloak>Sign in with Google (@dash0.com)</a>
+        </div>
         <!-- A live region announces its text, not aria-label changes: the spoken summary
              is visually hidden text inside it. -->
         <div class="star-count" role="status">
@@ -49,17 +58,8 @@
       </div>
     </header>
 
-    <section class="save-entry" aria-labelledby="save-entry-title" x-show="!debug" x-cloak>
+    <section class="save-entry" aria-labelledby="save-entry-title" x-show="!debug &amp;&amp; (accountEnabled || accountNotice !== '')" x-cloak>
       <h2 id="save-entry-title" class="visually-hidden">Your progress</h2>
-      <div class="save-entry-actions">
-        <button type="button" class="ui-btn ui-btn--ghost" id="save-open" @click="openSave()">Save code</button>
-        <button type="button" class="ui-btn ui-btn--ghost" id="board-open" x-show="accountEnabled" x-cloak
-                aria-haspopup="dialog" @click="openBoard()">Leaderboard</button>
-        <button type="button" class="ui-btn ui-btn--ghost" id="account-open" x-show="signedIn" x-cloak
-                aria-haspopup="dialog" @click="openAccount()">Account</button>
-        <!-- A kit button that navigates: the markup lib/ui/button.mjs linkButton makes. -->
-        <a class="ui-btn ui-btn--ghost" href="/api/auth-start" x-show="accountEnabled &amp;&amp; !signedIn" x-cloak>Sign in with Google (@dash0.com)</a>
-      </div>
       <div id="account-entry" x-show="accountEnabled" x-cloak>
         <p class="save-entry-text" x-show="signedIn" x-text="signedInText()"></p>
         <p class="save-entry-text" x-show="signedIn &amp;&amp; accountSummary() !== ''" x-cloak x-text="accountSummary()"></p>
@@ -114,7 +114,7 @@
           <h3 class="act-title"><button type="button" class="act-toggle" :id="'act-toggle-' + act.id" :aria-expanded="actExpandedAttr(act.id)" :aria-controls="'act-body-' + act.id" @click="toggleAct(act.id)" x-text="actLine(act)"></button></h3>
           <div class="act-body" :id="'act-body-' + act.id" x-show="actExpanded(act.id)">
             <p class="act-sub" x-show="act.sub" x-text="act.sub"></p>
-            <p class="act-badges" x-show="act.badges.length > 0"><template x-for="b in act.badges" :key="b.id"><span class="ui-chip" :data-tone="b.tone" x-text="b.label"></span></template></p>
+            <p class="act-badges" x-show="act.badges.length > 0"><span class="act-badges-label">Tags:</span> <template x-for="b in act.badges" :key="b.id"><span class="ui-chip" :data-tone="b.tone" x-text="b.label"></span></template></p>
             <div class="act-soon" x-show="act.soon"><p class="act-soon-chip"><span class="ui-chip" data-tone="neutral">Coming soon</span></p><p class="act-soon-teaser" x-text="act.teaser"></p></div>
             <div class="level-list">
               <template x-for="id in act.ids" :key="id">
@@ -266,7 +266,7 @@
               <h3 x-text="act.title"></h3>
               <p class="about-sub" x-show="act.sub" x-text="act.sub"></p>
               <p x-show="act.teaser" x-text="act.teaser"></p>
-              <p class="act-badges" x-show="act.badges.length > 0"><template x-for="b in act.badges" :key="b.id"><span class="ui-chip" :data-tone="b.tone" x-text="b.label"></span></template></p>
+              <p class="act-badges" x-show="act.badges.length > 0"><span class="act-badges-label">Tags:</span> <template x-for="b in act.badges" :key="b.id"><span class="ui-chip" :data-tone="b.tone" x-text="b.label"></span></template></p>
               <p x-show="act.soon"><span class="ui-chip" data-tone="neutral">Coming soon</span></p>
             </li>
           </template>

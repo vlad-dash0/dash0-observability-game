@@ -138,7 +138,7 @@ const PLAN = {
     `Storefront keeps ${n(TEN)} of ${n(TRACES)} traces a second, ${n(STOREFRONT)} spans, and checkout and payments follow it. ` +
     `The default, <code>${SAMPLER}=parentbased_always_on</code>, is ParentBased: for a span with a parent it uses the parent's sampled flag, which travels in the <code>traceparent</code> header, so a trace is kept whole or not at all. ` +
     'A ratio on a child would never run under ParentBased, because the ratio belongs to the root sampler, which is used only for a span with no parent. ' +
-    'These figures are authored from one table, not run by an engine. What head sampling cannot do is look at the trace: it decides at the root, before any error or slow request has happened, ' +
+    'These figures are worked out from the numbers in the lesson, not run by an engine. What head sampling cannot do is look at the trace: it decides at the root, before any error or slow request has happened, ' +
     'so it keeps 1 in 10 of the failures too. Keeping the errors is the job of tail sampling, next.',
 };
 
@@ -177,11 +177,12 @@ export default {
     steps: [
       {
         intro:
-          `Kettle &amp; Co's checkout makes ${n(TRACES)} traces a second through three services: <code>storefront</code> is the root, then <code>checkout</code> and <code>payments</code>. ` +
+          `<p>Kettle &amp; Co's checkout makes ${n(TRACES)} traces a second through three services: <code>storefront</code> is the root, then <code>checkout</code> and <code>payments</code>. ` +
           `A trace is ${WHOLE} spans (${SPANS.storefront} in storefront, ${SPANS.checkout} in checkout, ${SPANS.payments} in payments), so keeping everything is ${n(TRACES)} × ${WHOLE} = ${n(FULL)} spans a second, ` +
-          `and the backend takes ${n(CAP)} spans a second. Head sampling decides when the root span starts, from the trace ID and a ratio, and passes the decision to the children in the sampled flag of the <code>traceparent</code> header. ` +
-          `Storefront is already set to <code>${SAMPLER}=parentbased_traceidratio</code> and <code>${ARG}=0.1</code>: ${n(TEN)} traces a second, ${n(STOREFRONT)} spans, which leaves ${n(KIDS_CAP)} of the ${n(CAP)} for checkout and payments. ` +
-          'The arithmetic below is authored from this table, not run by a sampler.',
+          `and the backend takes ${n(CAP)} spans a second.</p>` +
+          '<p>Head sampling decides when the root span starts, from the trace ID and a ratio, and passes the decision to the children in the sampled flag of the <code>traceparent</code> header.</p>' +
+          `<p>Storefront is already set to <code>${SAMPLER}=parentbased_traceidratio</code> and <code>${ARG}=0.1</code>: ${n(TEN)} traces a second, ${n(STOREFRONT)} spans, which leaves ${n(KIDS_CAP)} of the ${n(CAP)} for checkout and payments.</p>` +
+          '<p>The numbers on this page are worked out from these figures. The game does not run a real sampler.</p>',
         question: 'Pick the sampler setting of checkout and of payments: keep what the team needs and stay within the budget.',
         qid: 'hs-q-plan',
         tradeoff: PLAN,

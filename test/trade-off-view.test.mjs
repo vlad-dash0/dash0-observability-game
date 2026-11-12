@@ -94,6 +94,11 @@ test('capText: the overshoot or the room left, numbers formatted the same way as
 
 // ---- the markup ------------------------------------------------------------------------------
 
+test('renderTradeoff: Check is a pill in a kit button row, like the other Check buttons (#321)', () => {
+  setup();
+  assert.equal(qa('[data-tradeoff] .ui-btn-row #' + fixture().id + '-check').length, 1);
+});
+
 test('renderTradeoff: the cost model, the cap, the needs, and the cost and what each card keeps', () => {
   setup();
   const board = text('[data-tradeoff]');

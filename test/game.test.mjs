@@ -573,8 +573,8 @@ test('G5 acts fold by progress, a toggle overrides and stores nothing, it surviv
   assert.equal(game.actExpanded('s7'), true, 'a coming-soon act is unfolded by default');
   assert.equal(game.actExpandedAttr('a0'), 'false');
   assert.equal(game.actExpandedAttr('a1'), 'true');
-  assert.equal(game.actLine(game.acts.find((a) => a.id === 'a0')), 'Act 0: First act, saved, 4 of 4');
-  assert.equal(game.actLine(game.acts.find((a) => a.id === 'a1')), 'Act 1: Second act, 0 of 1');
+  assert.equal(game.actLine(game.acts.find((a) => a.id === 'a0')), 'Act 0: First act, saved, 4\u00a0of\u00a04', 'the count never breaks across lines (#321)');
+  assert.equal(game.actLine(game.acts.find((a) => a.id === 'a1')), 'Act 1: Second act, 0\u00a0of\u00a01');
   assert.equal(game.actLine(game.acts.find((a) => a.id === 's7')), 'Act 7: Later, coming soon');
   assert.equal(game.toggleAct('a0'), true);
   assert.equal(game.actExpanded('a0'), true);
@@ -2203,13 +2203,17 @@ test('index.html: the progress strip sits under the header, the map and levels s
   const body = hub.querySelector('div.hub-body');
   assert.ok(body && body.parentElement === hub);
   assert.deepEqual([...body.children].map((c) => c.className), ['map-panel', 'levels']);
-  for (const id of ['account-entry', 'save-open', 'board-open', 'account-open']) {
-    assert.ok(strip.querySelector(`#${id}`), `#${id} stays in the strip`);
+  assert.ok(strip.querySelector('#account-entry'), '#account-entry stays in the strip');
+  const header = hub.querySelector('header.hub-header');
+  for (const id of ['save-open', 'board-open', 'account-open']) {
+    assert.ok(header.querySelector(`.head-right #${id}`), `#${id} sits in the header beside the stars, not alone on a row (#321)`);
   }
-  assert.ok(strip.querySelector('a[href="/api/auth-start"]'), 'the sign-in anchor stays in the strip');
+  assert.ok(header.querySelector('a[href="/api/auth-start"]'), 'the sign-in anchor sits in the header too');
+  assert.equal(header.querySelector('.save-entry-actions').getAttribute('aria-labelledby'), 'save-entry-title', 'the group is still named "Your progress"');
   const title = strip.querySelector('#save-entry-title');
   assert.equal(title.classList.contains('visually-hidden'), true, 'the heading is spoken, not shown');
   assert.equal(strip.getAttribute('aria-labelledby'), 'save-entry-title');
+  assert.match(strip.getAttribute('x-show'), /accountEnabled/, 'the strip is hidden while it holds nothing (account off), so no empty heading is announced');
   assert.equal(strip.textContent.includes('Copy it to another browser'), false, 'the old sentence is gone');
 });
 
