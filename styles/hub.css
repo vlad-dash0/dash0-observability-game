@@ -183,6 +183,18 @@
   transform: rotate(-45deg); transition: transform .15s;
 }
 .act-toggle[aria-expanded="true"]::before { transform: rotate(45deg); }
+.act-mark { flex: none; min-width: 1.4em; text-align: center; font-size: 14px; color: var(--color-text-muted); }
+.act-line { min-width: 0; }
+/* Act states (data-state from app.mjs actState): a glyph in .act-mark plus a border, a weight or a muted line, never colour alone. */
+.act[data-state="saved"] .act-mark { color: var(--color-success); font-weight: 700; }
+.act[data-state="locked"] .act-title, .act[data-state="soon"] .act-title { color: var(--color-text-muted); }
+.act[data-state="locked"] .act-title { font-weight: 600; }
+.act[data-state="current"], .act[data-state="incident"] {
+  border-inline-start: 3px solid var(--color-accent); padding-inline-start: var(--space-2);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 8%, transparent), transparent 60%);
+  border-start-end-radius: var(--radius); border-end-end-radius: var(--radius);
+}
+.act[data-state="current"] .act-mark, .act[data-state="incident"] .act-mark { color: var(--color-accent); }
 .act-toggle:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; border-radius: var(--radius); }
 @media (prefers-reduced-motion: reduce) { .act-toggle::before { transition: none; } }
 .act-body { padding-top: 2px; }
@@ -212,6 +224,9 @@
 .level-card:hover { border-color: var(--color-accent); box-shadow: 0 6px 24px var(--color-shadow); }
 .level-card.locked { opacity: .55; cursor: not-allowed; }
 .level-card.locked:hover { border-color: var(--color-border); box-shadow: none; }
+.level-card.locked { border-style: dashed; background: transparent; }
+.level-card.locked .level-name { color: var(--color-text-muted); font-weight: 600; }
+.level-card.done { border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border)); }
 .level-card.done::before {
   content: ""; position: absolute; inset: 0; border-radius: var(--radius-lg); pointer-events: none;
   background: linear-gradient(90deg, color-mix(in srgb, var(--color-success) 10%, transparent), transparent 60%);
