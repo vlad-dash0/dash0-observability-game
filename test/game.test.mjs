@@ -1109,7 +1109,7 @@ test('opening a level disposes the globe; finishing it mounts it again with the 
 /** Spies for the hub's scroll and focus: what scrollIntoView and the map heading's focus were given. */
 function spyHub(dom) {
   const spy = { scrolls: [], focuses: [] };
-  dom.document.querySelector('.map-panel').scrollIntoView = (o) => spy.scrolls.push(o);
+  dom.document.querySelector('.hub-header').scrollIntoView = (o) => spy.scrolls.push(o); // the header, so Save code and the stars stay in view (#331)
   dom.document.getElementById('map-title').focus = (o) => spy.focuses.push(o);
   return spy;
 }

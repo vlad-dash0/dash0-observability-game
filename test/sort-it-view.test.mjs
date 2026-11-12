@@ -1053,26 +1053,20 @@ function spyScroll() {
   return calls;
 }
 
-test('#321 a wrong placement scrolls its feedback into view by the least distance; smooth unless the player reduces motion', () => {
+test('#321 a placement scrolls its feedback into view by the least distance (the setFeedback seam, #331)', () => {
   const { mount } = setup();
   mount();
   const calls = spyScroll();
   sortTo('i2', 'metric');
-  assert.deepEqual(calls, [{ block: 'nearest', behavior: 'smooth' }]);
+  assert.deepEqual(calls, [{ block: 'nearest' }]);
   click('[data-bucket="log"]');
   assert.equal(calls.length, 2, 'a right placement reveals its note too');
-  const reduced = setup();
-  reduced.ctx.reduceMotion = true;
-  reduced.mount();
-  const again = spyScroll();
-  sortTo('i2', 'metric');
-  assert.deepEqual(again, [{ block: 'nearest', behavior: 'auto' }]);
 });
 
 test('#321 the feedback clears the page chrome when scrolled to, and the live region still announces', () => {
-  const css = read('styles/widgets.css');
-  const rule = rules(css).find((r) => r.selector.includes('-feedback'));
-  assert.ok(rule && 'scroll-margin-block-end' in Object.fromEntries(decls(rule.body)), 'scroll-margin on the feedback');
+  const css = read('styles/kit.css');
+  const rule = rules(css).find((r) => r.selector === '.ui-feedback' && r.body.includes('scroll-margin-block-end'));
+  assert.ok(rule && 'scroll-margin-block-end' in Object.fromEntries(decls(rule.body)), 'scroll-margin on the kit feedback');
   makeDom(renderSort(fixture(), newSortState(fixture())));
   assert.equal(q('#signals-feedback').getAttribute('role'), 'status');
   assert.equal(q('#signals-feedback').getAttribute('aria-live'), 'polite');

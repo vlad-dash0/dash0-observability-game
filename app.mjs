@@ -1040,7 +1040,8 @@ export function createGame(deps) {
       const reduced = !!reduceMotion();
       this.litNote = text;
       const go = () => {
-        doc.querySelector('.map-panel')?.scrollIntoView?.({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+        // The header (Save code, stars) is the top of the page and the map sits under it: scrolling to the map itself hid the header (#331).
+        doc.querySelector('.hub-header')?.scrollIntoView?.({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
         doc.getElementById('map-title')?.focus?.({ preventScroll: true });
       };
       if (typeof this.$nextTick === 'function') this.$nextTick(go);

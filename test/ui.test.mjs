@@ -28,7 +28,8 @@ test('layout: step, split, actions', () => {
   assert.equal(split({ mainHtml: 'm', sideHtml: 's' }),
     '<div class="ui-split"><div class="ui-split-main">m</div><div class="ui-split-side">s</div></div>');
   assert.equal(actions({ buttonsHtml: 'b' }), '<div class="ui-actions">b</div>');
-  assert.equal(actions({ wide: true, buttonsHtml: 'b' }), '<div class="ui-actions ui-actions--wide">b</div>');
+  // The footer is one width on every step (#331): wide is accepted, and the markup is the same.
+  assert.equal(actions({ wide: true, buttonsHtml: 'b' }), '<div class="ui-actions">b</div>');
 });
 
 test('reason, buttonRow: a muted line before a disabled button, and a row that keeps buttons pills (#321)', () => {
@@ -575,4 +576,41 @@ test('field wrap: a code field soft-wraps (wrap="soft"); without it nothing chan
   assert.doesNotMatch(field({ id: 'q', label: 'Query', kind: 'code', rows: 3 }), /wrap=/);
   assert.throws(() => field({ id: 'q', label: 'Q', wrap: true }), /field: wrap/);
   assert.throws(() => field({ id: 'q', label: 'Q', kind: 'code', wrap: 'yes' }), /field/);
+});
+
+test('#331 setFeedback scrolls the region into view by the least distance, once, after it is shown', () => {
+  const el = region();
+  const calls = [];
+  el.scrollIntoView = (o) => calls.push([o, el.hasAttribute('hidden')]);
+  setFeedback(el, 'error', 'x');
+  assert.deepEqual(calls, [[{ block: 'nearest' }, false]], 'shown before it is scrolled to');
+  clearFeedback(el);
+  assert.equal(calls.length, 1, 'clearing does not scroll');
+  assert.doesNotThrow(() => setFeedback(region(), 'neutral', 'no scrollIntoView in this DOM'));
+});
+
+test('#331 the kit feedback keeps a scroll margin so it clears the pinned footer', () => {
+  const r = rules(read('styles/kit.css')).find((x) => x.selector === '.ui-feedback' && x.body.includes('scroll-margin-block-end'));
+  assert.ok(r, 'scroll-margin-block-end on .ui-feedback');
+});
+
+test('#331 the footer bar has one width for every step, so the primary button never moves', () => {
+  const r = rules(read('styles/kit.css')).find((x) => x.selector === '.ui-actions');
+  assert.equal(Object.fromEntries(decls(r.body))['max-inline-size'], 'var(--layout-wide)');
+  assert.equal(rules(read('styles/kit.css')).some((x) => x.selector.includes('ui-actions--wide')), false);
+});
+
+test('#331 setFeedback({ scroll: false }) shows the line without scrolling (a step that opens with a line stays at its top)', () => {
+  const el = region();
+  let n = 0;
+  el.scrollIntoView = () => { n += 1; };
+  setFeedback(el, 'neutral', 'x', { scroll: false });
+  assert.equal(n, 0);
+  assert.equal(el.hasAttribute('hidden'), false);
+});
+
+test('#331 the sticky side column never outgrows the scrolling body, and the lines above a board stop at its edge', () => {
+  const css = read('styles/kit.css');
+  assert.match(css, /\.ui-split-side \{[^}]*max-block-size: calc\(100dvh - var\(--overlay-chrome\)\); overflow-y: auto/);
+  assert.match(css, /\.ui-step--wide > :is\([^)]*\.ui-lesson[^)]*\.ui-feedback[^)]*\) \{ max-inline-size: calc\(100% - var\(--side-width\) - var\(--space-6\)\)/);
 });
