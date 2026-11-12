@@ -42,7 +42,7 @@ const BUCKETS = [
   },
   {
     key: 'trust-average',
-    label: 'Nothing: the 0.79 second average is the number to trust, as it uses every request',
+    label: 'Nothing: the 0.79 second average is the number to trust',
     why: 'The average is the one that hid the problem. A mean is a sum divided by a count, so a few very slow requests are diluted by every fast one.',
   },
 ];

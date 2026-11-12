@@ -87,7 +87,7 @@ const FIX = [
   },
   {
     key: 'dedupe',
-    label: 'Dedupe the twin spans in the Collector before they reach Dash0',
+    label: 'Dedupe the twin spans in the Collector',
     why: 'That hides the symptom and keeps both setups running, with twice the instrumentation work in every cart request.',
   },
 ];

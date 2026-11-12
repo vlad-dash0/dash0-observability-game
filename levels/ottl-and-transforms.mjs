@@ -160,7 +160,7 @@ const CONFIG = {
 const BACKEND = [
   {
     key: 'spam-strip',
-    label: 'Add a Dash0 spam filter on the spans that carry <code>user.email</code>: it strips the attribute',
+    label: 'Add a Dash0 spam filter on the spans that carry <code>user.email</code>: it strips that attribute and keeps the rest of each span',
     why: 'A spam filter does not strip one attribute and keep the span. It matches whole spans, logs or data points and drops them, so you would lose the spans as well.',
   },
   {
@@ -171,7 +171,7 @@ const BACKEND = [
   },
   {
     key: 'filter-processor',
-    label: 'Add the filter processor to the Collector: it removes <code>user.email</code> from the spans and keeps the spans',
+    label: 'Add the filter processor to the Collector with a condition on <code>user.email</code>: it removes the attribute from the matching spans and keeps the spans',
     why: 'The filter processor is the Collector-side drop: it drops whole spans, logs or data points that match its conditions, before anything is sent. It does not edit one attribute, so the spans would be lost with the email. Changing an attribute is the transform processor\'s job.',
   },
   {

@@ -143,7 +143,7 @@ const FINISH =
   'A trace shows where one request spends its time, and comparing slow with normal requests shows what changed.';
 
 // The scenario line on the lesson card (incidentLesson adds one short rules line).
-const INTRO = 'Checkout is slow. Find where the time goes and what changed.';
+const INTRO = 'Find where the time goes and what changed.';
 
 /** The boss's data (pinned by test/checkout-is-slow.test.mjs). */
 export const CONTENT = { scenario: SCENARIO, triage: TRIAGE, finish: FINISH, intro: INTRO };

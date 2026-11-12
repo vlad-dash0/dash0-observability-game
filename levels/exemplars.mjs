@@ -86,7 +86,7 @@ const WHY = [
   },
   {
     key: 'backend-dropped',
-    label: 'The backend dropped the exemplars after the points arrived, to keep the metric small and cheap',
+    label: 'The backend dropped the exemplars after the points arrived',
     why: 'Exemplars are chosen in the SDK while measurements are recorded: the filter decides which measurements are eligible and the reservoir which are kept, and the kept ones leave the SDK in the metric data point. A point that left the SDK with none has none to lose.',
   },
 ];

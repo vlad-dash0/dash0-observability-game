@@ -97,7 +97,7 @@ const SORT = {
 const POD = [
   {
     key: 'same-thing',
-    label: 'Nothing: a span attribute and a resource attribute are the same thing, set in two places',
+    label: 'Nothing: a span attribute and a resource attribute are the same thing',
     why: 'They are not. A Resource is attached to the provider once, and every span, metric and log from it carries the Resource. A span attribute belongs to that one span.',
   },
   {
@@ -108,7 +108,7 @@ const POD = [
   },
   {
     key: 'cardinality',
-    label: 'A pod name has too many different values to be an attribute at all, on a span or on a Resource',
+    label: 'A pod name has too many different values to be an attribute at all',
     why: 'The value is not the problem: <code>k8s.pod.name</code> is a standard attribute with an agreed meaning, and a Resource carries it fine. The problem is where it is set.',
   },
 ];
