@@ -105,7 +105,7 @@ const ASYNC = [
   },
   {
     key: 'async-gauge',
-    label: 'An asynchronous Gauge: register a callback that reads the current heap size in use when the SDK collects',
+    label: 'An asynchronous Gauge: register a callback that reads the heap size when the SDK collects',
     why: 'The callback part is right, but a Gauge is for values that make no sense to add up. Heap sizes from several processes add up to the total heap in use, so the API points additive values to an asynchronous UpDownCounter.',
   },
 ];
@@ -114,7 +114,7 @@ const ASYNC = [
 const GAUGE = [
   {
     key: 'same-data',
-    label: 'Nothing: a running total is the same data whichever instrument you pick, only the name differs',
+    label: 'Nothing: a running total is the same data whichever instrument you pick',
     why: 'The instrument decides the kind of data point. A Gauge point is a sampled value, while a Counter produces a monotonic Sum with a start time, and backends treat the two differently.',
   },
   {

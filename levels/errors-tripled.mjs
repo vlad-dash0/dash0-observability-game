@@ -201,7 +201,7 @@ const RULE = [
   },
   {
     key: 'errors-undercounted',
-    label: `The error count is flat because the sampler keeps only ${KEEP_PCT}% of errors, so the real count is higher and the ratio is wrong`,
+    label: `The error count is flat because the sampler keeps only ${KEEP_PCT}% of errors, so the real count is higher and the ratio on the dashboard is wrong too`,
     why: `The <code>status_code</code> policy keeps every error, so the ${ERRORS} a second is the full count. It is the requests that are missing from the count.`,
   },
 ];

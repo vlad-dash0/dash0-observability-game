@@ -146,7 +146,7 @@ const PLAN = {
 const WHY = [
   {
     key: 'header-lost',
-    label: 'Setting a sampler on a service stops it propagating <code>traceparent</code>, so the children cannot see the root',
+    label: 'Setting a sampler on a service stops it propagating <code>traceparent</code> to its callees, so the children cannot see the root\'s decision',
     why: 'The sampler decides whether a span is recorded and exported, and propagation is separate: the sampled flag still travels in <code>traceparent</code> to the children. The children saw the root\'s decision and did not use it.',
   },
   {

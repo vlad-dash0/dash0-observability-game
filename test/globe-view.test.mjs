@@ -892,10 +892,10 @@ test('the caption follows the story: dark, building, incident, saved, every regi
   assert.equal(captionOf(['a', 'b']).phase, 'incident');
   assert.equal(captionOf(['a', 'b']).text, 'Alert! Zero is down. Tend to it now.');
   assert.deepEqual(captionOf(['a', 'b', 'boss0']), {
-    phase: 'saved', actId: 'g0', region: 'Zero', done: 3, total: 3, text: 'Zero is calm. You saved the day.',
+    phase: 'saved', actId: 'g0', region: 'Zero', done: 3, total: 3, text: 'Zero is calm. Next: One.',
   });
   const next = captionOf(['a', 'b', 'boss0', 'c']);
-  assert.deepEqual([next.phase, next.actId, next.region, next.text], ['saved', 'g1', 'One', 'One is calm. You saved the day.']);
+  assert.deepEqual([next.phase, next.actId, next.region, next.text], ['saved', 'g1', 'One', 'One is calm. Next: Two.']);
   const live = globeCaption(LIVE, globeState(LIVE, progressOf([...ACT_0, 'the-pager', 'resources'])));
   assert.deepEqual([live.phase, live.actId, live.text], ['building', 'act-1', "You're building! Northern Europe: 1 of 4 done."], 'building again once the next act is entered');
   const all = captionOf(['a', 'b', 'boss0', 'c', 'd']);
@@ -931,13 +931,15 @@ test('every live caption fits 60 characters, for every region and phase, with pl
   const maxTotal = Math.max(...LIVE.acts.map((a) => a.levelIds.length + (a.bossId == null ? 0 : 1)));
   assert.ok(maxTotal >= 3, 'the live registry has acts');
   const pair = { acts: [{ id: 'p' }, { id: 'q' }] };
-  for (const { region } of Object.values(ACT_REGIONS)) {
+  const names = Object.values(ACT_REGIONS).map((x) => x.region);
+  for (const [k, region] of names.entries()) {
+    const next = names[k + 1] ?? names[0];
     const r = (o) => ({ region, total: maxTotal, done: 0, pulse: false, resolved: false, ...o });
     const states = [
       { regions: { p: r({}) } },
       { regions: { p: r({ done: maxTotal - 1 }) } },
       { regions: { p: r({ done: maxTotal - 1, pulse: true }) } },
-      { regions: { p: r({ done: maxTotal, resolved: true }), q: r({ region: 'Next' }) } },
+      { regions: { p: r({ done: maxTotal, resolved: true }), q: r({ region: next }) } },
       { regions: { p: r({ done: maxTotal, resolved: true }), q: r({ region: 'Next', done: maxTotal, resolved: true }) }, soon: { s: { region: 'S' } } },
     ];
     for (const state of states) {

@@ -65,7 +65,7 @@ const WHY = [
 const BATCH = [
   {
     key: 'early',
-    label: 'Early, right after memory_limiter in the list, so everything after it handles fewer, bigger batches',
+    label: 'Early, right after memory_limiter in the list',
     why: 'Batching before the processors that drop or change data batches telemetry that may be discarded or changed straight afterwards. It also clears the request context, which a processor like k8sattributes reads.',
   },
   {

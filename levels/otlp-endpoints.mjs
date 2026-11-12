@@ -30,12 +30,12 @@ const PORT = [
   },
   {
     key: 'same-port',
-    label: 'Nothing: port 4317 serves both protocols, so the cause is somewhere else',
+    label: 'Nothing: port 4317 serves both OTLP/gRPC and OTLP/HTTP on every Collector, so the cause is somewhere else',
     why: 'Each OTLP transport has its own default port, 4317 for gRPC and 4318 for HTTP. A client has to use the one that matches its protocol.',
   },
   {
     key: 'needs-path',
-    label: 'The endpoint has to end in <code>/v1/traces</code>, because the exporter does not add a path',
+    label: 'The endpoint has to end in <code>/v1/traces</code>: the exporter does not add a path to the base URL you give it',
     why: 'With <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> an OTLP/HTTP exporter adds the signal path itself, so the general variable is a base URL. The wrong port is the problem here.',
   },
 ];
@@ -55,7 +55,7 @@ const SIGNAL = [
   },
   {
     key: 'rejected',
-    label: 'Nowhere: the exporter refuses a URL without a path',
+    label: 'Nowhere: the exporter refuses a URL without a path and logs an error at startup',
     why: 'Nothing requires a path. The exporter accepts the URL and sends to it as it is, and a URL with no path means the root path.',
   },
 ];
@@ -127,12 +127,12 @@ const TOKEN = [
   },
   {
     key: 'url',
-    label: 'In the endpoint URL, as a query parameter appended to the address the exporter sends every batch to',
+    label: 'In the endpoint URL, as a query parameter appended to the address the exporter sends every batch of spans, metrics and logs to',
     why: 'The endpoint is only an address. Dash0 reads the token from the <code>Authorization</code> header, and a token in a URL tends to end up in logs and config files.',
   },
   {
     key: 'resource',
-    label: 'As a resource attribute on the service\'s Resource, and it travels with every batch of telemetry',
+    label: 'As a resource attribute such as <code>auth.token</code> on the service\'s Resource, and it travels with every batch of telemetry',
     why: 'Resource attributes describe what produces the telemetry and travel with it as data, so the token would be sent along with every batch. Authentication is a header on the request, not part of the data.',
   },
 ];

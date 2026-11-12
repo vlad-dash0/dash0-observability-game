@@ -1260,18 +1260,35 @@ test('tickPlan: kept labels never overlap, the last one stays, and nothing is dr
   }
 });
 
+test('axis ticks are round steps inside the window, and a label that would overrun the track right edge is hidden (#340)', () => {
+  const spec = withHelps({});
+  Object.assign(spec.spans[0], { startMs: 0, endMs: 170 });
+  Object.assign(spec.spans[1], { startMs: 10, endMs: 150 });
+  Object.assign(spec.spans[2], { startMs: 20, endMs: 80 });
+  Object.assign(spec.spans[3], { startMs: 30, endMs: 70 });
+  Object.assign(spec.spans[4], { startMs: 40, endMs: 60 });
+  setup(spec);
+  assert.deepEqual(qa('[data-tick]').map((t) => t.textContent), ['0', '50 ms', '100 ms', '150 ms'], '34, 68, 102 and 136 are gone');
+  assert.deepEqual(qa('[data-tick]').map((t) => t.getAttribute('x')), ['0%', '29.41%', '58.82%', '88.24%'], 'at their value on the axis');
+  assert.equal(qa('.wf-grid').length > 0, true);
+  const labels = ['0', '50 ms', '100 ms', '150 ms'];
+  const at = [0, 50 / 170, 100 / 170, 150 / 170];
+  assert.deepEqual(tickPlan(labels, 240, at), [0, 1, 2], '150 ms starts at 211px of 240 and would run past the edge');
+  assert.deepEqual(tickPlan(labels, 2000, at), [0, 1, 2, 3]);
+});
+
 test('axis labels that would collide are marked hidden per layout, both from the same plan (#321)', () => {
   const spec = withHelps({});
-  Object.assign(spec.spans[0], { startMs: 0, endMs: 1300 });
+  Object.assign(spec.spans[0], { startMs: 0, endMs: 1000 });
   Object.assign(spec.spans[1], { startMs: 10, endMs: 90 });
   Object.assign(spec.spans[2], { startMs: 20, endMs: 80 });
   Object.assign(spec.spans[3], { startMs: 30, endMs: 70 });
   Object.assign(spec.spans[4], { startMs: 40, endMs: 60 });
   setup(spec);
   const tick = (i) => q(`[data-tick="${i}"]`);
-  assert.deepEqual(qa('[data-tick]').map((t) => t.textContent), ['0', '260 ms', '520 ms', '780 ms', '1040 ms', '1300 ms']);
+  assert.deepEqual(qa('[data-tick]').map((t) => t.textContent), ['0', '200 ms', '400 ms', '600 ms', '800 ms', '1000 ms']);
   assert.equal(tick(5).hasAttribute('data-hide-wide') || tick(5).hasAttribute('data-hide-narrow'), false, 'the end label always shows');
-  assert.equal(tick(4).hasAttribute('data-hide-wide'), true, '1040 ms is dropped in favour of 1300 ms');
+  assert.equal(tick(4).hasAttribute('data-hide-wide'), true, '800 ms is dropped in favour of 1000 ms');
   assert.equal(tick(4).hasAttribute('data-hide-narrow'), true);
   assert.equal(tick(0).hasAttribute('data-hide-narrow'), false);
 });
