@@ -19,7 +19,7 @@ const SORT = {
       bucket: 'auto',
       why: 'The HTTP server instrumentation starts a span for every request that reaches an Express route, with no code of yours.',
       whyNot: {
-        manual: 'The HTTP server instrumentation starts these spans for each request. You write no code for it.',
+        manual: 'Nothing here needs your own code: the instrumentation sees each Express request arrive and starts the span itself.',
       },
     },
     {
@@ -28,7 +28,7 @@ const SORT = {
       bucket: 'manual',
       why: 'Instrumentation knows nothing about your business functions. You start that span yourself with the API. Its span kind defaults to INTERNAL, though instrumentation libraries may emit INTERNAL spans too.',
       whyNot: {
-        auto: 'Instrumentation knows nothing about <code>applyLoyaltyDiscount()</code>. It is your own function, so no library wraps it for you.',
+        auto: 'No library has heard of <code>applyLoyaltyDiscount()</code>. It is your own function, so nothing wraps it unless you do.',
       },
     },
     {
@@ -37,7 +37,7 @@ const SORT = {
       bucket: 'auto',
       why: 'The Redis instrumentation wraps the client and starts a span for each command.',
       whyNot: {
-        manual: 'The Redis instrumentation wraps the client for you, so you write nothing to get a span per command.',
+        manual: 'You never call a tracer for Redis. The instrumentation wraps the client and does it.',
       },
     },
     {
@@ -46,7 +46,7 @@ const SORT = {
       bucket: 'manual',
       why: 'Only your code knows which coupon the customer used, so you set that attribute on the span yourself.',
       whyNot: {
-        auto: 'Instrumentation cannot know which coupon the customer used. That value lives in your code.',
+        auto: 'A library cannot see which coupon the customer used. Only your code holds that value.',
       },
     },
     {
@@ -55,7 +55,7 @@ const SORT = {
       bucket: 'auto',
       why: 'The HTTP client instrumentation starts a CLIENT span for each outgoing call, with no code of yours.',
       whyNot: {
-        manual: 'The HTTP client instrumentation starts a CLIENT span for each outgoing call. You write nothing.',
+        manual: 'Your code only calls <code>fetch</code>. The HTTP client instrumentation starts the CLIENT span around it.',
       },
     },
     {
@@ -64,7 +64,7 @@ const SORT = {
       bucket: 'manual',
       why: 'That is a business number only your code can read, so you add it as an attribute yourself.',
       whyNot: {
-        auto: 'Instrumentation does not know your cart\'s item count. It is a business value only your code reads.',
+        auto: 'A library cannot see your cart. The count is a business value, so your code has to read it and set it.',
       },
     },
   ],

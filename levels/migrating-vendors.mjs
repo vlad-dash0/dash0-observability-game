@@ -145,7 +145,7 @@ const SORT = {
       bucket: 'skipped',
       why: 'Converting it would cost effort and add a dashboard to maintain, and nobody would miss it. Leaving it out is a decision, not a gap.',
       whyNot: {
-        approximated: 'There are no numbers to compare, because nobody reads this dashboard.',
+        approximated: 'Whether its numbers come out close or exact does not matter, since nobody reads it.',
         manual: 'Nobody opened it in a year, so rebuilding it by hand is effort with no reader.',
         translated: 'Someone could carry it over, but nobody opens it, so the effort buys nothing.',
       },

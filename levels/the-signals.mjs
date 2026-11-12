@@ -28,7 +28,7 @@ const DATA = {
       why: 'A histogram point sums up many requests\' durations over an interval: numbers you aggregate and chart.',
       whyNot: {
         log: 'A histogram point holds no message and no severity. It counts many durations into buckets.',
-        trace: 'A histogram point is not one request\'s path. It counts many durations in buckets, with no span ID or parent.',
+        trace: 'A histogram point is not one request\'s path. It counts many durations in buckets.',
         profile: 'It holds no stack samples. A histogram point counts durations, and it does not say which function spent the time.',
       },
     },
@@ -39,7 +39,7 @@ const DATA = {
       why: 'A severity and a body: one log record, describing one event as it happened.',
       whyNot: {
         metric: 'It is one event with a message, not a number summed up over an interval.',
-        trace: 'A severity and a body describe one event. There is no span ID or parent here to place it in a tree of calls.',
+        trace: 'Nothing here is a tree of calls. It is one event with a message.',
         profile: 'There are no stack samples or function names here, only a severity and a message.',
       },
     },
@@ -61,7 +61,7 @@ const DATA = {
       why: 'A counter is a metric: a number that only goes up, recorded over time.',
       whyNot: {
         log: 'A counter holds a number, not a message. It has no severity and no body.',
-        trace: 'A counter does not follow one request. It has no trace ID, span ID or parent.',
+        trace: 'A counter does not follow one request. It adds up CPU time for the whole process.',
         profile: 'A counter gives a total of CPU time with no function names. It cannot say which code used it.',
       },
     },

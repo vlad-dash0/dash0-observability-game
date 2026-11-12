@@ -25,7 +25,7 @@ const SORT = {
       bucket: 'ok',
       why: 'For a 4xx, the HTTP conventions say a CLIENT span SHOULD be Error: the call storefront made did not get what it asked for.',
       whyNot: {
-        wrong: 'The call storefront made got a 404 back, so for the caller it did not get what it asked for. For a 4xx the conventions say a CLIENT span SHOULD be Error.',
+        wrong: 'Look at which side this span is on. A 404 is a failure for the caller that asked for a missing product, so Error is what its span should show.',
       },
     },
     {
@@ -34,7 +34,7 @@ const SORT = {
       bucket: 'wrong',
       why: 'For a 4xx, the HTTP conventions say a SERVER span MUST be left Unset. Only the caller\'s CLIENT span SHOULD be Error.',
       whyNot: {
-        ok: 'The 404 here is the server doing its job: the product does not exist. For a 4xx the conventions say a SERVER span MUST be left Unset, so Error does not follow them.',
+        ok: 'Look at which side this span is on. For catalog, a 404 for a missing product is a normal answer, so Error here is too much.',
       },
     },
     {
@@ -43,7 +43,7 @@ const SORT = {
       bucket: 'wrong',
       why: 'A 5xx SHOULD be Error, on the SERVER span too: checkout itself failed. Left Unset, the failure is invisible to anything that counts errors by span status.',
       whyNot: {
-        ok: 'A 500 means checkout itself failed, so Unset hides the failure. The conventions say a 5xx SHOULD be Error.',
+        ok: 'The request ended in a 500. Unset tells anything that counts errors by status that checkout did fine.',
       },
     },
     {
@@ -52,7 +52,7 @@ const SORT = {
       bucket: 'ok',
       why: 'A 2xx is a success, and instrumentation leaves it Unset. Unset is the normal status of a span that did not fail; nobody needs to set Ok.',
       whyNot: {
-        wrong: 'A 200 is a success and nothing failed. Leaving the status Unset is what instrumentation does, and nobody needs to set Ok.',
+        wrong: 'Nothing failed, so there is no failure to mark. A 200 is an ordinary success.',
       },
     },
     {
@@ -61,7 +61,7 @@ const SORT = {
       bucket: 'ok',
       why: 'A 5xx on a SERVER span SHOULD be Error: the server failed the request.',
       whyNot: {
-        wrong: 'A 503 is the server failing the request. Error on a SERVER span for a 5xx is what the conventions ask for.',
+        wrong: 'A 503 means the server could not do the job, and this is the server\'s own span. Error is what it should show.',
       },
     },
   ],

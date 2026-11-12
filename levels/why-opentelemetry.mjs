@@ -28,7 +28,7 @@ const PARTS = {
       why: '4318 is the default port for OTLP over HTTP, the protocol that carries telemetry between SDKs, Collectors and backends.',
       whyNot: {
         api: 'The API is what code calls to make telemetry. It does not define the bytes on the wire.',
-        sdk: 'It processes and exports telemetry inside the application. It is not the wire format.',
+        sdk: 'The SDK processes and exports telemetry inside the application. It does not define the bytes on the wire.',
         collector: 'A Collector is a process that speaks the wire format. It is not the format itself.',
         semconv: 'Semantic conventions name attributes. They do not define how telemetry is sent.',
       },
@@ -52,7 +52,7 @@ const PARTS = {
       why: 'Semantic conventions fix attribute names like this one, so every library and backend means the same thing by them.',
       whyNot: {
         api: 'The API creates telemetry. It does not fix what an attribute is called.',
-        sdk: 'It samples, batches and exports. It does not decide the standard names.',
+        sdk: 'The SDK samples, batches and exports. It does not decide the standard names.',
         otlp: 'OTLP carries attributes of any name. It does not say what each name means.',
         collector: 'A Collector can rename attributes, but it does not define the standard name.',
       },
@@ -64,7 +64,7 @@ const PARTS = {
       why: 'That is the Collector: it runs as its own process between your services and a backend.',
       whyNot: {
         api: 'The API is code you call inside a process. This is a separate process.',
-        sdk: 'It runs inside the application\'s process. This runs outside it.',
+        sdk: 'The SDK runs inside the application\'s process. This runs outside it.',
         otlp: 'OTLP is the protocol that process speaks, not the process.',
         semconv: 'Semantic conventions are names. They do not run, receive or forward anything.',
       },
@@ -77,7 +77,7 @@ const PARTS = {
       whyNot: {
         api: 'The API only defines calls such as starting a span. It does no batching or sampling, and without more behind it its calls record nothing.',
         otlp: 'OTLP is the protocol. It does not decide when spans are batched or which are kept.',
-        collector: 'A Collector can batch and sample too, but a span processor and a sampler are configured in the application\'s own code, not in a separate process.',
+        collector: 'A Collector can batch and sample too, but a batch span processor and a sampler named here are set up where the spans are created, in code or with environment variables such as <code>OTEL_TRACES_SAMPLER</code>. They are not a separate process.',
         semconv: 'Semantic conventions are names for attributes. They do not control batching or sampling.',
       },
     },

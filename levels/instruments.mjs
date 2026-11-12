@@ -23,9 +23,9 @@ const SORT = {
       bucket: 'counter',
       why: 'It only ever goes up: a Counter takes non-negative increments, here <code>add(1)</code> per order.',
       whyNot: {
-        histogram: 'A histogram keeps the spread of many measured values. An order has no size to measure, it is only counted.',
+        histogram: 'A histogram keeps the spread of many measured values. An order has no size to measure.',
         'up-down-counter': 'Nothing ever subtracts from it: an order that was placed stays placed.',
-        gauge: 'A gauge records a reading. Orders are counted, so a gauge would lose the rate math.',
+        gauge: 'A gauge records a reading. Orders arrive one at a time and add up, so a gauge would lose the rate math.',
       },
     },
     {
@@ -34,8 +34,8 @@ const SORT = {
       bucket: 'gauge',
       why: 'A current reading that makes no sense to add up: two rooms at 20 °C are not 40 °C. That is a Gauge.',
       whyNot: {
-        counter: 'A counter takes only non-negative increments and its total is a sum. A temperature goes up and down, and you read it as it is.',
-        histogram: 'A histogram keeps a spread of many separate values. Here there is one reading of the room at a time.',
+        counter: 'A counter takes only non-negative increments, and a temperature can fall.',
+        histogram: 'A histogram keeps a spread of many separate values. Here there is just one value for the room at any moment.',
         'up-down-counter': 'An UpDownCounter is for values you add up across sources. Adding two room temperatures tells you nothing.',
       },
     },
@@ -46,7 +46,7 @@ const SORT = {
       why: 'It goes up when an order is queued and down when one is taken, and the lengths from several pods add up to the total waiting. That is an UpDownCounter.',
       whyNot: {
         gauge: 'A gauge is for values that make no sense to add up. Queue lengths from several pods do add up to the total waiting.',
-        histogram: 'A histogram keeps the spread of many values. The queue is one length that moves up and down.',
+        histogram: 'A histogram keeps the spread of many separate values. A queue has one length at a time, so there is no spread to keep.',
         counter: 'A queue shrinks, and a Counter can only add non-negative amounts.',
       },
     },
@@ -68,8 +68,8 @@ const SORT = {
       why: 'Declines are events you count, and the total only grows. That is a Counter.',
       whyNot: {
         'up-down-counter': 'Nothing takes a decline back, so there is never a subtraction to make.',
-        histogram: 'A decline has no size to measure. Only the number of them matters.',
-        gauge: 'A gauge records a reading. Declines are counted, so a gauge would lose the rate math.',
+        histogram: 'A histogram is for values with a spread. A decline has no size or duration to measure.',
+        gauge: 'A gauge records a reading. Declines arrive one at a time and add up, so a gauge would lose the rate math.',
       },
     },
     {
@@ -89,8 +89,8 @@ const SORT = {
       bucket: 'up-down-counter',
       why: 'You add and subtract at the edges of each request, and the counts from three pods add up to what is in flight. That is an UpDownCounter.',
       whyNot: {
-        counter: 'A counter takes only non-negative increments. Here the number goes down when a request ends.',
-        histogram: 'A histogram records many separate values. This is one running count of what is in flight.',
+        counter: 'A Counter takes only non-negative increments. Here the number drops when a request ends.',
+        histogram: 'A histogram records many separate values. This is one running total of what is in flight.',
         gauge: 'A gauge is for values that make no sense to sum. In-flight requests from three pods do sum.',
       },
     },
