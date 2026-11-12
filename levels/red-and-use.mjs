@@ -7,7 +7,7 @@
 // Spec: https://opentelemetry.io/docs/collector/components/connector/ , https://opentelemetry.io/docs/specs/semconv/http/http-spans/
 // Spec: https://opentelemetry.io/docs/specs/otel/compatibility/prometheus_and_openmetrics/#otlp-metric-points-to-prometheus , https://prometheus.io/docs/prometheus/latest/querying/functions/#histogram_quantile
 // Source (spanmetrics connector README, names, dimensions, units, status codes and the feature gates): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/connector/spanmetricsconnector/README.md
-// Docs (component type at v0.164.0: `span_metrics`; `spanmetrics` is the deprecated alias): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/connector/spanmetricsconnector/metadata.yaml
+// Docs (component type at v0.164.0: `span_metrics`; `spanmetrics` is the deprecated alias): https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.164.0/connector/spanmetricsconnector/metadata.yaml
 // Source (USE method, Brendan Gregg): https://www.brendangregg.com/usemethod.html
 // Source (RED method, Tom Wilkie, as presented at GrafanaCon EU 2018): https://grafana.com/blog/2018/08/02/the-red-method-how-to-instrument-your-services/
 // Dash0 docs: https://www.dash0.com/docs/dash0/monitoring/services/built-in-metrics , https://www.dash0.com/docs/dash0/telemetry/metrics/understand-synthetic-metrics
@@ -87,7 +87,7 @@ const DASH0 = [
   },
   {
     key: 'connector-needed',
-    label: 'They come from a spanmetrics connector that Dash0 asks you to run in your Collector',
+    label: 'They come from a span_metrics connector that Dash0 asks you to run in your Collector',
     why: 'Dash0 does that derivation itself, from the spans it ingests. A connector in your own Collector is how you would get span metrics into a backend that does not.',
   },
   {
@@ -131,7 +131,7 @@ export default {
         intro:
           'Cart and checkout send traces but no metrics, and the team wants RED for each service now. Spans have ' +
           'what RED needs: each one is a request with a start, an end and a status. The Collector\'s ' +
-          '<code>spanmetrics</code> connector is in the contrib distribution.',
+          '<code>span_metrics</code> connector (formerly <code>spanmetrics</code>) is in the contrib distribution.',
         question: 'How do you get RED out of the traces?',
         qid: 'ru-q-connector',
         choice: { id: 'ru-connector', choices: CONNECTOR },
@@ -207,6 +207,6 @@ export default {
       },
     ],
     finish:
-      'You can read a service with RED and a resource with USE, you know saturation is not utilisation, you can get RED from spans with the spanmetrics connector, and Dash0 derives it from your spans.',
+      'You can read a service with RED and a resource with USE, you know saturation is not utilisation, you can get RED from spans with the span_metrics connector, and Dash0 derives it from your spans.',
   },
 };

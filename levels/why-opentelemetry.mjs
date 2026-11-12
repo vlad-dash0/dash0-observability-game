@@ -74,8 +74,8 @@ const DEPENDS_ON = [
   },
   {
     key: 'collector',
-    label: 'A Collector client package, to filter its spans before the library exports them',
-    why: 'The Collector is a separate process, not a package a library depends on.',
+    label: 'The Collector, added as a dependency, to filter the library\'s spans before it exports them',
+    why: 'There is no Collector package for a library to depend on: the Collector is a separate process that runs between your services and a backend.',
   },
 ];
 

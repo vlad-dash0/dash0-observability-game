@@ -160,7 +160,7 @@ const SORT = {
       bucket: 'manual',
       why: 'PromQL queries metrics, and the old tool\'s one-query mix of two signals has no one-query counterpart. The panel is rebuilt by hand, for instance as two panels side by side.',
       whyNot: {
-        translated: 'PromQL reaches logs only through derived metrics such as <code>dash0.logs</code>, and a text search over log lines has no PromQL counterpart, so a query that mixes the two cannot carry over as written.',
+        translated: 'PromQL reaches logs through derived metrics such as <code>dash0.logs</code>, and a text search over log lines is not something a derived metric can express, so a query that mixes the two cannot carry over as written.',
         approximated: 'No number here is a rough copy of an old one: the query that mixes the two signals does not come over in any form.',
       },
     },
