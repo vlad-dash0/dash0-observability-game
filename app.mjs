@@ -733,6 +733,7 @@ export function createGame(deps) {
       const status = this.actRow(act.id)?.status ?? 'open';
       if (status === 'saved') return 'saved';
       if (status === 'locked') return this.debug ? 'open' : 'locked';
+      if (status === 'incident') return 'incident';
       if (this.continueView() !== null && act.ids.includes(this.continueView().levelId)) return 'current';
       return status;
     },
