@@ -165,6 +165,7 @@
   --layout-narrow: 760px;
   --layout-wide: 1320px;
   --side-width: 300px;
+  --overlay-chrome: 14rem; /* the level overlay's header, footer and body padding, what a sticky side column leaves out of the viewport */
   --measure: 72ch;
   --opacity-disabled: .45;
   --dur-fast: .15s;

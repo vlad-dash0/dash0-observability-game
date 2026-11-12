@@ -179,7 +179,7 @@ export default {
         };
       });
       finish.onclick = () => ctx.finish({ text: REWARD, cards: [] });
-      buttons[0].focus();
+      buttons[0].focus({ preventScroll: true }); // a new step opens at its top (#331)
     };
 
     ctx.renderStep(
@@ -224,6 +224,6 @@ export default {
     });
     escalate.onclick = () => askAnswers();
     // The app moves focus to Back after run() (docs/DESIGN-SYSTEM.md, Focus); this keeps the step's own focus order.
-    buttons[0].focus();
+    buttons[0].focus({ preventScroll: true }); // a new step opens at its top (#331)
   },
 };

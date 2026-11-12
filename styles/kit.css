@@ -19,10 +19,15 @@
 .ui-split-side { min-width: 0; }
 @container level (min-width: 960px) {
   .ui-split { grid-template-columns: minmax(0, 1fr) var(--side-width); column-gap: var(--space-6); align-items: start; }
-  .ui-split-side { position: sticky; top: 0; }
+  /* Never taller than the scrolling body (the viewport less the overlay's header and footer), so its top is never pushed under the header when the success card makes it tall; a taller panel scrolls inside (#331). */
+  .ui-split-side { position: sticky; top: 0; max-block-size: calc(100dvh - var(--overlay-chrome)); overflow-y: auto; }
+  /* The lesson, lead-in, question and feedback above a board end at the board's right edge, not under the side panel (#331). */
+  .ui-step--wide > :is(.ui-lesson, .ui-prose, .ui-code, .ui-question, .ui-note, .ui-feedback) { max-inline-size: calc(100% - var(--side-width) - var(--space-6)); }
 }
+/* The footer bar is always as wide as the widest step, so the primary button sits at the same right edge on every
+   step of a level, whether the step above it is narrow or wide (#331). */
 .ui-actions {
-  inline-size: 100%; max-inline-size: var(--layout-narrow); margin-inline: 0 auto;
+  inline-size: 100%; max-inline-size: var(--layout-wide); margin-inline: 0 auto;
   display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-2) var(--space-3);
 }
 /* Why the button before it is disabled, on a line under the row; gone once that button is enabled (no script involved). */
@@ -34,7 +39,6 @@
   /* Two buttons share a row (labels may wrap) instead of stacking; the reason takes a row of its own. */
   .ui-actions .ui-btn:not(:only-of-type) { align-self: stretch; flex: 1 1 140px; padding-inline: var(--space-3); text-align: center; }
 }
-.ui-actions--wide { max-inline-size: var(--layout-wide); }
 
 /* ---------- Lesson glow card (text.mjs) ---------- */
 /* A hairline edge and an amber glow top left over the surface; the eyebrow is
@@ -53,7 +57,7 @@
   color: var(--color-lesson-eyebrow);
 }
 .ui-lesson p, .ui-lesson ul, .ui-lesson ol { max-inline-size: var(--measure); }
-.ui-lesson { max-inline-size: calc(var(--measure) + 2 * var(--space-5)); } /* one reading width in a narrow and a wide step, from the same left edge */
+/* The card fills its column (the lines inside keep one reading width, above); the column is the step's or, beside a side panel, the board's (#331). */
 .ui-lesson p + p, .ui-lesson p + ul, .ui-lesson p + ol { margin-top: var(--space-3); }
 .ui-lesson ul, .ui-lesson ol { padding-left: 1.4em; }
 .ui-lesson code {
@@ -314,6 +318,7 @@
   color: var(--color-text); font-size: var(--text-md); line-height: 1.5; overflow-wrap: anywhere;
 }
 .ui-feedback[hidden] { display: none; }
+.ui-feedback { scroll-margin-block-end: var(--space-4); } /* scrolled into view above the pinned footer (setFeedback, #331) */
 .ui-feedback:focus { outline: none; }
 .ui-feedback--bar { padding: 6px var(--space-3); font-size: 13.5px; }
 .ui-feedback-ico { flex: none; inline-size: 18px; text-align: center; font-weight: var(--weight-bold); color: var(--color-text-muted); }

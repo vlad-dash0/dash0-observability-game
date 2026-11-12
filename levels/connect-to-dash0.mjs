@@ -258,7 +258,7 @@ export default {
       const datasetEl = $('#ctd-dataset');
       const minted = practice ? $('#ctd-minted') : null;
       const mintedRow = practice ? $('#ctd-minted-row') : null;
-      endpointEl.focus();
+      endpointEl.focus({ preventScroll: true }); // a new step opens at its top (#331)
 
       // The shown practice token goes with the secret field: after Connect it is gone from the page.
       const scrub = () => {
@@ -342,7 +342,7 @@ export default {
         say(shown.tone, `${shown.html}${message}`);
         fb.setAttribute('data-outcome', outcome.kind);
         setActions({ retry: shown.retry, toPractice: !practice && outcome.kind === OUTCOME.unreachable });
-        (shown.retry ? actions.querySelector('#ctd-retry') : endpointEl).focus();
+        (shown.retry ? actions.querySelector('#ctd-retry') : endpointEl).focus({ preventScroll: true }); // the feedback just scrolled into view stays in view (#331)
       };
 
       function onConnect() {
@@ -422,7 +422,7 @@ export default {
         ),
         bar(button({ id: 'ctd-finish', label: 'Finish', variant: 'primary', finish: true })),
       );
-      $('#ctd-connected-title').focus();
+      $('#ctd-connected-title').focus({ preventScroll: true });
       actions.querySelector('#ctd-finish').onclick = () =>
         ctx.finish({
           text: practice

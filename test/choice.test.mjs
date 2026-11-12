@@ -349,3 +349,14 @@ test('labelledBy null means not given, like undefined (#57)', () => {
   assert.equal(q('#q1-choices').hasAttribute('role'), false);
   assert.equal(q('#q1-choices').hasAttribute('aria-labelledby'), false);
 });
+
+test('#331 a new step opens at its top: mount focuses the first choice without scrolling to it', () => {
+  const { ctx, dom, onRight } = setup();
+  const calls = [];
+  for (const b of qa('[data-pick]')) {
+    const f = b.focus.bind(b);
+    b.focus = (o) => { calls.push([b.dataset.pick, o]); f(o); };
+  }
+  mountChoice(ctx, CHOICES, { id: 'q1', onRight });
+  assert.deepEqual(calls, [['d', { preventScroll: true }]]);
+});

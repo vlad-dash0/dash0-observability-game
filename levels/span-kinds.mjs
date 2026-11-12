@@ -113,7 +113,7 @@ export default {
       );
       const next = bar.querySelector('#kinds-next');
       const line = ctx.ovBody.querySelector('#kinds-edges');
-      setFeedback(line, 'neutral', edgesLine(MAP.spans, e));
+      setFeedback(line, 'neutral', edgesLine(MAP.spans, e), { scroll: false }); // the step opens at its top (#331)
       mountBuild(ctx, MAP, {
         onComplete: () => {
           // The check passed, so every kind is the answer's: draw the map from it.
