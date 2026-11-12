@@ -523,7 +523,7 @@ test('hint tiers: each costs one ctx.hint(); tier 2 outlines two candidates, tie
   assert.equal(q('#b1-hint-tier [aria-hidden="true"]').getAttribute('data-tone'), 'hint');
   click('#b1-hint');
   assert.equal(counts.hints, 1);
-  assert.equal(q('#b1-hint-text').textContent.startsWith('Hint 1 of 3 · POST (storefront)A child starts after its parent starts'), true);
+  assert.equal(q('#b1-hint-text').textContent.startsWith('Hint 1 of 3POST (storefront)A child starts after its parent starts'), true);
   assert.equal(focus.last(), '#b1-hint-text');
   click('#b1-hint');
   assert.deepEqual(qa('[data-hint-cand="true"]').map((r) => r.dataset.span ?? r.dataset.drop), ['root', A]);
@@ -1189,7 +1189,8 @@ test('the hint header names a hinted twin like the button and the status do (#69
   const { mount } = setup(spec);
   mount();
   click('#b1-hint');
-  assert.equal(q('#b1-hint-text .ui-eyebrow').textContent, 'Hint 1 of 3 \u00b7 POST (storefront, trace 4bf92f35)');
+  assert.equal(q('#b1-hint-text .ui-eyebrow').textContent, 'Hint 1 of 3');
+  assert.equal(q('#b1-hint-text b').textContent, 'POST (storefront, trace 4bf92f35)', 'the subject keeps its own case on its own line (#332)');
 });
 
 test('twins get distinct screen-reader row labels, waiting and arrived; a unique span keeps its label (#228)', () => {

@@ -234,6 +234,8 @@ test('only the bar label is clipped (never the cell, whose connectors overhang),
   assert.equal(label.stroke, 'var(--color-surface)');
   assert.equal(label['stroke-width'], '8px', 'wide enough to hide the connector between words');
   assert.equal(label['paint-order'], 'stroke');
+  const out = pick('.wf-bar-label[data-out]');
+  assert.deepEqual([out.stroke, out['stroke-width'], out['paint-order']], [label.stroke, label['stroke-width'], label['paint-order']], '#332 a label placed outside its bar by measurement gets the same halo');
 });
 
 test('palette rule 5: kit.css puts no shadow or glow on anything, only inset rings', () => {
@@ -657,4 +659,17 @@ test('on a phone two action buttons share a row, but a lone one stays a pill (ne
   assert.ok(r, 'the shared-row rule exists, and only for a button with a sibling button');
   assert.match(Object.fromEntries(decls(r.body)).flex, /^1 1 \d+px$/);
   assert.equal(Object.fromEntries(decls(r.body))['align-self'], 'stretch', 'two buttons in a row are one height');
+});
+
+test('#332 a table cell never breaks a word mid-letter, a scrolling code block shows a fade, a cause reads like a choice, prose ends where the lesson does', () => {
+  const kit = sheetRules('kit.css');
+  const of = (sel) => Object.fromEntries(kit.filter((r) => r.selector === sel).flatMap((r) => decls(r.body)));
+  assert.equal(of('.ui-table th, .ui-table td, .ui-prose th, .ui-prose td')['overflow-wrap'], 'normal', 'the panel\'s anywhere must not reach a cell');
+  const fade = of('.ui-prose pre:not([data-wrap]), .ui-code:not([data-wrap])').background ?? '';
+  assert.equal(/local/.test(fade) && /scroll/.test(fade), true, 'edge fades that show only where there is more to scroll to');
+  assert.equal(of('.ui-prose p, .ui-prose li')['max-inline-size'], 'var(--layout-narrow)', 'prose, lesson card and table share one right edge');
+  const cause = of('.ui-option--hypothesis');
+  const choice = of('.ui-option--choice');
+  assert.equal(cause['font-weight'], choice['font-weight']);
+  assert.equal(cause['font-size'], choice['font-size']);
 });

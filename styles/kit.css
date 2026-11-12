@@ -56,12 +56,12 @@
   font: var(--weight-regular) 11px/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase;
   color: var(--color-lesson-eyebrow);
 }
-.ui-lesson p, .ui-lesson ul, .ui-lesson ol { max-inline-size: var(--measure); }
+.ui-lesson-body { max-inline-size: var(--measure); }
 /* The card fills its column (the lines inside keep one reading width, above); the column is the step's or, beside a side panel, the board's (#331). */
 .ui-lesson p + p, .ui-lesson p + ul, .ui-lesson p + ol { margin-top: var(--space-3); }
 .ui-lesson ul, .ui-lesson ol { padding-left: 1.4em; }
 .ui-lesson code {
-  font-family: var(--font-mono); font-size: .8em; border: 0; border-radius: var(--radius-xs); padding: 2px 6px;
+  font-family: var(--font-mono); font-size: .8em; border: 0; border-radius: var(--radius-xs); padding: 2px var(--space-1); /* tight: the end padding reads as a gap before a comma */
   background: var(--color-code-bg); color: var(--color-lesson-code);
   overflow-wrap: break-word; /* the card clips (overflow: hidden): a token wider than the card must break, not clip */
 }
@@ -86,7 +86,9 @@
 .ui-step-note { font-size: 13.5px; color: var(--color-text-muted); }
 .ui-note { font-size: 13.5px; color: var(--color-text-muted); overflow-wrap: anywhere; }
 .ui-prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-3); font-size: var(--text-md); line-height: 1.55; min-width: 0; }
-.ui-prose p, .ui-prose li { max-inline-size: var(--measure); }
+/* Prose reads out to the lesson card's right edge, which is the narrow step's width (760px): at 14px, 72ch ends 120px short of it,
+   so the lesson, the table and the text under it had three different right edges (#332). */
+.ui-prose p, .ui-prose li { max-inline-size: var(--layout-narrow); }
 .ui-prose ul, .ui-prose ol { padding-left: 1.4em; display: grid; gap: 6px; }
 /* A deletion keeps text colour; the strike carries the error tone. */
 .ui-prose del { text-decoration-color: var(--color-error); text-decoration-thickness: 2px; }
@@ -95,6 +97,18 @@
    config or code block keeps its lines and scrolls, because its indentation is the meaning. */
 .ui-prose pre[data-wrap] { white-space: pre-wrap; overflow-wrap: break-word; overflow-x: hidden; }
 .ui-prose pre[data-wrap] code { overflow-wrap: break-word; }
+.ui-code[data-wrap] { white-space: pre-wrap; overflow-wrap: break-word; overflow-x: hidden; }
+.ui-code[data-wrap] code { overflow-wrap: break-word; }
+/* A block that scrolls sideways shows it: a fade at each edge that has more behind it (the `local` layers cover the
+   `scroll` ones at the ends, so a block that fits, or is scrolled to an end, shows no fade there) (#332). */
+.ui-prose pre:not([data-wrap]), .ui-code:not([data-wrap]) {
+  background:
+    linear-gradient(to right, var(--color-code-bg) 30%, transparent) left center / 28px 100% no-repeat local,
+    linear-gradient(to left, var(--color-code-bg) 30%, transparent) right center / 28px 100% no-repeat local,
+    linear-gradient(to right, color-mix(in srgb, var(--color-text-muted) 65%, transparent), transparent) left center / 18px 100% no-repeat scroll,
+    linear-gradient(to left, color-mix(in srgb, var(--color-text-muted) 65%, transparent), transparent) right center / 18px 100% no-repeat scroll,
+    var(--color-code-bg);
+}
 
 /* ---------- Panel (panel.mjs) ---------- */
 .ui-panel {
@@ -256,7 +270,9 @@
   padding: var(--space-3) var(--space-3) 10px; border-radius: var(--radius-sm); background: var(--color-bg);
   font-weight: var(--weight-semibold);
 }
-.ui-option--hypothesis { padding: var(--space-3) 40px var(--space-3) 14px; border-radius: var(--radius-sm); background: var(--color-bg); }
+/* A cause reads like a choice option (same size and weight, #332); its fill is the page colour, not the surface, because it sits on the board's
+   surface-coloured card (the tiles beside it do the same): an option on a card takes the colour of the page. */
+.ui-option--hypothesis { padding: var(--space-3) 40px var(--space-3) 14px; border-radius: var(--radius-sm); background: var(--color-bg); font-size: var(--text-base); font-weight: var(--weight-semibold); }
 .ui-option--toggle { padding: 9px 13px; border-radius: var(--radius-sm); font-weight: var(--weight-semibold); }
 .ui-option--line { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 13px; }
 /* A radio card: the dot, then the label with its meta line beneath. The picked card (data-picked,
@@ -397,6 +413,9 @@
   padding: 5px 10px; border-top: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
   font-family: var(--font-mono); font-size: 11.5px; vertical-align: top;
 }
+/* A cell never breaks a word mid-letter ("Stat/us", "exceptio/n"): the panel's `anywhere` is inherited and would lower the
+   columns' min-content width, so the columns squeeze; `normal` keeps each word whole and the wrap scrolls sideways instead (#332). */
+.ui-table th, .ui-table td, .ui-prose th, .ui-prose td { overflow-wrap: normal; }
 /* Addresses and ids wrap instead of forcing the table wider than a phone (as .ui-lesson code does). */
 .ui-table code, .ui-prose table code { overflow-wrap: break-word; }
 .ui-table [data-num] { text-align: right; font-variant-numeric: tabular-nums; }

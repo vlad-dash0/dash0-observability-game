@@ -134,7 +134,7 @@ export default {
   scoring: { parMs: null },
   run(ctx) {
     const e = ctx.escapeHtml;
-    // The rows so far: a plain full-width kit block, not live. Only the newest row is announced, in the feedback region.
+    // The rows so far: full-width kit cards (copies of the feedback region), not live. Only the newest row is announced, in the feedback region.
     const rowsList = (id) => `<div class="pager-rows" id="${id}"></div>`;
     const alert = question({ id: 'pager-alert', html: e(ALERT) });
     const choices = (list, attr) =>
@@ -145,8 +145,10 @@ export default {
     /** The newest row is announced in the kit feedback region (neutral: information only); the row it replaces moves into the plain (not live) list, so each row is on screen once. */
     const addRow = (list, region, key, attr, label, body) => {
       if (region.newestHtml) {
-        list.rowsHtml = `${list.rowsHtml ?? ''}${region.newestHtml}`;
-        list.innerHTML = list.rowsHtml;
+        // The row it replaces becomes a card of its own, a copy of the kit region (not live, no id), so every row has one style (#332).
+        const old = region.cloneNode(true);
+        for (const attr of ['id', 'role', 'aria-live', 'tabindex']) old.removeAttribute(attr);
+        list.appendChild(old);
       }
       // A label that is a question reads on as it is; any other label gets a colon.
       const mark = label.endsWith('?') ? '' : ':';

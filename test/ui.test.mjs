@@ -11,7 +11,7 @@ import { decls, definedClasses, read, ROOT, rules, splitTop } from './helpers/cs
 import * as ui from '../lib/ui/index.mjs';
 
 const {
-  actions, button, buttonRow, checkbox, chip, clearFeedback, codeBlock, dots, eyebrow, feedback, field, finishButton, fold,
+  actions, button, buttonRow, checkbox, chip, clearFeedback, codeBlock, dots, eyebrow, feedback, field, finishButton, fold, hintHead,
   helpChips, lesson, linkButton, meter, nextButton, note, option, options, panel, prose, question, radio, radioGroup, reason, setFeedback,
   sideColumn, split, stars, stats, step, stepHead, table,
   BUTTON_VARIANTS, DOTS_TONES, FEEDBACK_TONES, LINK_VARIANTS, OPTION_KINDS, OPTION_STATES, OPTIONS_LAYOUTS, PANEL_VARIANTS, TONES,
@@ -43,7 +43,7 @@ test('reason, buttonRow: a muted line before a disabled button, and a row that k
 });
 
 test('text: lesson, question, eyebrow, stepHead, note, prose, codeBlock', () => {
-  assert.equal(lesson('Spans <code>nest</code>.'), '<section class="ui-lesson">Spans <code>nest</code>.</section>');
+  assert.equal(lesson('Spans <code>nest</code>.'), '<section class="ui-lesson"><div class="ui-lesson-body">Spans <code>nest</code>.</div></section>');
   assert.equal(question({ id: 'q1', html: 'Which <b>one</b>?' }), '<h3 class="ui-question" id="q1">Which <b>one</b>?</h3>');
   assert.equal(question({ html: 'Why?' }), '<h3 class="ui-question">Why?</h3>');
   assert.equal(eyebrow('Error budget'), '<p class="ui-eyebrow">Error budget</p>');
@@ -56,6 +56,9 @@ test('text: lesson, question, eyebrow, stepHead, note, prose, codeBlock', () => 
   assert.equal(prose('<p>x</p><table><tr><td>1</td></tr></table><pre>t</pre><table class="k"><tr><td>2</td></tr></table>'),
     '<div class="ui-prose"><p>x</p><div class="ui-table-wrap"><table><tr><td>1</td></tr></table></div><pre>t</pre>' +
     '<div class="ui-table-wrap"><table class="k"><tr><td>2</td></tr></table></div></div>', 'each table sits in the kit scroller; nothing else is wrapped');
+  assert.equal(hintHead('Hint 1 of 3'), '<p class="ui-eyebrow">Hint 1 of 3</p>');
+  assert.equal(hintHead('Hint 2 of 3', '"Cart" <x>'), '<p class="ui-eyebrow">Hint 2 of 3</p><p><b>&quot;Cart&quot; &lt;x&gt;</b></p>', '#332 the subject is escaped and outside the upper-cased eyebrow');
+  assert.equal(codeBlock('a', { wrap: true }), '<pre class="ui-code" data-wrap><code>a</code></pre>', '#332 wrap soft-wraps an env block');
   assert.equal(codeBlock('a < b && "c"'), '<pre class="ui-code"><code>a &lt; b &amp;&amp; &quot;c&quot;</code></pre>');
 });
 
@@ -288,6 +291,7 @@ const CASES = [
   ['lesson', null, (h) => lesson(h)],
   ['question', null, (h) => question({ id: 'q', html: h })],
   ['eyebrow', (t) => eyebrow(t), null],
+  ['hintHead', (t) => hintHead(t, t), null],
   ['stepHead', null, (h) => stepHead({ step: 1, titleHtml: h, noteHtml: h })],
   ['note', null, (h) => note(h)],
   ['prose', null, (h) => prose(h)],
@@ -432,6 +436,7 @@ const INVALID = [
   ['question', () => question({ id: '1q', html: 'x' })],
   ['question', () => question({ id: 'a b', html: 'x' })],
   ['eyebrow', () => eyebrow('')],
+  ['hintHead', () => hintHead('Hint 1 of 3', '')],
   ['stepHead', () => stepHead({ step: 0, titleHtml: 'x' })],
   ['stepHead', () => stepHead({ step: 1.5, titleHtml: 'x' })],
   ['note', () => note(5)],
@@ -613,4 +618,14 @@ test('#331 the sticky side column never outgrows the scrolling body, and the lin
   const css = read('styles/kit.css');
   assert.match(css, /\.ui-split-side \{[^}]*max-block-size: calc\(100dvh - var\(--overlay-chrome\)\); overflow-y: auto/);
   assert.match(css, /\.ui-step--wide > :is\([^)]*\.ui-lesson[^)]*\.ui-feedback[^)]*\) \{ max-inline-size: calc\(100% - var\(--side-width\) - var\(--space-6\)\)/);
+});
+
+test('#331 the lesson text holds the reading width in one body wrapper, whatever its children, while the card fills its column', () => {
+  const css = read('styles/kit.css');
+  const body = rules(css).find((r) => r.selector === '.ui-lesson-body');
+  assert.equal(Object.fromEntries(decls(body.body))['max-inline-size'], 'var(--measure)');
+  const card = Object.fromEntries(decls(rules(css).find((r) => r.selector === '.ui-lesson').body));
+  assert.equal('max-inline-size' in card, false, 'the card itself is not capped');
+  const { document } = parseHTML(`<!doctype html><body>${lesson('a bare text node')}${lesson('<code>x</code>')}</body>`);
+  for (const card of document.querySelectorAll('.ui-lesson')) assert.equal(card.querySelectorAll(':scope > .ui-lesson-body').length, 1);
 });

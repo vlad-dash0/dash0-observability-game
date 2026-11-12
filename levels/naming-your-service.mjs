@@ -105,7 +105,7 @@ export default {
             'Your first ticket: checkout went live last week and nobody can find its traces. ' +
               'Its code sets no service name and it runs on a plain Linux VM, so this environment ' +
               'is all its SDK has to go on. The process is started as <code>node</code>.',
-          )}<div id="nys-config">${codeBlock(GIVEN)}</div>${question({ id: 'nys-q-name', html: 'What service name does its telemetry show up under?' })}${choiceHtml(ctx, SHOWS_UP_AS, { id: 'nys', labelledBy: 'nys-q-name' })}`,
+          )}<div id="nys-config">${codeBlock(GIVEN, { wrap: true })}</div>${question({ id: 'nys-q-name', html: 'What service name does its telemetry show up under?' })}${choiceHtml(ctx, SHOWS_UP_AS, { id: 'nys', labelledBy: 'nys-q-name' })}`,
         }),
         actions({ wide: false, buttonsHtml: nextButton('nys-next', 'Pick the right answer to continue.') }),
       );
@@ -224,7 +224,7 @@ export default {
           bodyHtml: `${ctx.speech(
             'Checkout has a name. A week later a teammate pastes settings copied from the cart ' +
               'service into the deploy, and now both are set.',
-          )}${codeBlock(CLASH_ENV)}${question({ id: 'nys-q-wins', html: 'Which service name does the SDK report?' })}${choiceHtml(ctx, WHO_WINS, { id: 'nys', labelledBy: 'nys-q-wins' })}`,
+          )}${codeBlock(CLASH_ENV, { wrap: true })}${question({ id: 'nys-q-wins', html: 'Which service name does the SDK report?' })}${choiceHtml(ctx, WHO_WINS, { id: 'nys', labelledBy: 'nys-q-wins' })}`,
         }),
         actions({ wide: false, buttonsHtml: finishButton('nys-finish', 'Pick the right answer to finish the level.') }),
       );
