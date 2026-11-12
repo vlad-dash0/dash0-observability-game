@@ -89,7 +89,7 @@ const SORT = {
       bucket: 'up-down-counter',
       why: 'You add and subtract at the edges of each request, and the counts from three pods add up to what is in flight. That is an UpDownCounter.',
       whyNot: {
-        counter: 'A Counter takes only non-negative increments. Here the number drops when a request ends.',
+        counter: 'A counter takes only non-negative increments. Here the number drops when a request ends.',
         histogram: 'A histogram records many separate values. This is one running total of what is in flight.',
         gauge: 'A gauge is for values that make no sense to sum. In-flight requests from three pods do sum.',
       },

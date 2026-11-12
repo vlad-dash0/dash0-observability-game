@@ -2,7 +2,7 @@
 // Collector, semantic conventions), then picks what a shared library depends on: only
 // the API, a no-op until the application installs an SDK. Spec: docs/M1-DESIGN.md §6 Act 0.
 // Spec: https://opentelemetry.io/docs/concepts/instrumentation/libraries/#opentelemetry-api
-// Docs (package names in the options: `@opentelemetry/sdk-node` and the OTLP HTTP trace exporter `@opentelemetry/exporter-trace-otlp-http`): https://opentelemetry.io/docs/languages/js/getting-started/nodejs/ , https://opentelemetry.io/docs/languages/js/exporters/
+// Docs (package names in the options: `@opentelemetry/sdk-node` and the OTLP HTTP trace exporter `@opentelemetry/exporter-trace-otlp-http`): https://opentelemetry.io/docs/languages/js/getting-started/nodejs/ , https://opentelemetry.io/docs/languages/js/exporters/ , https://opentelemetry.io/docs/languages/sdk-configuration/general/
 import { actions, finishButton, nextButton, question, step } from '../lib/ui/index.mjs';
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountSort, renderSort } from '../lib/widgets/sort-it-view.mjs';
@@ -77,7 +77,7 @@ const PARTS = {
       whyNot: {
         api: 'The API only defines calls such as starting a span. It does no batching or sampling, and without more behind it its calls record nothing.',
         otlp: 'OTLP is the protocol. It does not decide when spans are batched or which are kept.',
-        collector: 'A Collector can batch and sample too, but a batch span processor and a sampler named here are set up where the spans are created, in code or with environment variables such as <code>OTEL_TRACES_SAMPLER</code>. They are not a separate process.',
+        collector: 'A Collector can batch and sample too, but a batch span processor and a sampler are set up where the spans are created, in code or with environment variables such as <code>OTEL_TRACES_SAMPLER</code>. They are not a separate process.',
         semconv: 'Semantic conventions are names for attributes. They do not control batching or sampling.',
       },
     },

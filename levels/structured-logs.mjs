@@ -92,7 +92,7 @@ const SORT = {
       whyNot: {
         body: 'A trace ID is 32 hex characters that machines use to match records, not a sentence.',
         severity: 'Nothing in a trace ID says how serious anything is.',
-        resource: 'Every request has its own trace ID, so it differs between records.',
+        resource: 'Each request has its own trace ID, so it is not fixed for a source the way a Resource is.',
         attributes: 'The record has a field of its own for this ID, so it is not a key you add. That field is how a backend can link the record to its trace.',
       },
     },
