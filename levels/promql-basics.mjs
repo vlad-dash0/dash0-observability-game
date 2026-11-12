@@ -67,7 +67,7 @@ const DASH0 = [
   },
   {
     key: 'metrics-only',
-    label: 'PromQL reaches metrics only: for logs and spans you leave <code>otel_metric_name</code> behind and learn a different query language',
+    label: 'PromQL reaches metrics only: logs and spans need a different query language, learned separately, and <code>otel_metric_name</code> does not apply to them',
     why: 'Dash0 turns logs and spans into synthetic metrics such as <code>dash0.logs</code> and <code>dash0.spans</code>, and you query those with the same PromQL.',
   },
 ];
