@@ -6,7 +6,7 @@
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
 import { newBuildState } from '../lib/widgets/build-it.mjs';
-import { actions, codeBlock, finishButton, nextButton, prose, question, step } from '../lib/ui/index.mjs';
+import { actions, codeBlock, finishButton, nextButton, question, step } from '../lib/ui/index.mjs';
 
 const CHARGE = '8f14e45fceea167a';
 const RETRY = '45c48cce2e2d7fbd';
@@ -137,9 +137,10 @@ export default {
         step({
           wide: true,
           bodyHtml: `${ctx.speech(
-          'Here is what happened in three spans. Set each status by the outcome: Error when ' +
-            'the operation failed, Unset when it completed, even if it handled an error on the way.',
-          )}${prose(`<ul>${stories}</ul>`)}${question({ html: 'Give each span the status its outcome calls for.' })}${renderBuild(ERRORS, newBuildState(ERRORS), { escapeHtml: e })}`,
+          '<p>Here is what happened in three spans. Set each status by the outcome: Error when ' +
+            'the operation failed, Unset when it completed, even if it handled an error on the way.</p>' +
+            `<ul>${stories}</ul>`,
+          )}${question({ html: 'Give each span the status its outcome calls for.' })}${renderBuild(ERRORS, newBuildState(ERRORS), { escapeHtml: e })}`,
         }),
         actions({ wide: true, buttonsHtml: nextButton('evl-next') }),
       );

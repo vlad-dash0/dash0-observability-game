@@ -505,7 +505,7 @@ export default {
           cards: [],
         });
       // Practice: the task starts in the explorer, not in the first answer field.
-      (practice ? $('#its-explorer-title') : $('#its-q-operation')).focus();
+      (practice ? $('#its-explorer-title') : $('#its-q-operation')).focus({ preventScroll: true }); // a new step opens at its top (#331)
     };
 
     stepStart();

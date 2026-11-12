@@ -198,7 +198,8 @@ test('T12 each step renders one kit step, wide by its type: a sort, build, incid
     seen.push(key);
     assert.equal(qa('.ui-step').length, 1, `step ${i + 1} (${key}) is one kit step`);
     assert.equal(qa('.ui-step--wide').length, wide ? 1 : 0, `step ${i + 1} (${key}) width`);
-    assert.equal(qa('.ui-actions--wide').length, wide ? 1 : 0, `step ${i + 1} (${key}) actions width`);
+    assert.equal(qa('.ui-actions--wide').length, 0, `step ${i + 1} (${key}) the footer is one width on every step`);
+    assert.equal(qa('.ui-actions').length, 1, `step ${i + 1} (${key}) one actions bar`);
     assert.equal(qa('.ui-step .ui-lesson').length, 1, `step ${i + 1} (${key}) opens with the lesson card`);
     assert.equal(qa('.ui-step .ui-question').length, FX.play.steps[i].question == null ? 0 : 1, `step ${i + 1} (${key}) question`);
     if (SIDE.includes(key)) {
