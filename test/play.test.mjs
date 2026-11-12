@@ -648,3 +648,10 @@ test('#339 the solved side column drops the star rule and the hint tools so the 
   const help = readFileSync(new URL('../lib/widgets/help-ladder.mjs', import.meta.url), 'utf8');
   assert.match(help, /setAttribute\('data-solved'/);
 });
+
+test('#346 at short heights the solved card shrinks its swirl and keeps the counters in one row', () => {
+  const css = readFileSync(new URL('../styles/kit.css', import.meta.url), 'utf8');
+  const block = css.match(/@media \(max-height: 760px\) \{([^}]*\}[^}]*)\}/)?.[1] ?? '';
+  assert.match(block, /\.ui-win-swirl \{ max-inline-size: 104px; \}/);
+  assert.match(block, /\.ui-side\[data-solved\] \.ui-score-counts \{ flex-wrap: nowrap;/);
+});

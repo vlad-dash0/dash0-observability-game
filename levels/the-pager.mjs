@@ -153,7 +153,7 @@ export default {
       // A label that is a question reads on as it is; any other label gets a colon.
       const mark = label.endsWith('?') ? '' : ':';
       region.newestHtml = `<p data-${attr}="${key}"><strong>${label}${mark}</strong> ${body}</p>`;
-      setFeedback(region, 'neutral', region.newestHtml);
+      setFeedback(region, 'neutral', region.newestHtml, { scroll: true }); // each row answers a click: in view, above the footer (#346)
     };
     const askAnswers = (escalatedByBudget = false) => {
       ctx.renderStep(

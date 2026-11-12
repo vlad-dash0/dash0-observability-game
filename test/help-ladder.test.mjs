@@ -265,3 +265,14 @@ test('#17 P3 a solved board ignores later asks, and an earlier step\'s board nev
   assert.equal(first.hintsShown(0), 0, 'and did not count the ask');
   assert.equal(q('#two-hints').textContent, '1', 'the live board did');
 });
+
+test('#346 solving resets the scroll of the sticky column that holds the card to its top', () => {
+  const dom = makeDom();
+  recordFocus(dom.window);
+  const ctx = { ovBody: dom.body, escapeHtml, reduceMotion: false };
+  dom.body.innerHTML = `<div class="ui-split-side" id="col"><div id="box">${sideHtml('s1', { hints: true, title: 'Trace assembled' })}</div></div>`;
+  const side = mountSide(ctx, q('#box'), 's1', { swirl: () => {} });
+  q('#col').scrollTop = 82; // focus on the title moved it in a real browser
+  side.succeed({ line: 'x', closing: '' });
+  assert.equal(q('#col').scrollTop, 0);
+});

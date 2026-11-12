@@ -378,3 +378,33 @@ test('#332 the-pager: every answer has one style: an earlier row is a copy of th
   const css = readFileSync(new URL('../styles/widgets.css', import.meta.url), 'utf8');
   assert.doesNotMatch(css, /\.pager-rows \{[^}]*padding-inline-start/, 'no inset: the cards are full width like the newest');
 });
+
+// ---- #346: each reply to a click scrolls into view (neutral feedback does not by default) ----
+
+/** Count scrollIntoView calls on a region, with the options each was given. */
+const spyScroll = (sel) => {
+  const calls = [];
+  q(sel).scrollIntoView = (o) => calls.push(o);
+  return calls;
+};
+
+test('#346 the pager: the "no data" reply to a look scrolls into view by the least distance', () => {
+  start();
+  const calls = spyScroll('#pager-feedback');
+  click('[data-look="service"]');
+  assert.equal(calls.length, 1, 'one scroll for the first reply');
+  assert.deepEqual(calls[0], { block: 'nearest' });
+  click('[data-look="since"]');
+  assert.equal(calls.length, 2, 'and one for the next');
+});
+
+test('#346 the pager: every answer in the ask phase scrolls into view', () => {
+  start();
+  click('[data-look="service"]');
+  click('#pager-escalate');
+  const calls = spyScroll('#pager-answers');
+  for (const [i, [key]] of ASKS.entries()) {
+    click(`[data-ask="${key}"]`);
+    assert.equal(calls.length, i + 1, `${key} scrolls`);
+  }
+});
