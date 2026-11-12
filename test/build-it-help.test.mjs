@@ -76,7 +76,7 @@ test('a specific note per span code, never naming the right parent', () => {
   const spec = b1Spec();
   const st = newBuildState(spec);
   setParent(spec, st, E, C);
-  assert.equal(note(spec, st, E), 'GET /products (storefront) carries trace id 0af76519, POST /checkout (api-gateway) carries 4bf92f35. Different trace ids, so it can\'t be the parent.');
+  assert.equal(note(spec, st, E), 'GET /products (storefront) carries trace ID 0af76519, POST /checkout (api-gateway) carries 4bf92f35. Different trace IDs, so it can\'t be the parent.');
   assert.equal(note(spec, st, B), 'POST (storefront) is a root now, yet another span of trace 4bf92f35 was already running when it started. Which call was it doing work for?');
   setParent(spec, st, C, D);
   assert.equal(note(spec, st, C), 'POST /checkout (api-gateway) runs 15 to 85 ms, which is not inside validate cart (api-gateway) (20 to 30 ms). A parent starts first and is still running when its child ends.');
@@ -97,6 +97,14 @@ test('a specific note per span code, never naming the right parent', () => {
   ]);
   setStatus(all, st2, E, 'ERROR');
   assert.equal(checkBuild(all, st2).issues.some((i) => i.code === 'wrong-status'), false);
+});
+
+test('noteFor: several missing links on one span read as one line with a count', () => {
+  const all = { ...b1Spec(), edit: ['parent', 'kind', 'status', 'links'] };
+  const st = newBuildState(all);
+  const line = (n) => text(noteFor(all, st, { code: 'missing-link', spanId: E, count: n }, escapeHtml));
+  assert.equal(line(1), 'GET /products (storefront): it should also point at a related span that is not its parent.');
+  assert.equal(line(3), 'GET /products (storefront): it should also point at 3 related spans that are not its parent.');
 });
 
 test('a specific note per logs-mode code, from the chosen span, never the expected one', () => {
@@ -145,7 +153,7 @@ test('hint tiers for a parent: the rule, two candidates outlined, then placed wi
   const st = newBuildState(spec);
   const placed = new Set([A]);
   const h1 = hintFor(spec, st, B, 1, { placed, e: escapeHtml });
-  assert.equal(text(h1.html).startsWith('A child starts after its parent starts and ends before its parent ends, and it carries the same trace id.'), true);
+  assert.equal(text(h1.html).startsWith('A child starts after its parent starts and ends before its parent ends, and it carries the same trace ID.'), true);
   assert.deepEqual([h1.cands, h1.apply], [[], null]);
   const h2 = hintFor(spec, st, B, 2, { placed, e: escapeHtml });
   assert.deepEqual(h2.cands, ['root', A]);
@@ -159,7 +167,7 @@ test('hint tiers for a parent: the rule, two candidates outlined, then placed wi
   assert.deepEqual(hintFor(spec, st, C, 2, { placed, e: escapeHtml }).cands, [A, B], 'the decoy is the next span that also contains it; both in board order');
   const e3 = hintFor(spec, st, E, 3, { placed: new Set([A, B, C, D]), e: escapeHtml });
   assert.deepEqual(e3.apply, { field: 'parent', value: null });
-  assert.equal(text(e3.html), 'Placed for you. Its trace id is 0af76519, unlike the others, so no span of this trace can be its parent.');
+  assert.equal(text(e3.html), 'Placed for you. Its trace ID is 0af76519, unlike the others, so no span of this trace can be its parent.');
 });
 
 test('tier 3 for a parent that sits below the span: lift it out first, to its own answer parent if that is free and placed, else to the root', () => {
@@ -222,7 +230,7 @@ test('a same-name, same-service twin is named with the view\'s suffix in notes a
   Object.assign(spec.spans[4], { name: b.name, service: b.service }); // E becomes B's twin in trace 0af76519
   const st = newBuildState(spec);
   setParent(spec, st, E, C);
-  assert.equal(note(spec, st, E), 'POST (storefront, trace 0af76519) carries trace id 0af76519, POST /checkout (api-gateway) carries 4bf92f35. Different trace ids, so it can\'t be the parent.');
+  assert.equal(note(spec, st, E), 'POST (storefront, trace 0af76519) carries trace ID 0af76519, POST /checkout (api-gateway) carries 4bf92f35. Different trace IDs, so it can\'t be the parent.');
   const placed = new Set([A, B, C, D, E]);
   assert.equal(text(hintFor(spec, st, C, 3, { placed, e: escapeHtml }).html), 'Placed for you. POST (storefront, trace 4bf92f35) is the CLIENT call into api-gateway, and this is the SERVER span that handled it.');
   assert.equal(text(hintFor(spec, st, D, 3, { placed, e: escapeHtml }).html), 'Placed for you. POST /checkout (api-gateway) is the innermost span of trace 4bf92f35 that runs around it (15 to 85 ms).');

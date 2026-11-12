@@ -94,5 +94,5 @@ test('the costs-a-star scanner has teeth: copy lines match, comment lines do not
   assert.ok(codeLines("x: 'A wrong pick costs a star.',").some((l) => COST_A_STAR.test(l)));
   assert.ok(codeLines("'Each cost one star'").some((l) => COST_A_STAR.test(l)));
   assert.ok(!codeLines('// a wrong pick costs a star').some((l) => COST_A_STAR.test(l)));
-  assert.ok(!codeLines("'costs no star now'").some((l) => COST_A_STAR.test(l)));
+  assert.ok(!codeLines("'costs 1 penalty, no star yet'").some((l) => COST_A_STAR.test(l)));
 });

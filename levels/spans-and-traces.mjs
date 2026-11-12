@@ -115,7 +115,7 @@ export default {
             'service records spans for its part of the work: one span per operation.',
           )}${question({ id: 'sat-q-one', html: 'What makes these spans one trace?' })}${choiceHtml(ctx, ONE_TRACE, { id: 'sat', labelledBy: 'sat-q-one' })}`,
         }),
-        actions({ wide: false, buttonsHtml: nextButton('sat-next') }),
+        actions({ wide: false, buttonsHtml: nextButton('sat-next', 'Pick the right answer to continue.') }),
       );
       const btn = next(stepTree);
       mountChoice(ctx, ONE_TRACE, {
@@ -134,11 +134,11 @@ export default {
           bodyHtml: `${ctx.speech(
           'The spans of trace <code>4bf92f35</code> reach the backend one by one, as each one ends. ' +
             'The first is already placed. Give each new span its parent as it arrives, so the ' +
-            'request reads top to bottom. A trace id is the request\'s id: every span of one ' +
-            'request carries it, so spans with different trace ids are never parent and child.',
+            'request reads top to bottom. A trace ID is the request\'s id: every span of one ' +
+            'request carries it, so spans with different trace IDs are never parent and child.',
           )}${question({ html: `Rebuild the request's span tree.` })}${renderBuild(TREE, newBuildState(TREE), { escapeHtml: ctx.escapeHtml })}`,
         }),
-        actions({ wide: true, buttonsHtml: nextButton('sat-next') }),
+        actions({ wide: true, buttonsHtml: nextButton('sat-next', 'Solve the board and press Check to continue.') }),
       );
       const btn = next(stepOther);
       mountBuild(ctx, TREE, {
@@ -158,7 +158,7 @@ export default {
             'yet it stays a root.',
           )}${question({ id: 'sat-q-other', html: 'What is <code>GET /products</code>?' })}${choiceHtml(ctx, OTHER, { id: 'sat-e', labelledBy: 'sat-q-other' })}`,
         }),
-        actions({ wide: false, buttonsHtml: finishButton('sat-finish') }),
+        actions({ wide: false, buttonsHtml: finishButton('sat-finish', 'Pick the right answer to finish the level.') }),
       );
       const finish = bar.querySelector('#sat-finish');
       mountChoice(ctx, OTHER, {

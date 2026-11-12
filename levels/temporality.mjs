@@ -39,7 +39,7 @@ const SPOT = {
 const CONVERT = [
   {
     key: 'gauge',
-    label: 'Turn them into gauges',
+    label: 'Turn them into gauges, so each report is a plain value',
     why: 'A gauge has no aggregation semantic, so you would swap the temporality problem for lost rate math. Counts and durations should stay Sums and Histograms.',
   },
   {
@@ -50,7 +50,7 @@ const CONVERT = [
   },
   {
     key: 'suffix',
-    label: 'Rename them with a <code>_total</code> suffix',
+    label: 'Rename them with a <code>_total</code> suffix, so the backend treats them as counters',
     why: 'A name is only a name. The points are still the change since the last report.',
   },
   {

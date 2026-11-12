@@ -65,9 +65,9 @@ const QUESTIONS = [
   },
   {
     key: QUESTION.traceId,
-    label: 'What is the trace id?',
+    label: 'What is the trace ID?',
     note: 'The id of the whole trace: 32 hexadecimal characters.',
-    nudge: 'A trace id is 32 characters, 0 to 9 and a to f.',
+    nudge: 'A trace ID is 32 characters, 0 to 9 and a to f.',
     wrong: 'That is not the id of this trace.',
   },
 ];
@@ -373,7 +373,7 @@ export default {
       $('#its-explorer').innerHTML = panel({
         headHtml: explorerHead('Trace View', 'its-trace-title'),
         sections: [
-          `<p>Trace id: <code id="its-trace">${e(t.traceId)}</code></p>`,
+          `<p>Trace ID: <code id="its-trace">${e(t.traceId)}</code></p>`,
           table({
             caption: 'Spans of the trace',
             head: ['Span', 'Parent', 'Start (ms)', 'Duration (ms)', 'Status'],

@@ -157,18 +157,18 @@ const SORT = {
 const BUILD = [
   {
     key: 'contrib-config',
-    label: 'Run the contrib distribution and list <code>acme_scrubber</code> in the config: contrib ships every component',
+    label: 'Run the contrib distribution and list <code>acme_scrubber</code> in the config: contrib ships every component, so it is already there',
     why: 'The contrib distribution holds the components of the Collector repositories, not every component that exists. A config can only enable what is compiled in, and your processor is not.',
   },
   {
     key: 'ocb',
-    label: 'Build a custom distribution with OCB, the OpenTelemetry Collector Builder: list your processor and the components you need in a manifest',
+    label: 'Build a custom distribution with OCB, the OpenTelemetry Collector Builder: list your processor in a manifest',
     right: true,
     why: 'ocb takes a manifest that lists the components to include, yours among them, and builds a Collector binary with exactly those. The same tool gives you a smaller binary and a smaller attack surface than contrib, which the contrib README suggests for production.',
   },
   {
     key: 'otlp-distro',
-    label: 'Use the otlp distribution: it is made for custom processors',
+    label: 'Use the otlp distribution: it is made for custom processors, and loads them by name at startup',
     why: 'The otlp distribution is a minimal one, with the OTLP receiver and exporters. It has no way to load your processor either: you need a build that compiles it in.',
   },
 ];

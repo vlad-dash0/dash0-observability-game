@@ -72,18 +72,18 @@ const BUILD = {
 const WHY = [
   {
     key: 'stripped',
-    label: 'Something in the pipeline stripped them: OpenTelemetry stamps a trace id on every log record',
+    label: 'Something in the pipeline stripped them: OpenTelemetry stamps a trace ID on every log record',
     why: 'It does not. A record carries ids only when it was emitted with a context that holds a span. Outside any span there is nothing to stamp, so there is nothing to strip.',
   },
   {
     key: 'no-active-span',
-    label: 'The log call ran outside an active span, or through a logger that is not bridged to OpenTelemetry, so nothing read a context',
+    label: 'The log call ran outside an active span, or through a logger that is not bridged to OpenTelemetry',
     right: true,
     why: 'Correlation is automatic only when the log call happens inside an active span and the logger is bridged: the appender for your logging library hands the current context to the Logs API, which uses the current context when none is passed, and the record gets that span\'s TraceId and SpanId. Startup code, and a worker that does not carry the request\'s context over, log outside any span, so the ids stay empty.',
   },
   {
     key: 'errors-only',
-    label: 'Only records at ERROR or above get trace ids',
+    label: 'Only records at ERROR or above get trace IDs, so these records have none',
     why: 'Severity plays no part. The ids come from the context at the moment of the call, so an INFO or DEBUG record written inside a span carries them, and an ERROR written outside one does not.',
   },
 ];
@@ -92,18 +92,18 @@ const WHY = [
 const FIX = [
   {
     key: 'zeros',
-    label: 'Fill the two fields with zeros so they are never empty',
-    why: 'All zeros is the invalid value: W3C Trace Context treats an all-zero trace id and an all-zero span id as invalid. A record of zeros links to nothing, and it hides that the context is missing.',
+    label: 'Fill the two fields with all-zero values in the log appender, so they are never empty',
+    why: 'All zeros is the invalid value: W3C Trace Context treats an all-zero trace ID and an all-zero span id as invalid. A record of zeros links to nothing, and it hides that the context is missing.',
   },
   {
     key: 'run-in-span',
-    label: 'Make the retry run inside a span: start one for each attempt, or carry the request\'s context over to the worker, and keep logging through the bridged logger',
+    label: 'Run the retry inside a span, or carry the request\'s context over to the worker, and keep the bridged logger',
     right: true,
     why: 'The ids come from the context at the moment of the log call. A span the worker starts for each attempt gives its records a span of their own, and carrying the request\'s context over to the worker thread gives them the request\'s trace. Either way the appender finds a valid span context and sets the fields.',
   },
   {
     key: 'in-message',
-    label: 'Write the trace id into the message text',
+    label: 'Write the trace ID and span ID into the message text of every log call by hand',
     why: 'A backend links records through the TraceId and SpanId fields of the record, or for non-OTLP logs through recognised attribute names. Text inside the Body is neither, so the record stays unlinked.',
   },
 ];
@@ -112,18 +112,18 @@ const FIX = [
 const DASH0 = [
   {
     key: 'by-time',
-    label: 'Yes: by default the tab lists every log from the same service around the same time',
+    label: 'Yes: by default the tab lists every log from the same service around the same time, so the record shows up',
     why: 'By default the tab lists the logs and span events of the same trace as the span. Listing by resource, within 30 minutes of the span, is a mode you switch to.',
   },
   {
     key: 'resource-mode',
-    label: 'No: the default lists logs of the same trace and this record has no trace id. The Resource mode lists logs of the same resource within 30 minutes, which can include it',
+    label: 'No: the default lists logs of the same trace, and this record has no trace ID. Resource mode can still show it',
     right: true,
     why: 'In the Related Logs &amp; Events tab of a span, the default mode shows every log record and span event in the same trace. A record with blank ids is not in that trace. The Resource mode shows everything on the same resource within 30 minutes of the span, which Dash0 suggests for logs outside the span\'s trace, such as background jobs. From a log, the Log Sidebar shows the span the record was created in, and an unlinked record has none. Getting the log call inside a span is what makes the link exact.',
   },
   {
     key: 'by-text',
-    label: 'Yes: Dash0 reads the trace id out of the message text',
+    label: 'Yes: Dash0 reads the trace ID out of the message text, so the record joins the span\'s trace',
     why: 'Dash0 takes the ids from the TraceId and SpanId fields of an OTLP record or, for other paths, from recognised attribute names such as <code>trace_id</code>. Text in the message is not one of them.',
   },
 ];
@@ -132,7 +132,7 @@ export default {
   id: 'correlation',
   no: '4.2',
   name: 'Correlation',
-  sub: 'Which trace was this',
+  sub: 'Which trace was this?',
   icon: '\u{1F517}',
   rewardTitle: 'Log correlator',
   cards: ['logs-need-an-active-span'],

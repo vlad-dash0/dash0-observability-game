@@ -86,9 +86,9 @@ test('starsLabel: still possible before success, earned after', () => {
 });
 
 test('hintCost follows the star rule: what one more penalty would cost now', () => {
-  assert.equal(hintCost(5, 4), 'costs 1 star');
-  assert.equal(hintCost(2, 2), 'costs no star now');
-  assert.equal(hintCost(3, 1), 'costs 2 stars');
+  assert.equal(hintCost(5, 4), 'costs 1 penalty');
+  assert.equal(hintCost(2, 2), 'costs 1 penalty, no star yet');
+  assert.equal(hintCost(3, 1), 'costs 1 penalty');
 });
 
 /** The right column on a fresh DOM; its stars come from the board's own counts passed to score(). */
@@ -173,13 +173,13 @@ test('S1 score takes more counts (the incident board\'s misleading views and bud
   assert.equal(q('#x-hints').textContent, '0');
   assert.equal(q('#x-stars').getAttribute('aria-label'), '2 of 5 stars still possible');
   side.hintUi({ label: 'Hint 1 of 3', disabled: false, tierHtml: '0 of 3 used' });
-  assert.equal(q('#x-hint-cost').textContent, 'costs no star now', 'a fourth penalty still gives 2 stars');
+  assert.equal(q('#x-hint-cost').textContent, 'costs 1 penalty, no star yet', 'a fourth penalty still gives 2 stars');
   side.score({ wrong: 0, wrongLabel: 'wrong picks', hints: 0, more: { misleading: 1, budget: 0 }, done: false });
   assert.equal(q('#x-misleading').textContent, '1');
   assert.equal(q('#x-budget').textContent, '0');
   assert.equal(q('#x-stars').getAttribute('aria-label'), '4 of 5 stars still possible');
   side.hintUi({ label: 'Hint 1 of 3', disabled: false, tierHtml: '0 of 3 used' });
-  assert.equal(q('#x-hint-cost').textContent, 'costs 1 star');
+  assert.equal(q('#x-hint-cost').textContent, 'costs 1 penalty');
   assert.equal(side.score({ wrong: 0, wrongLabel: 'wrong picks', hints: 0, done: false }), 5, 'without more: no extra penalty');
 });
 
@@ -221,15 +221,15 @@ test('#17 P3 mountSide counts a guide ask in the hints shown, the stars and the 
   const side2 = mountSide(ctx, q('#box'), 's1', {});
   side2.score({ wrong: 2, wrongLabel: 'wrong drops', hints: 0, done: false });
   side2.hintUi({ label: 'Hint 1 of 3', disabled: false, tierHtml: '' });
-  assert.equal(q('#s1-hint-cost').textContent, 'costs 1 star', 'two penalties: 3 stars, one more gives 2');
+  assert.equal(q('#s1-hint-cost').textContent, 'costs 1 penalty', 'two penalties: 3 stars, one more gives 2');
   ctx.askedGuide();
   assert.equal(q('#s1-hints').textContent, '1', 'the card shows the ask at once');
   assert.equal(q('#s1-stars').getAttribute('aria-label'), '2 of 5 stars still possible');
-  assert.equal(q('#s1-hint-cost').textContent, 'costs no star now', 'three penalties: 2 stars, a fourth still gives 2');
+  assert.equal(q('#s1-hint-cost').textContent, 'costs 1 penalty, no star yet', 'three penalties: 2 stars, a fourth still gives 2');
   assert.equal(side2.hintsShown(2), 3);
   side2.score({ wrong: 2, wrongLabel: 'wrong drops', hints: 0, done: false });
   side2.hintUi({ label: 'Hint 1 of 3', disabled: false, tierHtml: '' });
-  assert.equal(q('#s1-hint-cost').textContent, 'costs no star now', 'the ask survives a later score() and hintUi()');
+  assert.equal(q('#s1-hint-cost').textContent, 'costs 1 penalty, no star yet', 'the ask survives a later score() and hintUi()');
   const n = side2.score({ wrong: 1, wrongLabel: 'wrong drops', hints: 1, done: false });
   assert.equal(n, 2, 'one wrong, one hint and one ask: three penalties');
   assert.equal(q('#s1-hints').textContent, '2', 'the ask survives a later score()');

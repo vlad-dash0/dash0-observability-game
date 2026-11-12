@@ -60,23 +60,23 @@ const SORT = {
 const ANSWERABLE = [
   {
     key: 'rich',
-    label: 'Telemetry with many attributes you can slice after the fact',
+    label: 'Telemetry with many attributes to slice by afterwards',
     right: true,
     why: 'New questions need data that still carries the details, such as app version, country, user ID and cart size, so you can group and filter by them once the question exists.',
   },
   {
     key: 'dash',
-    label: 'More dashboards',
+    label: 'More dashboards, one for every service and region',
     why: 'A dashboard answers a question someone thought of in advance. The second kind are questions nobody had thought of yet.',
   },
   {
     key: 'alerts',
-    label: 'More alerts',
+    label: 'More alerts, with tighter thresholds on key metrics',
     why: 'An alert is a known question checked all the time. It can tell you something is wrong, not why only some requests are slow.',
   },
   {
     key: 'retention',
-    label: 'Keeping data for longer',
+    label: 'Keeping the same data for longer, month after month',
     why: 'Keeping data longer helps only if it has the detail you need. Months of CPU averages still cannot say whether that user timed out.',
   },
 ];
@@ -110,7 +110,7 @@ export default {
             'system: the ones a dashboard was built for in advance, and the new ones nobody planned for.',
         )}${question({ id: 'mvo-q-sort', html: 'Pick a question, then the kind it is.' })}${renderSort(SORT, newSortState(SORT), { escapeHtml: ctx.escapeHtml, labelledBy: 'mvo-q-sort' })}`,
         }),
-        actions({ wide: true, buttonsHtml: nextButton('mvo-next') }),
+        actions({ wide: true, buttonsHtml: nextButton('mvo-next', 'Sort every item to continue.') }),
       );
       const next = bar.querySelector('#mvo-next');
       mountSort(ctx, SORT, {
@@ -131,7 +131,7 @@ export default {
             'new ones from the telemetry your system already sends, without shipping new code.',
         )}${question({ id: 'mvo-q-why', html: 'What makes the second kind answerable?' })}${choiceHtml(ctx, ANSWERABLE, { id: 'mvo', labelledBy: 'mvo-q-why' })}`,
         }),
-        actions({ wide: false, buttonsHtml: finishButton('mvo-finish') }),
+        actions({ wide: false, buttonsHtml: finishButton('mvo-finish', 'Pick the right answer to finish the level.') }),
       );
       const finish = bar.querySelector('#mvo-finish');
       mountChoice(ctx, ANSWERABLE, {

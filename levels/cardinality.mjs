@@ -183,7 +183,7 @@ const BUDGET = {
 const DASH0 = [
   {
     key: 'fix-source',
-    label: 'Stop emitting the attribute at the source. A spam filter drops whole data points at ingestion, before they are stored, but it cannot remove one attribute and keep the rest',
+    label: 'Stop emitting the attribute at the source: a spam filter drops whole data points, not one attribute',
     right: true,
     why: 'The tree map shows which metric is large, and its sidebar shows the attributes behind it. Dash0\'s guidance for random or unbounded values is to reduce them at the instrumentation layer. A spam filter matches data points and drops them before they are stored, and a drop cannot be recovered. The filtered data still passes through ingest and carries the ingest charge, so a filter cuts what is stored, not what you send. To filter before sending, you can export it as a Collector filter processor configuration.',
   },
@@ -194,12 +194,12 @@ const DASH0 = [
   },
   {
     key: 'spam-free',
-    label: 'Add a spam filter: dropped data is free, so the volume stops costing anything',
+    label: 'Add a spam filter on the metric: dropped data is free, so the volume stops costing anything',
     why: 'Dropped data is not stored, but it still passes through SignalControl and carries the ingest charge. A spam filter reduces what is stored, not what you send.',
   },
   {
     key: 'leave',
-    label: 'Leave it: a high cardinality score is only a number',
+    label: 'Leave it: a high cardinality score is only a number, and storage handles many series',
     why: 'A high score is not always a problem, but it is a prompt to ask whether all of those dimensions are needed. Here a user id is the reason for it, and nothing needs a series for every user.',
   },
 ];

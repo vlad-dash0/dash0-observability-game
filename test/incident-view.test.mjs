@@ -283,7 +283,7 @@ test('V7 a board that needs no clue has no counter, and its causes are open from
 
 // ---- V8 lock line ------------------------------------------------------------------------
 
-const LOCKED = (n, need) => `Locked until you find ${need} clue${need === 1 ? '' : 's'} in Step 1 (${n} of ${need} so far). A clue is a view that helps explain the alert.`;
+const LOCKED = (n, need) => `Locked until you find ${need} clue${need === 1 ? '' : 's'} in Step 1. A clue is a view that helps explain the alert.`;
 const UNLOCKED = 'Unlocked. Pick the cause the evidence supports. A wrong pick counts as one penalty.';
 
 test('V8 the lock line counts clues only, describes the causes group, and is not a live region', () => {

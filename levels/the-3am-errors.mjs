@@ -149,18 +149,18 @@ const SCENARIO = {
 const LINK = [
   {
     key: 'trace-and-resource',
-    label: 'The <code>trace_id</code> on the log record, which names the trace, and resource attributes such as <code>service.name</code> and <code>service.version</code>, which describe the same producer on every signal',
+    label: 'The <code>trace_id</code> on the log record, and resource attributes such as <code>service.name</code> and <code>service.version</code>',
     right: true,
     why: 'A log record has TraceId and SpanId fields, so a backend can go from a log to the trace it was written in. Logs, traces and metrics each carry a Resource too, and the same attribute names and values for the same producer let a backend line them up by origin: here, inventory 3.1.0 on the trace and in the deploy list. The logs specification names three ways to correlate: by time, by trace context and by origin.',
   },
   {
     key: 'time-only',
-    label: 'Only the clock: the errors, the call and the deploy all happened around 03:00',
-    why: 'Time is the most basic form of correlation, and a fragile one: many things happen in the same minute. The trace id and the resource are what tie these three views to each other exactly.',
+    label: 'Only the clock: the errors, the trace and the deploy all happened around 03:00, so the time lines them up',
+    why: 'Time is the most basic form of correlation, and a fragile one: many things happen in the same minute. The trace ID and the resource are what tie these three views to each other exactly.',
   },
   {
     key: 'message-text',
-    label: 'The message text: the same words appear in the log, the trace and the deploy notes',
+    label: 'The message text: the same words appear in the log, the trace and the deploy notes, so a text search lines them up',
     why: 'Words in a message are not a link. A record is tied to a trace through its TraceId field, and to a producer through its Resource.',
   },
 ];
@@ -192,8 +192,8 @@ export default {
       },
     ],
     finish:
-      'You followed one request from the error logs to its trace to the deploy that changed it: inventory 3.1.0 renamed a ' +
-      'field and orders could not read the reply.\n\n' +
+      'The errors came from a deploy: inventory 3.1.0 renamed a ' +
+      'field and orders could not read the reply. The trace ID on an error log leads to the trace, and the trace to the deploy.\n\n' +
       'Dash0 uses PromQL as its query language for logs, traces and metrics alike, ' +
       'with a Query Builder tab for each, so a filter on service.name is written the same way in all three.',
   },

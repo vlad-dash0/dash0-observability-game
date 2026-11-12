@@ -17,7 +17,7 @@
 const WHEN = [
   {
     key: 'per-span',
-    label: 'On every span, so the values are always fresh',
+    label: 'On every span, in a span processor, so the values are always fresh',
     why: 'A Resource is attached to the tracer provider when the provider is created, and that association cannot be changed later. Detection is expected to finish quickly because it runs while the application starts, not per span.',
   },
   {
@@ -28,7 +28,7 @@ const WHEN = [
   },
   {
     key: 'in-backend',
-    label: 'In the backend, when the telemetry arrives',
+    label: 'In the backend, from the IP address and port the telemetry arrives from',
     why: 'A backend can only read the resource attributes that arrive with the telemetry. Detection happens before that, in the SDK when it starts.',
   },
 ];
@@ -121,18 +121,18 @@ const CONFIG = {
 const RBAC = [
   {
     key: 'pods-namespaces',
-    label: 'Permission to <code>get</code>, <code>watch</code> and <code>list</code> pods and namespaces, through a ClusterRole bound to the Collector\'s service account',
+    label: 'Permission to <code>get</code>, <code>watch</code> and <code>list</code> pods and namespaces, through a ClusterRole on its service account',
     right: true,
     why: 'The processor reads pod metadata from the Kubernetes API, so the service account the Collector runs as needs those permissions (some attributes need more). Without them the processor cannot discover pods and adds nothing.',
   },
   {
     key: 'api-key',
-    label: 'A Dash0 API key in the processor settings',
+    label: 'A Dash0 API key in the processor settings, so it can look the pods up in Dash0',
     why: 'The processor talks to the Kubernetes API of the cluster, not to Dash0. Its access is Kubernetes access, granted with RBAC. A Dash0 token belongs to the exporter.',
   },
   {
     key: 'nothing',
-    label: 'Nothing: it reads the pod name off the telemetry that arrives',
+    label: 'Nothing: it reads the pod name and namespace off the telemetry that arrives, so no lookup is needed',
     why: 'The processor looks the pod up: it keeps a record of the cluster\'s pods, and matches telemetry to one, by default through the IP address of the incoming connection. That lookup uses the Kubernetes API, which needs permissions.',
   },
 ];
@@ -141,7 +141,7 @@ const RBAC = [
 const DASH0 = [
   {
     key: 'operator-adds',
-    label: 'It instruments supported runtimes without code changes, and adds Kubernetes resource attributes such as <code>k8s.pod.name</code> to the workload',
+    label: 'It instruments supported runtimes without code changes and adds Kubernetes attributes such as <code>k8s.pod.name</code>',
     right: true,
     why: 'In namespaces enabled for Dash0 monitoring, the operator instruments supported workloads for tracing, and improves the OpenTelemetry resource attributes: <code>k8s.namespace.name</code>, <code>k8s.pod.name</code>, <code>k8s.pod.uid</code> and <code>k8s.container.name</code> are added to the workload\'s resource attributes, so you do not set them by hand. Resource attributes are detected for every runtime, with a few exceptions such as libc-free binaries.',
   },
@@ -152,7 +152,7 @@ const DASH0 = [
   },
   {
     key: 'logs-only',
-    label: 'It only collects pod logs; the resource attributes stay yours to set',
+    label: 'It only collects pod logs and metrics; the resource attributes stay yours to set by hand',
     why: 'The operator does collect pod logs, and metrics too, but it also instruments workloads and adds Kubernetes resource attributes to them.',
   },
 ];
@@ -161,7 +161,7 @@ export default {
   id: 'detectors-and-kubernetes',
   no: '1.3',
   name: 'Detectors and Kubernetes',
-  sub: 'Which pod is this',
+  sub: 'Which pod is this?',
   icon: '\u{2638}\u{FE0F}',
   rewardTitle: 'Pod identifier',
   cards: ['k8sattributes-in-collector'],

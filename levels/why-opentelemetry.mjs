@@ -57,23 +57,23 @@ const PARTS = {
 const DEPENDS_ON = [
   {
     key: 'sdk',
-    label: 'The SDK',
+    label: 'The SDK (<code>@opentelemetry/sdk-node</code>), so tracing works out of the box',
     why: 'The SDK is the application\'s choice: how to sample, batch and export. A library that brings it makes those choices for all 30 services.',
   },
   {
     key: 'api',
-    label: 'Only the API (<code>@opentelemetry/api</code>)',
+    label: 'The API (<code>@opentelemetry/api</code>), with no SDK installed by the library',
     right: true,
     why: 'Libraries depend only on the OTel API; only the application installs the SDK. Without an SDK, API calls are no-ops: they record nothing and cost almost nothing. Each of the 30 services picks its own SDK.',
   },
   {
     key: 'exporter',
-    label: 'An OTLP exporter',
+    label: 'An OTLP exporter (<code>@opentelemetry/exporter-trace-otlp-http</code>), so spans reach a backend',
     why: 'Exporting is SDK work, set up by the application. A library that exports on its own decides for all 30 services where their telemetry goes.',
   },
   {
     key: 'collector',
-    label: 'The Collector',
+    label: 'The Collector, bundled with the library, so spans get filtered before export',
     why: 'The Collector is a separate process, not a package a library depends on.',
   },
 ];
@@ -107,7 +107,7 @@ export default {
             'instrument anything, learn which part does what.',
         )}${question({ id: 'otel-q-parts', html: 'Which part of OpenTelemetry is each one?' })}${renderSort(PARTS, newSortState(PARTS), { escapeHtml: ctx.escapeHtml, labelledBy: 'otel-q-parts' })}`,
         }),
-        actions({ wide: true, buttonsHtml: nextButton('otel-next') }),
+        actions({ wide: true, buttonsHtml: nextButton('otel-next', 'Sort every item to continue.') }),
       );
       const next = bar.querySelector('#otel-next');
       mountSort(ctx, PARTS, {
@@ -128,7 +128,7 @@ export default {
             'services. They want it to emit spans.',
         )}${question({ id: 'otel-q-dep', html: 'Which OpenTelemetry package should the library depend on?' })}${choiceHtml(ctx, DEPENDS_ON, { id: 'otel', labelledBy: 'otel-q-dep' })}`,
         }),
-        actions({ wide: false, buttonsHtml: finishButton('otel-finish') }),
+        actions({ wide: false, buttonsHtml: finishButton('otel-finish', 'Pick the right answer to finish the level.') }),
       );
       const finish = bar.querySelector('#otel-finish');
       mountChoice(ctx, DEPENDS_ON, {

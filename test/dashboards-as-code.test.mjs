@@ -256,7 +256,7 @@ test('step 1 whyNot: only on decoys, each a full sentence that names no fault li
   assert.match(plain(spec.whyNot['item-rate']), /columns 0 to 12 of the 24/);
   assert.match(plain(spec.whyNot['item-corner']), /columns 12 to 24/);
   assert.doesNotMatch(plain(JSON.stringify(spec.whyNot)), /third item|two rows/);
-  for (const id of ['panel-rate', 'panel-count']) assert.match(plain(spec.whyNot[id]), /This panel is defined, and its query is in the part of the file not shown\./, id);
+  for (const id of ['panel-rate', 'panel-count']) assert.match(plain(spec.whyNot[id]), /the panel exists, its query is in the part of the file not shown/, id);
   assert.match(plain(spec.whyNot['query-errors']), /rate of 5xx requests divided by the rate of all requests/);
 });
 

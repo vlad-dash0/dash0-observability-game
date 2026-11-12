@@ -33,66 +33,99 @@ const SORT = {
       label: 'A handler throws an exception on an empty cart',
       bucket: 'spans',
       why: 'The request reached checkout and the handler failed while handling it, so the server span records the error status and the exception.',
+      whyNot: {
+        probe: 'The request does arrive: checkout handles it and the handler fails. Your server span is there to record the error.',
+      },
     },
     {
       id: 'tls-expired',
       label: 'The TLS certificate on checkout\'s public hostname has expired',
       bucket: 'probe',
       why: 'Clients refuse the connection during the handshake, before any HTTP request is sent. No request reaches checkout, so checkout has no server span for it. A probe does the handshake itself and fails.',
+      whyNot: {
+        spans: 'The handshake fails before any HTTP request is sent, so checkout never handles one and makes no server span.',
+      },
     },
     {
       id: 'payment-dns',
       label: 'Checkout\'s call to the payment provider fails its DNS lookup',
       bucket: 'spans',
       why: 'This failure is on the way out of your service. Checkout\'s client span for the call records the error, a DNS error, which is the example the HTTP spans page gives, so your spans do record it.',
+      whyNot: {
+        probe: 'The failure is on the way out of your service, and checkout\'s client span for the call records the DNS error.',
+      },
     },
     {
       id: 'slow-query',
       label: 'One SQL query in checkout takes 4 seconds',
       bucket: 'spans',
       why: 'The request got in, so the server span is long and the database client span under it shows where the time went.',
+      whyNot: {
+        probe: 'The request reaches checkout, so its server span exists and the database client span under it shows the 4 seconds.',
+      },
     },
     {
       id: 'dns-dropout',
       label: 'Checkout\'s public hostname drops out of DNS',
       bucket: 'probe',
       why: 'Visitors\' lookups of the name return no address, so their requests are never sent and nothing arrives at checkout to be traced. A probe looks the name up like a visitor does and fails.',
+      whyNot: {
+        spans: 'Visitors\' lookups fail, so their requests are never sent and nothing reaches checkout to make a span.',
+      },
     },
     {
       id: 'inventory-loop',
       label: 'A loop in checkout calls the inventory service 30 times per request',
       bucket: 'spans',
       why: 'The requests arrive and run, slowly, and the trace shows 30 client spans under one server span.',
+      whyNot: {
+        probe: 'The requests arrive and run, so the trace shows 30 client spans under one server span.',
+      },
     },
     {
       id: 'dns-stale',
       label: 'A DNS record still points the hostname at a retired address',
       bucket: 'probe',
       why: 'Clients resolve the name to an address that no longer serves checkout, and their requests go nowhere. Nothing arrives to be traced. A probe resolves the name like a visitor does and fails the same way.',
+      whyNot: {
+        spans: 'Requests go to an address that no longer serves checkout, so none reaches your code and no server span is made.',
+      },
     },
     {
       id: 'payment-tls',
       label: 'The payment provider\'s TLS certificate has expired, so checkout\'s calls to it fail',
       bucket: 'spans',
       why: 'The handshake fails on the way out of your service, and, as with a DNS error, checkout\'s client span for the call records the error. A TLS failure is invisible to your spans only when it stops requests from reaching you.',
+      whyNot: {
+        probe: 'The handshake fails on the way out of your service, and checkout\'s client span for the call records the error.',
+      },
     },
     {
       id: 'cdn-stale',
       label: 'The CDN serves a broken page from its cache',
       bucket: 'probe',
       why: 'The CDN answers visitors itself, so the request never travels to your service, and the spans of your service see a quiet, healthy origin. A probe fetches the page from outside and can check what it got.',
+      whyNot: {
+        spans: 'The CDN answers from its cache, so the request never reaches checkout and your spans see a quiet, healthy origin.',
+      },
     },
     {
       id: 'bad-deploy',
       label: 'A bad deploy makes every request to /pay return 500',
       bucket: 'spans',
       why: 'The requests reach the new code, which fails them, so each one becomes a server span with an error status.',
+      whyNot: {
+        probe: 'The requests reach the new code, which fails them, so each one becomes a server span with an error status.',
+      },
     },
     {
       id: 'lb-no-targets',
       label: 'The load balancer has no healthy target left',
       bucket: 'probe',
       why: 'The load balancer answers with an error of its own and forwards nothing to checkout, so checkout has no server span for those requests. A probe sees the error response.',
+      whyNot: {
+        spans: 'The load balancer answers on its own and forwards nothing, so checkout makes no server span for those requests.',
+      },
     },
   ],
 };

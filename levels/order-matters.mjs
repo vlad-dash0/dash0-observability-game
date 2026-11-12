@@ -45,18 +45,18 @@ const SPOT = {
 const WHY = [
   {
     key: 'cleans-data',
-    label: 'So it can clean up the data before the other processors see it',
+    label: 'So it can clean up the data before the other processors see it, and free memory early',
     why: 'The memory limiter does not change telemetry. It checks the Collector\'s memory use at intervals and, when it is too high, refuses data.',
   },
   {
     key: 'refuse-early',
-    label: 'So it can refuse data before anything else has spent memory on it, and receivers can retry or slow their senders',
+    label: 'So it can refuse data before other processors spend memory on it, and receivers can retry',
     right: true,
     why: 'When memory is over the soft limit, the processor returns a non-permanent error to the component before it, so receivers can retry the data and can apply backpressure to their senders. The best practice is to make it the first processor in a pipeline, so backpressure reaches the receivers and fewer data are dropped when the limiter triggers.',
   },
   {
     key: 'any-position',
-    label: 'It does not matter: it only watches memory, so it works anywhere in the list',
+    label: 'It does not matter: it only watches memory, so it works anywhere in the processor list',
     why: 'It watches memory, but it can only refuse what passes through it. Placed after other processors, those handle and may hold the data first, which makes it likelier that data is dropped when the limiter triggers.',
   },
 ];

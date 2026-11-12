@@ -15,18 +15,18 @@
 const METHODS = [
   {
     key: 'red-services-use-resources',
-    label: 'RED for each service: Rate, Errors, Duration of its requests. USE for each resource, such as a CPU or a disk: Utilisation, Saturation, Errors',
+    label: 'RED for each service: Rate, Errors, Duration. USE for each resource, such as a CPU or a disk: Utilisation, Saturation, Errors',
     right: true,
     why: 'RED asks how many requests a service gets, how many of them fail and how long they take. USE asks, of a resource, how busy it is, how much work waits for it and how many errors it throws. RED was made for request-driven services, and USE for resources such as CPUs, disks and network interfaces.',
   },
   {
     key: 'swapped',
-    label: 'USE for each service, RED for each resource',
+    label: 'USE for each service: Utilisation, Saturation, Errors. RED for each resource, such as a CPU or a disk: Rate, Errors, Duration',
     why: 'Swapped. A CPU or a disk has no request to count the rate or duration of, and a service is not "busy" the way a resource is. RED reads requests, USE reads resources.',
   },
   {
     key: 'red-everything',
-    label: 'RED for everything, because every component takes requests',
+    label: 'RED for everything: Rate, Errors, Duration fit a service, a CPU or a disk alike, since every component takes requests',
     why: 'RED came out of microservices, because the USE method does not fit a service. The reverse holds too: a CPU, disk or interface is checked by how busy it is and how much work queues for it, which RED does not ask.',
   },
 ];
@@ -55,18 +55,18 @@ const SATURATION = [
 const CONNECTOR = [
   {
     key: 'spanmetrics',
-    label: 'Add the <code>spanmetrics</code> connector: it exports from a traces pipeline into a metrics pipeline, as a calls counter and a duration histogram',
+    label: 'Add the <code>spanmetrics</code> connector: traces pipeline in, metrics pipeline out, as calls and duration',
     right: true,
     why: 'It counts the spans passing through it into <code>traces.span.metrics.calls</code>, by default for each service.name, span.name, span.kind and status.code, so rate is the calls and errors are the calls with an error status. It records span durations into <code>traces.span.metrics.duration</code>, in milliseconds by default. A feature gate, <code>connector.spanmetrics.legacyMetricNames</code>, brings back the legacy names, and the component is now spelled <code>span_metrics</code>, so check what your version emits.',
   },
   {
     key: 'processor',
-    label: 'Add the <code>spanmetrics</code> processor to the traces pipeline',
+    label: 'Add the <code>spanmetrics</code> processor to the traces pipeline, so it writes the metrics beside the spans',
     why: 'The connector replaced that processor. A processor stays inside one pipeline, and turning traces into metrics means crossing from a traces pipeline into a metrics one, which is what a connector does.',
   },
   {
     key: 'errors-metric',
-    label: 'Read the errors from a separate errors metric that the connector emits',
+    label: 'Read the errors from a separate errors metric that the connector emits beside calls and duration',
     why: 'There is no separate errors metric. An error is a call whose status code dimension is an error: <code>status.code</code> with the value <code>STATUS_CODE_ERROR</code>, or <code>otel.status_code</code> with <code>ERROR</code> when a feature gate is on.',
   },
   {

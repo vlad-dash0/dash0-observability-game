@@ -144,7 +144,7 @@ export default {
           wide: true,
           bodyHtml: `${ctx.speech(intro)}${question({ id: `${spec.id}-q`, html: questionHtml })}${renderSort(spec, newSortState(spec), { escapeHtml: ctx.escapeHtml, labelledBy: `${spec.id}-q` })}`,
         }),
-        actions({ wide: true, buttonsHtml: nextButton('sig-next') }),
+        actions({ wide: true, buttonsHtml: nextButton('sig-next', 'Sort every item to continue.') }),
       );
       mountSort(ctx, spec, { onComplete: unlock(next()) });
       next().onclick = then;
@@ -173,7 +173,7 @@ export default {
           wide: false,
           bodyHtml: `${ctx.speech('One of the four is still settling.')}${question({ id: 'sig-q-new', html: 'Which signal is the newest and still maturing?' })}${choiceHtml(ctx, NEWEST, { id: 'sig', labelledBy: 'sig-q-new' })}`,
         }),
-        actions({ wide: false, buttonsHtml: finishButton('sig-finish') }),
+        actions({ wide: false, buttonsHtml: finishButton('sig-finish', 'Pick the right answer to finish the level.') }),
       );
       const finish = bar.querySelector('#sig-finish');
       mountChoice(ctx, NEWEST, { id: 'sig', onRight: unlock(finish) });

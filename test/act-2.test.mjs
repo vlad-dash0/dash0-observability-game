@@ -717,7 +717,7 @@ test('every Act 2 step waits for its answer and states each outcome in words', (
         const fb = () => q(`#${step.build}-feedback`).textContent;
         if (qa(`#${step.build}-check`).length) {
           click(`#${step.build}-check`);
-          assert.match(fb(), /^Not yet: \d+ problems?\./, `${id}: a failed check says so`);
+          assert.match(fb(), /^Not quite: \d+ problems?\./, `${id}: a failed check says so`);
         } else {
           // Instant feedback (#146): a wrong move is named in the status line at once.
           if (step.edit.includes('kind')) {
@@ -767,7 +767,7 @@ test('spans-and-traces: the cross-trace parent is named in words, with both trac
   }
   click(`[data-span="${ids['storefront GET /products']}"]`);
   click(`[data-parent="${ids['api-gateway POST /checkout']}"]`);
-  assert.equal(q('#sat-tree-status').textContent.includes('GET /products (storefront) carries trace id 0af76519, POST /checkout (api-gateway) carries 4bf92f35. Different trace ids'), true);
+  assert.equal(q('#sat-tree-status').textContent.includes('GET /products (storefront) carries trace ID 0af76519, POST /checkout (api-gateway) carries 4bf92f35. Different trace IDs'), true);
 });
 
 test('span-kinds: the "Map edges" line is a status region, from serviceEdges before and after', () => {

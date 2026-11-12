@@ -712,7 +712,7 @@ test('the Hint button: tier and cost before use; with nothing selected it picks 
   assert.equal(chips(), 'Helps: Instant feedback on Hints on');
   assert.equal(text('#signals-hint'), 'Hint 1 of 3');
   assert.equal(q('#signals-hint').disabled, false);
-  assert.equal(text('#signals-hint-cost'), 'costs 1 star');
+  assert.equal(text('#signals-hint-cost'), 'costs 1 penalty');
   click('#signals-hint'); // nothing selected: the target is the first item SHOWN (i4, reversed), not i1
   assert.equal(pressed('i4'), 'true');
   assert.equal(pressed('i1'), 'false');
@@ -783,7 +783,7 @@ test('a 2-bucket board: "Hint 1 of 2", then after the rule "Hint 2 of 2" places 
   mount();
   click('[data-item="i1"]');
   assert.equal(hintLabel(), 'Hint 1 of 2', 'tier 2 cannot narrow two buckets: it is not offered');
-  assert.equal(tierLine(), '0 of 2 hints used on this item');
+  assert.equal(tierLine(), 'No hints used on this item yet');
   click('#signals-hint');
   assert.equal(hintLabel(), 'Hint 2 of 2');
   assert.equal(tierLine(), '1 of 2 hints used on this item');
@@ -954,7 +954,7 @@ test('item ids that are Object.prototype names ("constructor") mount with hints 
   const { counts, mount } = setup(spec);
   mount(); // the target at mount is "constructor" (first shown): no own map entry yet
   assert.equal(hintLabel(), 'Hint 1 of 3');
-  assert.equal(tierLine(), '0 of 3 hints used on the next item');
+  assert.equal(tierLine(), 'No hints used on the next item yet');
   assert.deepEqual(hintedBuckets(), []);
   assert.equal(hintText(), '');
   click('#signals-hint'); // the rule
@@ -984,7 +984,7 @@ test('one bucket left with no hint taken: the side line says so, no dots, "No mo
   assert.deepEqual(counts, { mistakes: 2, hints: 0, done: 0 });
   // Another item with its ladder intact shows the count and its dots again.
   click('[data-item="i1"]');
-  assert.equal(tierLine(), '0 of 3 hints used on this item');
+  assert.equal(tierLine(), 'No hints used on this item yet');
   assert.equal(q('#signals-hint-tier').querySelectorAll('.ui-dots i').length, 3);
 });
 
@@ -1178,9 +1178,9 @@ test('#323 the guide, the rule and the instructions share one vocabulary, and no
 test('#323 the hint note says which item it counts for', () => {
   const { mount } = setup(withHints());
   mount();
-  assert.equal(tierLine(), '0 of 3 hints used on the next item');
+  assert.equal(tierLine(), 'No hints used on the next item yet');
   click('[data-item="i1"]');
-  assert.equal(tierLine(), '0 of 3 hints used on this item');
+  assert.equal(tierLine(), 'No hints used on this item yet');
 });
 
 test('#323 breakable adds soft breaks to text runs only, never inside a nested tag or its attributes', () => {

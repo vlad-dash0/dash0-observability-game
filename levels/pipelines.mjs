@@ -19,18 +19,18 @@
 const JOIN = [
   {
     key: 'processor',
-    label: 'A processor, listed in the traces pipeline',
+    label: 'A processor, listed in the traces pipeline, that converts its spans into metrics',
     why: 'A processor changes or filters data inside one pipeline. It cannot hand traces to a different pipeline as metrics.',
   },
   {
     key: 'connector',
-    label: 'A connector, such as <code>count</code>, used as an exporter in the traces pipeline and as a receiver in the metrics pipeline',
+    label: 'A connector, such as <code>count</code>: an exporter in the traces pipeline, a receiver in the metrics one',
     right: true,
     why: 'A connector is both an exporter and a receiver: it consumes data at the end of one pipeline and emits data at the start of another, of the same signal or a different one. It has to be used in both roles. Defining it under <code>connectors</code> only configures it.',
   },
   {
     key: 'extension',
-    label: 'An extension, enabled under <code>service.extensions</code>',
+    label: 'An extension, enabled under <code>service.extensions</code> and wired to the metrics pipeline',
     why: 'Extensions add abilities that are not part of the data path, such as a health check. They do not take part in a pipeline at all.',
   },
 ];
@@ -105,14 +105,11 @@ const CONFIG = {
   helps: { hints: true },
   hint: 'A component works only when it is both defined in its own section and enabled by a list under <code>service</code>. Compare the two both ways: a name listed but not defined stops the Collector, and a component defined but listed nowhere does nothing. Fix by adding what is missing, not by deleting a name.',
   explain:
-    'A component takes effect only when it is both defined in its section and enabled: receivers, processors and exporters by listing them in a pipeline, ' +
-    'extensions under <code>service.extensions</code>. Listed but not defined, the Collector refuses to start, as with <code>health_check</code> here. ' +
-    'Defined but not listed, the component is not enabled and does nothing: <code>memory_limiter</code> was sitting under ' +
-    '<code>processors</code> while both pipelines ran without it. Deleting it, listing it in only one pipeline, or giving it another name would all leave a pipeline ' +
-    'unprotected, so the task needs it listed in both. Each pipeline gets its own instance of a processor listed in several. ' +
-    'The order of each list is the next level\'s question, and this game checks the wiring, not the settings. ' +
-    'In Collector v0.164.0 the OTLP gRPC exporter is <code>otlp_grpc</code> and the OTLP HTTP exporter is <code>otlp_http</code>; ' +
-    '<code>otlp</code> and <code>otlphttp</code> are deprecated aliases that still resolve, and every config in this act uses the new names.',
+    '<p>A component takes effect only when it is both defined in its section and enabled. <code>health_check</code> was listed but not defined, so the Collector refuses to start. <code>memory_limiter</code> was defined but not listed, so it does nothing: both pipelines ran without it.</p>' +
+    '<p>Receivers, processors and exporters are enabled by listing them in a pipeline, extensions under <code>service.extensions</code>. Deleting <code>memory_limiter</code>, listing it in only one pipeline, or giving it another name would all leave a pipeline unprotected, so it must be listed in both. Each pipeline gets its own instance of a processor listed in several.</p>' +
+    '<p>The order of each list is the next level\'s question, and this game checks the wiring, not the settings.</p>' +
+    '<p>In Collector v0.164.0 the OTLP gRPC exporter is <code>otlp_grpc</code> and the OTLP HTTP exporter is <code>otlp_http</code>; ' +
+    '<code>otlp</code> and <code>otlphttp</code> are deprecated aliases that still resolve, and every config in this act uses the new names.</p>',
 };
 
 // Step 3: extensions. `why` follows "Right." or "Not quite.".

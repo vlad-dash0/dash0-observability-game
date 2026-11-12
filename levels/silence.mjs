@@ -208,7 +208,7 @@ const RULE = [
   {
     key: 'listed-must-be-defined',
     label:
-      'Every id listed in <code>service.pipelines</code> must be defined in its own section. The pipelines listed <code>otlp_grpc/dash0</code>, which the config no longer defined, so the Collector failed validation and exited',
+      'Every id listed in <code>service.pipelines</code> must be defined in its own section: the pipelines listed <code>otlp_grpc/dash0</code>, which the config no longer defined, so validation failed',
     right: true,
     why: 'The Collector checks every receiver, processor and exporter a pipeline lists against the config and returns "references exporter ... which is not configured", an error, before it starts anything. Renaming the definition to <code>otlp_grpc/dash0-eu</code> without changing the three pipelines left every exporter list pointing at nothing.',
   },
@@ -250,8 +250,8 @@ export default {
       },
     ],
     finish:
-      'You followed the silence from one flat cluster to its restarting Collector pods, to the error in their log, to the rename ' +
-      'that left the pipelines pointing at an exporter that was no longer defined. An id a pipeline lists must be defined, or the ' +
+      'The silence came from Collector pods that kept restarting: a rename left the pipelines pointing at an exporter that was ' +
+      'no longer defined, and the error was in the pod log. An id a pipeline lists must be defined, or the ' +
       'Collector will not start; the config can be checked before a rollout with the Collector\'s validate command.',
   },
 };
