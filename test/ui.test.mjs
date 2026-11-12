@@ -43,7 +43,7 @@ test('reason, buttonRow: a muted line before a disabled button, and a row that k
 });
 
 test('text: lesson, question, eyebrow, stepHead, note, prose, codeBlock', () => {
-  assert.equal(lesson('Spans <code>nest</code>.'), '<section class="ui-lesson">Spans <code>nest</code>.</section>');
+  assert.equal(lesson('Spans <code>nest</code>.'), '<section class="ui-lesson"><div class="ui-lesson-body">Spans <code>nest</code>.</div></section>');
   assert.equal(question({ id: 'q1', html: 'Which <b>one</b>?' }), '<h3 class="ui-question" id="q1">Which <b>one</b>?</h3>');
   assert.equal(question({ html: 'Why?' }), '<h3 class="ui-question">Why?</h3>');
   assert.equal(eyebrow('Error budget'), '<p class="ui-eyebrow">Error budget</p>');
@@ -618,4 +618,14 @@ test('#331 the sticky side column never outgrows the scrolling body, and the lin
   const css = read('styles/kit.css');
   assert.match(css, /\.ui-split-side \{[^}]*max-block-size: calc\(100dvh - var\(--overlay-chrome\)\); overflow-y: auto/);
   assert.match(css, /\.ui-step--wide > :is\([^)]*\.ui-lesson[^)]*\.ui-feedback[^)]*\) \{ max-inline-size: calc\(100% - var\(--side-width\) - var\(--space-6\)\)/);
+});
+
+test('#331 the lesson text holds the reading width in one body wrapper, whatever its children, while the card fills its column', () => {
+  const css = read('styles/kit.css');
+  const body = rules(css).find((r) => r.selector === '.ui-lesson-body');
+  assert.equal(Object.fromEntries(decls(body.body))['max-inline-size'], 'var(--measure)');
+  const card = Object.fromEntries(decls(rules(css).find((r) => r.selector === '.ui-lesson').body));
+  assert.equal('max-inline-size' in card, false, 'the card itself is not capped');
+  const { document } = parseHTML(`<!doctype html><body>${lesson('a bare text node')}${lesson('<code>x</code>')}</body>`);
+  for (const card of document.querySelectorAll('.ui-lesson')) assert.equal(card.querySelectorAll(':scope > .ui-lesson-body').length, 1);
 });

@@ -56,7 +56,7 @@
   font: var(--weight-regular) 11px/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase;
   color: var(--color-lesson-eyebrow);
 }
-.ui-lesson p, .ui-lesson ul, .ui-lesson ol { max-inline-size: var(--measure); }
+.ui-lesson-body { max-inline-size: var(--measure); }
 /* The card fills its column (the lines inside keep one reading width, above); the column is the step's or, beside a side panel, the board's (#331). */
 .ui-lesson p + p, .ui-lesson p + ul, .ui-lesson p + ol { margin-top: var(--space-3); }
 .ui-lesson ul, .ui-lesson ol { padding-left: 1.4em; }
