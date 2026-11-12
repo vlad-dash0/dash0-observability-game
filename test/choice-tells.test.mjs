@@ -38,10 +38,12 @@ async function allQuestions() {
   return out;
 }
 
+// Code formatting is read off the raw label, before plain() strips the tags.
+const CODE = /<code>|`/;
 const TAIL = /\bso\b|\b(because|since)\b/i;
 const maxOf = (labels) => Math.max(...labels.map((x) => x.length));
 
-// Each strategy marks the options it would pick and picks one of them at random (all, when it marks none).
+// Each strategy (given the plain labels, then the raw ones) marks the options it would pick and picks one of them at random (all, when it marks none).
 const STRATEGIES = {
   longest: (labels) => labels.map((l) => l.length === maxOf(labels)),
   shortest: (labels) => labels.map((l) => l.length === Math.min(...labels.map((x) => x.length))),
@@ -50,6 +52,8 @@ const STRATEGIES = {
     const [lo, hi] = [Math.min(...labels.map((x) => x.length)), maxOf(labels)];
     return labels.map((l) => l.length > lo && l.length < hi);
   },
+  // The options whose label has code formatting (<code> or backticks); all of them, when none or all are marked.
+  code: (_labels, raw) => raw.map((l) => CODE.test(l)),
   noTail: (labels) => labels.map((l) => !TAIL.test(l)),
   longestNoTail: (labels) => {
     const ok = labels.map((l) => !TAIL.test(l));
@@ -63,7 +67,7 @@ const STRATEGIES = {
 const score = (qs, mark) =>
   qs.reduce((sum, q) => {
     const labels = q.choices.map((c) => plain(c.label));
-    let m = mark(labels);
+    let m = mark(labels, q.choices.map((c) => c.label));
     if (!m.some(Boolean)) m = m.map(() => true);
     const right = q.choices.findIndex((c) => c.right);
     return sum + (m[right] ? 1 / m.filter(Boolean).length : 0);
