@@ -29,9 +29,8 @@ test('every Sort item has a whyNot for every other bucket, in every level', asyn
 
 // A reason must not hand over the right bucket: on boards with three or more buckets, no reason may
 // contain a distinctive word of the right bucket's label (its name, before any colon). Words that
-// the item's own label already shows are fine, since the player reads them anyway. Limited to the
-// boards fixed in #343; the distributions and filter-or-sampler boards use words like core and filter
-// in both labels and prose and are a separate cleanup.
+// the item's own label already shows are fine, since the player reads them anyway. Covers every
+// Sort board in the registry (#345).
 const plain = (html) => html.replace(/<[^>]+>/g, ' ');
 const STOP = new Set('the and for are not with from that this into over only each such'.split(' '));
 const stems = (text) =>
@@ -39,13 +38,10 @@ const stems = (text) =>
     (plain(text).toLowerCase().match(/[a-z]+/g) ?? []).filter((w) => w.length > 2 && !STOP.has(w)).map((w) => w.slice(0, 5)),
   );
 
-const CHECKED = new Set(['monitoring-vs-observability', 'the-signals', 'why-opentelemetry', 'status-and-errors', 'baggage', 'auto-vs-manual', 'instruments', 'structured-logs', 'migrating-vendors']);
-
 test('on boards with three or more buckets, no reason names the right bucket', async () => {
   const leaks = [];
   for (const act of ACTS) {
     for (const level of [...act.levels, ...(act.boss ? [act.boss] : [])]) {
-      if (!CHECKED.has(level.id)) continue;
       const mod = await import(`../levels/${level.id}.mjs`);
       const steps = mod.CONTENT?.steps ?? mod.default.play?.steps ?? [];
       for (const s of steps) {
