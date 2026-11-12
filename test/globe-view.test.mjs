@@ -884,26 +884,26 @@ const captionOf = (ids) => globeCaption(REG, globeState(REG, progressOf(ids), MA
 test('the caption follows the story: dark, building, incident, saved, every region saved', () => {
   assert.deepEqual(captionOf([]), {
     phase: 'dark', actId: 'g0', region: 'Zero', done: 0, total: 3,
-    text: 'The planet is dark. Shine the o11y light on your world.',
+    text: 'The world is dark. Light up Zero.',
   });
   assert.deepEqual(captionOf(['a']), {
-    phase: 'building', actId: 'g0', region: 'Zero', done: 1, total: 3, text: "You're building! Zero: 1 of 3 done.",
+    phase: 'building', actId: 'g0', region: 'Zero', done: 1, total: 3, text: 'Zero: 1 of 3 lit. Keep going!',
   });
   assert.equal(captionOf(['a', 'b']).phase, 'incident');
-  assert.equal(captionOf(['a', 'b']).text, 'Alert! Zero is down. Tend to it now.');
+  assert.equal(captionOf(['a', 'b']).text, 'Alert! Zero went dark. Save it!');
   assert.deepEqual(captionOf(['a', 'b', 'boss0']), {
-    phase: 'saved', actId: 'g0', region: 'Zero', done: 3, total: 3, text: 'Zero is calm. Next: One.',
+    phase: 'saved', actId: 'g0', region: 'Zero', done: 3, total: 3, text: 'Zero glows. Mission: One.',
   });
   const next = captionOf(['a', 'b', 'boss0', 'c']);
-  assert.deepEqual([next.phase, next.actId, next.region, next.text], ['saved', 'g1', 'One', 'One is calm. Next: Two.']);
+  assert.deepEqual([next.phase, next.actId, next.region, next.text], ['saved', 'g1', 'One', 'One glows. Mission: Two.']);
   const live = globeCaption(LIVE, globeState(LIVE, progressOf([...ACT_0, 'the-pager', 'resources'])));
-  assert.deepEqual([live.phase, live.actId, live.text], ['building', 'act-1', "You're building! Northern Europe: 1 of 4 done."], 'building again once the next act is entered');
+  assert.deepEqual([live.phase, live.actId, live.text], ['building', 'act-1', 'Northern Europe: 1 of 4 lit. Keep going!'], 'building again once the next act is entered');
   const all = captionOf(['a', 'b', 'boss0', 'c', 'd']);
-  assert.deepEqual(all, { phase: 'allSaved', actId: null, region: null, done: 5, total: 5, text: 'Every region is calm. You saved the day.' });
+  assert.deepEqual(all, { phase: 'allSaved', actId: null, region: null, done: 5, total: 5, text: 'The whole world glows. You saved the day.' });
   assert.equal(captionOf(['a', 'b', 'c', 'd']).actId, 'g0', 'an open incident outranks the later acts');
   assert.equal(captionOf(['a', 'b', 'c', 'd']).phase, 'incident');
   const soon = globeCaption(REG, globeState(REG, progressOf(['a', 'b', 'boss0', 'c', 'd']), { ...MAP, ACT_REGIONS: { ...MAP.ACT_REGIONS, s7: { region: 'Seven' } } }, [S7]));
-  assert.equal(soon.text, 'You saved the day. More regions are coming soon.');
+  assert.equal(soon.text, 'The whole world glows. More regions are coming soon.');
 });
 
 test('an untouched current act with no saved act before it reads dark, even when a later act has progress', () => {

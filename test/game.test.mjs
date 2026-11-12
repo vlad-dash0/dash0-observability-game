@@ -564,6 +564,28 @@ test('G3 focus returns to Continue when it opened the level and is still shown, 
   assert.deepEqual(f2, ['#hub-continue'], 'Continue is still shown, so it wins over the folded act toggle');
 });
 
+test('act rows and level status show saved, current, open and locked apart, with a glyph and the words', () => {
+  const done = Object.fromEntries(['x', 'y', 'a', 'b'].map((id) => [id, { stars: 3, at: null }]));
+  const { game } = setup({ initial: { [STORAGE_KEY]: v1(done) }, comingSoon: [S7] });
+  const act = (id) => game.acts.find((a) => a.id === id);
+  assert.equal(game.actState(act('a0')), 'saved');
+  assert.equal(game.actState(act('a1')), 'current', 'the act Continue points into');
+  assert.equal(game.actState(act('s7')), 'soon');
+  const marks = ['a0', 'a1', 's7'].map((id) => game.actMark(act(id)));
+  assert.equal(new Set(marks).size, 3, 'every state has its own glyph');
+  assert.ok(game.actLine(act('a0')).includes('saved'), 'the words stay in the accessible name');
+  const fresh = setup().game;
+  assert.equal(fresh.actState(fresh.acts[0]), 'current');
+  const dbg = setup({ debug: true }).game;
+  assert.ok(dbg.acts.filter((a) => !a.soon).every((a) => dbg.actState(a) !== 'locked'), 'debug opens every act');
+  const ids = Object.keys(fresh.acts.flatMap((a) => a.ids).reduce((o, i) => ({ ...o, [i]: 1 }), {}));
+  const text = (g, st) => { const id = ids.find((i) => g.levelState(i) === st); return id === undefined ? null : g.levelStatusText(id); };
+  const seen = [text(game, 'done'), text(fresh, 'open'), text(fresh, 'locked')];
+  assert.ok(seen.every((t) => t !== null), 'the fixture has all three states: ' + seen.join('|'));
+  assert.deepEqual(seen.map((t) => t.split(' ').slice(1).join(' ')), ['Play again', 'Start', 'Locked']);
+  assert.equal(new Set(seen.map((t) => t.split(' ')[0])).size, 3, 'a glyph per state, not colour alone');
+});
+
 test('G5 acts fold by progress, a toggle overrides and stores nothing, it survives progress, debug unfolds', () => {
   const done = Object.fromEntries(['x', 'y', 'a', 'b'].map((id) => [id, { stars: 3, at: null }]));
   const { game, store } = setup({ initial: { [STORAGE_KEY]: v1(done) }, comingSoon: [S7] });
@@ -604,7 +626,8 @@ test('M3 each act heading is a disclosure button wired to its body', () => {
   assert.equal(body.getAttribute(':id'), "'act-body-' + act.id");
   assert.equal(body.getAttribute('x-show'), 'actExpanded(act.id)');
   for (const sel of ['.act-sub', '.act-badges', '.act-soon', '.level-list']) assert.ok(body.querySelector(sel), `${sel} is inside the body`);
-  assert.equal(toggle.children.length, 0, 'the toggle holds only its text');
+  assert.deepEqual([...toggle.children].map((c) => c.getAttribute('class')), ['act-mark', 'act-line'], 'the toggle holds a glyph and the line');
+  assert.equal(toggle.querySelector('.act-mark').getAttribute('aria-hidden'), 'true', 'the glyph is not read; the line carries the state');
 });
 
 test('the reward text splits into paragraphs at a blank line, and the card renders one p per paragraph, left-aligned', () => {
@@ -1041,7 +1064,7 @@ test('hubInert is true while any dialog is open', () => {
 test('acts carry their display title and the hub toggle renders the act line that starts with it', () => {
   const { game } = setup();
   assert.equal(game.acts[0].title, 'Act 0: First act');
-  const toggle = deepQuery(shell, 'h3.act-title > button.act-toggle');
+  const toggle = deepQuery(shell, 'h3.act-title > button.act-toggle .act-line');
   assert.equal(toggle.getAttribute('x-text'), 'actLine(act)', 'the hub renders actLine(act)');
   for (const act of game.acts) assert.ok(game.actLine(act).startsWith(act.title), act.id);
 });
@@ -2166,10 +2189,10 @@ test('the legend lists what the globe draws now', () => {
 });
 
 test('the caption text follows the progress, and is empty when no region is mapped', () => {
-  assert.equal(setup().game.captionText(), 'The planet is dark. Shine the o11y light on your world.');
+  assert.equal(setup().game.captionText(), 'The world is dark. Light up Zero.');
   const after = setup({ initial: { [STORAGE_KEY]: v1({ x: { stars: 3, at: AT } }) } }).game;
-  assert.equal(after.captionText(), "You're building! Zero: 1 of 4 done.");
-  assert.equal(setup({ debug: true }).game.captionText(), 'Every region is calm. You saved the day.');
+  assert.equal(after.captionText(), 'Zero: 1 of 4 lit. Keep going!');
+  assert.equal(setup({ debug: true }).game.captionText(), 'The whole world glows. You saved the day.');
   assert.equal(setup({ registry: EMPTY }).game.captionText(), '');
   assert.deepEqual(setup({ registry: EMPTY }).game.globeLegend(), [], 'no caption, no key');
 });

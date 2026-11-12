@@ -93,6 +93,11 @@ const NICK_ERRORS = Object.freeze({
   blocked: 'That nickname is not available.',
 });
 
+// The glyph that leads an act row and a level's status, per state; a shape as well as a colour (aria-hidden: the words carry the state).
+const ACT_MARKS = Object.freeze({ saved: '\u2713', current: '\u25B6', incident: '!', open: '\u25CB', locked: '\uD83D\uDD12', soon: '\u00B7' });
+const LEVEL_MARKS = Object.freeze({ done: '\u2713', open: '\u25B6', locked: '\uD83D\uDD12' });
+const LEVEL_WORDS = Object.freeze({ done: 'Play again', open: 'Start', locked: 'Locked' });
+
 // Screen-reader wording for each levelState.
 const STATE_LABELS = Object.freeze({
   locked: 'locked',
@@ -718,6 +723,23 @@ export function createGame(deps) {
       if (act.soon) return `${act.title}, coming soon`;
       // No break inside "2 of 4": the count stays on one line when the title wraps.
       return (this.actRow(act.id)?.line ?? act.title).replace(/(\d+) of (\d+)$/, '$1\u00a0of\u00a0$2');
+    },
+    // One state per act row, for its mark and look: soon, saved, incident, current (the act Continue points into), open, locked (debug opens it).
+    actState(act) {
+      if (act.soon) return 'soon';
+      const status = this.actRow(act.id)?.status ?? 'open';
+      if (status === 'saved') return 'saved';
+      if (status === 'locked') return this.debug ? 'open' : 'locked';
+      if (this.continueView() !== null && act.ids.includes(this.continueView().levelId)) return 'current';
+      return status;
+    },
+    actMark(act) {
+      return ACT_MARKS[this.actState(act)];
+    },
+    // The level status text with its leading glyph: "\u2713 Play again", "\u25B6 Start", "lock Locked".
+    levelStatusText(id) {
+      const state = this.levelState(id);
+      return `${LEVEL_MARKS[state]} ${LEVEL_WORDS[state]}`;
     },
     // Fold or unfold one act (memory only, debug included); returns whether it is now expanded.
     toggleAct(id) {
