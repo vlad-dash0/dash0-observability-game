@@ -81,7 +81,9 @@
 .wf-tid[data-tint="0"] { background: var(--color-trace-0); border-color: var(--color-trace-0-edge); color: var(--color-text); }
 .wf-tid[data-tint="1"] { background: var(--color-trace-1); border-color: var(--color-trace-1-edge); color: var(--color-text); }
 .wf-cmp { color: var(--color-text); border: 1px dashed var(--color-parent); border-radius: 4px; padding: 0 5px; }
+.wf-cmp[data-reserve][hidden] { display: inline-block; visibility: hidden; } /* keeps its place while off (#353) */
 .wf-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.wf-tags[data-reserve] { min-inline-size: 100px; min-block-size: 17px; align-self: center; } /* room for the longest tag, so one appearing never reflows the row (#353) */
 .wf-tag { font-family: var(--font-mono); font-size: 10px; letter-spacing: .04em; padding: 0 6px; border-radius: 999px; border: 1px solid var(--color-border); color: var(--color-text-muted); white-space: nowrap; }
 .wf-tag[data-tag="sel"] { color: var(--color-text); border-color: var(--color-text); }
 .wf-tag[data-tag="par"] { color: var(--color-parent); border-color: var(--color-parent); }

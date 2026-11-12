@@ -878,7 +878,8 @@ export function createGame(deps) {
         report(e);
       }
       starting = false;
-      this.focusSoon(this.howToOpen ? '#ov-howto-title' : '#ov-back');
+      if (this.howToOpen) this.focusSoon('#ov-howto-title');
+      else this.focusStepStart();
       return true;
     },
 
@@ -938,6 +939,10 @@ export function createGame(deps) {
         return;
       }
       this.howToAuto = false;
+      this.focusStepStart();
+    },
+    // The step's first control through focusFirst (Back when it has none), once the overlay is rendered (#353).
+    focusStepStart() {
       const go = () => {
         const first = doc.querySelector(STEP_CONTROLS);
         focusFirst(first, { fallback: doc.querySelector('#ov-back') });

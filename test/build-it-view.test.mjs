@@ -1463,6 +1463,27 @@ test('#339 a finished Build it board no longer asks for a pick under the waterfa
   assert.equal(/Pick a span to give it a parent/.test(q('[data-build-panel]').textContent), false);
 });
 
+test('#353 a finished Build it board has no empty bordered panel', () => {
+  const { mount } = setup(withHelps(ALL));
+  mount();
+  assert.equal(qa('[data-build-panel] .ui-panel').length, 1, 'a board in play has its panel');
+  solveQueue();
+  assert.equal(qa('[data-build-panel] .ui-panel').length, 0);
+  assert.equal(q('[data-build-panel]').textContent.trim(), '');
+});
+
+test('#353 picking a span fills slots the rows already have, so no row changes height', () => {
+  const { mount } = setup(withHelps({ ...ALL, queue: false }));
+  mount();
+  const rows = qa('[data-span]');
+  assert.equal(rows.every((r) => r.querySelector('[data-cmp]').hasAttribute('data-reserve') && r.querySelector('[data-cmp]').hidden && r.querySelector('[data-cmp]').textContent.startsWith('moving: ')), true, 'each row holds a hidden, sized "moving" slot');
+  assert.equal(rows.every((r) => r.querySelector('[data-tags]').hasAttribute('data-reserve')), true, 'and a tag slot with reserved room');
+  click(`[data-span="${B}"]`);
+  const same = qa('[data-span]');
+  assert.equal(same.length, rows.length);
+  for (const r of same) assert.equal(r.querySelectorAll('[data-cmp]').length, 1, 'the chip fills its slot, no element is added');
+});
+
 test('#339 a Build it board says Check only when it renders a Check button (one source for both)', async () => {
   const { buildReason, hasCheckButton } = await import('../lib/widgets/build-it-help.mjs');
   for (const helps of [ALL, CHECK, {}]) {
