@@ -42,6 +42,9 @@ const SORT = {
       bucket: 'body',
       why: 'The message a person reads. The Body holds the message of the record: a human-readable string, or structured data.',
       whyNot: {
+        severity: 'Severity is a short level label such as WARN or ERROR. This is a sentence about what happened.',
+        resource: 'A Resource is the same for every record from a source. This sentence is about one event.',
+        trace: 'Trace context holds IDs that tie a record to a request. It holds no message text.',
         attributes: 'Attributes are key and value pairs, facts about the event. This is a sentence for a person to read, with no key and no value.',
       },
     },
@@ -51,6 +54,8 @@ const SORT = {
       bucket: 'attributes',
       why: 'A fact about this one event, as a key and a value. Attributes hold additional information about the specific event occurrence, and they can differ from record to record.',
       whyNot: {
+        severity: 'An order ID is not a level such as WARN or ERROR.',
+        trace: 'An order ID is a business fact, not a trace or span ID.',
         body: 'The message says what happened. The order is a fact about it, and a fact you may want to filter on is hard to use as text inside a sentence.',
         resource: 'A Resource describes the source and is the same for every record from it. Orders differ from record to record, so it cannot go there.',
       },
@@ -61,6 +66,9 @@ const SORT = {
       bucket: 'severity',
       why: 'The level as the source wrote it, the original string. It is one of the two severity fields of a record.',
       whyNot: {
+        body: 'The Body is the message. WARN is one short level label, not a message that explains the event.',
+        resource: 'WARN on one record can be ERROR on the next.',
+        trace: 'WARN is not the ID of a trace or a span.',
         attributes: 'The level of a record has fields of its own in the data model, so it is not added as one more key and value.',
       },
     },
@@ -70,6 +78,9 @@ const SORT = {
       bucket: 'resource',
       why: 'It says which service emitted the record, and it is the same on every record the service emits. The Resource describes the source of the log.',
       whyNot: {
+        body: 'This is a key and a value, not a sentence.',
+        severity: 'service.name says nothing about how serious a record is.',
+        trace: 'This is not a trace or span ID.',
         attributes: 'It does not describe this event. It describes the source, and it is the same for every record from it.',
       },
     },
@@ -79,6 +90,9 @@ const SORT = {
       bucket: 'trace',
       why: 'The ID of the trace the record was written in, as defined by W3C Trace Context. It is a field of the record, set for logs that are part of request processing.',
       whyNot: {
+        body: 'A trace ID is 32 hex characters that machines use to match records, not a sentence.',
+        severity: 'Nothing in a trace ID says how serious anything is.',
+        resource: 'Each request has its own trace ID, so it is not fixed for a source the way a Resource is.',
         attributes: 'The record has a field of its own for this ID, so it is not a key you add. That field is how a backend can link the record to its trace.',
       },
     },
@@ -88,6 +102,9 @@ const SORT = {
       bucket: 'body',
       why: 'Another message for a person to read: the Body.',
       whyNot: {
+        severity: 'This is a sentence, not a level such as WARN.',
+        resource: 'A retry message is about one moment, so it is not the same on every record.',
+        trace: 'A sentence is not an ID.',
         attributes: 'Attributes are key and value facts. This is a sentence for a reader, with no key and no value.',
       },
     },
@@ -97,6 +114,8 @@ const SORT = {
       bucket: 'attributes',
       why: 'Another fact about this one event. It can be card on one record and another method on the next, which is what attributes are for.',
       whyNot: {
+        severity: 'card is a value, not a level such as WARN or ERROR.',
+        trace: 'card is not a trace or span ID.',
         body: 'It is a fact you may want to filter and count by. Words in a message are text to search, not a field you can query.',
         resource: 'It varies from record to record. A Resource stays the same for the source, so it cannot go there.',
       },
@@ -107,6 +126,9 @@ const SORT = {
       bucket: 'severity',
       why: 'The normalised level: an integer from 1 to 24. 13 is the first number of the WARN range, 13 to 16.',
       whyNot: {
+        body: '13 is an integer, not a message for a person.',
+        resource: '13 can be 17 on the next record.',
+        trace: '13 is not the ID of a trace or a span.',
         attributes: 'It is the other half of the level, which has fields of its own in the record. It is not a key you add.',
       },
     },
@@ -116,6 +138,9 @@ const SORT = {
       bucket: 'resource',
       why: 'The pod is part of the source that emits the record, and it stays the same for the life of the producer. That is a resource attribute.',
       whyNot: {
+        body: 'A pod name is not a sentence about what happened.',
+        severity: 'A pod name says nothing about how serious a record is.',
+        trace: 'A pod name is not a trace or span ID.',
         attributes: 'The pod is the same for every record the process emits. It describes the producer, not this event.',
       },
     },
@@ -125,7 +150,10 @@ const SORT = {
       bucket: 'trace',
       why: 'The ID of the span the record was written in. Like TraceId, it is a field of the record.',
       whyNot: {
-        attributes: 'The record has a field of its own for this ID, next to the one for the trace ID. It is not a key you add.',
+        body: 'A span ID is 16 hex characters for machines, not a sentence to read.',
+        severity: 'A span ID is just 16 hex characters. It carries no level.',
+        resource: 'A span ID changes with each operation.',
+        attributes: 'The record has a field of its own for this ID. It is not a key you add.',
       },
     },
     {
@@ -134,6 +162,8 @@ const SORT = {
       bucket: 'attributes',
       why: 'The attempt this record is about, a fact about this one event. The next record can say 2.',
       whyNot: {
+        severity: 'An attempt count is not a level such as WARN or ERROR.',
+        trace: 'An attempt number is not a trace or span ID.',
         body: 'A number you may want to filter on is hard to use as a word in a sentence.',
         resource: 'It changes from one record to the next, and a Resource does not.',
       },
@@ -144,6 +174,9 @@ const SORT = {
       bucket: 'trace',
       why: 'The trace flags of the trace the record belongs to, as defined by W3C Trace Context. 01 is the sampled flag. It is a field of the record, with TraceId and SpanId.',
       whyNot: {
+        body: '01 is one flag byte, not text for a person.',
+        severity: '01 is one flag byte. It carries no level.',
+        resource: 'These flags can differ from one request to the next.',
         attributes: 'The record has a field of its own for the flags, as it does for the trace ID and the span ID. It is not a key you add.',
       },
     },

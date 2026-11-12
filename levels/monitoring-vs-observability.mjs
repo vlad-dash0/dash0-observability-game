@@ -22,36 +22,54 @@ const SORT = {
       label: 'Is CPU on db-1 above 90%?',
       bucket: 'known',
       why: 'Someone picked that threshold before anything broke, and a dashboard or an alert checks it all the time. That is monitoring.',
+      whyNot: {
+        new: 'The limit is known up front, so an alert already asks this for you. Nobody has to explore anything to answer it.',
+      },
     },
     {
       id: 'ios',
       label: 'Why are only iOS 5.2 checkouts from Germany slow since 14:05 UTC?',
       bucket: 'new',
       why: 'Nobody builds a dashboard for iOS 5.2 in Germany. You answer it by slicing telemetry by app version, country and time after the fact.',
+      whyNot: {
+        known: 'Nobody has a threshold or a chart ready for iOS 5.2 in Germany. The slice only matters once the slowdown has started.',
+      },
     },
     {
       id: '5xx',
       label: 'Has the checkout API 5xx rate stayed under 1% for the last 5 minutes?',
       bucket: 'known',
       why: 'An error-rate threshold is a classic alert: decided in advance, checked all the time.',
+      whyNot: {
+        new: 'The rate, the limit and the window are all fixed up front, so an alert can ask this continuously.',
+      },
     },
     {
       id: 'cust',
       label: 'Is this one user hitting API timeouts?',
       bucket: 'new',
       why: 'No chart follows one user. You need telemetry that carries the user ID, so you can filter by it when the question comes up.',
+      whyNot: {
+        known: 'Nobody keeps a chart per user ahead of time. This one user only matters once their timeouts appear.',
+      },
     },
     {
       id: 'disk',
       label: 'Is the log disk down to 8 GB free space?',
       bucket: 'known',
       why: 'A disk running out of space is a failure mode you know about, with a number you can watch. A dashboard answers it.',
+      whyNot: {
+        new: '8 GB is a number you can set ahead of time for a failure you already expect. Nothing here needs exploring.',
+      },
     },
     {
       id: 'coupon',
       label: 'Is the coupon path slowing over 10% of carts with 20+ items?',
       bucket: 'new',
       why: 'This combines two details, the coupon path and the cart size, that nobody thought to chart together. You ask it of the telemetry itself.',
+      whyNot: {
+        known: 'Nobody charts coupon use against cart size ahead of time. The two details only meet after the slowdown, so no ready chart or alert covers them.',
+      },
     },
   ],
 };

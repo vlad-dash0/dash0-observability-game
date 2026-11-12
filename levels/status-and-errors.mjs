@@ -24,30 +24,45 @@ const SORT = {
       label: 'storefront CLIENT span for <code>GET /products/999</code>: 404, status Error',
       bucket: 'ok',
       why: 'For a 4xx, the HTTP conventions say a CLIENT span SHOULD be Error: the call storefront made did not get what it asked for.',
+      whyNot: {
+        wrong: 'Look at which side this span is on. A 404 is a failure for the caller that asked for a missing product, so Error is what its span should show.',
+      },
     },
     {
       id: 'b',
       label: 'catalog SERVER span for <code>GET /products/999</code>: 404, status Error',
       bucket: 'wrong',
       why: 'For a 4xx, the HTTP conventions say a SERVER span MUST be left Unset. Only the caller\'s CLIENT span SHOULD be Error.',
+      whyNot: {
+        ok: 'Look at which side this span is on. For catalog, a 404 for a missing product is a normal answer, so Error here is too much.',
+      },
     },
     {
       id: 'c',
       label: 'checkout SERVER span for <code>POST /checkout</code>: 500, status Unset',
       bucket: 'wrong',
       why: 'A 5xx SHOULD be Error, on the SERVER span too: checkout itself failed. Left Unset, the failure is invisible to anything that counts errors by span status.',
+      whyNot: {
+        ok: 'The request ended in a 500. Unset tells anything that counts errors by status that checkout did fine.',
+      },
     },
     {
       id: 'd',
       label: 'inventory SERVER span for <code>GET /stock</code>: 200, status Unset',
       bucket: 'ok',
       why: 'A 2xx is a success, and instrumentation leaves it Unset. Unset is the normal status of a span that did not fail; nobody needs to set Ok.',
+      whyNot: {
+        wrong: 'Nothing failed, so there is no failure to mark. A 200 is an ordinary success.',
+      },
     },
     {
       id: 'e',
       label: 'payments SERVER span for <code>POST /v1/charge</code>: 503, status Error',
       bucket: 'ok',
       why: 'A 5xx on a SERVER span SHOULD be Error: the server failed the request.',
+      whyNot: {
+        wrong: 'A 503 means the server could not do the job, and this is the server\'s own span. Error is what it should show.',
+      },
     },
   ],
 };

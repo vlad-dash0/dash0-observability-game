@@ -22,30 +22,45 @@ const SORT = {
       label: '<code>experiment.variant=redesign-B</code>',
       bucket: 'ok',
       why: 'An experiment arm is no secret, and every service on the path can use it, for example to tag its own spans with the variant.',
+      whyNot: {
+        never: 'An experiment arm identifies nobody and grants no access, so there is nothing to keep out of a header.',
+      },
     },
     {
       id: 'email',
       label: '<code>user.email=ana@example.com</code>',
       bucket: 'never',
       why: 'An email address identifies a person. Baggage goes out in a plain <code>baggage</code> header to every downstream, third-party APIs included, and anyone inspecting the traffic can read it.',
+      whyNot: {
+        ok: 'Think about where the header travels. Every downstream service gets it, and a third-party API could log or keep the address.',
+      },
     },
     {
       id: 'tier',
       label: '<code>tenant.tier=gold</code>',
       bucket: 'ok',
       why: 'A coarse tier says nothing about one person, and downstream services can use it, for example to route or prioritise.',
+      whyNot: {
+        never: 'A coarse tier identifies nobody and grants nothing, so there is no harm in sending it on.',
+      },
     },
     {
       id: 'token',
       label: '<code>session.token=eyJhbGciOiJIUzI1NiJ9</code>',
       bucket: 'never',
       why: 'A session token is a credential. Anyone who reads the <code>baggage</code> header, a third party included, could reuse it.',
+      whyNot: {
+        ok: 'Think about who reads the header. Any service that sees it, a third party too, could present the token as its own.',
+      },
     },
     {
       id: 'last4',
       label: '<code>card.last4=4242</code>',
       bucket: 'never',
       why: 'Even part of a card number is payment data. Baggage can be passed on outside your network by downstream services, so keep it out.',
+      whyNot: {
+        ok: 'Four digits of a card are still payment data, and the header can travel beyond your own services.',
+      },
     },
   ],
 };

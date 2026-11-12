@@ -46,6 +46,7 @@ const SORT = {
       bucket: 'approximated',
       why: 'The new tool receives latency as histogram buckets, and a percentile is estimated from them: for a classic histogram, <code>histogram_quantile</code> assumes the requests are spread evenly inside the bucket the percentile falls in. The chart comes out close, not equal.',
       whyNot: {
+        skipped: 'The p95 line is still wanted in the new tool, so it is not dropped. It moves over, with a different way of computing it.',
         translated: 'A percentile is not a plain query. The old tool took it from every raw sample and the new one estimates it from buckets, so the line does not mean exactly the same.',
         manual: 'The query behind this chart carries over as it is, so there is nothing to write again.',
       },
@@ -67,6 +68,7 @@ const SORT = {
       bucket: 'skipped',
       why: 'It describes the tool you are leaving. Nothing in the new tool needs it, so it stays behind.',
       whyNot: {
+        approximated: 'No number gets compared here. The panel only describes the old tool, and nothing in the new tool plays that part.',
         translated: 'There is nothing to convert: the panel describes the old tool itself, and the new tool has no agent or licence of that kind.',
         manual: 'Nothing needs to be built in the new tool: the panel only describes the old tool.',
       },
@@ -77,6 +79,7 @@ const SORT = {
       bucket: 'manual',
       why: 'The band comes from the old tool\'s own model, and the model does not move. The need is still real, so someone decides what "normal" means in a query they write, for instance the same hour last week with a margin.',
       whyNot: {
+        skipped: 'The need to spot odd request rates remains. Leaving the chart out would lose that check.',
         translated: 'The band comes from the old tool\'s own learned model. A query cannot read it, so there is nothing to convert as written.',
         approximated: 'No number here is a rough version of an old one: the old tool\'s model does not come over in any form.',
       },
@@ -87,6 +90,7 @@ const SORT = {
       bucket: 'translated',
       why: 'A gauge is plotted as it is: select the series, group by host. There is nothing to compute, so there is nothing to lose.',
       whyNot: {
+        skipped: 'Memory per host is still worth watching, so the chart is not dropped.',
         approximated: 'A gauge is plotted as it is, with no calculation to be off by, so the line is the same in the new tool.',
         manual: 'Nothing needs to be written again: select the series and group by host.',
       },
@@ -97,6 +101,7 @@ const SORT = {
       bucket: 'approximated',
       why: 'It is the same estimate as the p95 chart, now deciding whether someone is paged, and 1.2 s sits inside a bucket, not on a boundary, so the estimate is interpolated there. Step 2 shows a window where the estimate and the raw-sample percentile land on opposite sides of a threshold.',
       whyNot: {
+        skipped: 'Someone still needs to be paged when checkout gets slow, so the alert is not dropped.',
         translated: 'A percentile estimated from buckets does not mean the same as one taken from raw samples. Step 2 shows them landing on opposite sides of a threshold.',
         manual: 'The query carries over as written. What differs is the number it gives, not who has to write it.',
       },
@@ -107,6 +112,7 @@ const SORT = {
       bucket: 'skipped',
       why: 'The queue is gone, so the alert has nothing to watch. Moving a monitoring tool is a good time to leave it behind.',
       whyNot: {
+        approximated: 'There is no number to check. The queue no longer exists, so the alert reads nothing.',
         translated: 'The queue is gone, so there is nothing for a carried-over alert to watch.',
         manual: 'Rebuilding it by hand would only recreate an alert for a queue that no longer exists.',
       },
@@ -139,6 +145,7 @@ const SORT = {
       bucket: 'skipped',
       why: 'Converting it would cost effort and add a dashboard to maintain, and nobody would miss it. Leaving it out is a decision, not a gap.',
       whyNot: {
+        approximated: 'Whether its numbers come out close or exact does not matter, since nobody reads it.',
         manual: 'Nobody opened it in a year, so rebuilding it by hand is effort with no reader.',
         translated: 'Someone could carry it over, but nobody opens it, so the effort buys nothing.',
       },
@@ -160,6 +167,7 @@ const SORT = {
       bucket: 'manual',
       why: 'PromQL queries metrics, and the old tool\'s one-query mix of two signals has no one-query counterpart. The panel is rebuilt by hand, for instance as two panels side by side.',
       whyNot: {
+        skipped: 'The panel is still useful, because it puts request counts next to a search of the logs. Dropping it would lose that view.',
         translated: 'PromQL reaches logs through derived metrics such as <code>dash0.logs</code>, and a text search over log lines is not something a derived metric can express, so a query that mixes the two cannot carry over as written.',
         approximated: 'No number here is a rough copy of an old one: the query that mixes the two signals does not come over in any form.',
       },

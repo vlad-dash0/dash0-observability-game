@@ -23,8 +23,9 @@ const SORT = {
       bucket: 'counter',
       why: 'It only ever goes up: a Counter takes non-negative increments, here <code>add(1)</code> per order.',
       whyNot: {
+        histogram: 'A histogram keeps the spread of many measured values. An order has no size to measure.',
         'up-down-counter': 'Nothing ever subtracts from it: an order that was placed stays placed.',
-        gauge: 'A gauge records a reading. Orders are counted, so a gauge would lose the rate math.',
+        gauge: 'A gauge records a reading. Orders arrive one at a time and add up, so a gauge would lose the rate math.',
       },
     },
     {
@@ -33,6 +34,8 @@ const SORT = {
       bucket: 'gauge',
       why: 'A current reading that makes no sense to add up: two rooms at 20 °C are not 40 °C. That is a Gauge.',
       whyNot: {
+        counter: 'A counter takes only non-negative increments, and a temperature can fall.',
+        histogram: 'A histogram keeps a spread of many separate values. Here there is just one value for the room at any moment.',
         'up-down-counter': 'An UpDownCounter is for values you add up across sources. Adding two room temperatures tells you nothing.',
       },
     },
@@ -42,6 +45,8 @@ const SORT = {
       bucket: 'up-down-counter',
       why: 'It goes up when an order is queued and down when one is taken, and the lengths from several pods add up to the total waiting. That is an UpDownCounter.',
       whyNot: {
+        gauge: 'A gauge is for values that make no sense to add up. Queue lengths from several pods do add up to the total waiting.',
+        histogram: 'A histogram keeps the spread of many separate values. A queue has one length at a time, so there is no spread to keep.',
         counter: 'A queue shrinks, and a Counter can only add non-negative amounts.',
       },
     },
@@ -51,6 +56,8 @@ const SORT = {
       bucket: 'histogram',
       why: 'Many separate values where the spread matters, such as the slowest 1%. A Histogram keeps that spread.',
       whyNot: {
+        counter: 'A counter can only add up. It would give a total of the time, with no way to see the slowest 1%.',
+        'up-down-counter': 'An UpDownCounter keeps a running sum. A total of durations says nothing about how the slow ones are spread.',
         gauge: 'A gauge keeps one sampled value, so a slow tail would vanish behind the last request.',
       },
     },
@@ -60,7 +67,9 @@ const SORT = {
       bucket: 'counter',
       why: 'Declines are events you count, and the total only grows. That is a Counter.',
       whyNot: {
-        gauge: 'A gauge records a reading. Declines are counted, so a gauge would lose the rate math.',
+        'up-down-counter': 'Nothing takes a decline back, so there is never a subtraction to make.',
+        histogram: 'A histogram is for values with a spread. A decline has no size or duration to measure.',
+        gauge: 'A gauge records a reading. Declines arrive one at a time and add up, so a gauge would lose the rate math.',
       },
     },
     {
@@ -69,6 +78,8 @@ const SORT = {
       bucket: 'gauge',
       why: 'A ratio is a reading, and adding two ratios gives nonsense. That is a Gauge.',
       whyNot: {
+        counter: 'A counter adds non-negative amounts. A ratio can fall as well as rise, and adding ratios makes no sense.',
+        'up-down-counter': 'An UpDownCounter is for values you add up across sources. Two ratios of 0.9 do not make 1.8.',
         histogram: 'It is one current value, not a spread of individual values.',
       },
     },
@@ -78,6 +89,8 @@ const SORT = {
       bucket: 'up-down-counter',
       why: 'You add and subtract at the edges of each request, and the counts from three pods add up to what is in flight. That is an UpDownCounter.',
       whyNot: {
+        counter: 'A counter takes only non-negative increments. Here the number drops when a request ends.',
+        histogram: 'A histogram records many separate values. This is one running total of what is in flight.',
         gauge: 'A gauge is for values that make no sense to sum. In-flight requests from three pods do sum.',
       },
     },
@@ -86,6 +99,11 @@ const SORT = {
       label: 'Size of each response, in bytes',
       bucket: 'histogram',
       why: 'Many separate values where the spread matters, such as the largest responses. A Histogram keeps that spread.',
+      whyNot: {
+        counter: 'A counter only adds up. A total of bytes would hide how big the largest responses are.',
+        'up-down-counter': 'An UpDownCounter keeps a running sum. Adding sizes up would lose the difference between small and large responses.',
+        gauge: 'A gauge keeps one sampled value, so most responses, and the largest ones, would never be seen.',
+      },
     },
   ],
 };
