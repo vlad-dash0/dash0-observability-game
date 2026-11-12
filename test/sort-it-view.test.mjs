@@ -1236,3 +1236,11 @@ test('#339 Escape with an item picked clears the pick and is handled; with none 
   assert.equal(esc(), true);
   assert.equal(q('[data-item="i2"]').getAttribute('aria-pressed'), 'false');
 });
+
+test('#346 a bucket picked with nothing selected scrolls its refusal into view', () => {
+  const { mount } = setup();
+  mount();
+  const calls = spyScroll();
+  drop(null, 'metric');
+  assert.equal(calls.length, 1);
+});

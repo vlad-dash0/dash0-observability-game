@@ -491,6 +491,11 @@
 .ui-score-rule { font-size: 11.5px; color: var(--color-text-muted); }
 /* Solved: the win card replaces the star rule and the hint tools, so the whole column fits under the side cap without an inner scroll (#339). */
 .ui-side[data-solved] :is(.ui-score-rule, .ui-hints) { display: none; }
+/* Short windows (1280x623, 1440x723): a solved side panel must not need an inner scroll, so the swirl shrinks and the counters share one row (#346). */
+@media (max-height: 760px) {
+  .ui-win-swirl { max-inline-size: 104px; }
+  .ui-side[data-solved] .ui-score-counts { flex-wrap: nowrap; gap: var(--space-3); }
+}
 .ui-hints { display: grid; gap: 10px; }
 .ui-hints-head {
   font-family: var(--font-mono); font-size: var(--text-xs); font-weight: var(--weight-semibold); letter-spacing: .08em;

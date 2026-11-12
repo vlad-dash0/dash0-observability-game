@@ -1460,3 +1460,11 @@ test('#339 a Build it board says Check only when it renders a Check button (one 
   assert.equal(buildReason(withHelps(ALL)), 'Get every span right');
   assert.equal(buildReason({ ...logsSpec(), helps: { instant: true } }), 'Get every record right');
 });
+
+test('#346 Reset scrolls its reply into view', () => {
+  const { mount } = setup(withHelps(ALL));
+  mount();
+  const calls = spyScrolls();
+  click('#b1-reset');
+  assert.equal(calls.length, 1);
+});
