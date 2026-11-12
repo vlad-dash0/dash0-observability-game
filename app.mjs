@@ -29,6 +29,7 @@ import { NICK_RE } from './lib/account/nickname.mjs';
 import { setFeedback } from './lib/ui/index.mjs';
 import { escapeHtml } from './lib/lesson-kit.mjs';
 import { trapTab } from './lib/modal-focus.mjs';
+import { focusFirst } from './lib/widgets/focus.mjs';
 import { createLevelContext } from './lib/level-context.mjs';
 import { cardTotals, emptyProgress, mergeProgress, recordCompletion, registryIds, starTotals } from './lib/progress.mjs';
 import { MAX_STARS } from './lib/scoring.mjs';
@@ -116,6 +117,7 @@ function isTyping(el) {
 
 const NUDGE_MS = 2600;
 const CONFETTI = 40;
+const STEP_CONTROLS = ['button', 'input', 'select', 'textarea'].map((t) => `#ov-body ${t}`).join(','); // the step's controls, for leaveHowTo
 const FOCUS_FRAMES = 10; // focusSoon waits at most this many frames for its target to be shown
 
 /**
@@ -233,6 +235,7 @@ export function createGame(deps) {
     aboutLoop: GLOBE_LOOP,
     howTo: NO_HOW_TO,
     howToOpen: false,
+    howToAuto: false, // the card opened by itself as the level started: closing it returns to the step, not the header button (#351)
     howToFlagKey: null, // a type that turned up mid-level with an unseen guide: the header button says so (#321)
     helpRev: 0, // bumped when another tab changes the stored help choices (onStorage)
     howToNote: '', // the polite announcement of that flag
@@ -811,6 +814,7 @@ export function createGame(deps) {
       this.howTo = howToView(level);
       this.howToKey = this.howTo.topics[0]?.key ?? null;
       this.howToOpen = this.howToKey !== null && this.howToNew(this.howToKey);
+      this.howToAuto = this.howToOpen;
       let starting = true;
       const announced = new Set();
       const onWidget = (key) => {
@@ -819,7 +823,10 @@ export function createGame(deps) {
         this.howToKey = key;
         this.howToNote = '';
         const fresh = this.howToNew(key);
-        if (starting) this.howToOpen = fresh;
+        if (starting) {
+          this.howToOpen = fresh;
+          this.howToAuto = fresh;
+        }
         else if (fresh) {
           // Mid-level: never a pop-up over the step. The header button is flagged; the note is said once per type.
           this.howToFlagKey = key;
@@ -896,9 +903,25 @@ export function createGame(deps) {
         this.howToFlagKey = null;
         this.howToNote = '';
         this.howToOpen = true;
+        this.howToAuto = false;
         this.focusSoon('#ov-howto-title');
       }
       return true;
+    },
+    // Focus after the card closes: the step's first control when the card opened by itself (the player never
+    // asked for it, so the header button is not where they were), else the How to play button that opened it.
+    leaveHowTo() {
+      if (!this.howToAuto) {
+        this.focusSoon('#ov-howto-open');
+        return;
+      }
+      this.howToAuto = false;
+      const go = () => {
+        const first = doc.querySelector(STEP_CONTROLS);
+        focusFirst(first, { fallback: doc.querySelector('#ov-back') });
+      };
+      if (typeof this.$nextTick === 'function') this.$nextTick(go);
+      else go();
     },
     // Close: this type's guide is gone until the page reloads, nothing stored.
     closeHowTo() {
@@ -906,7 +929,7 @@ export function createGame(deps) {
       seenHelp.add(this.howToKey);
       this.howToNote = '';
       this.howToOpen = false;
-      this.focusSoon('#ov-howto-open');
+      this.leaveHowTo();
     },
     // Don't show again: this type's guide only, stored per widget (not in debug), and always
     // hidden for this visit, whether or not the write went through.
@@ -916,7 +939,7 @@ export function createGame(deps) {
       if (!this.debug) hideHelp(storage, [this.howToKey]);
       this.howToNote = '';
       this.howToOpen = false;
-      this.focusSoon('#ov-howto-open');
+      this.leaveHowTo();
     },
 
     // Abort the open level (its timers stop, a stale finish is a no-op) and clear its DOM.

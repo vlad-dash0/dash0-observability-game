@@ -1433,12 +1433,41 @@ test('howToExpanded mirrors the card as the aria-expanded string', () => {
   assert.equal(s.game.howToExpanded(), 'false');
 });
 
+test('closing the card that opened by itself focuses the step\'s first control; one the player opened returns to How to play (#351)', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  const doc = s.dom.document;
+  const body = doc.getElementById('ov-body');
+  body.innerHTML = '<button id="first">One</button><button id="second">Two</button>';
+  const landed = [];
+  for (const b of body.querySelectorAll('button')) b.focus = () => landed.push(b.id);
+  escapeOn(s);
+  assert.equal(s.game.howToOpen, false);
+  assert.deepEqual(landed, ['first'], 'Escape on the auto-opened card lands on the step');
+  assert.equal(s.focused.at(-1), '#ov-howto-title', 'and does not queue the header button');
+  assert.equal(s.game.toggleHowTo(), true);
+  assert.equal(s.focused.at(-1), '#ov-howto-title');
+  s.game.closeHowTo();
+  assert.equal(s.focused.at(-1), '#ov-howto-open', 'opened by the player: back to the button that opened it');
+});
+
+test('Don\'t show again on the auto-opened card also returns to the step (#351)', () => {
+  const s = cardGame();
+  s.game.openLevel('w');
+  const doc = s.dom.document;
+  const body = doc.getElementById('ov-body');
+  body.innerHTML = '<button id="first">One</button>';
+  const landed = [];
+  body.querySelector('button').focus = () => landed.push('first');
+  s.game.hideHowTo();
+  assert.deepEqual(landed, ['first']);
+});
+
 test('Close dismisses for this visit only', () => {
   const s = cardGame();
   s.game.openLevel('w');
   s.game.closeHowTo();
   assert.equal(s.game.howToOpen, false);
-  assert.equal(s.focused.at(-1), '#ov-howto-open');
   assert.equal(s.store.data.has(HELP_KEY), false, 'Close stores nothing');
   s.game.closeOverlay();
   s.game.openLevel('w');
@@ -1461,7 +1490,6 @@ test("Don't show again is stored per widget and respected later", () => {
   s.game.openLevel('w');
   s.game.hideHowTo();
   assert.equal(s.game.howToOpen, false);
-  assert.equal(s.focused.at(-1), '#ov-howto-open');
   assert.equal(s.store.data.get(HELP_KEY), '{"v":1,"hidden":["choice"]}', 'only the guide on show');
   const later = cardGame({ storage: () => s.store });
   later.game.openLevel('w');
