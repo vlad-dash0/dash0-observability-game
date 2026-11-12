@@ -6,6 +6,7 @@
 import { actions, feedback, finishButton, nextButton, question, setFeedback, step } from '../lib/ui/index.mjs';
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
+import { buildReason } from '../lib/widgets/build-it-help.mjs';
 import { applyState, newBuildState } from '../lib/widgets/build-it.mjs';
 import { serviceEdges } from '../lib/widgets/trace.mjs';
 
@@ -109,7 +110,7 @@ export default {
             'out and SERVER handles the call; PRODUCER sends a message and CONSUMER processes it.',
           )}${question({ html: 'Give each span its kind.' })}${renderBuild(MAP, newBuildState(MAP), { escapeHtml: e })}${feedback({ id: 'kinds-edges' })}`,
         }),
-        actions({ wide: true, buttonsHtml: nextButton('kinds-next', 'Solve the board and press Check to continue.') }),
+        actions({ wide: true, buttonsHtml: nextButton('kinds-next', `${buildReason(MAP)} to continue.`) }),
       );
       const next = bar.querySelector('#kinds-next');
       const line = ctx.ovBody.querySelector('#kinds-edges');
@@ -119,7 +120,7 @@ export default {
           // The check passed, so every kind is the answer's: draw the map from it.
           const right = newBuildState(MAP);
           for (const [id, want] of Object.entries(MAP.answer)) right.spans[id].kind = want.kind;
-          setFeedback(line, 'neutral', edgesLine(applyState(MAP, right), e));
+          setFeedback(line, 'neutral', edgesLine(applyState(MAP, right), e), { scroll: true });
           next.disabled = false;
           return next;
         },

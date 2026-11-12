@@ -9,6 +9,7 @@
 import { actions, finishButton, nextButton, question, step } from '../lib/ui/index.mjs';
 import { choiceHtml, mountChoice } from '../lib/widgets/choice.mjs';
 import { mountBuild, renderBuild } from '../lib/widgets/build-it-view.mjs';
+import { buildReason } from '../lib/widgets/build-it-help.mjs';
 import { newBuildState } from '../lib/widgets/build-it.mjs';
 
 const TRACE = '4bf92f3577b34da6a3ce929d0e0e4736';
@@ -138,7 +139,7 @@ export default {
             'request carries it, so spans with different trace IDs are never parent and child.',
           )}${question({ html: `Rebuild the request's span tree.` })}${renderBuild(TREE, newBuildState(TREE), { escapeHtml: ctx.escapeHtml })}`,
         }),
-        actions({ wide: true, buttonsHtml: nextButton('sat-next', 'Solve the board and press Check to continue.') }),
+        actions({ wide: true, buttonsHtml: nextButton('sat-next', `${buildReason(TREE)} to continue.`) }),
       );
       const btn = next(stepOther);
       mountBuild(ctx, TREE, {

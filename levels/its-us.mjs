@@ -252,7 +252,7 @@ export default {
       setSendBar({ busy: true });
       const fb = $('#its-feedback');
       fb.removeAttribute('data-outcome');
-      setFeedback(fb, 'neutral', 'Sending the incident.');
+      setFeedback(fb, 'neutral', 'Sending the incident.', { scroll: true });
       let outcome;
       try {
         outcome = await tele.sendBatch(spans, { signal: ctx.signal });
@@ -338,7 +338,7 @@ export default {
         const value = $('#its-fvalue').value.trim();
         form = { key, op, value };
         if (value === '') {
-          setFeedback($('#its-filter-feedback'), 'neutral', 'Type a value to filter by.');
+          setFeedback($('#its-filter-feedback'), 'neutral', 'Type a value to filter by.', { scroll: true });
           return;
         }
         applied = { key, op, value };
@@ -459,7 +459,7 @@ export default {
         ),
         bar(
           button({ id: 'its-check', label: 'Check my answers', variant: 'primary' }) +
-            finishButton('its-finish'),
+            finishButton('its-finish', 'Answer all four questions to finish the level.'),
         ),
       );
       if (practice) showList();
@@ -486,7 +486,7 @@ export default {
             }
             setFeedback(fb, 'error', e(qn.wrong));
           } else {
-            setFeedback(fb, 'neutral', e(qn.nudge));
+            setFeedback(fb, 'neutral', e(qn.nudge), { scroll: true });
           }
         }
         if (passed.size === QUESTIONS.length) {

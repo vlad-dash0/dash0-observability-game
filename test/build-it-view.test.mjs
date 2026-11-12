@@ -1384,3 +1384,62 @@ test('the dashed border of an off help chip, its main cue on a phone, keeps 3:1 
     }
   }
 });
+
+// ---- #339: the scroll follows the message kind; a pick never moves the page ----
+
+/** Count scrollIntoView calls on both of the board's feedback regions. */
+function spyScrolls() {
+  const calls = [];
+  for (const sel of ['[id$="-status"]', '#b1-feedback']) {
+    const el = q(sel);
+    if (el) el.scrollIntoView = (o) => calls.push([sel, o]);
+  }
+  return calls;
+}
+
+test('#339 picking a span, and cancelling the pick, never scroll the page', () => {
+  const { mount } = setup(withHelps({ ...ALL, queue: false }));
+  mount();
+  const calls = spyScrolls();
+  click(`[data-span="${B}"]`);
+  assert.match(status(), /Pick the parent of/);
+  click(`[data-span="${B}"]`);
+  assert.equal(status(), 'Cancelled.');
+  assert.deepEqual(calls, []);
+});
+
+test('#339 a pick (and the focus after it) asks the browser not to scroll', () => {
+  const { mount, focus } = setup(withHelps({ ...ALL, queue: false }));
+  mount();
+  click(`[data-span="${B}"]`);
+  assert.equal(focus.prevented().at(-1), true);
+});
+
+test('#339 a wrong drop scrolls its verdict into view; a refused or already-there drop does too', () => {
+  const { mount, counts } = setup(withHelps({ ...ALL, queue: false }));
+  mount();
+  const calls = spyScrolls();
+  drag(C, E);
+  assert.equal(counts.mistakes, 1);
+  assert.equal(calls.length, 1, 'the wrong verdict scrolls once');
+});
+
+test('#339 a finished Build it board no longer asks for a pick under the waterfall', () => {
+  const { mount } = setup(withHelps(ALL));
+  mount();
+  solveQueue();
+  assert.equal(/Pick a span to give it a parent/.test(q('[data-build-panel]').textContent), false);
+});
+
+test('#339 a Build it board says Check only when it renders a Check button (one source for both)', async () => {
+  const { buildReason, hasCheckButton } = await import('../lib/widgets/build-it-help.mjs');
+  for (const helps of [ALL, CHECK, {}]) {
+    const spec = withHelps(helps);
+    const { mount } = setup(spec);
+    mount();
+    assert.equal(qa('[id$="-check"]').length === 1, hasCheckButton(spec));
+    assert.equal(/Check/.test(buildReason(spec)), hasCheckButton(spec));
+  }
+  assert.equal(buildReason(withHelps(ALL)), 'Get every span right');
+  assert.equal(buildReason({ ...logsSpec(), helps: { instant: true } }), 'Get every record right');
+});

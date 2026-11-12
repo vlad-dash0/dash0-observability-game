@@ -629,3 +629,18 @@ test('#331 the lesson text holds the reading width in one body wrapper, whatever
   const { document } = parseHTML(`<!doctype html><body>${lesson('a bare text node')}${lesson('<code>x</code>')}</body>`);
   for (const card of document.querySelectorAll('.ui-lesson')) assert.equal(card.querySelectorAll(':scope > .ui-lesson-body').length, 1);
 });
+
+test('#339 the scroll follows the message kind: verdicts scroll, a neutral prompt does not, { scroll } overrides', () => {
+  const run = (tone, opts) => {
+    const el = region();
+    let n = 0;
+    el.scrollIntoView = () => { n += 1; };
+    setFeedback(el, tone, 'x', opts);
+    return n;
+  };
+  assert.equal(run('error'), 1, 'a wrong answer scrolls');
+  assert.equal(run('success'), 1, 'a right answer scrolls');
+  assert.equal(run('neutral'), 0, 'a prompt does not');
+  assert.equal(run('neutral', { scroll: true }), 1, 'a neutral result can opt in');
+  assert.equal(run('error', { scroll: false }), 0, 'and a verdict can opt out');
+});

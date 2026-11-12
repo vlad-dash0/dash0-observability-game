@@ -167,7 +167,7 @@ export default {
         wide: true,
         bodyHtml: `${ctx.speech(incidentLesson(INTRO))}${renderIncident(SCENARIO, newIncident(SCENARIO), { escapeHtml: ctx.escapeHtml })}`,
       }),
-      actions({ wide: true, buttonsHtml: finishButton('cis-finish') }),
+      actions({ wide: true, buttonsHtml: finishButton('cis-finish', 'Name the cause to finish the level.') }),
     );
     const finish = ctx.ovActions.querySelector('#cis-finish');
     mountIncident(ctx, SCENARIO, {

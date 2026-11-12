@@ -17,6 +17,7 @@
 import { PRACTICE_HOSTS, REASONS, TOKEN_PREFIX } from '../lib/dash0/ingress.mjs';
 import { OUTCOME, TIMEOUT_MS } from '../lib/otlp/send.mjs';
 import { MODE, STATE } from '../lib/telemetry.mjs';
+import { focusFirst } from '../lib/widgets/focus.mjs';
 import { actions as actionsBar, button, chip, feedback, field, note, panel, prose, radio, radioGroup, reason, setFeedback, step } from '../lib/ui/index.mjs';
 
 // The Permissions options of an auth token (glossary/auth-tokens). Only Ingesting is right. The
@@ -252,13 +253,13 @@ export default {
       );
 
       const fb = $('#ctd-feedback');
-      const say = (tone, html) => setFeedback(fb, tone, html);
+      const say = (tone, html) => setFeedback(fb, tone, html, { scroll: true }); // each line answers a button press (#339)
       const endpointEl = $('#ctd-endpoint');
       const tokenEl = $('#ctd-token');
       const datasetEl = $('#ctd-dataset');
       const minted = practice ? $('#ctd-minted') : null;
       const mintedRow = practice ? $('#ctd-minted-row') : null;
-      endpointEl.focus({ preventScroll: true }); // a new step opens at its top (#331)
+      focusFirst(endpointEl, { fallback: fb }); // a new step opens at its top, on a visible element (#331, #339)
 
       // The shown practice token goes with the secret field: after Connect it is gone from the page.
       const scrub = () => {
@@ -305,7 +306,7 @@ export default {
         const mintFb = $('#ctd-mint-feedback');
         $('#ctd-mint').onclick = () => {
           if (!scope) {
-            setFeedback(mintFb, 'neutral', 'Pick a permission first.');
+            setFeedback(mintFb, 'neutral', 'Pick a permission first.', { scroll: true });
             return;
           }
           minted.textContent = tele.practiceCredential(scope.key); // a public practice token, only ever shown here
@@ -346,10 +347,9 @@ export default {
       };
 
       function onConnect() {
-        // The token leaves the field before anything else happens, and never comes back.
+        // The token leaves the field once a request is about to be sent or once it is itself refused, and never comes
+        // back; a refusal of anything else (the endpoint, the dataset, a missing scope) keeps what the player typed (#339).
         const token = tokenEl.value;
-        tokenEl.value = '';
-        scrub();
         const endpoint = endpointEl.value;
         const dataset = datasetEl.value;
         const input = `${endpoint}\n${dataset}`;
@@ -374,6 +374,10 @@ export default {
         }
         const verdict = tele.connect({ mode, endpoint, token, dataset });
         if (!verdict.ok) {
+          if (verdict.field === 'token') {
+            tokenEl.value = '';
+            scrub();
+          }
           // An emptied token field is a nudge, not a wrong answer. Over the same endpoint and dataset it
           // keeps the last useful reason (a double click); after a change that reason is stale.
           if (verdict.reason === 'empty' && lastProblem && same) return;
@@ -392,6 +396,8 @@ export default {
           return;
         }
         lastProblem = false;
+        tokenEl.value = '';
+        scrub();
         send();
       }
 

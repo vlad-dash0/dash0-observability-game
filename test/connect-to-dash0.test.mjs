@@ -209,7 +209,8 @@ for (const [endpoint, token, expected] of REASON_CASES) {
     assert.match(q('#ctd-feedback').textContent, expected);
     assert.match(q('#ctd-feedback').textContent, /Nothing was sent/);
     assert.equal(h.mistakes(), 1);
-    assert.equal(q('#ctd-token').value, '', 'the field is cleared even when the form is wrong');
+    // A refused token is cleared and never echoed; a refused endpoint keeps what was typed (#339).
+    assert.equal(q('#ctd-token').value, token === SHAPED ? SHAPED : '');
   });
 }
 
@@ -378,11 +379,12 @@ test('a fixed endpoint clears the old reason: the token is asked for again, free
     assert.match(q('#ctd-feedback').textContent, /4317/);
     assert.equal(h.mistakes(), 1);
     fill('#ctd-endpoint', fix);
-    press('#ctd-connect'); // the token field was emptied by the first press
+    assert.equal(q('#ctd-token').value, SHAPED, 'a refused endpoint keeps the token (#339)');
+    press('#ctd-connect'); // the kept token is sent with the fixed endpoint
     assert.doesNotMatch(q('#ctd-feedback').textContent, /4317/);
-    assert.match(q('#ctd-feedback').textContent, again);
-    assert.match(q('#ctd-feedback').textContent, /Nothing was sent/);
-    assert.equal(h.mistakes(), 1, 'asking for the token again is free');
+    assert.doesNotMatch(q('#ctd-feedback').textContent, /Nothing was sent/);
+    assert.equal(q('#ctd-token').value, '', 'sent: the field is emptied');
+    assert.equal(h.mistakes(), 1, 'no further mistake');
   }
 });
 
