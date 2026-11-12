@@ -564,6 +564,14 @@ test('G3 focus returns to Continue when it opened the level and is still shown, 
   assert.deepEqual(f2, ['#hub-continue'], 'Continue is still shown, so it wins over the folded act toggle');
 });
 
+test('an act with an open incident reads as incident for a real player, even where Continue points into it', () => {
+  const reg = buildRegistry([{ id: 'a0', no: 0, name: 'First act', levels: [L('x', '0.1')], boss: L('bx', null) }], { deck: [], nodeIds: [] });
+  const { game } = setup({ registry: reg, initial: { [STORAGE_KEY]: v1({ x: { stars: 3, at: null } }) } });
+  assert.equal(game.continueView().levelId, 'bx', 'Continue points at the incident, inside the act');
+  assert.equal(game.actState(game.acts[0]), 'incident');
+  assert.equal(game.actMark(game.acts[0]), '!');
+});
+
 test('act rows and level status show saved, current, open and locked apart, with a glyph and the words', () => {
   const done = Object.fromEntries(['x', 'y', 'a', 'b'].map((id) => [id, { stars: 3, at: null }]));
   const { game } = setup({ initial: { [STORAGE_KEY]: v1(done) }, comingSoon: [S7] });

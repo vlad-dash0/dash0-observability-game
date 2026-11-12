@@ -222,10 +222,11 @@
 }
 .level-card:active { transform: scale(.985); }
 .level-card:hover { border-color: var(--color-accent); box-shadow: 0 6px 24px var(--color-shadow); }
-.level-card.locked { opacity: .55; cursor: not-allowed; }
+.level-card.locked { cursor: not-allowed; }
 .level-card.locked:hover { border-color: var(--color-border); box-shadow: none; }
 .level-card.locked { border-style: dashed; background: transparent; }
-.level-card.locked .level-name { color: var(--color-text-muted); font-weight: 600; }
+.level-card.locked :is(.level-name, .level-sub, .level-status) { color: var(--color-text-muted); }
+.level-card.locked .level-name { font-weight: 600; }
 .level-card.done { border-color: color-mix(in srgb, var(--color-success) 45%, var(--color-border)); }
 .level-card.done::before {
   content: ""; position: absolute; inset: 0; border-radius: var(--radius-lg); pointer-events: none;
@@ -251,6 +252,12 @@
 }
 .level-card.done .level-status { color: var(--color-success); }
 .level-stars { font-size: 15px; letter-spacing: 1px; color: var(--color-parent); }
+/* At 320px the status column (stars, "Play again") left the name 84px: whole words broke ("Resource / s"). Narrow cards stack it under the name. */
+@media (max-width: 420px) {
+  .level-card { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 14px; row-gap: var(--space-1); }
+  .level-ico { grid-row: 1 / span 2; }
+  .level-status { grid-column: 2; flex-direction: row; align-items: center; justify-content: flex-start; gap: var(--space-2); margin-inline-start: 0; }
+}
 
 /* ---------- Level overlay: header, scrolling body, pinned actions ---------- */
 .overlay {

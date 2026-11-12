@@ -89,7 +89,7 @@
 /* Prose reads out to the lesson card's right edge, which is the narrow step's width (760px): at 14px, 72ch ends 120px short of it,
    so the lesson, the table and the text under it had three different right edges (#332). */
 .ui-prose p, .ui-prose li { max-inline-size: var(--layout-narrow); }
-.ui-prose ul, .ui-prose ol { padding-left: 1.4em; display: grid; gap: 6px; }
+.ui-prose ul, .ui-prose ol { padding-left: 1.4em; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; /* a long token (a traceparent) wraps at 320px instead of widening the list */ }
 /* A deletion keeps text colour; the strike carries the error tone. */
 .ui-prose del { text-decoration-color: var(--color-error); text-decoration-thickness: 2px; }
 .ui-prose pre, .ui-code { font-size: 12px; line-height: 1.6; overflow-x: auto; max-inline-size: 100%; }

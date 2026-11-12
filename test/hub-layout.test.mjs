@@ -49,7 +49,8 @@ test('L4: every globe stage width is capped by min(100%, ...), so it never overf
 test('L5: a 551px column (a 1024px window) stays one card per row; 688px (768) and 700px (1280) go two-up', () => {
   const m = /@container levels \(min-width: (\d+)px\)/.exec(R.find((r) => r.selector === '.level-list' && r.at[0]?.startsWith('@container'))?.at[0] ?? '');
   assert.ok(m && Number(m[1]) > 551 && Number(m[1]) <= 688, m?.[1]);
-  assert.equal(R.filter((r) => r.selector === '.level-card' && r.at.length).length, 0, 'no tighter card inside a query: a two-up card is at least 294px');
+  const tighter = R.filter((r) => r.selector === '.level-card' && r.at.length && decls(r.body).some(([k]) => /^(padding|min-|max-|width|inline-size|block-size|height)/.test(k)));
+  assert.equal(tighter.length, 0, 'no tighter card inside a query: a two-up card is at least 294px (the 420px query only stacks the status under the name)');
 });
 
 test('L6: html and body never clip or scroll on the x axis, or the sticky map has no scroll parent to stick in', () => {

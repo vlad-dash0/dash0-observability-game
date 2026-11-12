@@ -222,6 +222,15 @@ test('inline code is inline and breaks only a token wider than the line (a trace
   assert.equal(pick('pre code')['overflow-wrap'], 'normal', 'a block under <pre> scrolls, it does not wrap');
 });
 
+test('a locked level card stays readable: muted text token, no opacity fade; a lesson list column can shrink so a token wraps', () => {
+  const card = Object.fromEntries(sheetRules('hub.css').filter((r) => r.selector === '.level-card.locked').flatMap((r) => decls(r.body)));
+  assert.equal(card.opacity, undefined, 'opacity .55 put the text at 2.9:1');
+  const locked = sheetRules('hub.css').filter((r) => r.selector === '.level-card.locked :is(.level-name, .level-sub, .level-status)').flatMap((r) => decls(r.body));
+  assert.deepEqual(Object.fromEntries(locked), { color: 'var(--color-text-muted)' });
+  const list = Object.fromEntries(sheetRules('kit.css').filter((r) => r.selector === '.ui-prose ul, .ui-prose ol').flatMap((r) => decls(r.body)));
+  assert.equal(list['grid-template-columns'], 'minmax(0, 1fr)', 'an auto column grows to a traceparent and the card clips it');
+});
+
 test('only the bar label is clipped (never the cell, whose connectors overhang), and a label beside its bar has a halo', () => {
   const rules = sheetRules('widgets.css');
   const pick = (sel) => Object.fromEntries(rules.filter((r) => r.selector === sel).flatMap((r) => decls(r.body)));
