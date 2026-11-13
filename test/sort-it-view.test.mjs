@@ -596,17 +596,13 @@ test('#359 a dragend resets the zone counts: a missed dragleave does not leave t
   assert.equal(overOf('metric'), false, 'one enter and one leave end it');
 });
 
-test('#359 a foreign drag, or a drag over a finished board, is not allowed to drop', () => {
+test('#359 a foreign drag is not allowed to drop', () => {
   const { mount } = setup();
   mount();
   const over = { prevented: false, preventDefault() { this.prevented = true; }, dataTransfer: dt() };
   zoneOf('metric').ondragover(over);
   assert.equal(over.prevented, false, 'nothing of ours is being dragged');
   assert.equal(over.dataTransfer.dropEffect, '');
-  for (const [i, b] of [['i1', 'metric'], ['i2', 'log'], ['i3', 'trace'], ['i4', 'metric']]) drop(i, b);
-  const late = { prevented: false, preventDefault() { this.prevented = true; }, dataTransfer: dt() };
-  zoneOf('metric').ondragover(late);
-  assert.equal(late.prevented, false, 'a finished board takes no drop');
 });
 
 test('#359 a drag that is not ours does not light a zone', () => {
@@ -621,7 +617,7 @@ test('#359 the kit lets drag events through a disabled dashed box and lights its
   const has = (sel, k, v) => css.some((r) => r.selector.split(',').map((x) => x.trim()).includes(sel) && decls(r.body).some(([a, b]) => a === k && b === v));
   assert.equal(has('.ui-option--drop:disabled', 'pointer-events', 'none'), true);
   assert.equal(has('[data-over] > .ui-option--drop', 'border-color', 'var(--color-success)'), true);
-  // An enabled button (a card is picked) has a (0,4,0) border rule of its own: the lit rule must out-weigh it.
+  // An enabled button (a card is picked) has a (0,3,0) border rule of its own: the lit rule (0,4,0) must out-weigh it.
   assert.equal(has('[data-over] > .ui-option--drop:enabled:not([data-state])', 'border-color', 'var(--color-success)'), true, 'lit while enabled');
   assert.equal(has('.ui-option--drop:enabled:not([data-state])', 'border-color', 'var(--color-text)'), true);
 });

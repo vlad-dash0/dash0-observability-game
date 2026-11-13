@@ -350,6 +350,18 @@ test('#359 a dragend resets every target count: a missed dragleave does not leav
   t2.ondragenter({});
   t2.ondragleave({});
   assert.equal(t2.hasAttribute('data-over'), false, 'one enter and one leave end it');
+  // The root zone is wired once, outside the board's redraws: dragend resets it too.
+  const dtr = { preventDefault() {}, dataTransfer: { setData() {} } };
+  q(`[data-span="${B}"]`).ondragstart(dtr);
+  const root = q('[data-drop="root"]');
+  root.ondragenter({});
+  root.ondragenter({});
+  q(`[data-span="${B}"]`).ondragend({});
+  assert.equal(root.hasAttribute('data-over'), false);
+  q(`[data-span="${B}"]`).ondragstart(dtr);
+  root.ondragenter({});
+  root.ondragleave({});
+  assert.equal(root.hasAttribute('data-over'), false, 'root: one enter and one leave end it');
 });
 
 test('#359 the root zone is lit by a drag and left dark when nothing moves', () => {
