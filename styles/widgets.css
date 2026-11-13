@@ -160,7 +160,7 @@
 }
 
 /* Sort it (lib/widgets/sort-it-view.mjs, #156, #261): no boxes. The category choices are kit options;
-   the placed items sit in plain groups (a heading with a tally, then the list) in a grid that shrinks
+   each category zone holds its choice button, then a heading with a tally and the placed items, in a grid that shrinks
    to one column. */
 .sort-instr { color: var(--color-text-muted); font-size: 13.5px; margin: 0 0 var(--space-2); }
 .sort-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: var(--space-3); margin-top: var(--space-4); }

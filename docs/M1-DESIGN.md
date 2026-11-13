@@ -106,8 +106,8 @@ row `Helps: Instant feedback on, Hints on|off` above the board). Items are toggl
 choice button (`data-bucket`, disabled until an item is selected and for a category already tried
 for it, outlined when hinted; the dashed box), then the heading "Label" with the tally "(N)" and the
 `[data-bucket-list]` of placed items; the zones sit in a grid under the plain line "Then choose where it goes, or drag it there." (a drop anywhere on a zone sorts the item, and the zone lights while a drag is over it, #359); a kit stats line reads "Sorted N of M";
-`#ID-feedback` is the kit feedback region; the plain-text instruction ("Pick one to sort.", and over the
-category buttons "Then choose where it goes, or drag it there.") is `<p class="sort-instr" id="ID-instr">`.
+`#ID-feedback` is the kit feedback region; the plain-text instructions are `<p class="sort-instr" id="ID-instr">`
+("Pick one to sort.") and, over the category zones, `#ID-choose` ("Then choose where it goes, or drag it there.").
 `labelledBy`, a plain-token heading id, makes the widget a labelled group.
 `mountSort(ctx, spec, {onComplete, swirl?})`: the pool order is shuffled once per mount through
 `ctx.shuffle`; tap-to-place (item then category button; keyboard-native); drag is an enhancement calling

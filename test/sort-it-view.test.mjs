@@ -177,7 +177,7 @@ test('S2 sortView: with no selection, or once done, no bucket is enabled', () =>
 
 // ---- S3 kit markup ------------------------------------------------------------------------
 
-test('S3 renderSort: kit markup in one split; the side column with a hidden success card and zeroed score; toggle items; categories as choice buttons and plain groups; no retired class', () => {
+test('S3 renderSort: kit markup in one split; the side column with a hidden success card and zeroed score; toggle items; categories as zones (choice button, then heading and list); no retired class', () => {
   const { mount } = setup();
   assert.equal(qa('.ui-split').length, 1, 'one board-and-side split');
   assert.equal(qa('.ui-split-side [id="signals-win"]').length, 1, 'the success card is in the side column');
