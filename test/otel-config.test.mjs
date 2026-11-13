@@ -2,7 +2,7 @@
 // Spec: the header of lib/otel/config.mjs; the validators are in lib/dash0/ingress.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { serverTelemetryConfig } from '../lib/otel/config.mjs';
+import { gameEventsEnabled, serverTelemetryConfig } from '../lib/otel/config.mjs';
 import { ENV_ON } from './helpers/otel.mjs';
 
 const E = 'DASH0_OTLP_ENDPOINT';
@@ -48,4 +48,16 @@ test('localhost is accepted only off Vercel', () => {
   const local = { ...ENV_ON, [E]: 'http://localhost:4318' };
   assert.equal(serverTelemetryConfig(local).tracesUrl, 'http://localhost:4318/v1/traces');
   assert.deepEqual(serverTelemetryConfig({ ...local, VERCEL: '1' }), { state: 'invalid', field: 'endpoint', reason: 'not-https' });
+});
+
+test('gameEventsEnabled needs the telemetry on and the kill switch unset or on', () => {
+  const sw = (value) => ({ ...ENV_ON, DASH0_GAME_EVENTS: value });
+  assert.equal(gameEventsEnabled({}), false);
+  assert.equal(gameEventsEnabled({ ...ENV_ON, [T]: 'bad token' }), false, 'invalid is off');
+  assert.equal(gameEventsEnabled(ENV_ON), true);
+  assert.equal(gameEventsEnabled(sw('on')), true);
+  assert.equal(gameEventsEnabled(sw('off')), false);
+  assert.equal(gameEventsEnabled(sw('x')), false);
+  assert.equal(gameEventsEnabled(sw('')), false);
+  assert.equal(gameEventsEnabled({ DASH0_GAME_EVENTS: 'on' }), false, 'the switch alone turns nothing on');
 });
