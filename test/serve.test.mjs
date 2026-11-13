@@ -355,6 +355,23 @@ test('TELEMETRY_STUB prints one line per span, with no network', async () => {
   }
 });
 
+test('TELEMETRY_STUB: a play-events POST prints its spans and sends nothing', async () => {
+  const lines = [];
+  const saved = globalThis.fetch;
+  globalThis.fetch = () => { throw new Error('no network in TELEMETRY_STUB'); };
+  const stub = await listen({ telemetryStub: true, log: (l) => lines.push(l) });
+  try {
+    const payload = JSON.stringify({ v: 1, sid: '0123456789abcdef', events: [{ t: 'error', kind: 'TypeError', agoMs: 5 }] });
+    const res = await send(stub.port, 'POST', '/api/events', { body: payload, headers: { 'content-type': 'text/plain;charset=UTF-8' } });
+    assert.equal(res.status, 204, res.body);
+    assert.equal(lines.filter((l) => l.startsWith('span client.error')).length, 1, lines.join('\n'));
+    assert.equal(lines.filter((l) => l.startsWith('span POST /api/events')).length, 1, 'and the function span');
+  } finally {
+    globalThis.fetch = saved;
+    stub.server.close();
+  }
+});
+
 test('AUTH_STUB handlers are instrumented too', async () => {
   const lines = [];
   const stub = await listen({ authStub: true, telemetryStub: true, log: (l) => lines.push(l) });

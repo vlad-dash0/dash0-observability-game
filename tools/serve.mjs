@@ -197,6 +197,10 @@ export function startServer({ root = REPO, port = 3000, host = '127.0.0.1', log 
         if (env !== null && Object.hasOwn(AUTH_FACTORIES, name)) {
           return instrumented(name, (t) => mod[AUTH_FACTORIES[name]]({ env, log: t.log, ...tracedFetch(name, t) }));
         }
+        // The play events go to the console under TELEMETRY_STUB: the fake env turns them on, `send` replaces the network.
+        if (telemetryStub && name === 'events') {
+          return instrumented(name, (t) => mod.createEvents({ env: STUB_TELEMETRY_ENV, send: consoleExporter(log), log: t.log }));
+        }
         // Under TELEMETRY_STUB the module's own wiring (real env, real exporter) is replaced by a console one.
         if (telemetryStub && (name === 'guide' || Object.hasOwn(AUTH_FACTORIES, name))) {
           const factory = name === 'guide' ? 'createGuide' : AUTH_FACTORIES[name];

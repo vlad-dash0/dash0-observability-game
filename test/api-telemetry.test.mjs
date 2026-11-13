@@ -42,6 +42,7 @@ const CASES = [
   ['auth-start', 302, 'unconfigured'],
   ['auth-callback', 302, 'unconfigured'],
   ['guide', 200, undefined], // GET does not log
+  ['events', 200, undefined], // GET does not log
 ];
 
 test('every api function exports through the wrapper', async (t) => {
@@ -83,6 +84,24 @@ test("the guide's model call is a CLIENT span", async (t) => {
   assert.equal(client.parentSpanId, server.spanId);
   assert.equal(server.attrs['game.level.id'], 'resources');
   assert.equal(server.attrs['game.step.id'], 'res-pod');
+});
+
+test('a play-events POST exports its own spans, and the function span is a second, separate export', async (t) => {
+  const rec = rig(t);
+  const { POST } = await load('events');
+  const res = await POST(new Request('https://game.test/api/events', {
+    method: 'POST',
+    headers: { 'content-type': 'text/plain;charset=UTF-8', 'x-forwarded-for': '203.0.113.9' },
+    body: JSON.stringify({ v: 1, sid: '0123456789abcdef', events: [{ t: 'play', level: 'resources', outcome: 'abandon', durationMs: 4000, agoMs: 20 }] }),
+  }));
+  assert.equal(res.status, 204);
+  assert.equal(rec.calls.length, 2, 'the events export and the function span');
+  const web = rec.calls.find((c) => c.body.resourceSpans[0].resource.attributes.some((a) => a.value.stringValue === 'oncall-game-web'));
+  const api = rec.calls.find((c) => c !== web);
+  assert.deepEqual(spansOf(web.body).map((s) => s.name), ['level.play']);
+  assert.equal(spansOf(web.body)[0].attrs['game.level.id'], 'resources');
+  assert.deepEqual(spansOf(api.body).map((s) => s.name), ['POST /api/events'], 'no CLIENT span for the events export');
+  assert.equal(spansOf(api.body)[0].attrs['game.api.outcome'], 'accepted');
 });
 
 test('dormant without env: no ingress call from any function', async (t) => {

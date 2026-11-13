@@ -20,6 +20,7 @@ Next is the platform milestone (OUTLINE §8). Foundation design:
 - [docs/FOUNDATION.md](docs/FOUNDATION.md): M0 design (contracts, invariants, test spec)
 - [docs/M1-DESIGN.md](docs/M1-DESIGN.md): M1 design (Act 0 and Act 2 content, widgets)
 - [docs/DECLARATIVE-LEVELS.md](docs/DECLARATIVE-LEVELS.md): M2 declarative level format (#71)
+- [docs/GAME-EVENTS.md](docs/GAME-EVENTS.md): play events from the browser to the owner's Dash0 (wire contract, owner steps)
 - [docs/LIVE-DEMO.md](docs/LIVE-DEMO.md): Act 9 Live Demo foundation (privacy, template, sign-off gates)
 - [docs/prototypes/README.md](docs/prototypes/README.md): approved UI prototypes (reference specs for builders)
 
@@ -43,7 +44,8 @@ what the endpoint can spend (the in-memory rate limit is per instance and a requ
 served). Locally `GUIDE_STUB=1 npm run dev` answers with a canned reply and needs no key. The rate limit is best
 effort (per instance, in memory), not a quota.
 
-Server telemetry (docs/FOUNDATION.md §2.10) sends one trace per `api/` request to your Dash0 when the endpoint and the
+Server telemetry (docs/FOUNDATION.md §2.10) sends one trace per `api/` request
+(and, once the page sends them, anonymous play events, docs/GAME-EVENTS.md) to your Dash0 when the endpoint and the
 token are set in the Vercel project's environment (the dataset is optional; none set means off; a partial or malformed
 set is reported in the function log and changes nothing for players). `TELEMETRY_STUB=1 npm run dev` prints one line per
 span instead, with no network.

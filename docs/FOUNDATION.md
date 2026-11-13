@@ -502,7 +502,8 @@ Firefox, not Safari.
 ### 2.10 Server telemetry (#18)
 
 The `api/` functions send one trace per request to the owner's Dash0 when configured, and do nothing otherwise.
-Code: `lib/otel/` (`config.mjs`, `traceparent.mjs`, `attributes.mjs`, `server.mjs`) over the lab's `lib/otlp/encode.mjs`
+Play events from the browser (`api/events.mjs`, resource `oncall-game-web`, one trace per event): docs/GAME-EVENTS.md.
+Code: `lib/otel/` (`config.mjs`, `traceparent.mjs`, `attributes.mjs`, `export.mjs`, `server.mjs`) over the lab's `lib/otlp/encode.mjs`
 and `lib/otlp/send.mjs`; no package, no install step. Each `api/<name>.mjs` ends with the same three lines
 (`createServerTelemetry({name, env: process.env})`, the factory over `log: telemetry.log` (the guide and the sign-in
 callback also `fetch: telemetry.trace(globalThis.fetch)`), `export const {...} = telemetry.instrument(...)`).
