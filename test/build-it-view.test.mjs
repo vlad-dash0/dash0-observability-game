@@ -307,6 +307,46 @@ test('drop onto the root zone makes the span a root; the zone accepts only while
   assert.equal(label(E).endsWith('root, right'), true);
 });
 
+test('#359 a drag over a target sets dropEffect copy and lights data-over; child enter and leave do not flicker it; leave, drop and dragend clear it', () => {
+  const { mount } = setup(withHelps(ALL));
+  mount();
+  const row = q(`[data-span="${B}"]`);
+  const dataTransfer = { setData() {}, effectAllowed: '', dropEffect: '' };
+  row.ondragstart({ preventDefault() {}, dataTransfer });
+  assert.equal(dataTransfer.effectAllowed, 'copyMove', 'a copy drop is allowed');
+  const t = q(`[data-drop="${A}"]`);
+  t.ondragover({ preventDefault() {}, dataTransfer });
+  assert.equal(dataTransfer.dropEffect, 'copy');
+  assert.equal(t.hasAttribute('data-over'), false);
+  t.ondragenter({});
+  assert.equal(t.hasAttribute('data-over'), true, 'set on dragenter');
+  t.ondragenter({}); // a child
+  t.ondragleave({}); // the zone itself
+  assert.equal(t.hasAttribute('data-over'), true, 'held while the pointer is on a child');
+  t.ondragleave({});
+  assert.equal(t.hasAttribute('data-over'), false, 'cleared when it leaves');
+  t.ondragenter({});
+  row.ondragend({});
+  assert.equal(qa('[data-over]').length, 0, 'cleared on dragend');
+  q(`[data-span="${B}"]`).ondragstart({ preventDefault() {}, dataTransfer });
+  const t2 = q(`[data-drop="${A}"]`);
+  t2.ondragenter({});
+  t2.ondrop({ preventDefault() {} });
+  assert.equal(qa('[data-over]').length, 0, 'cleared on drop');
+});
+
+test('#359 the root zone is lit by a drag and left dark when nothing moves', () => {
+  const { mount } = setup(withHelps(ALL));
+  mount();
+  const root = q('[data-drop="root"]');
+  root.ondragenter({});
+  assert.equal(root.hasAttribute('data-over'), false, 'nothing is moving');
+  q(`[data-span="${B}"]`).ondragstart({ preventDefault() {}, dataTransfer: { setData() {} } });
+  const r2 = q('[data-drop="root"]');
+  r2.ondragenter({});
+  assert.equal(r2.hasAttribute('data-over'), true);
+});
+
 // ---- pick path -------------------------------------------------------------------------
 
 test('pick path: picking a span offers root and every placed span, itself and its descendants disabled; it takes the same path', () => {
