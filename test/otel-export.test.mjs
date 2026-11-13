@@ -1,4 +1,4 @@
-// lib/otel/export.mjs: the budgeted export shared by server.mjs and api/events.mjs.
+// lib/otel/export.mjs: the time-limited export shared by server.mjs and api/events.mjs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { exportWithinBudget, FLUSH_BUDGET_MS } from '../lib/otel/export.mjs';

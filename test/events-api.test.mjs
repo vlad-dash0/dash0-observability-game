@@ -55,7 +55,7 @@ const spied = (req) => {
 };
 const attrKeys = (span) => Object.keys(span.attrs).sort();
 
-test('1 off (no env, or a bad token): GET says off, POST is a 204 that reads nothing and sends nothing', async () => {
+test('1 off (no env, or a bad token): GET says off, POST is a 204 that reads nothing and sends no play event', async () => {
   for (const env of [{}, { ...ENV_ON, DASH0_AUTH_TOKEN: 'bad token' }]) {
     const { events, logs, sent } = setup({ env });
     assert.deepEqual(await (await events.GET(get())).json(), { v: 1, on: false });
