@@ -310,7 +310,7 @@
 .ui-option--drop:enabled:not([data-state]) { border-color: var(--color-text); }
 .ui-option--drop:disabled:not([data-state]) { color: var(--color-text-muted); background: transparent; }
 .ui-option--drop:disabled { pointer-events: none; } /* a disabled button swallows drag events: let them reach the drop zone around it */
-[data-over] > .ui-option--drop { border-color: var(--color-success); } /* a drag is over the zone: the dashed box lights up */
+[data-over] > .ui-option--drop, [data-over] > .ui-option--drop:enabled:not([data-state]) { border-color: var(--color-success); } /* a drag is over the zone: the dashed box lights up */
 
 /* ---------- Feedback (feedback.mjs) ---------- */
 /* One live region, three tones: the icon and its alt text say the tone, the border echoes it. */

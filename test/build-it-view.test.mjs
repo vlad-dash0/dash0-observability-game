@@ -335,6 +335,23 @@ test('#359 a drag over a target sets dropEffect copy and lights data-over; child
   assert.equal(qa('[data-over]').length, 0, 'cleared on drop');
 });
 
+test('#359 a dragend resets every target count: a missed dragleave does not leave the next drag lit', () => {
+  const { mount } = setup(withHelps(ALL));
+  mount();
+  const row = q(`[data-span="${B}"]`);
+  row.ondragstart({ preventDefault() {}, dataTransfer: { setData() {} } });
+  const t = q(`[data-drop="${A}"]`);
+  t.ondragenter({});
+  t.ondragenter({}); // a child; its leave never arrives
+  q(`[data-span="${B}"]`).ondragend({});
+  assert.equal(qa('[data-over]').length, 0);
+  q(`[data-span="${B}"]`).ondragstart({ preventDefault() {}, dataTransfer: { setData() {} } });
+  const t2 = q(`[data-drop="${A}"]`);
+  t2.ondragenter({});
+  t2.ondragleave({});
+  assert.equal(t2.hasAttribute('data-over'), false, 'one enter and one leave end it');
+});
+
 test('#359 the root zone is lit by a drag and left dark when nothing moves', () => {
   const { mount } = setup(withHelps(ALL));
   mount();

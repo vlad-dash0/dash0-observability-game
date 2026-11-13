@@ -165,6 +165,7 @@
 .sort-instr { color: var(--color-text-muted); font-size: 13.5px; margin: 0 0 var(--space-2); }
 .sort-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
 .sort-group { min-width: 0; }
+.sort-group { padding-inline: var(--space-2); } /* always, so the lit tint (below) moves nothing */
 .sort-group[data-over] { background: color-mix(in srgb, var(--color-success) 8%, transparent); border-radius: var(--radius-sm); }
 .sort-group-title { margin: 0; font-weight: 600; display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
 .sort-group-name { min-width: 0; overflow-wrap: anywhere; }
