@@ -21,7 +21,7 @@
 .wf-attrs { list-style: none; font-family: var(--font-mono); font-size: 13px; overflow-wrap: anywhere; }
 .wf-root {
   display: flex; align-items: center; justify-content: center; gap: 10px;
-  border: 1px dashed var(--color-border); border-radius: var(--radius-sm); padding: 10px 12px;
+  border: 1px dashed var(--color-border); border-radius: var(--radius-sm); padding: 14px 12px;
   color: var(--color-text-muted); font: 600 12px var(--font-mono); letter-spacing: .03em;
 }
 .wf-root svg path { fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
@@ -160,11 +160,13 @@
 }
 
 /* Sort it (lib/widgets/sort-it-view.mjs, #156, #261): no boxes. The category choices are kit options;
-   the placed items sit in plain groups (a heading with a tally, then the list) in a grid that shrinks
+   each category zone holds its choice button, then a heading with a tally and the placed items, in a grid that shrinks
    to one column. */
 .sort-instr { color: var(--color-text-muted); font-size: 13.5px; margin: 0 0 var(--space-2); }
 .sort-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
 .sort-group { min-width: 0; }
+.sort-group { padding-inline: var(--space-2); } /* always, so the lit tint (below) moves nothing */
+.sort-group[data-over] { background: color-mix(in srgb, var(--color-success) 8%, transparent); border-radius: var(--radius-sm); }
 .sort-group-title { margin: 0; font-weight: 600; display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
 .sort-group-name { min-width: 0; overflow-wrap: anywhere; }
 .sort-tally { flex: none; white-space: nowrap; color: var(--color-text-muted); font-weight: 400; } /* the count never drops to a line of its own */

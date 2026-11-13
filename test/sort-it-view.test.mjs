@@ -177,7 +177,7 @@ test('S2 sortView: with no selection, or once done, no bucket is enabled', () =>
 
 // ---- S3 kit markup ------------------------------------------------------------------------
 
-test('S3 renderSort: kit markup in one split; the side column with a hidden success card and zeroed score; toggle items; categories as choice buttons and plain groups; no retired class', () => {
+test('S3 renderSort: kit markup in one split; the side column with a hidden success card and zeroed score; toggle items; categories as zones (choice button, then heading and list); no retired class', () => {
   const { mount } = setup();
   assert.equal(qa('.ui-split').length, 1, 'one board-and-side split');
   assert.equal(qa('.ui-split-side [id="signals-win"]').length, 1, 'the success card is in the side column');
@@ -201,9 +201,9 @@ test('S3 renderSort: kit markup in one split; the side column with a hidden succ
   setup();
   assert.deepEqual(qa('[data-bucket]').map((b) => b.dataset.bucket), ['metric', 'log', 'trace']);
   assert.deepEqual(qa('[data-bucket]').map((b) => b.textContent.trim()), ['Metric', 'Log', 'Trace']);
-  // #261: no boxes. The choice buttons are a plain row; each category is a plain group with a tally heading.
+  // #261: no boxes. Each category is one zone holding its choice button, the heading with the tally and the placed items.
   for (const b of qa('[data-bucket]')) {
-    assert.equal(b.closest('[data-drop]') === null, true, `${b.dataset.bucket} is a choice button, not inside a drop zone`);
+    assert.equal(b.closest('[data-drop]')?.dataset.drop, b.dataset.bucket, `${b.dataset.bucket} is a choice button inside its own drop zone (#359)`);
     assert.equal(b.classList.contains('ui-option--choice'), true, `${b.dataset.bucket} is a kit choice option`);
   }
   assert.equal(qa('.ui-panel--drop, .sort-buckets').length, 0, 'no drop panel and no bucket grid');
@@ -491,28 +491,135 @@ test('the drop path is the click path: a wrong drop costs a mistake, a right dro
   assert.equal(feedback(), 'Pick one to sort first.', 'the finished drag was cleared');
 });
 
-test('dropping an item on an enabled category button takes the click path; a disabled one is not a drop target', () => {
+const dt = () => {
+  const data = {};
+  return { setData: (k, v) => { data[k] = String(v); }, getData: (k) => data[k] ?? '', dropEffect: '' };
+};
+const zoneOf = (bucket) => q(`[data-drop="${bucket}"]`);
+const overOf = (bucket) => zoneOf(bucket).hasAttribute('data-over');
+
+test('#359 the drop zone is the dashed box plus its heading and list; the button has no drag handlers, so a drop on it reaches the zone', () => {
   const { counts, mount } = setup();
   mount();
-  const data = {};
-  const dataTransfer = { setData: (k, v) => { data[k] = String(v); }, getData: (k) => data[k] ?? '' };
-  const dropOnButton = (item, bucket) => {
+  for (const b of qa('[data-bucket]')) {
+    const zone = b.closest('[data-drop]');
+    assert.equal(zone.querySelector('.sort-group-title') !== null && zone.querySelector('[data-bucket-list]') !== null, true, 'the zone holds the heading and the list');
+    assert.equal(b.ondrop ?? null, null, 'the button is no drop target of its own');
+  }
+  // No card picked: every dashed box is disabled, and a drag over it (bubbling to its zone) still sorts.
+  assert.equal(enabledBuckets().length, 0);
+  const dataTransfer = dt();
+  q('[data-item="i2"]').ondragstart({ dataTransfer });
+  zoneOf('log').ondragover({ preventDefault() {}, dataTransfer });
+  zoneOf('log').ondrop({ preventDefault() {}, dataTransfer });
+  assert.equal(placed('log'), 'Stack trace text');
+  assert.equal(counts.mistakes, 0);
+});
+
+test('#359 a drop on the heading, the placed list or the disabled button sorts the item, and a wrong zone costs a mistake', () => {
+  const { counts, mount } = setup();
+  mount();
+  // Real bubbling events started on the child, so moving a child out of the zone turns this red.
+  const fire = (type, el, dataTransfer) => {
+    const Ev = el.ownerDocument.defaultView.Event;
+    const ev = new Ev(type, { bubbles: true, cancelable: true });
+    ev.dataTransfer = dataTransfer;
+    el.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  };
+  const dropOn = (item, el) => {
+    const dataTransfer = dt();
     q(`[data-item="${item}"]`).ondragstart({ dataTransfer });
-    const btn = q(`[data-bucket="${bucket}"]`);
-    let allowed = false;
-    btn.ondragover({ preventDefault: () => { allowed = true; } });
-    btn.ondrop({ preventDefault() {} });
+    const allowed = fire('dragover', el, dataTransfer);
+    fire('drop', el, dataTransfer);
     return allowed;
   };
-  click('[data-item="i2"]');
-  assert.equal(dropOnButton('i2', 'metric'), true, 'dragover allows the drop');
-  assert.equal(counts.mistakes, 1, 'a wrong drop costs a mistake');
-  assert.equal(q('[data-bucket="metric"]').disabled, true);
-  assert.equal(q('[data-bucket="metric"]').ondrop, null, 'a tried category is no drop target');
-  click('[data-item="i2"]');
-  dropOnButton('i2', 'log');
-  assert.equal(placed('log'), 'Stack trace text');
+  assert.equal(dropOn('i2', zoneOf('metric').querySelector('.sort-group-title')), true, 'dragover on the heading allows the drop');
+  assert.equal(counts.mistakes, 1, 'a wrong zone costs a mistake');
+  assert.equal(placed('log'), '');
+  assert.equal(dropOn('i2', zoneOf('log').querySelector('[data-bucket-list]')), true);
+  assert.equal(placed('log'), 'Stack trace text', 'a drop on the list sorts it');
   assert.equal(counts.mistakes, 1);
+  assert.equal(enabledBuckets().length, 0, 'nothing is picked, so every button is disabled');
+  assert.equal(dropOn('i1', q('[data-bucket="metric"]')), true, 'dragover on the disabled button reaches the zone');
+  assert.equal(placed('metric'), 'Request rate', 'a drop on the disabled button sorts it');
+  assert.equal(counts.mistakes, 1);
+});
+
+test('#359 dragover sets dropEffect copy, so the green + cursor stays', () => {
+  const { mount } = setup();
+  mount();
+  const dataTransfer = dt();
+  q('[data-item="i1"]').ondragstart({ dataTransfer });
+  zoneOf('metric').ondragover({ preventDefault() {}, dataTransfer });
+  assert.equal(dataTransfer.dropEffect, 'copy');
+});
+
+test('#359 data-over lights the zone while a drag is over it, holds through child enter and leave, clears on leave, drop and dragend', () => {
+  const { mount } = setup();
+  mount();
+  const dataTransfer = dt();
+  const item = q('[data-item="i1"]');
+  item.ondragstart({ dataTransfer });
+  const z = zoneOf('metric');
+  assert.equal(overOf('metric'), false);
+  z.ondragenter({ dataTransfer }); // the zone
+  assert.equal(overOf('metric'), true, 'set on dragenter');
+  z.ondragenter({ dataTransfer }); // a child (the dashed box): enter fires before the zone's leave
+  z.ondragleave({ dataTransfer }); // leaving the zone element itself
+  assert.equal(overOf('metric'), true, 'still over: the pointer moved onto a child');
+  z.ondragleave({ dataTransfer });
+  assert.equal(overOf('metric'), false, 'cleared when the pointer leaves the zone');
+  z.ondragenter({ dataTransfer });
+  assert.equal(overOf('metric'), true);
+  item.ondragend({});
+  assert.equal(overOf('metric'), false, 'cleared on dragend');
+  q('[data-item="i1"]').ondragstart({ dataTransfer });
+  zoneOf('metric').ondragenter({ dataTransfer });
+  zoneOf('metric').ondrop({ preventDefault() {}, dataTransfer });
+  assert.equal(qa('[data-over]').length, 0, 'cleared on drop');
+});
+
+test('#359 a dragend resets the zone counts: a missed dragleave does not leave the next drag lit', () => {
+  const { mount } = setup();
+  mount();
+  const dataTransfer = dt();
+  const item = q('[data-item="i1"]');
+  item.ondragstart({ dataTransfer });
+  zoneOf('metric').ondragenter({ dataTransfer });
+  zoneOf('metric').ondragenter({ dataTransfer }); // a child; its leave never arrives
+  item.ondragend({});
+  assert.equal(overOf('metric'), false);
+  q('[data-item="i1"]').ondragstart({ dataTransfer });
+  zoneOf('metric').ondragenter({ dataTransfer });
+  zoneOf('metric').ondragleave({ dataTransfer });
+  assert.equal(overOf('metric'), false, 'one enter and one leave end it');
+});
+
+test('#359 a foreign drag is not allowed to drop', () => {
+  const { mount } = setup();
+  mount();
+  const over = { prevented: false, preventDefault() { this.prevented = true; }, dataTransfer: dt() };
+  zoneOf('metric').ondragover(over);
+  assert.equal(over.prevented, false, 'nothing of ours is being dragged');
+  assert.equal(over.dataTransfer.dropEffect, '');
+});
+
+test('#359 a drag that is not ours does not light a zone', () => {
+  const { mount } = setup();
+  mount();
+  zoneOf('metric').ondragenter({ dataTransfer: dt() });
+  assert.equal(overOf('metric'), false);
+});
+
+test('#359 the kit lets drag events through a disabled dashed box and lights its border from the zone', () => {
+  const css = rules(read('styles/kit.css'));
+  const has = (sel, k, v) => css.some((r) => r.selector.split(',').map((x) => x.trim()).includes(sel) && decls(r.body).some(([a, b]) => a === k && b === v));
+  assert.equal(has('.ui-option--drop:disabled', 'pointer-events', 'none'), true);
+  assert.equal(has('[data-over] > .ui-option--drop', 'border-color', 'var(--color-success)'), true);
+  // An enabled button (a card is picked) has a (0,3,0) border rule of its own: the lit rule (0,4,0) must out-weigh it.
+  assert.equal(has('[data-over] > .ui-option--drop:enabled:not([data-state])', 'border-color', 'var(--color-success)'), true, 'lit while enabled');
+  assert.equal(has('.ui-option--drop:enabled:not([data-state])', 'border-color', 'var(--color-text)'), true);
 });
 
 test('a bucket with nothing selected costs nothing, is neutral and asks to pick one first', () => {

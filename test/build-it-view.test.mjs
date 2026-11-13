@@ -307,6 +307,75 @@ test('drop onto the root zone makes the span a root; the zone accepts only while
   assert.equal(label(E).endsWith('root, right'), true);
 });
 
+test('#359 a drag over a target sets dropEffect copy and lights data-over; child enter and leave do not flicker it; leave, drop and dragend clear it', () => {
+  const { mount } = setup(withHelps(ALL));
+  mount();
+  const row = q(`[data-span="${B}"]`);
+  const dataTransfer = { setData() {}, effectAllowed: '', dropEffect: '' };
+  row.ondragstart({ preventDefault() {}, dataTransfer });
+  assert.equal(dataTransfer.effectAllowed, 'copyMove', 'a copy drop is allowed');
+  const t = q(`[data-drop="${A}"]`);
+  t.ondragover({ preventDefault() {}, dataTransfer });
+  assert.equal(dataTransfer.dropEffect, 'copy');
+  assert.equal(t.hasAttribute('data-over'), false);
+  t.ondragenter({});
+  assert.equal(t.hasAttribute('data-over'), true, 'set on dragenter');
+  t.ondragenter({}); // a child
+  t.ondragleave({}); // the zone itself
+  assert.equal(t.hasAttribute('data-over'), true, 'held while the pointer is on a child');
+  t.ondragleave({});
+  assert.equal(t.hasAttribute('data-over'), false, 'cleared when it leaves');
+  t.ondragenter({});
+  row.ondragend({});
+  assert.equal(qa('[data-over]').length, 0, 'cleared on dragend');
+  q(`[data-span="${B}"]`).ondragstart({ preventDefault() {}, dataTransfer });
+  const t2 = q(`[data-drop="${A}"]`);
+  t2.ondragenter({});
+  t2.ondrop({ preventDefault() {} });
+  assert.equal(qa('[data-over]').length, 0, 'cleared on drop');
+});
+
+test('#359 a dragend resets every target count: a missed dragleave does not leave the next drag lit', () => {
+  const { mount } = setup(withHelps(ALL));
+  mount();
+  const row = q(`[data-span="${B}"]`);
+  row.ondragstart({ preventDefault() {}, dataTransfer: { setData() {} } });
+  const t = q(`[data-drop="${A}"]`);
+  t.ondragenter({});
+  t.ondragenter({}); // a child; its leave never arrives
+  q(`[data-span="${B}"]`).ondragend({});
+  assert.equal(qa('[data-over]').length, 0);
+  q(`[data-span="${B}"]`).ondragstart({ preventDefault() {}, dataTransfer: { setData() {} } });
+  const t2 = q(`[data-drop="${A}"]`);
+  t2.ondragenter({});
+  t2.ondragleave({});
+  assert.equal(t2.hasAttribute('data-over'), false, 'one enter and one leave end it');
+  // The root zone is wired once, outside the board's redraws: dragend resets it too.
+  const dtr = { preventDefault() {}, dataTransfer: { setData() {} } };
+  q(`[data-span="${B}"]`).ondragstart(dtr);
+  const root = q('[data-drop="root"]');
+  root.ondragenter({});
+  root.ondragenter({});
+  q(`[data-span="${B}"]`).ondragend({});
+  assert.equal(root.hasAttribute('data-over'), false);
+  q(`[data-span="${B}"]`).ondragstart(dtr);
+  root.ondragenter({});
+  root.ondragleave({});
+  assert.equal(root.hasAttribute('data-over'), false, 'root: one enter and one leave end it');
+});
+
+test('#359 the root zone is lit by a drag and left dark when nothing moves', () => {
+  const { mount } = setup(withHelps(ALL));
+  mount();
+  const root = q('[data-drop="root"]');
+  root.ondragenter({});
+  assert.equal(root.hasAttribute('data-over'), false, 'nothing is moving');
+  q(`[data-span="${B}"]`).ondragstart({ preventDefault() {}, dataTransfer: { setData() {} } });
+  const r2 = q('[data-drop="root"]');
+  r2.ondragenter({});
+  assert.equal(r2.hasAttribute('data-over'), true);
+});
+
 // ---- pick path -------------------------------------------------------------------------
 
 test('pick path: picking a span offers root and every placed span, itself and its descendants disabled; it takes the same path', () => {

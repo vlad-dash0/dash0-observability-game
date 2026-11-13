@@ -102,13 +102,12 @@ a wide step: a kit split with the board and the side column (score card with a w
 count, success card with its swirl, and the hint tools when the step's helps turn hints on; a chips
 row `Helps: Instant feedback on, Hints on|off` above the board). Items are toggle options (`data-item` +
 `aria-pressed`, no answer attribute) in a named group (`role="group" aria-label="Items to sort"`,
-`aria-describedby="ID-instr"`); there are no bucket boxes (#261): the categories are a row of kit
-choice options (`data-bucket`, disabled until an item is selected and for a category already tried
-for it, outlined when hinted) under a plain "Then choose its category." line, and below that one plain
-group per category (`[data-drop]`: a heading "Label" with the tally "(N)", and the
-`[data-bucket-list]` of placed items); a kit stats line reads "Sorted N of M";
-`#ID-feedback` is the kit feedback region; the plain-text instruction ("Pick one to sort.", and over the
-category buttons "Then choose where it goes, or drag it there.") is `<p class="sort-instr" id="ID-instr">`.
+`aria-describedby="ID-instr"`); there are no bucket boxes (#261): each category is one zone (`[data-drop]`) holding its kit
+choice button (`data-bucket`, disabled until an item is selected and for a category already tried
+for it, outlined when hinted; the dashed box), then the heading "Label" with the tally "(N)" and the
+`[data-bucket-list]` of placed items; the zones sit in a grid under the plain line "Then choose where it goes, or drag it there." (a drop anywhere on a zone sorts the item, and the zone lights while a drag is over it, #359); a kit stats line reads "Sorted N of M";
+`#ID-feedback` is the kit feedback region; the plain-text instructions are `<p class="sort-instr" id="ID-instr">`
+("Pick one to sort.") and, over the category zones, `#ID-choose` ("Then choose where it goes, or drag it there.").
 `labelledBy`, a plain-token heading id, makes the widget a labelled group.
 `mountSort(ctx, spec, {onComplete, swirl?})`: the pool order is shuffled once per mount through
 `ctx.shuffle`; tap-to-place (item then category button; keyboard-native); drag is an enhancement calling

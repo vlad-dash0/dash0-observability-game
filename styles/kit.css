@@ -306,9 +306,11 @@
 .ui-option--toggle:disabled, .ui-option--choice:disabled:not([data-state], .ui-option--drop) { opacity: var(--opacity-disabled); cursor: not-allowed; }
 /* A drop target (dashed means a drop zone): centred, and legible while inactive. Inactive is muted text on
    a transparent card, not a fade; active is full-strength text with a full-strength dashed border. */
-.ui-option--drop { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; padding: var(--space-3); border-style: dashed; border-width: 2px; border-color: var(--color-text-muted); }
+.ui-option--drop { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; padding: var(--space-4) var(--space-3); border-style: dashed; border-width: 2px; border-color: var(--color-text-muted); }
 .ui-option--drop:enabled:not([data-state]) { border-color: var(--color-text); }
 .ui-option--drop:disabled:not([data-state]) { color: var(--color-text-muted); background: transparent; }
+.ui-option--drop:disabled { pointer-events: none; } /* a disabled button swallows drag events: let them reach the drop zone around it */
+[data-over] > .ui-option--drop, [data-over] > .ui-option--drop:enabled:not([data-state]) { border-color: var(--color-success); } /* a drag is over the zone: the dashed box lights up */
 
 /* ---------- Feedback (feedback.mjs) ---------- */
 /* One live region, three tones: the icon and its alt text say the tone, the border echoes it. */
