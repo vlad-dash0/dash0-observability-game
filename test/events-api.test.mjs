@@ -44,6 +44,15 @@ function setup({ env = ENV_ON, answer = { kind: 'accepted' }, limiter, extra = {
 const post = (payload = body(), { headers = {}, method = 'POST' } = {}) =>
   new Request(URL_, { method, headers: { 'content-type': 'text/plain;charset=UTF-8', ...headers }, body: payload });
 const get = () => new Request(URL_);
+// The request with a counting `text()` and `clone()` (a clone is another way to read the body): `reads.n` counts both.
+const spied = (req) => {
+  const reads = { n: 0 };
+  const text = req.text.bind(req);
+  const clone = req.clone.bind(req);
+  req.text = async () => { reads.n += 1; return text(); };
+  req.clone = () => { reads.n += 1; return clone(); };
+  return { req, reads };
+};
 const attrKeys = (span) => Object.keys(span.attrs).sort();
 
 test('1 off (no env, or a bad token): GET says off, POST is a 204 that reads nothing and sends nothing', async () => {
@@ -79,10 +88,11 @@ test('3 GET says on, with no secret and never cached', async () => {
 });
 
 test('4 a valid batch is one export of three spans with the right times and attributes', async () => {
-  const { events, logs, sent } = setup();
+  const { events, logs, sent, tm } = setup();
   const res = await events.POST(post());
   assert.equal(res.status, 204);
   assert.equal(sent.length, 1);
+  assert.equal(tm.active(), 0, 'the export timer is cleared');
   assert.equal(resourceOf(sent[0])['service.name'], 'oncall-game-web');
   assert.ok(!('service.instance.id' in resourceOf(sent[0])));
   const [play, , err] = spansOf(sent[0]);
@@ -135,6 +145,13 @@ test('6 refusals send nothing and never echo the input', async () => {
   assert.deepEqual(await (await events.POST(post('{nope'))).json(), { error: 'bad-request', field: 'body' });
 });
 
+test('6a a declared length over the cap is refused before the body is read', async () => {
+  const { events } = setup();
+  const { req, reads } = spied(post(body(), { headers: { 'content-length': '9000' } }));
+  assert.equal((await events.POST(req)).status, 413);
+  assert.equal(reads.n, 0);
+});
+
 test('6b an Origin of null (a beacon under no-referrer) and the same host are allowed', async () => {
   for (const origin of ['null', 'https://game.test']) {
     const { events, sent } = setup();
@@ -157,8 +174,10 @@ test('8 the per-client limit answers 429 with retry-after before the export', as
   const as = (ip) => post(body(), { headers: { 'x-forwarded-for': ip } });
   assert.equal((await events.POST(as('203.0.113.1'))).status, 204);
   assert.equal((await events.POST(as('203.0.113.1'))).status, 204);
-  const limited = await events.POST(as('203.0.113.1'));
+  const third = spied(as('203.0.113.1'));
+  const limited = await events.POST(third.req);
   assert.equal(limited.status, 429);
+  assert.equal(third.reads.n, 0, 'a limited request is refused before its body is read');
   assert.equal(limited.headers.get('retry-after'), '600');
   assert.equal((await events.POST(as('203.0.113.2'))).status, 204);
   assert.equal(sent.length, 3);
@@ -191,5 +210,6 @@ test('10 nothing about the request reaches the export; a bad id is left out of a
   const wire = JSON.stringify(sent[0]);
   for (const canary of ['SECRETCOOKIE', 'AGENTCANARY', '198.51.100.7', 'REFERERCANARY', 'game.test']) assert.ok(!wire.includes(canary), canary);
   assert.ok(!('game.level.id' in gameSpan({ name: 'level.play', sid: SID, levelId: 'Bad Id!', outcome: 'abandon' }).attributes));
+  assert.ok(!('session.id' in gameSpan({ name: 'level.play', sid: 'ABC', outcome: 'abandon' }).attributes));
   assert.equal(gameSpan({ name: 'level.play', sid: SID, levelId: 'ok-id' }).attributes['game.level.id'], 'ok-id');
 });

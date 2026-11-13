@@ -1,8 +1,8 @@
 // Play events (#18 P1): a Vercel Node function (Web Request in, Response out, one named export per HTTP
 // method; docs/FOUNDATION.md §2.8). The page posts small anonymous batches (lib/play-events.mjs); this
 // function turns each event into a span and exports them to the owner's Dash0 with the owner's token,
-// which never reaches the browser. Dormant: unless the DASH0_* variables are valid (and DASH0_GAME_EVENTS
-// is not thrown) a POST is a 204 that reads nothing and sends nothing. Nothing about the player leaves
+// which never reaches the browser. Dormant: unless the DASH0_* variables are valid and DASH0_GAME_EVENTS
+// is unset or `on`, a POST is a 204 that reads nothing and sends no play event. Nothing about the player leaves
 // this file: no session id, level, address or cookie in a response or a log line.
 import { liveRegistry } from '../app.mjs';
 import { clientKey, reply } from '../lib/http.mjs';
@@ -79,7 +79,11 @@ export function createEvents({
     }
   }
 
-  /** An Origin, when sent, must name this host. `null` is allowed: Referrer-Policy no-referrer makes beacons send it. */
+  /**
+   * An Origin, when sent, must name this host. `null` is allowed: a text/plain beacon is a no-cors request
+   * (https://www.w3.org/TR/beacon/) and under Referrer-Policy no-referrer it sends `Origin: null`
+   * (https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Referrer-Policy).
+   */
   function originAllowed(request) {
     const origin = request.headers.get('origin');
     if (origin === null || origin === 'null') return true;
